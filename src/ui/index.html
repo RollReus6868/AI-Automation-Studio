@@ -1,0 +1,406 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' file: data: blob:; media-src 'self' file: blob:; style-src 'self' 'unsafe-inline'; font-src 'self'">
+  <title>AI Automation Studio</title>
+  <link rel="stylesheet" href="fonts.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="nen-sang"></div>
+<div class="app">
+  <!-- ── Thanh trái ─────────────────────────────────────────────── -->
+  <aside class="rail">
+    <img class="logo" src="../../icons/icon256.png" alt="" title="AI Automation Studio">
+    <nav id="nav">
+      <button data-trang="anh"><i data-icon="image"></i><span>Tạo ảnh</span></button>
+      <button data-trang="video"><i data-icon="video"></i><span>Tạo video</span></button>
+      <button data-trang="nhanvat"><i data-icon="user-plus"></i><span>Nhân vật</span></button>
+      <button data-trang="thuvien"><i data-icon="layout-grid"></i><span>Thư viện</span></button>
+      <button data-trang="taikhoan"><i data-icon="contact"></i><span>Tài khoản</span></button>
+      <button data-trang="huongdan"><i data-icon="book-open"></i><span>Hướng dẫn</span></button>
+      <button data-trang="caidat"><i data-icon="settings"></i><span>Cài đặt</span></button>
+    </nav>
+  </aside>
+
+  <div class="khung">
+    <!-- ── Thanh trên ─────────────────────────────────────────────── -->
+    <header class="topbar">
+      <div class="brand"><b class="chu-gradient">AI Studio</b><span class="gach">/</span><span id="tieuDeTrang">Tạo ảnh</span></div>
+      <div class="duan" id="khuDuAn">
+        <button class="chon-duan" id="nutDuAn"><span id="tenDuAn">Mặc định - 0</span><i data-icon="chevron-down"></i></button>
+        <div class="menu" id="menuDuAn" hidden></div>
+        <button class="chip nut-tk-duan" id="nutTkDuAn"><i data-icon="users"></i><span id="chuTkDuAn">—</span></button>
+        <button class="nut-icon" id="nutThemDuAn" title="Dự án mới"><i data-icon="plus"></i></button>
+        <button class="nut-icon" id="nutMoThuMucDuAn" title="Mở thư mục kết quả của dự án"><i data-icon="folder"></i></button>
+        <button class="nut-icon" id="nutMenuDuAn" title="Đổi tên / xoá dự án"><i data-icon="ellipsis-vertical"></i></button>
+        <div class="menu menu-phai" id="menuDuAnThem" hidden>
+          <button data-lenh="taiKhoan"><i data-icon="users"></i>Tài khoản chạy dự án…</button>
+          <button data-lenh="doiTen"><i data-icon="pencil"></i>Đổi tên dự án</button>
+          <button data-lenh="xoaXong"><i data-icon="circle-check"></i>Xoá các việc đã xong khỏi danh sách</button>
+          <button data-lenh="xoaDuAn" class="do"><i data-icon="trash-2"></i>Xoá dự án</button>
+        </div>
+      </div>
+      <div class="gian"></div>
+      <button class="chip chip-moi" id="chipCapNhat" hidden><i data-icon="sparkles"></i><span></span></button>
+      <span class="chip" id="chipChay"><span class="cham"></span><span>Đang nghỉ</span></span>
+      <span class="chip" id="chipHomNay"><i data-icon="crown"></i><span>Hôm nay 0 ảnh · 0 video</span></span>
+      <button class="nut-gradient" id="nutChayTatCa"><i data-icon="play"></i><span>Chạy tất cả</span></button>
+    </header>
+
+    <!-- ── Trang Tạo ảnh / Tạo video (dùng chung) ─────────────────── -->
+    <main class="trang ba-cot" id="trang-tao">
+      <section class="panel cot-tao">
+        <div class="panel-dau">
+          <h2><i data-icon="sparkles"></i><span id="tieuDeTao">Tạo ảnh</span></h2>
+          <button class="nut-vien nho" id="nutMauPrompt"><i data-icon="book-marked"></i>Mẫu prompt</button>
+          <div class="menu menu-phai menu-mau" id="menuMau" hidden></div>
+        </div>
+        <div class="cuon">
+          <label class="nhan">Chạy trên</label>
+          <div class="phan-doan" id="nenTao">
+            <button data-v="muse" class="on">Muse</button>
+            <button data-v="flow">Google Flow</button>
+          </div>
+          <small class="mo ghi-nen" id="ghiNen"></small>
+
+          <label class="nhan">Chế độ tạo</label>
+          <div class="phan-doan" id="cheDo">
+            <button data-v="tudo" class="on">Tự do</button>
+            <button data-v="nguoimau">Người mẫu</button>
+          </div>
+          <div id="khuNguoiMau" hidden>
+            <label class="nhan">Chọn nhân vật gắn vào mọi prompt</label>
+            <div class="chips-nv" id="chonNhanVat"></div>
+          </div>
+
+          <label class="nhan">Prompt</label>
+          <div class="o-prompt">
+            <textarea id="oPrompt" spellcheck="false" placeholder="Mô tả chi tiết ảnh bạn muốn tạo…&#10;Mỗi dòng là một prompt. Gõ tên nhân vật (vd: Lan) để tự gửi kèm ảnh nhân vật."></textarea>
+            <div class="dem" id="demPrompt">0 prompt · 0 ký tự</div>
+          </div>
+          <div class="duoi-prompt">
+            <button class="nut-vien nho" id="nutNhapPrompt"><i data-icon="file-text"></i>Nhập file .txt</button>
+            <button class="nut-vien nho" id="nutNhapNhieu" title="Chọn nhiều file .txt: mỗi file thành một dự án (tên theo tên file) và tự vào hàng đợi"><i data-icon="folder-open"></i>Nhập nhiều file .txt</button>
+            <span class="mo" id="ghiKhoang"></span>
+          </div>
+
+          <label class="nhan">Ảnh tham chiếu <small>(tùy chọn)</small></label>
+          <div class="tha-anh" id="thaAnh">
+            <i data-icon="image"></i>
+            <div>Kéo thả ảnh vào đây</div>
+            <small><a id="nutChonAnh">hoặc nhấn để chọn ảnh</a> · <a id="nutChonThuMuc">chọn thư mục</a></small>
+          </div>
+          <div class="ds-tham-chieu" id="dsThamChieu"></div>
+
+          <div class="dong-cong-tac">
+            <div>
+              <b>Giữ nguyên nhân vật</b> <i data-icon="info" title="Prompt nhắc tên nhân vật nào thì tự gửi kèm ảnh nhân vật đó"></i>
+              <small>Tự gửi kèm ảnh nhân vật khi prompt nhắc tên, giữ khuôn mặt và đặc điểm.</small>
+            </div>
+            <label class="cong-tac"><input type="checkbox" id="tuNhanVat" checked><span></span></label>
+          </div>
+
+          <label class="nhan">Tỷ lệ khung hình</label>
+          <div class="ty-le" id="tyLe">
+            <button data-v="9:16" class="on"><i data-icon="rectangle-vertical"></i>9:16</button>
+            <button data-v="16:9"><i data-icon="rectangle-horizontal"></i>16:9</button>
+            <button data-v="1:1"><i data-icon="square"></i>1:1</button>
+            <button data-v="4:3"><i data-icon="rectangle-horizontal"></i>4:3</button>
+            <button data-v="3:4"><i data-icon="rectangle-vertical"></i>3:4</button>
+          </div>
+
+          <div class="khoi-chuoi" id="khuVideoThuMuc">
+            <div class="dong-cong-tac">
+              <div>
+                <b>Tạo video từ thư mục ảnh</b>
+                <small>Chọn thư mục ảnh có sẵn trên máy: mỗi ảnh thành một video, tất cả dùng chung prompt bên dưới. (Để trống ô này mà ô Prompt có đúng số prompt bằng số ảnh thì ghép ảnh 1 ↔ prompt 1…)</small>
+              </div>
+            </div>
+            <div class="dong-o"><button class="nut-vien nho" id="nutVideoThuMuc"><i data-icon="folder-open"></i>Chọn thư mục ảnh</button><span class="mo" id="ghiVideoThuMuc">Chưa chọn</span></div>
+            <label class="o-chon nho" for="promptThuMuc"><b>Prompt dùng chung</b></label>
+            <textarea id="promptThuMuc" rows="3" spellcheck="false" placeholder="Prompt dùng chung cho mọi ảnh trong thư mục, vd: nhân vật quay đầu mỉm cười, tóc bay nhẹ trong gió"></textarea>
+          </div>
+
+          <div class="khoi-chuoi" id="khuChuoi">
+            <div class="dong-cong-tac">
+              <div>
+                <b>Ảnh xong → tự tạo video</b>
+                <small>Mỗi ảnh tạo xong được dùng làm khung đầu cho một video, tất cả video dùng chung prompt bên dưới.</small>
+              </div>
+              <label class="cong-tac"><input type="checkbox" id="batChuoi"><span></span></label>
+            </div>
+            <div id="khuPromptVideo" hidden>
+              <textarea id="promptVideoChung" rows="3" spellcheck="false" placeholder="Prompt video dùng chung, vd: máy quay đẩy chậm vào nhân vật, gió nhẹ, ánh sáng điện ảnh"></textarea>
+              <div class="hang-chon">
+                <label class="o-chon nho">Video chạy ở
+                  <select id="nenVideoChuoi"><option value="">Cùng nơi tạo ảnh</option><option value="muse">Muse</option><option value="flow">Google Flow</option></select>
+                </label>
+                <label class="o-chon nho">Tỷ lệ video
+                  <select id="tyLeVideoChuoi"><option value="">Giống ảnh</option><option>9:16</option><option>16:9</option><option>1:1</option><option>4:3</option><option>3:4</option></select>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <details class="nang-cao" id="nangCao">
+            <summary><i data-icon="sliders-horizontal"></i>Cài đặt nâng cao<i data-icon="chevron-down" class="mui"></i></summary>
+            <div class="luoi-2">
+              <label>Số bản mỗi prompt<input type="number" id="soBan" min="1" max="10" value="1"></label>
+              <label>Tách prompt theo
+                <select id="tachPrompt"><option value="dong">Mỗi dòng</option><option value="doan">Dòng trống</option></select>
+              </label>
+            </div>
+            <div class="luoi-2">
+              <label>Chạy từ prompt số<input type="number" id="tuSo" min="1" placeholder="1"></label>
+              <label>đến prompt số<input type="number" id="denSo" min="1" placeholder="cuối"></label>
+            </div>
+            <label>Thêm vào cuối mỗi prompt<input type="text" id="hauTo" placeholder="vd: phong cách điện ảnh, ánh sáng mềm"></label>
+            <label>Số luồng mỗi tài khoản <small>(áp dụng ngay, cả khi đang chạy)</small><input type="number" id="luongNhanh" min="1" max="20"></label>
+            <small class="mo">Ảnh trong "chọn thư mục" được gán lần lượt: ảnh 1 → prompt 1, ảnh 2 → prompt 2… (xếp theo tên).</small>
+
+            <div class="nhom-tai">
+              <div class="dong-cong-tac"><div><b id="ncNhanTai">Tải ảnh về</b><small>Tắt: chỉ giữ trong app (vẫn xem, vẫn làm video được).</small></div><label class="cong-tac"><input type="checkbox" id="ncTai"><span></span></label></div>
+              <label id="ncNhanThuMuc">Thư mục lưu ảnh</label>
+              <div class="dong-o"><input id="ncThuMuc" readonly><button class="nut-vien nho" id="ncChonThuMuc">Đổi…</button><button class="nut-vien nho" id="ncMoThuMuc">Mở</button></div>
+              <label id="ncNhanTen">Tên file ảnh<input id="ncTen" placeholder="{duAn}/{duAn}_{so}"></label>
+              <small class="mo" id="ncViDu"></small>
+              <small class="mo">Ký hiệu: <code>{duAn}</code> tên dự án · <code>{so}</code> số trong hàng đợi · <code>{stt}</code> dòng prompt thứ mấy · <code>{prompt}</code> vài chữ đầu · <code>{ngay}</code> ngày · <code>{loai}</code> anh/video · <code>{tenAnh}</code> tên ảnh nguồn (video từ ảnh). <code>/</code> = thư mục con. Trùng tên tự thêm (2), không ghi đè.</small>
+            </div>
+          </details>
+        </div>
+        <div class="chan-nut">
+          <button class="nut-gradient to" id="nutTaoChay"><i data-icon="play"></i>Tạo &amp; chạy</button>
+          <button class="nut-gradient to mui-ten" id="nutTaoMenu"><i data-icon="chevron-down"></i></button>
+          <div class="menu menu-tren" id="menuTao" hidden>
+            <button id="nutChiThem"><i data-icon="plus"></i>Chỉ thêm vào hàng đợi (chưa chạy)</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel cot-hang">
+        <div class="panel-dau">
+          <h2><i data-icon="list"></i><span id="tieuDeHang">Hàng đợi ảnh</span></h2>
+          <div class="o-tim"><i data-icon="search"></i><input id="oTim" placeholder="Tìm prompt hoặc số thứ tự…"></div>
+        </div>
+        <div class="loc-dong">
+          <label class="chon-het" title="Chọn / bỏ chọn mọi việc đang hiện trong danh sách"><input type="checkbox" id="chonHet"><span>Chọn hết</span></label>
+          <div class="tabs-loc" id="tabsLoc"></div>
+          <div class="gian"></div>
+          <select class="loc-nen" id="locNen" title="Lọc theo nơi chạy"><option value="">Muse + Flow</option><option value="muse">Chỉ Muse</option><option value="flow">Chỉ Flow</option></select>
+          <button class="nut-vien nho" id="nutDatLai" title="Đưa mọi việc của hàng đợi này về Chờ như lúc mới thêm"><i data-icon="rotate-ccw"></i><span>Đặt lại</span></button>
+          <button class="nut-vien nho" id="nutSapXep"><i data-icon="arrow-down-up"></i><span>Mới nhất</span></button>
+        </div>
+        <div class="thanh-chon" id="thanhChon" hidden>
+          <span id="soChon">0 đã chọn</span>
+          <button class="nut-vien nho" id="chonChayLai"><i data-icon="rotate-ccw"></i>Tạo lại</button>
+          <button class="nut-vien nho" id="chonXoaChat" title="Xoá đoạn chat trên muse.ai của các việc đã chọn"><i data-icon="message-square-x"></i>Xoá chat Muse</button>
+          <button class="nut-vien nho do" id="chonXoa"><i data-icon="trash-2"></i>Xoá</button>
+          <button class="nut-vien nho" id="chonBo"><i data-icon="x"></i>Bỏ chọn</button>
+        </div>
+        <div class="ds-hang cuon" id="dsHang"></div>
+      </section>
+
+      <section class="panel cot-chitiet" id="cotChiTiet">
+        <div class="panel-dau">
+          <h2><i data-icon="sparkles"></i>Chi tiết kết quả</h2>
+          <button class="nut-icon" id="nutPhongTo" title="Xem lớn"><i data-icon="maximize-2"></i></button>
+        </div>
+        <div class="cuon" id="chiTiet"></div>
+      </section>
+    </main>
+
+    <!-- ── Nhân vật ───────────────────────────────────────────────── -->
+    <main class="trang" id="trang-nhanvat" hidden>
+      <section class="panel trang-don">
+        <div class="panel-dau">
+          <h2><i data-icon="user-plus"></i>Nhân vật</h2>
+          <button class="nut-gradient nho" id="nutThemNV"><i data-icon="plus"></i>Thêm nhân vật</button>
+        </div>
+        <p class="mo">Mỗi nhân vật có tên + 1–4 ảnh. Bật "Giữ nguyên nhân vật" rồi gõ tên nhân vật trong prompt, tool tự gửi kèm ảnh để Muse giữ đúng khuôn mặt.</p>
+        <div class="luoi-nv cuon" id="dsNhanVat"></div>
+      </section>
+    </main>
+
+    <!-- ── Thư viện ───────────────────────────────────────────────── -->
+    <main class="trang" id="trang-thuvien" hidden>
+      <section class="panel trang-don">
+        <div class="panel-dau">
+          <h2><i data-icon="layout-grid"></i>Thư viện</h2>
+          <div class="tabs-loc" id="locThuVien">
+            <button data-v="tat" class="on">Tất cả</button><button data-v="anh">Ảnh</button><button data-v="video">Video</button>
+          </div>
+          <div class="gian"></div>
+          <label class="o-chon">Dự án <select id="duAnThuVien"></select></label>
+        </div>
+        <div class="luoi-tv cuon" id="dsThuVien"></div>
+      </section>
+    </main>
+
+    <!-- ── Tài khoản ──────────────────────────────────────────────── -->
+    <main class="trang" id="trang-taikhoan" hidden>
+      <section class="panel cot-tk">
+        <div class="panel-dau">
+          <h2><i data-icon="contact"></i>Tài khoản</h2>
+          <div class="hang-nut-dau">
+            <button class="nut-vien nho" id="nutCapNhatToken" title="Đọc lại mức dùng token của mọi tài khoản Muse"><i data-icon="refresh-cw"></i>Cập nhật token</button>
+            <button class="nut-gradient nho" id="nutThemTK"><i data-icon="plus"></i>Thêm Muse</button>
+            <button class="nut-gradient nho" id="nutThemTKFlow"><i data-icon="plus"></i>Thêm Flow</button>
+          </div>
+        </div>
+        <p class="mo">Mỗi tài khoản đăng nhập riêng một lần trong khung bên phải, app nhớ phiên (app không bao giờ hỏi hay lưu mật khẩu). Mỗi dự án chọn một tài khoản <b>chính</b> và các tài khoản <b>dự phòng</b> cho từng nơi chạy — bấm nút tài khoản cạnh tên dự án. Muse: <b id="soLuongTK">3</b> luồng mỗi tài khoản; Flow: <b id="soTabFlow">1</b> tab mỗi tài khoản. Việc lỗi ở tài khoản chính thì chuyển ngay sang dự phòng.</p>
+        <div class="cuon" id="dsTaiKhoan"></div>
+      </section>
+      <section class="panel cot-trinh-duyet">
+        <div class="panel-dau">
+          <h2><i data-icon="monitor"></i><span id="tieuDeDangNhap">Đăng nhập</span></h2>
+          <button class="nut-gradient nho" id="nutXongDangNhap" hidden><i data-icon="check"></i>Xong, đóng lại</button>
+        </div>
+        <div class="o-trinh-duyet" id="oTrinhDuyet">
+          <div class="trong"><i data-icon="log-in"></i><div>Bấm <b>Đăng nhập</b> ở một tài khoản bên trái — trang muse.ai hoặc Google Flow sẽ mở ở đây để bạn đăng nhập.<br><small>Tài khoản Flow: đăng nhập Google, mở (hoặc tạo) một dự án Flow rồi bấm <b>Xong</b> — app nhớ dự án đó để chạy.</small></div></div>
+        </div>
+      </section>
+    </main>
+
+    <!-- ── Hướng dẫn ──────────────────────────────────────────────── -->
+    <main class="trang" id="trang-huongdan" hidden>
+      <section class="panel trang-don cuon huong-dan">
+        <h2><i data-icon="book-open"></i>Hướng dẫn nhanh</h2>
+        <ol>
+          <li><b>Tài khoản:</b> vào mục Tài khoản → <i>Đăng nhập</i> → đăng nhập muse.ai trong khung bên phải → bấm <i>Xong</i>. Muốn chạy nhiều tài khoản thì <i>Thêm tài khoản</i> và đăng nhập từng cái.</li>
+          <li><b>Mức token:</b> mỗi thẻ tài khoản hiện mức dùng token lấy từ Muse (gói tuần + token bổ sung còn lại). Tự cập nhật mỗi khi chạy hết hàng chờ; bấm <i>Cập nhật token</i> (hoặc <i>Kiểm tra</i> ở một tài khoản) để đọc lại ngay.</li>
+          <li><b>Tạo ảnh / Tạo video:</b> dán prompt (mỗi dòng một prompt), chọn tỷ lệ khung, bấm <i>Tạo &amp; chạy</i>. Mỗi prompt chạy trong một chat phụ mới của Muse nên không dính ngữ cảnh cũ.</li>
+          <li><b>Ảnh tham chiếu:</b> kéo thả ảnh để gửi kèm mọi prompt. <i>Chọn thư mục</i> để gán ảnh 1 → prompt 1, ảnh 2 → prompt 2 (dùng làm khung đầu khi tạo video từ ảnh).</li>
+          <li><b>Nhân vật:</b> lưu ảnh nhân vật kèm tên. Bật <i>Giữ nguyên nhân vật</i>, prompt nhắc tên nào thì tự gửi ảnh nhân vật đó. Chế độ <i>Người mẫu</i>: chọn nhân vật gắn vào mọi prompt.</li>
+          <li><b>Ảnh → video:</b> ở một ảnh đã xong, bấm <i>⋮ → Tạo video từ ảnh này</i>. Muốn cả mẻ: bật <i>Ảnh xong → tự tạo video</i> ở cột Tạo ảnh và nhập một prompt video dùng chung — ảnh nào xong là tự có video tương ứng.</li>
+          <li><b>Chạy một đoạn:</b> <i>Cài đặt nâng cao → Chạy từ prompt số … đến số …</i>. Đặt tên file bằng <code>{stt}</code> để số trong tên khớp số dòng prompt.</li>
+          <li><b>Video từ ảnh có sẵn:</b> trang Tạo video → <i>Tạo video từ thư mục ảnh</i> → chọn thư mục; gõ prompt vào ô <i>Prompt dùng chung</i> rồi Tạo &amp; chạy — mỗi ảnh một video. Đặt tên video <code>{tenAnh}</code> để video trùng tên ảnh.</li>
+          <li><b>Ảnh và video chạy song song:</b> khi bật <i>Ảnh xong → tự tạo video</i>, ảnh nào xong là video của nó được chạy ngay ở luồng rảnh kế tiếp, không chờ hết mẻ ảnh.</li>
+          <li><b>Việc lỗi:</b> hết hàng chờ mà còn việc lỗi, tool tự chạy lại chúng (mặc định tối đa 2 lượt — đổi ở Cài đặt).</li>
+          <li><b>Nhiều luồng hơn:</b> tăng <i>Số luồng mỗi tài khoản</i> (Cài đặt nâng cao), không cần tạo thêm dự án. Tài khoản khác của dự án là dự phòng: chỉ chạy khi tài khoản chính lỗi.</li>
+          <li><b>Tài khoản chính + dự phòng:</b> bấm nút tài khoản cạnh tên dự án (hoặc khi tạo dự án mới) để chọn. Việc nào lỗi hoặc quá lâu (ảnh quá 3 phút, video quá 5 phút — chỉnh ở Cài đặt) thì chạy lại NGAY ở tài khoản dự phòng kế tiếp; tài khoản chính lỗi 2 việc liền (hoặc Muse "Connecting...") thì nghỉ 15 phút, cả dự án sang dự phòng. Bấm <i>Chạy tất cả</i> lại là cho mọi tài khoản cơ hội mới.</li>
+          <li><b>Kết quả</b>: thư mục lưu, công tắc tải về và mẫu tên file nằm trong <i>Cài đặt nâng cao</i> của từng trang Tạo ảnh / Tạo video (mặc định <code>Mac_dinh/Mac_dinh_001.png</code>).</li>
+          <li><b>Nhiều file .txt:</b> bấm <i>Nhập nhiều file .txt</i>, chọn cả loạt — mỗi file thành một dự án mang tên file, dùng chung tuỳ chọn đang chọn ở cột Tạo, rồi tự chạy.</li>
+          <li><b>Dừng giữa chừng</b> không mất lượt: chạy lại, tool mở lại đúng chat cũ để lấy kết quả chứ không gửi lại prompt.</li>
+          <li><b>Muse trả lời chữ thay vì ảnh</b> (hỏi lại, từ chối): dòng đó báo lỗi kèm câu Muse nói. Sửa prompt rồi bấm <i>Tạo lại</i>.</li>
+          <li><b>Xoá đoạn chat trên Muse:</b> nút <i>Xoá chat</i> ở thẻ tài khoản xoá MỌI đoạn chat phụ của tài khoản đó trên muse.ai (phải bấm Dừng trước). Muốn xoá một số: chọn việc ở hàng đợi → <i>Xoá chat Muse</i>. Không khôi phục được; file đã tải về vẫn giữ.</li>
+          <li><b>Muse "Connecting...":</b> Muse mất kết nối thì không tải được chat/ảnh/video. Tool tự <i>tạm dừng</i> hàng chờ (không phí lượt); khi muse.ai hết "Connecting..." bấm <i>Chạy tất cả</i>.</li>
+          <li><b>Đặt lại hàng đợi:</b> nút <i>Đặt lại</i> trên hàng đợi đưa mọi việc của dự án đang xem (trang ảnh hoặc video) về <i>Chờ</i> như lúc mới thêm; bấm chạy là tạo lại từ đầu, kết quả mới ghi đè file cũ cùng tên.</li>
+          <li><b>Google Flow:</b> Tài khoản → <i>Thêm Flow</i> → <i>Đăng nhập</i> → đăng nhập Google, mở (hoặc tạo) một dự án Flow → <i>Xong</i>. Ở trang Tạo ảnh / Tạo video chọn <i>Chạy trên: Google Flow</i> rồi Tạo &amp; chạy như Muse. Flow nhận việc theo mẻ (mặc định 10 prompt), engine Flow tự dán, bấm Tạo, thử lại, tải về; từng việc vẫn hiện riêng trên hàng đợi.</li>
+          <li><b>Flow ⇄ Muse tự động:</b> bật <i>Ảnh xong → tự tạo video</i> và chọn <i>Video chạy ở</i>: ảnh Flow → video Muse, ảnh Muse → video Flow, hoặc cùng một nơi. Ảnh lưu vào thư mục chung (mặc định <code>Tài liệu/AI Automation Studio</code>), video tự lấy ảnh từ đó. Video Flow gắn ảnh bằng <code>@tên</code> (Character Sync) — ảnh chưa có trên Flow thì app tự tải lên.</li>
+          <li><b>Flow nhắc "hoạt động bất thường":</b> chế độ an toàn cho tài khoản đó nghỉ; dự án có tài khoản Flow dự phòng thì việc chuyển ngay sang dự phòng, không thì tự chạy lại khi hết giờ nghỉ.</li>
+          <li><b>Lỗi lạ:</b> Cài đặt → bật <i>Hiện các luồng chạy ngầm</i> để nhìn thấy trang Muse / Flow của từng luồng; nhật ký đầy đủ ở thư mục dữ liệu (<code>nhat-ky.txt</code>).</li>
+        </ol>
+      </section>
+    </main>
+
+    <!-- ── Cài đặt ────────────────────────────────────────────────── -->
+    <main class="trang" id="trang-caidat" hidden>
+      <section class="panel trang-don cuon">
+        <div class="panel-dau"><h2><i data-icon="settings"></i>Cài đặt</h2><button class="nut-gradient nho" id="cdLuu"><i data-icon="check"></i>Lưu cài đặt</button></div>
+        <div class="the-cai">
+          <h3><i data-icon="sliders-horizontal"></i>Chạy</h3>
+          <div class="luoi-3">
+            <label>Số luồng mỗi tài khoản<input type="number" id="cdLuong" min="1" max="20"></label>
+            <label>Nghỉ giữa 2 lần gửi (giây, mỗi tài khoản)<input type="number" id="cdNghi" min="0" max="120"></label>
+            <label>Tự thử lại ngay khi lỗi (lần)<input type="number" id="cdThuLai" min="0" max="5"></label>
+            <label>Hết lượt → tự chạy lại việc lỗi (số lượt)<input type="number" id="cdChayLaiLoi" min="0" max="10"></label>
+            <label>Chờ tối đa 1 ảnh (giây) — quá thì chuyển tài khoản dự phòng<input type="number" id="cdChoAnh" min="60" max="1800"></label>
+            <label>Chờ tối đa 1 video (giây) — quá thì chuyển tài khoản dự phòng<input type="number" id="cdChoVideo" min="120" max="3600"></label>
+            <label>Muse trả chữ bao lâu thì coi là lỗi (giây)<input type="number" id="cdChoChu" min="15" max="600"></label>
+          </div>
+          <div class="dong-cong-tac"><div><b>Lưu ảnh dạng PNG</b><small>Muse trả webp; bật để đổi sang png (nặng hơn, dễ dùng hơn).</small></div><label class="cong-tac"><input type="checkbox" id="cdPng"><span></span></label></div>
+          <div class="dong-cong-tac"><div><b>Hiện các luồng chạy ngầm</b><small>Để soi lỗi: trang Muse / Flow của các luồng sẽ hiện đè lên app.</small></div><label class="cong-tac"><input type="checkbox" id="cdXemLuong"><span></span></label></div>
+          <div class="dong-cong-tac"><div><b>Tắt máy khi chạy hết hàng chờ</b><small>Windows, macOS. Tắt sau 60 giây; Windows huỷ bằng lệnh <code>shutdown /a</code>.</small></div><label class="cong-tac"><input type="checkbox" id="cdTatMay"><span></span></label></div>
+        </div>
+        <div class="the-cai" id="cdFlow">
+          <h3><i data-icon="sparkles"></i>Google Flow</h3>
+          <small class="mo">Giữ đúng các cài đặt của Flow Automation Studio. Tải về và đặt tên file do app tự lo (theo mẫu tên chung ở Cài đặt nâng cao của trang Tạo).</small>
+          <div class="luoi-3">
+            <label>Số tab mỗi tài khoản Flow<input type="number" id="fTab" min="1" max="4"></label>
+            <label>Mỗi mẻ giao Flow tối đa (prompt)<input type="number" id="fMe" min="1" max="50"></label>
+            <label>Số kết quả mỗi prompt<select id="fSoLuong"><option>1</option><option>2</option><option>3</option><option>4</option></select></label>
+            <label>Chờ giữa 2 prompt — từ (giây)<input type="number" id="fChoMin" min="1" max="600"></label>
+            <label>đến (giây)<input type="number" id="fChoMax" min="1" max="600"></label>
+            <label>Thử lại khi lỗi (lần, rồi chuyển dự phòng)<input type="number" id="fThuLai" min="0" max="10"></label>
+            <label>Giãn nhịp bấm Tạo giữa các tab (giây)<input type="number" id="fGian" min="0" max="600"></label>
+            <label>Chất lượng ảnh tải về<select id="fChatAnh"><option value="img_1k">1K</option><option value="img_2k">2K</option><option value="img_4k">4K</option></select></label>
+            <label>Chất lượng video tải về<select id="fChatVideo"><option value="720p">720p</option><option value="1080p">1080p</option><option value="4k">4K</option></select></label>
+            <label>Khi nghi mất mạng<select id="fMang"><option value="auto">Gọi thử Flow rồi mới dừng</option><option value="off">Bỏ qua, không dừng</option></select></label>
+          </div>
+          <div class="dong-cong-tac"><div><b>Ngẫu nhiên thời gian chờ</b><small>Tắt: luôn chờ đúng số "từ".</small></div><label class="cong-tac"><input type="checkbox" id="fNgauNhien"><span></span></label></div>
+          <div class="dong-cong-tac"><div><b>Thêm số thứ tự vào đầu câu lệnh gửi Flow</b></div><label class="cong-tac"><input type="checkbox" id="fSoThuTu"><span></span></label></div>
+          <div class="dong-cong-tac"><div><b>Cuộn trang ngẫu nhiên giữa các lần tạo</b></div><label class="cong-tac"><input type="checkbox" id="fCuon"><span></span></label></div>
+          <div class="dong-cong-tac"><div><b>Gỡ ảnh tham chiếu bị dính</b><small>Ô nhập còn ảnh của prompt trước thì gỡ trước khi dán (mẻ không gắn ảnh).</small></div><label class="cong-tac"><input type="checkbox" id="fGoAnh"><span></span></label></div>
+          <div class="dong-cong-tac"><div><b>Đổi tên kết quả trên Flow theo mã việc</b><small>Cần cho "ảnh Flow → video Flow" cùng tài khoản khỏi tải ảnh lên lại.</small></div><label class="cong-tac"><input type="checkbox" id="fDoiTen"><span></span></label></div>
+          <h4>Model</h4>
+          <div class="luoi-3">
+            <label>Model ảnh<select id="fModelAnh"></select></label>
+            <label>Model video chính<select id="fModelChinh"></select></label>
+            <label>Model video phụ (xen kẽ)<select id="fModelPhu"></select></label>
+            <label>Cứ mấy prompt thì một prompt dùng model phụ<input type="number" id="fXenKe" min="0" max="50"></label>
+            <label>Model dự phòng khi Lower Priority bị chặn<select id="fModelDuPhong"></select></label>
+            <label>Tránh Lower Priority (phút, tăng dần)<input type="number" id="fThuLaiPhut" min="5" max="240"></label>
+          </div>
+          <small class="mo">Danh sách theo các model Flow đang có (28/09/2026). App chọn model trên Flow trước mỗi mẻ; Flow không còn model nào thì nhật ký báo và giữ nguyên model trên trang.</small>
+          <h4>Chế độ an toàn</h4>
+          <div class="dong-cong-tac"><div><b>Bật chế độ an toàn (nên bật)</b><small>Flow bắt đầu báo lỗi dồn dập / "hoạt động bất thường" thì cho tài khoản nghỉ. Dự án có tài khoản Flow dự phòng thì việc chuyển ngay sang dự phòng.</small></div><label class="cong-tac"><input type="checkbox" id="fAnToan"><span></span></label></div>
+          <div class="luoi-3">
+            <label>Số prompt lỗi<input type="number" id="fNguong" min="1" max="50"></label>
+            <label>trong (phút)<input type="number" id="fCuaSo" min="1" max="120"></label>
+            <label>thì nghỉ (phút)<input type="number" id="fNghi" min="1" max="240"></label>
+            <label>Nghỉ tối đa (phút)<input type="number" id="fNghiToiDa" min="1" max="600"></label>
+            <label>Giải lao sau mỗi (prompt, 0 = tắt)<input type="number" id="fCuMoi" min="0" max="500"></label>
+            <label>Giải lao (phút)<input type="number" id="fGiaiLao" min="1" max="120"></label>
+          </div>
+          <div class="dong-cong-tac"><div><b>Bị chặn lại thì nghỉ gấp đôi</b><small>10 → 20 → 40 phút…</small></div><label class="cong-tac"><input type="checkbox" id="fNhanDoi"><span></span></label></div>
+          <div class="dong-cong-tac"><div><b>Nghỉ giữa các thao tác</b><small>Nghỉ ngẫu nhiên trước khi nhập, bấm Tạo, đổi tên, tải về.</small></div><label class="cong-tac"><input type="checkbox" id="fNghiTT"><span></span></label></div>
+          <div class="luoi-3">
+            <label>Nghỉ thao tác từ (giây)<input type="number" id="fNghiTTMin" min="0" max="60" step="0.5"></label>
+            <label>đến (giây)<input type="number" id="fNghiTTMax" min="0" max="60" step="0.5"></label>
+          </div>
+        </div>
+        <div class="the-cai">
+          <h3><i data-icon="file-text"></i>Mẫu câu lệnh gửi Muse</h3>
+          <small class="mo">{prompt} = prompt của bạn · {tyLe} = tỷ lệ khung · {thamChieu} = dòng giải thích ảnh đính kèm (tự sinh).</small>
+          <label>Ảnh<textarea id="cdMauAnh" rows="3"></textarea></label>
+          <label>Video<textarea id="cdMauVideo" rows="3"></textarea></label>
+          <button class="nut-vien nho" id="cdMauGoc"><i data-icon="rotate-ccw"></i>Trả về mẫu gốc</button>
+        </div>
+        <div class="the-cai">
+          <h3><i data-icon="refresh-cw"></i>Cập nhật</h3>
+          <div id="cdCapNhat" class="mo"></div>
+          <div class="dong-o"><button class="nut-vien" id="cdKiemCapNhat">Kiểm tra bản mới</button><button class="nut-vien" id="cdMoDuLieu">Mở thư mục dữ liệu</button></div>
+        </div>
+      </section>
+    </main>
+
+    <!-- ── Nhật ký ─────────────────────────────────────────────────── -->
+    <footer class="logbar">
+      <button class="nhat-ky-mo" id="nutNhatKy" title="Xem nhật ký chạy"><i data-icon="scroll-text"></i>Nhật ký<span class="dem-loi" id="demLoiLog" hidden></span></button>
+      <span class="dong-cuoi" id="dongCuoi">[HỆ THỐNG] Sẵn sàng.</span>
+      <button class="lien-ket" id="nutSaoChepLog">Sao chép</button>
+      <button class="lien-ket" id="nutXoaLog">Xoá</button>
+    </footer>
+    <div class="ngan-log" id="nganLog" hidden><div class="cuon" id="dsLog"></div></div>
+  </div>
+</div>
+
+<!-- Hộp thoại dùng chung (thay window.prompt — Electron không có) -->
+<div class="phu" id="phu" hidden>
+  <div class="hop">
+    <h3 id="hopTieuDe"></h3>
+    <div id="hopNoiDung"></div>
+    <div class="hop-nut"><button class="nut-vien" id="hopHuy">Huỷ</button><button class="nut-gradient" id="hopOk">OK</button></div>
+  </div>
+</div>
+<!-- Xem lớn -->
+<div class="phu xem-lon" id="xemLon" hidden><button class="nut-icon dong" id="dongXemLon"><i data-icon="x"></i></button><div id="xemLonNoiDung"></div></div>
+<div class="toast" id="toast" hidden></div>
+
+<script src="icons.js"></script>
+<script src="../main/hang-doi.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

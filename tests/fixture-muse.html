@@ -1,0 +1,213 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Muse giả</title>
+<style>body{font-family:sans-serif;background:#111;color:#eee} textarea{width:400px;height:60px} img,video{max-width:200px}</style>
+</head><body>
+<!--
+  TRANG MUSE GIẢ cho kiểm thử — dựng lại đúng các thuộc tính đã đo trên muse.ai (10/10/2026).
+  Từ khoá trong prompt điều khiển hành vi:
+    HOI_LAI  → Muse chỉ trả chữ, không ảnh
+    NOTFOUND → khung ảnh hiện "chat-image-not-found" 2 giây rồi mới có ảnh
+    LUOI     → khung ảnh không có <img>, phải bấm "Open generated image" mới thấy
+    CHAM     → tạo mất 6 giây (mặc định 2 giây)
+  Nút dock [data-testid=hatch-dock-more] mở menu bằng POINTERDOWN (như Radix, click() trơn không mở);
+  mục cuối menu mở Cài đặt có mức dùng token ([role=progressbar], như Muse 11/10/2026).
+  Chưa có cookie muse_login=1 → hiện màn đăng nhập.
+  Cookie muse_lang=vi → giao diện tiếng Việt (như Muse trên máy Mac tiếng Việt). Vài nhãn CỐ Ý lạ
+  (nút gửi, nút gỡ tệp, màn đăng nhập) để kiểm đường dự phòng không cần đọc chữ của muse-trang.js.
+  Cookie muse_hong=1 → tài khoản đó luôn trả chữ (như HOI_LAI) — kiểm chuyển sang tài khoản dự phòng.
+  Cookie muse_matketnoi=1 → Muse kẹt "Connecting..." (mất kết nối máy ảo, như 12/10/2026): chat không nạp.
+  Danh sách chat phụ bên trái (như Muse 12/10/2026): hàng [data-testid=hatch-thread-row], nút ⋯ TRONG hàng
+  mở menu bằng pointerdown; click nổi lên hàng thì chuyển sang chat đó (như thật). Xoá → hộp xác nhận.
+  Mỗi lần gửi báo về máy chủ kiểm thử: POST /__gui {prompt, soFile, thread, t0}; mở chat: GET /__thread/<id>;
+  danh sách chat: GET /__ds-thread; xoá chat: POST /__xoa {thread}.
+-->
+<div id="goc"></div>
+<script>
+const goc = document.getElementById('goc');
+const ngu = (ms) => new Promise((r) => setTimeout(r, ms));
+const daDangNhap = document.cookie.includes('muse_login=1');
+const VI = document.cookie.includes('muse_lang=vi');
+const MAT = document.cookie.includes('muse_matketnoi=1');
+const HONG = document.cookie.includes('muse_hong=1');   // tài khoản "hỏng": Muse chỉ trả chữ (kiểm chuyển tài khoản)
+const L = VI
+  ? { o: 'Nhắn tin', gui: 'Đẩy đi', go: 'Hủy tệp', dangGo: 'Trợ lý đang nhập', mo: 'Mở ảnh đã tạo', dong: 'Đóng', caiDat: 'Cài đặt',
+      menu: ['Phím tắt', 'Báo lỗi', 'Cài đặt'],
+      hanMuc: [['Gói miễn phí', 'Đặt lại vào 16 thg 10', 'Đã dùng 56%', 56], ['Token bổ sung', 'Không bao giờ hết hạn', 'Đã dùng 0% (còn 3 tỷ token)', 0]] }
+  : { o: 'Message', gui: 'Send', go: 'Remove attachment', dangGo: 'Assistant is typing', mo: 'Open generated image', dong: 'Close', caiDat: 'Settings',
+      menu: ['Keyboard shortcuts', 'Report an issue', 'Settings'],
+      hanMuc: [['Free plan', 'Weekly limit resets on Oct 16', '56% used', 56], ['Additional tokens', 'Never expires', '0% used (3B tokens left)', 0]] };
+// Như Muse thật: chat lưu ở MÁY CHỦ (máy chủ kiểm thử), không ở trình duyệt.
+const docThread = async (id) => { try { return await (await fetch('/__thread/' + id)).json(); } catch (_) { return null; } };
+
+function anhBlob(w, h, loai) {
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  const g = c.getContext('2d'); g.fillStyle = '#c8a'; g.fillRect(0, 0, w, h); g.fillStyle = '#123'; g.fillRect(10, 10, w / 2, h / 3);
+  return new Promise((r) => c.toBlob(r, loai || 'image/webp'));
+}
+
+function veDangNhap() {
+  goc.innerHTML = VI
+    ? '<main><h1>Muse, AI làm giúp bạn</h1><p>Chào mừng trở lại</p><input type="email" placeholder="Nhập để tiếp tục"><button>Tiếp tục</button></main>'
+    : '<main><h1>Muse, AI that gets it done for you</h1><p>Log in or create an account</p><input placeholder="Mobile number or email"><button>Continue</button></main>';
+}
+
+// data-pel-click: mã đo lường của Muse, không đổi theo ngôn ngữ. Bản tiếng Việt CỐ Ý bỏ để ép
+// trình trợ giúp đi đường dự phòng (nhãn / nút mới / ảnh thu nhỏ).
+const pel = (ma) => (VI ? '' : `data-pel-click="${ma}"`);
+
+function veKhung(tinHtml) {
+  // Như Muse thật (đo 12/10/2026): KHÔNG có <form>; input file nằm trong div bọc sát ô nhập, ảnh thu
+  // nhỏ + nút gỡ ở tổ tiên cấp 2, nút đính kèm + Send ở cấp 3. Send hiện khi có chữ HOẶC có tệp.
+  // Như Muse thật (đo 10/10/2026): ô nhập "tạm" (data-hatch-composer-prehydration-input) có ngay,
+  // nhưng phần điều khiển chỉ được gắn khi trang ĐANG HIỆN (requestAnimationFrame chạy): trang ẩn
+  // thì không bao giờ có nút Send. Nút Send chỉ xuất hiện khi ô nhập có chữ.
+  goc.innerHTML = `
+    <div role="log" aria-label="Chat messages">${tinHtml || ''}</div>
+    <svg role="status" aria-label="Loading" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/></svg>
+    <div data-testid="hatch-side-chats-panel-content"><div id="dsChat"></div><div data-testid="active-side-chat-load-more-sentinel"></div></div>
+    <div data-pel-impression="status_limit_reached_impression"><span><span title="${MAT ? 'Connecting...' : 'Connected'}">${MAT ? 'Connecting...' : 'Connected'}</span></span></div>
+    <button type="button" data-testid="hatch-dock-more" data-pel-click="settings_menu_open_click" aria-label="${L.caiDat}">⚙</button>
+    <div class="khung-soan">
+      <div>
+        <div id="dinhKem"></div>
+        <div><textarea aria-label="${L.o}" placeholder="${L.o}" data-hatch-composer-prehydration-input="true"></textarea><input type="file" multiple hidden></div>
+      </div>
+      <button aria-label="Attach file" ${pel('chat_tap_attachment')} type="button"></button>
+      <span id="choNutGui"></span>
+    </div>`;
+  const ta = document.querySelector('textarea');
+  const inp = document.querySelector('input[type=file]');
+  veDsChat();
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    ta['__reactFiber$gia'] = {};           // dấu "đã hydrate" giống React
+    const veNut = () => {
+      const co = !!ta.value.trim() || !!(inp.files && inp.files.length);
+      const nut = document.querySelector('#choNutGui button');
+      if (co && !nut) {
+        document.getElementById('choNutGui').innerHTML = `<button aria-label="${L.gui}" ${pel('chat_send_message')} type="button">↑</button>`;
+        document.querySelector('#choNutGui button').addEventListener('click', () => guiTin(ta.value, inp.files ? inp.files.length : 0));
+      } else if (!co && nut) nut.remove();
+    };
+    ta.addEventListener('input', veNut);
+    document.querySelector('[data-testid=hatch-dock-more]').addEventListener('pointerdown', moMenu);
+    veNut();
+    inp.addEventListener('change', () => {
+      document.getElementById('dinhKem').innerHTML = Array.from(inp.files).map((f) => VI
+        ? `<span><img src="${URL.createObjectURL(f)}" width="24"><button aria-label="${L.go}" type="button">x</button></span>`
+        : `<span><img src="${URL.createObjectURL(f)}" width="24"><button aria-label="${L.go}" ${pel('chat_remove_attachment_click')} type="button">x</button></span>`).join('');
+      veNut();
+    });
+  }));
+}
+
+function moMenu() {
+  const m = document.createElement('div');
+  m.setAttribute('role', 'menu');
+  m.innerHTML = L.menu.map((t) => `<div role="menuitem">${t}</div>`).join('');
+  m.lastElementChild.addEventListener('click', () => {
+    m.remove();
+    const d = document.createElement('div');
+    d.setAttribute('role', 'dialog');
+    d.innerHTML = `<h2>${L.caiDat}</h2>` + L.hanMuc.map(([ten, ghi, chu, pt]) =>
+      `<div><span>${ten}</span><br><span>${ghi}</span><br><span>${chu}</span><div role="progressbar" aria-valuenow="${pt}" aria-valuemin="0" aria-valuemax="100"></div></div>`).join('');
+    document.body.appendChild(d);
+  });
+  document.body.appendChild(m);
+}
+
+async function veDsChat() {
+  let ds = [];
+  try { ds = await (await fetch('/__ds-thread')).json(); } catch (_) {}
+  const o = document.getElementById('dsChat');
+  if (!o) return;
+  const dangMo = (location.pathname.match(/\/thread\/([^/]+)$/) || [])[1];
+  o.innerHTML = '<div data-testid="hatch-thread-row" role="button">Main chat</div>' + ds.map((t) =>
+    `<div data-testid="hatch-thread-row" role="button" data-id="${t.thread}" ${t.thread === dangMo ? 'aria-current="page"' : ''}>${t.tieuDe}` +
+    '<span><button type="button" aria-label="More thread actions" aria-haspopup="menu" data-pel-click="chat_thread_options_open">⋯</button></span></div>').join('');
+  for (const h of o.querySelectorAll('[data-id]')) {
+    h.addEventListener('click', () => { history.pushState({}, '', '/thread/' + h.dataset.id); veThread(h.dataset.id); });
+    h.querySelector('button').addEventListener('pointerdown', () => moMenuChat(h.dataset.id));
+  }
+}
+function moMenuChat(id) {
+  const m = document.createElement('div');
+  m.setAttribute('role', 'menu');
+  m.innerHTML = '<div role="menuitem" data-pel-click="chat_thread_pin_click">Pin</div><div role="menuitem" data-pel-click="chat_thread_delete_open">Delete</div>';
+  m.lastElementChild.addEventListener('click', () => {
+    m.remove();
+    const d = document.createElement('div');
+    d.setAttribute('role', 'dialog');
+    d.innerHTML = '<h2>Delete side chat?</h2><button data-pel-click="chat_thread_delete_cancel">Cancel</button><button data-pel-click="chat_thread_delete_confirm">Delete</button>';
+    d.firstElementChild.nextElementSibling.onclick = () => d.remove();
+    d.lastElementChild.onclick = async () => {
+      await fetch('/__xoa', { method: 'POST', body: JSON.stringify({ thread: id }) });
+      d.remove();
+      if (location.pathname.endsWith('/' + id)) { history.pushState({}, '', '/'); veKhung(''); } else veDsChat();
+    };
+    document.body.appendChild(d);
+  });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') m.remove(); }, { once: true });
+  document.body.appendChild(m);
+}
+
+async function guiTin(prompt, soFile) {
+  const id = Math.random().toString(16).slice(2, 10) + '-' + Date.now().toString(16);
+  await fetch('/__gui', { method: 'POST', body: JSON.stringify({ prompt, soFile, thread: id, t0: Date.now() }) });
+  history.pushState({}, '', '/thread/' + id);
+  veThread(id);
+}
+
+let henVe = null;
+async function veThread(id) {
+  clearTimeout(henVe);
+  const t = await docThread(id);
+  if (!t || MAT) { veKhung(''); return; }
+  const user = `<div data-message-item="true" data-message-role="user"><div aria-busy="false"><span>You:</span><p>${t.prompt.replace(/</g, '&lt;')}</p></div></div>`;
+  const tre = /CHAM/.test(t.prompt) ? 6000 : 2000;
+  const daQua = Date.now() - t.t0;
+  if (daQua < tre) {
+    veKhung(user + `<div aria-label="${L.dangGo}"><div></div><div></div><div></div></div>`);
+    henVe = setTimeout(() => veThread(id), tre - daQua + 50);
+    return;
+  }
+  const video = /^Tạo 1 video/.test(t.prompt);
+  if (/HOI_LAI/.test(t.prompt) || HONG) {
+    veKhung(user + '<div data-message-item="true" data-message-role="assistant"><div aria-busy="false"><div data-hatch-assistant-message-body="true">Bạn muốn ảnh theo phong cách nào?</div></div></div>');
+    return;
+  }
+  const chu = `<div data-message-item="true" data-message-role="assistant"><div aria-busy="false"><div data-hatch-assistant-message-body="true">${video ? 'Video đây bạn nhé!' : 'Xong rồi đây.'}</div></div></div>`;
+  if (video) {
+    const b = new Blob([new Uint8Array(4096).map((_, i) => i % 251)], { type: 'video/mp4' });
+    veKhung(user + chu + `<div data-message-item="true" data-message-role="assistant"><div aria-busy="false"><div data-testid="hatch-chat-attachment-presentation-video"><video src="${URL.createObjectURL(b)}"></video></div><button aria-label="Download video"></button></div></div>`);
+    return;
+  }
+  const tyLe = (t.prompt.match(/tỷ lệ (\d+):(\d+)/) || [0, 9, 16]);
+  const w = 64 * +tyLe[1], h = 64 * +tyLe[2];
+  if (/NOTFOUND/.test(t.prompt) && daQua < tre + 2000) {
+    veKhung(user + chu + `<div data-message-item="true" data-message-role="assistant"><div data-testid="hatch-chat-attachment-presentation-image"><div data-testid="chat-image-not-found"></div></div></div>`);
+    henVe = setTimeout(() => veThread(id), tre + 2050 - daQua);
+    return;
+  }
+  const url = URL.createObjectURL(await anhBlob(w, h));
+  const luoi = /LUOI/.test(t.prompt);
+  veKhung(user + chu + `<div data-message-item="true" data-message-role="assistant"><div aria-busy="false">
+    <div data-testid="hatch-chat-attachment-presentation-image">${luoi ? '' : `<img src="${url}">`}</div>
+    <button aria-label="${L.mo} ${luoi ? 'ảnh lười' : 'ảnh'}" type="button" id="moXem"></button></div></div>`);
+  document.getElementById('moXem').onclick = () => {
+    const d = document.createElement('div');
+    d.setAttribute('role', 'dialog');
+    d.innerHTML = `<button aria-label="${L.dong}">x</button><img src="${url}">`;
+    d.querySelector('button').onclick = () => d.remove();
+    document.body.appendChild(d);
+  };
+}
+
+function lo() {
+  if (!daDangNhap) { veDangNhap(); return; }
+  const m = location.pathname.match(/\/thread\/([^/]+)$/);
+  if (m && m[1] !== 'new') veThread(m[1]); else veKhung('');
+}
+// Như Muse: trang chủ cũng là trang chat (Next.js nạp chậm một nhịp).
+setTimeout(lo, 300);
+</script>
+</body></html>

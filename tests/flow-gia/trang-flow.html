@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="vi"><head><meta charset="utf-8"><title>Google Flow giả</title>
+<style>body{font-family:sans-serif;background:#111;color:#eee}.ProseMirror{min-height:60px;border:1px solid #555;padding:6px}</style>
+</head><body>
+<script>
+  // Trang chủ Flow: nút "Dự án mới" → trang dự án có ô nhập prompt (ProseMirror).
+  if (/\/project\//.test(location.pathname)) {
+    document.body.innerHTML = '<h3>Dự án Flow giả</h3><div class="ProseMirror" contenteditable="true"><p><br></p></div>' +
+      '<button aria-label="Tạo">Tạo</button><div id="luoi"></div>';
+  } else if (/(^|;\s*)flow_dang_xuat=1/.test(document.cookie)) {
+    // Chưa đăng nhập: Google đưa sang trang đăng nhập (ngoài /fx/ → app coi là ngoài Flow).
+    location.replace(location.href.replace(/\/fx\/.*/, '/signin/v2/identifier'));
+  } else {
+    document.body.innerHTML = '<h3>Flow</h3><button id="moi">+ Dự án mới</button>';
+    document.getElementById('moi').onclick = () => {
+      location.href = location.pathname.replace(/\/$/, '') + '/project/gia-' + Math.random().toString(36).slice(2, 8);
+    };
+  }
+</script>
+</body></html>
