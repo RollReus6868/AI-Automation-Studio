@@ -115,7 +115,7 @@ async function kiemTruocKhiChay(wc, settings, log) {
       delete moi[k];
       DA_BO.set(k, cu);
       log('warning', `⚠️ Bỏ qua selector bạn chỉ cho "${TEN_MUC[k]}" (${cu}): ${kq[k].lyDo}. ` +
-        `Mẻ này dùng selector mặc định. Vào Cài đặt → Chẩn đoán giao diện Flow, bấm ✕ đỏ ở dòng "${TEN_MUC[k]}" để khỏi thấy lại cảnh báo này.`);
+        `Mẻ này dùng selector mặc định cho "${TEN_MUC[k]}".`);
     }
   }
   s.selectors = moi;

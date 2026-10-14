@@ -24,6 +24,7 @@ const hd = require('../main/hang-doi');
 const { FLOW_URL, FLOW_HOST_RE, moPhongBi } = require('./tab-flow');
 const { caiDatEngine, chuanHoaFlow } = require('./cai-dat-flow');
 const { buildStartMessage } = require('./main/jobs');
+const nhipTT = require('./main/nhip-thao-tac');
 
 const cho = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -77,6 +78,7 @@ class LuongFlow {
     const t = this.tab;
     if (t && this.dsViec) {
       t.nghiAnToan = false;
+      nhipTT.huy(t);      // cắt ngang khoảng nghỉ giữa thao tác đang chờ — kẻo dán prompt cũ sau khi đã dừng
       this.tabs.dispatch(t.id, { action: 'STOP_AUTOMATION' }).catch(() => {});
       // Engine không trả lời (trang đang tải lại…) thì 6 giây sau tự kết thúc mẻ.
       setTimeout(() => { if (this._ketMe) this._ketMe('dung'); }, 6000);
@@ -326,12 +328,14 @@ class LuongFlow {
         const gac = setInterval(() => {
           if (this.huy !== huyLuc) return;
           if (hetViecLuc && Date.now() - hetViecLuc > 180000) {
+            nhipTT.huy(t);
             this.tabs.dispatch(t.id, { action: 'STOP_AUTOMATION' }).catch(() => {});
             return ket('xong');
           }
           if (t.nghiAnToan) { lanCuoi = Date.now(); return; }   // đang nghỉ an toàn — không phải đứng im
           if (Date.now() - lanCuoi > this.dungYenMs) {
             this.log('error', `❌ [${this.id}] Flow không báo gì quá ${Math.round(this.dungYenMs / 60000)} phút — dừng mẻ.`);
+            nhipTT.huy(t);
             this.tabs.dispatch(t.id, { action: 'STOP_AUTOMATION' }).catch(() => {});
             ket('dungYen');
           }

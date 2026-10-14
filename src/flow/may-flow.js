@@ -146,6 +146,7 @@ function taoMayFlow(o) {
     }
     for (const t of ds) {
       t.nghiAnToan = true;
+      nhipTT.huy(t);   // cắt ngang khoảng nghỉ giữa thao tác đang chờ
       try { await tabs.dispatch(t.id, { action: 'PAUSE_AUTOMATION' }); } catch (_) {}
     }
     const cu = henChayLai.get(khoa(accountId));
@@ -310,7 +311,7 @@ function taoMayFlow(o) {
       const duPhong = ds[0].keHoachModel.duPhong;
       log('error', `🚫 [${ten}] Lower Priority bị Flow chặn (${qd.lyDo}). Ngừng gửi Lower Priority ${anToan.doDai(ms)}, chuyển sang ${duPhong} (tốn credit) và chạy tiếp.`);
       so.moc.length = 0; so.coCauChan = false;
-      for (const t of ds) { t.nghiAnToan = true; try { await tabs.dispatch(t.id, { action: 'PAUSE_AUTOMATION' }); } catch (_) {} }
+      for (const t of ds) { t.nghiAnToan = true; nhipTT.huy(t); try { await tabs.dispatch(t.id, { action: 'PAUSE_AUTOMATION' }); } catch (_) {} }
       await cho(6000);
       const hong = [];
       for (const t of ds) {
@@ -604,7 +605,7 @@ function taoMayFlow(o) {
 
       // Engine vừa kết luận một phần tử giao diện Flow đã vỡ.
       case 'UI_BREAK':
-        log('error', `🧩 [${tabId}] Giao diện Flow có phần tử không dò được: ${JSON.stringify(message.data || {}).slice(0, 300)} — vào Cài đặt → Flow → Chẩn đoán.`);
+        log('error', `🧩 [${tabId}] Giao diện Flow có phần tử không dò được: ${JSON.stringify(message.data || {}).slice(0, 300)} — Google có thể vừa đổi giao diện Flow; gửi Nhật ký cho người phát triển.`);
         return { success: true };
 
       case 'TRIGGER_SHUTDOWN': {

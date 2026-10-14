@@ -8,7 +8,7 @@
   "license": "MIT",
   "scripts": {
     "start": "electron .",
-    "test": "node tests/run.js && node tests/cap-nhat-test.js",
+    "test": "node tests/run.js && node tests/flow/run.js && node tests/cap-nhat-test.js",
     "build:win": "electron-builder --win --x64",
     "build:mac": "electron-builder --mac --arm64 --x64"
   },

@@ -67,11 +67,7 @@ const khoiGiua = (m, dau, sau) => { const i = m.indexOf(dau); if (i < 0) return 
 //  • cập nhật: mở trang phát hành giới hạn github.com (nút mở trang phát hành không còn; bộ cập nhật tự dựng link).
 //  • an toàn: nút "gợi ý nhịp an toàn" (btnNhipAnToan) không còn trong Cài đặt → Google Flow.
 //
-//  CẦN XEM (lỗi thật ở src — bài kiểm không đưa vào để bộ kiểm xanh, xem báo cáo):
-//  • nhịp thao tác: Tạm dừng / Dừng KHÔNG cắt ngang lần nghỉ giữa thao tác. nhipTT.huy() không được gọi ở
-//    đâu cả: src/flow/luong-flow.js dung() (STOP_AUTOMATION, ~dòng 80) và gác đứng im (~dòng 329, 335),
-//    src/flow/may-flow.js batDauNghi (~dòng 149) và thuChuyenDuPhong (~dòng 313) gửi PAUSE/STOP mà không
-//    gọi nhipTT.huy(t). Bản Flow cũ có (bài cũ: /nhipTT\.huy\(t\)[\s\S]{0,120}PAUSE_AUTOMATION/ và …STOP_AUTOMATION).
+//  (Lỗi bài kiểm từng chỉ ra khi gộp — Dừng / Tạm dừng không cắt ngang lần nghỉ giữa thao tác — đã sửa, bài kiểm ở mục nhịp thao tác.)
 // ============================================================================
 
 const {
@@ -1234,7 +1230,7 @@ test('model: nối dây trong máy Flow (may-flow.js) đủ các chỗ', () => {
     'chế độ an toàn chưa thử chuyển dự phòng trước khi nghỉ');
   // 5. Đang chuyển dự phòng thì đánh dấu nghỉ (như lúc nghỉ) trước khi tạm dừng — gác đứng im của
   //    luồng Flow dựa vào cờ này để không cắt mẻ.
-  assert.ok(/t\.nghiAnToan = true;\s*try \{ await tabs\.dispatch\(t\.id, \{ action: 'PAUSE_AUTOMATION' \}\)/.test(thanHam(m, 'async function thuChuyenDuPhong')),
+  assert.ok(/t\.nghiAnToan = true;\s*(nhipTT\.huy\(t\);\s*)?try \{ await tabs\.dispatch\(t\.id, \{ action: 'PAUSE_AUTOMATION' \}\)/.test(thanHam(m, 'async function thuChuyenDuPhong')),
     'chuyển dự phòng chưa đánh dấu nghiAnToan trước khi tạm dừng');
 });
 
@@ -1807,7 +1803,13 @@ test('nhịp thao tác: nối đúng chỗ trong máy Flow (may-flow.js)', () =>
   assert.strictEqual((m.match(/^\s+ganNhipThaoTac\(tab, settings\);/gm) || []).length, 1,
     'phải gắn nhịp thao tác đúng một chỗ giao việc');
   assert.ok(/ganNhipThaoTac\(tab, settings\);/.test(thanHam(m, 'async function chuanBiMe')), 'chuanBiMe chưa gắn nhịp thao tác');
-  // (Tạm dừng / Dừng cắt ngang lần nghỉ — CẦN XEM: nhipTT.huy() chưa được gọi ở bản gộp, xem đầu file.)
+  // Tạm dừng / Dừng phải cắt ngang lần nghỉ đang chờ (kẻo dán prompt cũ sau khi đã dừng).
+  const mf = boGhiChu(docNguon('src', 'flow', 'may-flow.js'));
+  const lf = boGhiChu(docNguon('src', 'flow', 'luong-flow.js'));
+  const demPause = (mf.match(/PAUSE_AUTOMATION/g) || []).length;
+  assert.strictEqual((mf.match(/nhipTT\.huy\(t\);[^\n]*\n?[^\n]*PAUSE_AUTOMATION/g) || []).length, demPause, 'mọi PAUSE_AUTOMATION phải đi sau nhipTT.huy(t)');
+  const demStop = (lf.match(/STOP_AUTOMATION/g) || []).length;
+  assert.strictEqual((lf.match(/nhipTT\.huy\(t\);[^\n]*\n\s*this\.tabs\.dispatch\(t\.id, \{ action: 'STOP_AUTOMATION' \}\)/g) || []).length, demStop, 'mọi STOP_AUTOMATION của luồng phải đi sau nhipTT.huy(t)');
 });
 
 test('nhịp thao tác: giao diện có ô và gửi đi đúng khoá', () => {
