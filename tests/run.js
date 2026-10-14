@@ -647,6 +647,11 @@ test('tài khoản: mặc định có Muse 1 + Flow 1, phiên tách theo nền t
   const d2 = dp.taoDuAn('Q', ['tk-1']);
   assert.deepStrictEqual(dp._dsTk(d2.id, 'flow'), ['flow-1', f2.id], 'chưa chọn tài khoản Flow nào = mọi tài khoản Flow');
   assert.strictEqual(tk.sua(f2.id, { flowUrl: 'https://evil.example/x' }) && tk.tim(f2.id).flowUrl, '', 'chỉ nhận URL dự án Flow');
+  // Google dời Flow sang flow.google.com (15/10/2026): địa chỉ dự án mới phải được nhận và LƯU.
+  tk.sua(f2.id, { flowUrl: 'https://flow.google.com/project/47741c48-4019-4392-9dab-d179db623498' });
+  assert.strictEqual(tk.tim(f2.id).flowUrl, 'https://flow.google.com/project/47741c48-4019-4392-9dab-d179db623498');
+  tk.sua(f2.id, { flowUrl: 'https://flow.google.com/' });
+  assert.strictEqual(tk.tim(f2.id).flowUrl, 'https://flow.google.com/project/47741c48-4019-4392-9dab-d179db623498', 'trang chủ Flow không phải dự án');
   tk.sua(f2.id, { flowUrl: 'https://labs.google/fx/vi/tools/flow/project/abc' });
   assert.strictEqual(tk.tim(f2.id).flowUrl, 'https://labs.google/fx/vi/tools/flow/project/abc');
 });

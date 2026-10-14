@@ -62,7 +62,10 @@ module.exports = function e2eFlow({ win, app, LENH, dieuPhoi, taiKhoan }) {
       kiem(anh1.every((j) => j.flowTen && j.flowTen.tk === 'flow-1' && j.flowTen.ten), 'nhớ tên ảnh trên Flow (để video Flow dùng lại bằng @tên)');
       kiem(new Set(anh1.map((j) => fs.readFileSync(j.files[0]).length)).size === 1 && fs.readFileSync(anh1[0].files[0]).equals(PNG1),
         'nội dung file ảnh đúng là file Flow tải về');
-      kiem(/\/project\//.test(taiKhoan.ds.find((a) => a.id === 'flow-1').flowUrl || ''), 'nhớ trang dự án Flow của tài khoản (lần sau mở thẳng)');
+      // Đọc từ KHO đã lưu (không phải object trong bộ nhớ — luồng gán thẳng vào đó nên che mất lỗi kho từ chối địa chỉ).
+      const luu1 = (taiKhoan.store.get('taiKhoan').taiKhoan || []).find((a) => a.id === 'flow-1') || {};
+      kiem(/\/project\//.test(luu1.flowUrl || ''), `nhớ (đã LƯU) trang dự án Flow của tài khoản: ${luu1.flowUrl}`);
+      kiem(LENH.trangThai().nhatKy.some((d) => /Mở dự án Flow mới/.test(d.chu)), 'trang chủ Flow: bấm được nút "Dự án mới" có biểu tượng chữ đứng trước');
       kiem(video1.length === 3 && video1.every((j) => j.nen === 'muse' && j.trangThai === 'xong' && j.taiKhoan === 'tk-1' && /\.mp4$/.test(j.files[0] || '')),
         'mỗi ảnh Flow sinh đúng 1 video chạy ở MUSE, xong có file .mp4');
       const gui1 = (await daGui()).filter((g) => /chuyển động nhẹ/.test(g.prompt));

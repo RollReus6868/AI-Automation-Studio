@@ -653,11 +653,11 @@
     if (lenh === 'dangNhap') { U.dangNhapMo = true; await api.call('moDangNhap', { id, khung: khungTrinhDuyet() }); }
     else if (lenh === 'kiem') { toast(`Đang kiểm "${a.ten}"…`); const r = await api.call('kiemTaiKhoan', { id }); toast(r === 'da-dang-nhap' ? `"${a.ten}" đã đăng nhập` : `"${a.ten}" chưa đăng nhập`, r !== 'da-dang-nhap'); }
     else if (lenh === 'duAnFlow') {
-      const v = await hoi({ tieuDe: `Dự án Flow của "${a.ten}"`, ok: 'Lưu', html: `<p>Dán địa chỉ trang dự án Flow (dạng <code>https://labs.google/fx/vi/tools/flow/project/…</code>). Để trống: app tự bấm "Dự án mới" khi chạy.</p>
-        <label>Địa chỉ dự án<input name="url" value="${esc(a.flowUrl || '')}" placeholder="https://labs.google/fx/vi/tools/flow/project/…"></label>` });
+      const v = await hoi({ tieuDe: `Dự án Flow của "${a.ten}"`, ok: 'Lưu', html: `<p>Dán địa chỉ trang dự án Flow (dạng <code>https://flow.google.com/project/…</code>). Để trống: app tự bấm "Dự án mới" khi chạy.</p>
+        <label>Địa chỉ dự án<input name="url" value="${esc(a.flowUrl || '')}" placeholder="https://flow.google.com/project/…"></label>` });
       if (!v) return;
       const url = v.url.trim();
-      if (url && !/^https:\/\/labs\.google\/fx\/.*\/project\//.test(url)) { toast('Địa chỉ phải là trang dự án trên labs.google (có /project/)', true); return; }
+      if (url && !/^https:\/\/(flow\.google\.com|labs\.google\/fx)\/.*project\/[^/?#\s]+/.test(url)) { toast('Địa chỉ phải là trang dự án Flow (flow.google.com/project/…)', true); return; }
       await api.call('suaTaiKhoan', { id, thay: { flowUrl: url } });
       toast(url ? 'Đã lưu dự án Flow' : 'Đã bỏ dự án — app sẽ tự mở dự án mới');
     } else if (lenh === 'xoaChat') {

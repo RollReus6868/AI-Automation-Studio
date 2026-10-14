@@ -1,4 +1,5 @@
 'use strict';
+const { laUrlDuAnFlow } = require('../flow/tab-flow');
 // ============================================================================
 //  tai-khoan.js — NHIỀU TÀI KHOẢN MUSE / GOOGLE FLOW, MỖI TÀI KHOẢN MỘT PHIÊN
 //  Mỗi tài khoản là một session partition riêng — 'persist:muse-<id>' cho Muse,
@@ -56,10 +57,10 @@ class QuanLyTaiKhoan {
     if (typeof thay.bat === 'boolean') a.bat = thay.bat;
     if (typeof thay.trangThai === 'string') a.trangThai = thay.trangThai;
     if (thay.hanMuc && Array.isArray(thay.hanMuc.muc)) a.hanMuc = thay.hanMuc;   // mức token đọc từ Muse
-    // Trang dự án Flow: chỉ nhận đúng địa chỉ dự án trên labs.google (rỗng = để app tự mở dự án mới).
+    // Trang dự án Flow: chỉ nhận địa chỉ dự án Flow (flow.google.com hoặc labs.google; rỗng = app tự mở dự án mới).
     if (typeof thay.flowUrl === 'string' && a.nen === 'flow') {
       const u = thay.flowUrl.trim();
-      if (!u || /^https:\/\/labs\.google\/fx\/.*\/project\//.test(u) || /^file:/.test(u)) a.flowUrl = u;
+      if (!u || laUrlDuAnFlow(u) || /^file:/.test(u)) a.flowUrl = u;
     }
     this.luu();
     return true;

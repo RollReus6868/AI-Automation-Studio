@@ -156,7 +156,11 @@ function taoLuong(tk, stt) {
   if (tk.nen === 'flow') {
     return new LuongFlow({ id, taiKhoan: tk, tabs: tabsFlow, may: mayFlow, log,
       thuMucTam: path.join(app.getPath('userData'), 'flow-tai-tam', slugThuMuc(`${tk.id}-${stt}`)),
-      docAnh, luuUrl: (tkId, url) => { taiKhoan.sua(tkId, { flowUrl: url }); log('info', `📁 Nhớ trang dự án Flow của "${tk.ten}": ${url}`); baoTrangThai(); } });
+      docAnh, luuUrl: (tkId, url) => {
+        taiKhoan.sua(tkId, { flowUrl: url });
+        if (taiKhoan.tim(tkId).flowUrl === url) log('info', `📁 Nhớ trang dự án Flow của "${tk.ten}": ${url}`);
+        baoTrangThai();
+      } });
   }
   // Giữ kích thước thật 1280×800 (không thu nhỏ): trang quá nhỏ có thể không vẽ ảnh.
   const w = taoCuaSoAn(tk, `Muse · ${id}`);
@@ -205,7 +209,8 @@ async function dongDangNhap(kiem = true) {
     const url = view.webContents.getURL();
     if (/\/project\//.test(url) && url !== tk.flowUrl) {
       taiKhoan.sua(id, { flowUrl: url });
-      log('info', `📁 Nhớ trang dự án Flow của "${tk.ten}": ${url}`);
+      if (taiKhoan.tim(id).flowUrl === url) log('info', `📁 Nhớ trang dự án Flow của "${tk.ten}": ${url}`);
+      else log('warning', `⚠ Không nhận được địa chỉ dự án Flow "${url}" — báo cho người phát triển.`);
     }
     await kiemTaiKhoan(id);
   } else if (kiem) {

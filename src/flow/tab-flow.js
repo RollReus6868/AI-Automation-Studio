@@ -236,4 +236,14 @@ function moPhongBi(r) {
   return r;
 }
 
-module.exports = { QuanLyTabFlow, FLOW_URL, FLOW_HOST_RE, moPhongBi, docNguon };
+/**
+ * Địa chỉ trang DỰ ÁN Flow (để nhớ cho tài khoản). Google đã dời Flow từ labs.google/fx/…/project/<id>
+ * sang flow.google.com/project/<id> (người dùng gặp 15/10/2026) — nhận cả hai, và mọi địa chỉ
+ * FLOW_HOST_RE nhận (trang giả của kiểm thử).
+ */
+function laUrlDuAnFlow(u) {
+  const s = String(u || '').trim();
+  return /^https?:\/\//.test(s) && FLOW_HOST_RE.test(s) && /\/project\/[^/?#\s]+/.test(s);
+}
+
+module.exports = { QuanLyTabFlow, FLOW_URL, FLOW_HOST_RE, moPhongBi, docNguon, laUrlDuAnFlow };

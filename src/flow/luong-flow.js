@@ -29,15 +29,27 @@ const nhipTT = require('./main/nhip-thao-tac');
 const cho = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const CO_O_NHAP = `!!document.querySelector('.ProseMirror[contenteditable="true"], [data-slate-editor="true"][contenteditable="true"], [role="textbox"][contenteditable="true"]')`;
-// Trang chủ Flow (chưa vào dự án): bấm "Dự án mới" một lần. Không tìm thấy thì thôi — người dùng mở dự án khi đăng nhập.
+// Trang chủ Flow (chưa vào dự án): bấm "Dự án mới". Nút của Flow có biểu tượng chữ (vd "add_2") đứng trước
+// nhãn → so phần CUỐI chữ của nút. Không tìm thấy thì thôi — người dùng mở dự án khi đăng nhập.
 const BAM_DU_AN_MOI = `(() => {
-  const re = /^(\\+\\s*)?(new project|dự án mới|tạo dự án( mới)?)$/i;
-  const ds = [...document.querySelectorAll('button, a, [role="button"]')].filter((e) => e.offsetParent);
-  const nut = ds.find((e) => re.test(String(e.innerText || e.textContent || '').replace(/\\s+/g, ' ').replace(/^add\\s*/i, '').trim()));
+  const re = /(^|\\s)(new project|dự án mới|tạo dự án( mới)?)$/i;
+  const chu = (e) => String(e.innerText || e.textContent || '').replace(/\\s+/g, ' ').trim();
+  const ds = [...document.querySelectorAll('button, a, [role="button"]')].filter((e) => e.offsetParent && chu(e).length <= 40);
+  const nut = ds.find((e) => re.test(chu(e)));
   if (!nut) return false;
+  const r = nut.getBoundingClientRect(), o = { bubbles: true, cancelable: true, view: window, clientX: r.x + r.width / 2, clientY: r.y + r.height / 2 };
+  for (const t of ['pointerdown', 'mousedown', 'pointerup', 'mouseup']) nut.dispatchEvent(new (t.startsWith('pointer') ? PointerEvent : MouseEvent)(t, o));
   nut.click();
   return true;
 })()`;
+// Hết giờ mà chưa vào được dự án: chụp lại thứ đang thấy để lần sau đọc nhật ký là biết vì sao.
+const CHAN_DOAN_TRANG = `(() => ({
+  url: location.href,
+  oNhap: [...document.querySelectorAll('[contenteditable="true"], textarea, [role="textbox"]')].filter((e) => e.offsetParent)
+    .map((e) => e.tagName.toLowerCase() + (e.className && typeof e.className === 'string' ? '.' + e.className.split(/\\s+/).slice(0, 2).join('.') : '')).slice(0, 5),
+  nut: [...document.querySelectorAll('button, a, [role="button"]')].filter((e) => e.offsetParent)
+    .map((e) => String(e.innerText || e.getAttribute('aria-label') || '').replace(/\\s+/g, ' ').trim()).filter(Boolean).slice(0, 12)
+}))()`;
 
 const TRANG_THAI_BUOC = { WAITING: 'Chờ trong mẻ Flow', PASTING: 'Đang dán prompt', CREATING: 'Flow đang tạo', COMPLETED: 'Đang tải về' };
 
@@ -99,6 +111,9 @@ class LuongFlow {
     const wc = t.view.webContents;
     const het = Date.now() + this.choSanSangMs;
     let lanBam = 0, ngoaiFlow = 0;
+    // Tab cũ còn nằm ở trang chủ mà tài khoản đã có dự án (người dùng vừa đăng nhập + bấm Xong) → mở thẳng dự án.
+    const urlNay = wc.getURL();
+    if (this.taiKhoan.flowUrl && urlNay && !/\/project\//.test(urlNay)) wc.loadURL(this.taiKhoan.flowUrl).catch(() => {});
     while (Date.now() < het) {
       if (this.huy !== huyLuc) return { dung: true };
       if (wc.isDestroyed()) { this.tab = null; return { ok: false, loi: 'Tab Flow đã bị đóng' }; }
@@ -124,6 +139,10 @@ class LuongFlow {
       }
       await cho(1000);
     }
+    const cd = await wc.executeJavaScript(CHAN_DOAN_TRANG, true).catch(() => null);
+    this.log('warning', `🔎 [${this.id}] Chưa vào được dự án Flow — tab đang ở ${cd ? cd.url : wc.getURL()}` +
+      (t.ready ? '' : ' (engine chưa bám được trang)') +
+      (cd ? ` · ô nhập thấy: ${cd.oNhap.join(', ') || 'không có'} · nút: ${cd.nut.join(' | ')}` : ''));
     return { ok: false, loi: `Không vào được trang dự án Flow sau ${Math.round(this.choSanSangMs / 1000)} giây` +
       ' (mục Tài khoản → Đăng nhập → mở một dự án Flow rồi bấm Xong)' };
   }
