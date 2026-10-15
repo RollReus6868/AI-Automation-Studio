@@ -1,4 +1,9 @@
-# AI Automation Studio 1.1.2
+# AI Automation Studio 1.1.3
+
+- **Sửa lỗi đăng nhập Suno bằng Google** ("Couldn't sign you in — This browser or app may not be secure"): khung đăng nhập Suno giờ dùng cùng kiểu trình duyệt với khung đăng nhập Google Flow (vốn đăng nhập Google được trong app). Nếu Google vẫn từ chối, gửi lại ảnh chụp cho người phát triển.
+- **Sửa lỗi khung đăng nhập "treo" đè lên các mục khác**: bấm *Xong, đóng lại*, chuyển sang mục khác hoặc xoá tài khoản thì khung đăng nhập đóng **ngay**; bước kiểm tài khoản chạy ngầm sau đó (trước đây khung nằm đè lên màn hình tới khi kiểm xong, có khi ~25 giây).
+
+## Bản 1.1.2
 
 - **Nhận đúng hộp "Out of Downloads" của Suno** (theo ảnh bạn gửi): tài khoản hết lượt tải thì bấm Download hiện hộp này → app nhận ra ngay, cho tài khoản đó nghỉ 6 giờ và **tạo lại + tải bài ở tài khoản Suno dự phòng**. Nhật ký ghi: *Suno hết lượt tải về: "Out of Downloads — You don't have any downloads left…"*.
 

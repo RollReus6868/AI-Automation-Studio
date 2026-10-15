@@ -84,9 +84,14 @@ function phien(tk) {
       // Google Flow: giữ nguyên phiên như Flow Automation Studio (đã chạy thật). Tải về theo TỪNG
       // tab: Electron đưa webContents vào will-download nên biết chắc file nào của tab nào.
       taiVeFlow.attach(ses);
+    } else if (tk.nen === 'suno') {
+      // Suno đăng nhập bằng Google: giữ user agent THẬT của app như phiên Flow (Google cho đăng nhập ở
+      // phiên Flow). Lỗi 15/10/2026: bỏ chữ "Electron/…" (như Muse) → Google báo "Couldn't sign you in —
+      // This browser or app may not be secure". Chỉ xin trang tiếng Anh (nhãn suno-trang.js đã đo).
+      ganTaiSuno(ses);
+      ses.setUserAgent(ses.getUserAgent(), 'en-US,en');
     } else {
-      if (tk.nen === 'suno') ganTaiSuno(ses);
-      // Bỏ chữ "Electron/…" khỏi user agent: nhiều trang chặn đăng nhập trong webview.
+      // Muse (đăng nhập Meta): bỏ chữ "Electron/…" khỏi user agent — đã chạy thật từ Muse Automation Studio.
       // Xin Muse giao diện tiếng Anh (nhãn đã đo); Muse vẫn hiện tiếng Việt thì muse-trang.js cũng hiểu.
       ses.setUserAgent(ses.getUserAgent().replace(/\s(Electron|AIAutomationStudio|ai-automation-studio|MuseAutomationStudio|muse-automation-studio)\/\S+/gi, ''), 'en-US,en');
     }
@@ -255,29 +260,28 @@ function datKhungDangNhap(k) {
     width: Math.max(200, Math.round(k.width)), height: Math.max(200, Math.round(k.height)) });
 }
 
+/**
+ * Đóng khung đăng nhập: gỡ khỏi cửa sổ NGAY rồi mới kiểm tài khoản (chạy nền, cửa sổ ẩn riêng).
+ * Lỗi 15/10/2026: gỡ khung SAU khi kiểm xong (Suno tới 25 s) → khung đăng nhập là lớp native nằm đè lên
+ * mọi mục khác, hộp thoại (vd "Xoá tài khoản?") cũng phải chờ — trông như app treo.
+ */
 async function dongDangNhap(kiem = true) {
   if (!dangNhap) return;
   const { id, view } = dangNhap;
   dangNhap = null;
-  const tk = taiKhoan.tim(id);
-  if (kiem && tk && tk.nen === 'flow') {
-    // Người dùng đang mở một dự án Flow lúc bấm Xong → luồng chạy đúng dự án đó.
-    const url = view.webContents.getURL();
-    if (/\/project\//.test(url) && url !== tk.flowUrl) {
-      taiKhoan.sua(id, { flowUrl: url });
-      if (taiKhoan.tim(id).flowUrl === url) log('info', `📁 Nhớ trang dự án Flow của "${tk.ten}": ${url}`);
-      else log('warning', `⚠ Không nhận được địa chỉ dự án Flow "${url}" — báo cho người phát triển.`);
-    }
-    await kiemTaiKhoan(id);
-  } else if (kiem && tk && tk.nen === 'suno') {
-    await kiemTaiKhoan(id);
-  } else if (kiem) {
-    const tt = await docTrangThai(view.webContents, 4000);
-    if (tt) taiKhoan.sua(id, { trangThai: tt.coONhap ? 'da-dang-nhap' : 'can-dang-nhap' });
-  }
+  const url = (() => { try { return view.webContents.getURL(); } catch (_) { return ''; } })();
   try { win.contentView.removeChildView(view); } catch (_) {}
   try { view.webContents.close(); } catch (_) {}
   baoTrangThai();
+  const tk = taiKhoan.tim(id);
+  if (!kiem || !tk) return;
+  if (tk.nen === 'flow' && /\/project\//.test(url) && url !== tk.flowUrl) {
+    // Người dùng đang mở một dự án Flow lúc bấm Xong → luồng chạy đúng dự án đó.
+    taiKhoan.sua(id, { flowUrl: url });
+    if (taiKhoan.tim(id).flowUrl === url) log('info', `📁 Nhớ trang dự án Flow của "${tk.ten}": ${url}`);
+    else log('warning', `⚠ Không nhận được địa chỉ dự án Flow "${url}" — báo cho người phát triển.`);
+  }
+  kiemTaiKhoan(id).catch((e) => log('warning', `👤 Không kiểm được "${tk.ten}": ${e.message}`));
 }
 
 async function docTrangThai(wc, ms) {
@@ -506,6 +510,7 @@ const LENH = {
   themTaiKhoan: ({ ten, nen }) => { const a = taiKhoan.them(ten, nen); baoTrangThai(); return a; },
   suaTaiKhoan: ({ id, thay }) => { taiKhoan.sua(id, thay); baoTrangThai(); },
   xoaTaiKhoan: async ({ id }) => {
+    if (dangNhap && dangNhap.id === id) await dongDangNhap(false);
     const r = taiKhoan.xoa(id);
     if (r.ok) { try { await session.fromPartition(r.taiKhoan.partition).clearStorageData(); } catch (_) {} }
     baoTrangThai();

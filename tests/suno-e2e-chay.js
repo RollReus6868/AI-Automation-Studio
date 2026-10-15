@@ -45,6 +45,29 @@ module.exports = function e2eSuno({ win, app, LENH, dieuPhoi, taiKhoan }) {
       await dangNhap('suno-1');
       kiem(await LENH.kiemTaiKhoan({ id: 'suno-1' }) === 'da-dang-nhap', 'đã đăng nhập Suno → "Đã đăng nhập"');
 
+      // 0b) Khung đăng nhập (lỗi 15/10/2026): Google chặn khi user agent bị bỏ chữ Electron; khung còn đè lên
+      // mục khác ~25 s sau khi bấm Xong (chờ kiểm tài khoản xong mới gỡ).
+      const uaSuno = session.fromPartition('persist:suno-suno-1').getUserAgent();
+      const uaFlow = session.fromPartition('persist:flow-flow-1').getUserAgent();
+      kiem(/Electron\//.test(uaSuno) && uaSuno === uaFlow, `phiên Suno dùng đúng user agent của phiên Flow (Google cho đăng nhập): ${uaSuno}`);
+      const soLop = win.contentView.children.length;
+      LENH.moDangNhap({ id: 'suno-1', khung: { x: 300, y: 100, width: 800, height: 600 } });
+      kiem(win.contentView.children.length === soLop + 1 && LENH.trangThai().dangNhap && LENH.trangThai().dangNhap.id === 'suno-1', 'mở khung đăng nhập Suno');
+      await ngu(1500);
+      await cauHinh({ treoKiem: 4000 });   // trang Suno nạp chậm → bước kiểm tài khoản sau khi đóng khung mất lâu
+      const t0 = Date.now();
+      await LENH.dongDangNhap();
+      kiem(win.contentView.children.length === soLop && !LENH.trangThai().dangNhap && Date.now() - t0 < 1000,
+        `bấm Xong → khung đăng nhập gỡ khỏi cửa sổ NGAY (${Date.now() - t0} ms), không chờ kiểm tài khoản`);
+      await cho(() => /Suno 1.*đã đăng nhập Suno/.test(LENH.trangThai().nhatKy.slice(-3).map((d) => d.chu).join('\n')), 30000, 'kiểm tài khoản chạy nền sau khi đóng khung');
+      await cauHinh({ treoKiem: 0 });
+      LENH.moDangNhap({ id: 'suno-1', khung: { x: 300, y: 100, width: 800, height: 600 } });
+      await LENH.xoaTaiKhoan({ id: 'khong-co' });
+      kiem(win.contentView.children.length === soLop + 1, 'xoá tài khoản khác không đóng khung đang mở');
+      await LENH.dongDangNhap();
+      kiem(win.contentView.children.length === soLop, 'đóng khung lần 2');
+      await ngu(200);
+
       // 1) Hai prompt nhạc ở Suno 1: Advanced, prompt vào Styles, lời trống; tải bài dài hơn trong 2 bài đầu.
       ghi('-- 1. Tạo 2 bài nhạc ở "Suno 1"');
       let nk = LENH.trangThai().nhatKy.length;

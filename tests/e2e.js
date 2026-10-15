@@ -20,7 +20,7 @@ const daGui = [];
 const flowGhi = [];   // mọi thứ engine Flow giả nhận được (mẻ, kho ảnh, chế độ…)
 let duAnFlow = ['gia-khac'];
 // Suno giả: bài lưu theo tài khoản; mỗi lần Create 4 bài (2 đủ dài, 2 bản nghe thử — bài 3 dài 4:00 làm mồi).
-const suno = { clips: {}, gui: [], tai: [], dinhDang: [], hetTai: [], hetTao: [], lan: 0 };
+const suno = { clips: {}, gui: [], tai: [], dinhDang: [], hetTai: [], hetTao: [], lan: 0, treoKiem: 0 };
 function sunoApi(req, res) {
   const json = (o) => { res.setHeader('content-type', 'application/json'); res.end(JSON.stringify(o)); };
   const body = (fn) => { let b = ''; req.setEncoding('utf8'); req.on('data', (d) => { b += d; }); req.on('end', () => { let o = {}; try { o = JSON.parse(b); } catch (_) {} fn(o); }); };
@@ -42,7 +42,7 @@ function sunoApi(req, res) {
       json({ ok: true });
     });
   }
-  if (u.pathname === '/__suno-cau-hinh') return body((o) => { if (o.hetTai) suno.hetTai = o.hetTai; if (o.hetTao) suno.hetTao = o.hetTao; json({ ok: true }); });
+  if (u.pathname === '/__suno-cau-hinh') return body((o) => { if (o.hetTai) suno.hetTai = o.hetTai; if (o.hetTao) suno.hetTao = o.hetTao; if ('treoKiem' in o) suno.treoKiem = +o.treoKiem || 0; json({ ok: true }); });
   if (u.pathname === '/__suno-gui') return json({ gui: suno.gui, tai: suno.tai, dinhDang: suno.dinhDang });
   const m = u.pathname.match(/^\/__suno-mp3\/([^/]+)$/);
   if (m) {
@@ -82,7 +82,11 @@ const sv = http.createServer((req, res) => {
     return;
   }
   if (req.url.startsWith('/__suno-')) { sunoApi(req, res); return; }
-  if (req.url.startsWith('/suno/')) { res.setHeader('content-type', 'text/html; charset=utf-8'); res.end(trangSuno); return; }
+  if (req.url.startsWith('/suno/')) {
+    // treoKiem: trang Suno nạp chậm (bài kiểm khung đăng nhập không được chờ bước kiểm tài khoản).
+    setTimeout(() => { res.setHeader('content-type', 'text/html; charset=utf-8'); res.end(trangSuno); }, suno.treoKiem);
+    return;
+  }
   if (req.url.startsWith('/fx/')) { res.setHeader('content-type', 'text/html; charset=utf-8'); res.end(trangFlow); return; }
   if (req.url.startsWith('/signin/')) { res.setHeader('content-type', 'text/html; charset=utf-8'); res.end('<!doctype html><title>Đăng nhập Google giả</title><input type=email>'); return; }
   if (req.method === 'POST' && req.url === '/__gui') {
