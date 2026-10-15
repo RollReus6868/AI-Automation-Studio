@@ -541,9 +541,37 @@ test('1.0.2: nút Xuất .txt nhật ký, Tải về hàng loạt, ba công tắ
   const html = docNguon('src/ui/index.html', true);
   for (const id of ['nutXuatLog', 'chonTai', 'cdVideoCanhAnh', 'cdXoaChat', 'cdXoaDuAnFlow']) assert.ok(html.includes(`id="${id}"`), id);
   assert.ok(/\$\('#nutXuatLog'\)\.onclick[\s\S]{0,200}api\.call\('xuatNhatKy'/.test(ui));
-  assert.ok(/\$\('#chonTai'\)\.onclick[\s\S]{0,120}api\.call\('taiNhieu', \{ ids: \[\.\.\.U\.chon\] \}/.test(ui));
+  assert.ok(/\$\('#chonTai'\)\.onclick[\s\S]{0,1500}api\.call\('taiNhieu', \{ ids, mau: U\.mauTai, tuChat: v\.tuChat \}/.test(ui), 'Tải về gửi kèm mẫu tên + tuỳ chọn lấy lại từ chat');
   const luu = ui.slice(ui.indexOf("$('#cdLuu').onclick"), ui.indexOf("toast('Đã lưu cài đặt')"));
   for (const k of ['videoCanhAnh', 'xoaChatKhiXong', 'xoaDuAnFlowKhiXong']) assert.ok(luu.includes(k), `Lưu cài đặt thiếu ${k}`);
+});
+test('1.0.3: tải về hàng loạt — file trên máy còn thì chép, mất thì lấy lại từ chat Muse, không thì báo', () => {
+  const con = new Set(['/a/1.mp4', '/a/2.png', '/a/4a.png']);
+  const v = (so, thay) => Object.assign({ id: so, so, nen: 'muse', trangThai: 'xong', files: [`/a/${so}.mp4`], thread: `https://muse.ai/thread/t${so}`, taiKhoan: 'tk-1' }, thay);
+  const kq = HD.keHoachTai([
+    v(5, { files: ['/mat/5.mp4'] }),                         // mất file, còn chat → lấy lại
+    v(1),                                                     // còn file → chép
+    v(2, { files: ['/a/2.png'], thread: '' }),                // còn file, không chat → chép
+    v(3, { files: ['/mat/3.mp4'], thread: '' }),              // mất file, hết chat → không được
+    v(4, { files: ['/a/4a.png', '/mat/4b.png'] }),            // mất 1 trong 2 file, còn chat → lấy lại cả việc
+    v(6, { nen: 'flow', files: ['/mat/6.mp4'] }),             // Flow không có chat → không được
+    v(7, { files: ['/mat/7.mp4'], thread: 'https://muse.ai/thread/new' }),   // chưa từng gửi được → không được
+    v(8, { trangThai: 'loi' }), v(9, { trangThai: 'chay' })
+  ], (f) => con.has(f));
+  assert.deepStrictEqual(kq.coFile.map((x) => `${x.j.so}:${x.i}:${x.nguon}`), ['1:0:/a/1.mp4', '2:0:/a/2.png']);
+  assert.deepStrictEqual(kq.tuChat.map((j) => j.so), [4, 5]);
+  assert.deepStrictEqual(kq.khongDuoc.map((j) => j.so), [3, 6, 7]);
+  assert.strictEqual(kq.chuaXong, 2);
+  // Đặt tên lại: mặc định {stt} — video #154 nối từ ảnh có stt 154 → 154.mp4.
+  assert.strictEqual(HD.tenFile({ ten: 'X' }, { so: 300, stt: 154, loai: 'video' }, 'video/mp4', 0, HD.MAU_TEN_ANH_MAC_DINH), '154.mp4');
+});
+test('1.0.3: main.js tải về hàng loạt — lấy lại từ chat bằng luồng chỉ MỞ chat cũ (có thread), không ghi đè file', () => {
+  const m = docNguon('main.js');
+  const t = m.slice(m.indexOf('taiNhieu: async'), m.indexOf('kiemCapNhat:'));
+  assert.ok(/hd\.keHoachTai\(/.test(t) && /LENH\.chonThuMucTai\(/.test(t));
+  assert.ok(/l\.chay\(\{ \.\.\.j, files: \[\] \}/.test(t), 'bản sao việc giữ thread → Luong đi nhánh tiepTuc, không gửi prompt');
+  assert.ok(/fs\.existsSync\(p\) \|\| daDung\.has\(p\)/.test(t), 'trùng tên → (2), không ghi đè');
+  assert.ok(/dongCuaSoAn\(w\)/.test(t) && /dangTaiNhieu = false/.test(t));
 });
 test('1.0.2: mọi công tắc trong Cài đặt đứng TRƯỚC chữ, sát lề trái', () => {
   const css = docNguon('src/ui/style.css');

@@ -447,6 +447,29 @@ module.exports = function e2e({ win, app, LENH, dieuPhoi }) {
       kiem(v16.every((j) => !j.thread) && da16.length >= 4 && !da16.some((t) => con16.includes(t)),
         `chat Muse của 4 việc đã xong bị xoá trên Muse (${da16.length} chat của mục này, còn ${da16.filter((t) => con16.includes(t)).length})`);
       LENH.datCaiDat({ xoaChatKhiXong: false });
+
+      // 17) 1.0.3: tải về hàng loạt, đặt tên mới, thư mục mới. File trên máy còn → chép; mất → mở lại
+      //     chat Muse cũ lấy file (KHÔNG gửi lại prompt); mất cả file lẫn chat → báo, không làm gì.
+      ghi('-- 17. Tải về hàng loạt: đặt tên mới, lấy lại từ chat cũ');
+      LENH.xoaViec({ ids: viec().map((j) => j.id) });
+      const d17 = LENH.taoDuAn({ ten: 'Tai lai', taiKhoan: ['tk-1'] });
+      LENH.them({ duAn: d17.id, loai: 'anh', tyLe: '1:1', prompts: ['tải lại một', 'tải lại hai', 'tải lại ba'], chay: true });
+      const v17 = viec().filter((j) => j.duAn === d17.id);
+      await cho(() => !dieuPhoi.dangChay && !dieuPhoi.coViecDangChay(), 120000, 'chạy xong 3 ảnh');
+      kiem(v17.length === 3 && v17.every((j) => j.trangThai === 'xong' && j.thread && fs.existsSync(j.files[0])), '3 ảnh xong, còn chat');
+      fs.unlinkSync(v17[1].files[0]);                          // #2: file trên máy mất, chat còn
+      fs.unlinkSync(v17[2].files[0]); v17[2].thread = '';      // #3: mất cả file lẫn chat
+      const ra17 = path.join(tam, 'tai-lai-17');
+      LENH.chonThuMucTai = async () => ra17;
+      const gui17 = (await daGui()).length;
+      const r17 = await LENH.taiNhieu({ ids: v17.map((j) => j.id), mau: 'moi/{stt}' });
+      const co17 = fs.existsSync(path.join(ra17, 'moi')) ? fs.readdirSync(path.join(ra17, 'moi')).sort() : [];
+      ghi(`   ${JSON.stringify(r17)} → ${co17.join(', ')}`);
+      kiem(r17 && r17.ok && r17.da === 2 && r17.layLai === 1 && r17.hong === 1, 'chép 1 file còn trên máy + lấy lại 1 file từ chat, báo 1 việc không lấy được');
+      kiem(co17.length === 2 && /^001\.(png|webp)$/.test(co17[0]) && /^002\.(png|webp)$/.test(co17[1]), `đặt tên mới theo mẫu moi/{stt} (${co17.join(', ')})`);
+      kiem((await daGui()).length === gui17, 'không gửi lại prompt nào lên Muse');
+      kiem(fs.existsSync(v17[1].files[0]) && path.dirname(v17[1].files[0]) === path.join(ra17, 'moi'), 'việc mất file trỏ sang bản vừa lấy lại');
+      kiem(LENH.trangThai().nhatKy.some((d) => /#\d+: không còn file, cũng không còn chat/.test(d.chu)), 'nhật ký nêu việc không lấy được');
     } catch (err) {
       ghi('LỖI KỊCH BẢN: ' + err.stack);
       loi.push('ngoại lệ');

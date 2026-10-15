@@ -286,6 +286,7 @@ function capNhatToken() {
  * @param threads  [url…] chỉ xoá các chat đó; bỏ trống → xoá MỌI chat phụ ("Main chat" Muse không cho xoá).
  */
 let dangXoaChat = false;
+let dangTaiNhieu = false;
 async function xoaChat(id, threads) {
   const tk = taiKhoan.tim(id);
   if (!tk) return { ok: false, loi: 'Không tìm thấy tài khoản' };
@@ -518,22 +519,83 @@ const LENH = {
     fs.writeFileSync(r.filePath, '\uFEFF' + String(chu || '').split(/\r?\n/).join(xd) + xd, 'utf8');
     return { ok: true, file: r.filePath };
   },
-  /** Tải về hàng loạt: chép file kết quả của các việc đã chọn vào một thư mục người dùng chọn. */
-  taiNhieu: async ({ ids }) => {
-    const files = dieuPhoi.viec.filter((j) => ids.includes(j.id)).flatMap((j) => j.files || []).filter((f) => fs.existsSync(f));
-    if (!files.length) return { ok: false, loi: 'Các việc đã chọn chưa có file kết quả nào' };
-    const r = await dialog.showOpenDialog(win, { title: `Chọn thư mục lưu ${files.length} file`, properties: ['openDirectory', 'createDirectory'] });
-    if (r.canceled || !r.filePaths[0]) return { ok: false };
-    let da = 0;
-    for (const f of files) {
-      let dich = path.join(r.filePaths[0], path.basename(f));
-      if (path.resolve(dich) === path.resolve(f)) { da++; continue; }
-      for (let n = 2; fs.existsSync(dich); n++) dich = path.join(r.filePaths[0], path.basename(f).replace(/(\.[^.]+)?$/, ` (${n})$1`));
-      fs.copyFileSync(f, dich);
-      da++;
+  /** Hộp chọn thư mục lưu khi tải về hàng loạt (bài kiểm thử thay bằng hàm giả). */
+  chonThuMucTai: async ({ soFile }) => {
+    const r = await dialog.showOpenDialog(win, { title: `Chọn thư mục lưu ${soFile} file`, properties: ['openDirectory', 'createDirectory'] });
+    return r.canceled ? '' : r.filePaths[0] || '';
+  },
+  /**
+   * Tải về hàng loạt các việc đã chọn vào một thư mục, đặt tên lại theo `mau` (mặc định {stt}).
+   * File trên máy còn → chép. Mất (vd việc làm trước 1.0.2, file nằm chỗ khác đã bị xoá) mà việc Muse còn
+   * chat → mở lại ĐÚNG chat cũ trong cửa sổ ẩn và lấy file — KHÔNG gửi lại prompt, không tốn lượt.
+   */
+  taiNhieu: async ({ ids, mau, tuChat = true }) => {
+    if (dangTaiNhieu) return { ok: false, loi: 'Đang tải về — đợi lượt trước xong đã' };
+    mau = String(mau || '').trim() || hd.MAU_TEN_ANH_MAC_DINH;
+    const ke = hd.keHoachTai(dieuPhoi.viec.filter((j) => (ids || []).includes(j.id)), (f) => fs.existsSync(f));
+    if (!tuChat) { ke.khongDuoc.push(...ke.tuChat); ke.tuChat = []; }
+    const soViec = new Set(ke.coFile.map((x) => x.j)).size + ke.tuChat.length;
+    if (!soViec) {
+      return { ok: false, loi: ke.chuaXong && !ke.khongDuoc.length ? 'Các việc đã chọn chưa xong' : 'Các việc đã chọn không còn file trên máy, cũng không còn chat Muse để lấy lại' };
     }
-    log('success', `⬇ Đã tải ${da} file về ${r.filePaths[0]}`);
-    return { ok: true, da, thuMuc: r.filePaths[0] };
+    const thuMuc = await LENH.chonThuMucTai({ soFile: soViec });
+    if (!thuMuc) return { ok: false };
+    dangTaiNhieu = true;
+    const daDung = new Set();
+    // Không bao giờ ghi đè: trùng tên (file có sẵn, hoặc hai việc cùng số thứ tự) → thêm (2), (3)…
+    const dich = (j, mime, i) => {
+      const d = dieuPhoi.duAn.find((x) => x.id === j.duAn) || { ten: 'Du_an' };
+      const goc = path.join(thuMuc, hd.tenFile(d, j, mime, i, mau));
+      let p = goc;
+      for (let n = 2; fs.existsSync(p) || daDung.has(p); n++) p = goc.replace(/(\.[^.\\/]+)$/, ` (${n})$1`);
+      daDung.add(p);
+      fs.mkdirSync(path.dirname(p), { recursive: true });
+      return p;
+    };
+    let da = 0, layLai = 0;
+    const hong = [...ke.khongDuoc.map((j) => `#${j.so}: không còn file, cũng không còn chat`)];
+    try {
+      for (const { j, i, nguon } of ke.coFile) {
+        try { fs.copyFileSync(nguon, dich(j, hd.mimeTuDuoi(nguon), i)); da++; } catch (err) { hong.push(`#${j.so}: ${err.message}`); }
+      }
+      // Lấy lại từ chat: mỗi tài khoản một cửa sổ ẩn, lần lượt từng chat.
+      const theoTk = new Map();
+      for (const j of ke.tuChat) theoTk.set(j.taiKhoan, [...(theoTk.get(j.taiKhoan) || []), j]);
+      for (const [tkId, ds] of theoTk) {
+        const tk = taiKhoan.tim(tkId);
+        if (!tk) { hong.push(...ds.map((j) => `#${j.so}: tài khoản đã bị xoá khỏi app`)); continue; }
+        log('info', `⬇ "${tk.ten}": lấy lại ${ds.length} file từ chat Muse cũ…`);
+        const w = taoCuaSoAn(tk, 'Muse · tải lại từ chat');
+        const l = new Luong({ id: 'tai-lai', taiKhoan: tk, wc: w.webContents, nguon: NGUON_TRANG, goc: GOC_MUSE, log });
+        try {
+          for (const j of ds) {
+            // Bản sao có thread → luồng chỉ mở chat và chờ lấy kết quả, không bao giờ gửi prompt.
+            const r = await l.chay({ ...j, files: [] }, {
+              tinNhan: '', files: [], png: dieuPhoi.caiDat.png, choToiDaGiay: 90, choChuGiay: 30,
+              choGui: async () => {}, capNhat: () => {}
+            });
+            if (!r.ok) { hong.push(`#${j.so}: ${r.loi || 'không lấy được từ chat'}`); continue; }
+            const cu = j.files || [];
+            const moi = r.files.map((f, i) => { const p = dich(j, f.mime, i); fs.writeFileSync(p, Buffer.from(f.b64, 'base64')); return p; });
+            layLai += moi.length;
+            da += moi.length;
+            // File cũ đã mất → app trỏ sang bản vừa tải để còn xem / nối video.
+            j.files = moi.map((p, i) => (cu[i] && fs.existsSync(cu[i]) ? cu[i] : p));
+            j.tam = false;
+            dieuPhoi.luu();
+            log('info', `⬇ #${j.so} lấy lại từ chat → ${moi[0]}`);
+          }
+        } finally {
+          dongCuaSoAn(w);
+        }
+      }
+    } finally {
+      dangTaiNhieu = false;
+      baoTrangThai();
+    }
+    for (const h of hong) log('warning', `⬇ ${h}`);
+    log(hong.length ? 'warning' : 'success', `⬇ Đã tải ${da} file về ${thuMuc}${layLai ? ` (${layLai} file lấy lại từ chat Muse)` : ''}${hong.length ? ` · ${hong.length} việc không tải được` : ''}`);
+    return { ok: true, da, layLai, hong: hong.length, thuMuc };
   },
 
   kiemCapNhat: () => capNhat && capNhat.kiemTra(),

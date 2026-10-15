@@ -219,9 +219,29 @@ function soSanhTuNhien(a, b) {
   return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' });
 }
 
+/**
+ * Tải về hàng loạt các việc đã chọn: việc nào lấy từ file trên máy, việc nào phải lấy lại từ chat Muse.
+ * Chỉ việc đã Xong. File trên máy còn → chép; mất mà việc Muse còn đường dẫn chat + tài khoản → lấy lại
+ * từ chat cũ (mở chat, KHÔNG gửi lại prompt); còn lại → không lấy được.
+ * @returns {{coFile:[{j,i,nguon}], tuChat:[j], khongDuoc:[j], chuaXong:number}}  (theo thứ tự số việc)
+ */
+function keHoachTai(viec, tonTai) {
+  const kq = { coFile: [], tuChat: [], khongDuoc: [], chuaXong: 0 };
+  for (const j of [...viec].sort((a, b) => a.so - b.so || a.id - b.id)) {
+    if (j.trangThai !== 'xong') { kq.chuaXong++; continue; }
+    const files = j.files || [];
+    const con = files.map((f, i) => ({ j, i, nguon: f })).filter((x) => x.nguon && tonTai(x.nguon));
+    if (files.length && con.length === files.length) kq.coFile.push(...con);
+    else if ((j.nen || 'muse') === 'muse' && j.thread && j.taiKhoan && !/\/thread\/new\b/.test(j.thread)) kq.tuChat.push(j);
+    else if (con.length) kq.coFile.push(...con);
+    else kq.khongDuoc.push(j);
+  }
+  return kq;
+}
+
 const HD = {
   TY_LE, MAU_MAC_DINH, MAU_TEN_MAC_DINH, MAU_TEN_ANH_MAC_DINH, PROMPT_VIDEO_MAC_DINH, slugTen, tachPrompt, timNhanVat, taoTinNhan, tenFile, mimeTuDuoi, chonKhoang,
-  viecKeTiep, taiKhoanChoViec, thoiGianDuKien, tienDoUoc, daXong, laTraLoiChu, soSanhTuNhien
+  viecKeTiep, taiKhoanChoViec, thoiGianDuKien, tienDoUoc, daXong, laTraLoiChu, soSanhTuNhien, keHoachTai
 };
 // Dùng chung cho tiến trình chính (require) và giao diện (<script> → window.HD).
 if (typeof module !== 'undefined' && module.exports) module.exports = HD;

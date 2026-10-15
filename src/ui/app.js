@@ -27,7 +27,7 @@
   function luuUi() {
     try {
       localStorage.setItem(KHOA, JSON.stringify({ trang: U.trang, duAn: U.duAn, loc: U.loc, moiNhat: U.moiNhat, cheDo: U.cheDo,
-        tyLe: U.tyLe, nhap: U.nhap, tvLoc: U.tvLoc, tvDuAn: U.tvDuAn, chuoi: U.chuoi, promptThuMuc: U.promptThuMuc, nen: U.nen, locNen: U.locNen }));
+        tyLe: U.tyLe, nhap: U.nhap, tvLoc: U.tvLoc, tvDuAn: U.tvDuAn, chuoi: U.chuoi, promptThuMuc: U.promptThuMuc, nen: U.nen, locNen: U.locNen, mauTai: U.mauTai }));
     } catch (_) {}
   }
 
@@ -1003,8 +1003,16 @@
       toast(r && r.ok ? `Đã xoá ${r.da} đoạn chat${r.hong ? ` · ${r.hong} không xoá được` : ''}${r.boQua ? ` · ${r.boQua} việc không có chat` : ''}` : (r && r.loi) || 'Không xoá được', !(r && r.ok) || !!r.hong);
     };
     $('#chonTai').onclick = async () => {
-      const r = await api.call('taiNhieu', { ids: [...U.chon] });
-      if (r && r.ok) toast(`Đã tải ${r.da} file về ${r.thuMuc}`);
+      const ids = [...U.chon];
+      const v = await hoi({ tieuDe: `Tải về ${ids.length} việc đã chọn`, ok: 'Chọn thư mục…', html: `
+        <label>Đặt tên file<input name="mau" value="${esc(U.mauTai || HD.MAU_TEN_ANH_MAC_DINH)}" placeholder="${HD.MAU_TEN_ANH_MAC_DINH}"></label>
+        <small><code>{stt}</code> số thứ tự prompt (154 → <code>154.mp4</code>) · <code>{tenAnh}</code> tên ảnh nguồn · <code>{duAn}</code> · <code>{so}</code> · <code>{prompt}</code> · <code>{ngay}</code> · dấu <code>/</code> tạo thư mục con. Trùng tên thì thêm (2), không ghi đè.</small>
+        <label class="hang-tk"><input type="checkbox" name="tuChat" checked>File trên máy không còn thì lấy lại từ chat Muse cũ (không gửi lại prompt, không tốn lượt)</label>` });
+      if (!v) return;
+      U.mauTai = v.mau.trim(); luuUi();
+      toast('Đang tải về… (xem Nhật ký)');
+      const r = await api.call('taiNhieu', { ids, mau: U.mauTai, tuChat: v.tuChat });
+      if (r && r.ok) toast(`Đã tải ${r.da} file về ${r.thuMuc}${r.layLai ? ` · ${r.layLai} lấy lại từ chat Muse` : ''}${r.hong ? ` · ${r.hong} việc không tải được (xem Nhật ký)` : ''}`, !!r.hong);
       else if (r && r.loi) toast(r.loi, true);
     };
     $('#chonChayLai').onclick = async () => {
