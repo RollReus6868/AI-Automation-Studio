@@ -403,8 +403,8 @@ module.exports = function e2e({ win, app, LENH, dieuPhoi }) {
         document.querySelector('#hopOk').click(); })()`);
       await cho(() => LENH.trangThai().duAn.some((d) => d.ten === 'Du phong'), 5000, 'tạo dự án');
       const d15 = LENH.trangThai().duAn.find((d) => d.ten === 'Du phong');
-      // Hộp có thêm nhóm Google Flow (tài khoản chính "Flow 1") — phần Muse phải đúng [chính, dự phòng].
-      kiem(d15 && JSON.stringify(d15.taiKhoan.filter((id) => id !== 'flow-1')) === JSON.stringify(['tk-1', tk3.id]), `dự án nhớ [chính, dự phòng] (${d15 && JSON.stringify(d15.taiKhoan)})`);
+      // Hộp có thêm nhóm Google Flow và Suno (tài khoản chính "Flow 1", "Suno 1") — phần Muse phải đúng [chính, dự phòng].
+      kiem(d15 && JSON.stringify(d15.taiKhoan.filter((id) => id !== 'flow-1' && id !== 'suno-1')) === JSON.stringify(['tk-1', tk3.id]), `dự án nhớ [chính, dự phòng] (${d15 && JSON.stringify(d15.taiKhoan)})`);
       kiem(await choJs(`document.querySelector('#chuTkDuAn').textContent === 'Muse 1 +1 dự phòng'`, 5000, 'nút tài khoản dự án'), 'nút cạnh tên dự án hiện tài khoản chính + số dự phòng');
       LENH.xoaViec({ ids: viec().filter((j) => j.trangThai === 'cho').map((j) => j.id) });   // việc chờ sót của các mục trước
       const gui15 = (await daGui()).length, nk15 = LENH.trangThai().nhatKy.length;

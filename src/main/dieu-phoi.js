@@ -18,7 +18,11 @@ const { chuanHoaFlow, khoaMe } = require('../flow/cai-dat-flow');
 
 const NGHI_MS = 15 * 60 * 1000;   // tài khoản lỗi liên tiếp / mất kết nối → tạm nghỉ chừng này
 const LOI_LIEN_TIEP_NGHI = 2;      // lỗi liên tiếp bao nhiêu việc thì cho tài khoản tạm nghỉ
-const TEN_NEN = { muse: 'Muse', flow: 'Flow' };
+const TEN_NEN = { muse: 'Muse', flow: 'Flow', suno: 'Suno' };
+// Suno báo hết lượt (tạo / tải về) → tài khoản nghỉ lâu, việc tạo lại ở tài khoản dự phòng.
+const NGHI_HET_LUOT_MS = 6 * 60 * 60 * 1000;
+const chuanNen = (n) => (n === 'flow' || n === 'suno' ? n : 'muse');
+const TEN_LOAI = { anh: 'ảnh', video: 'video', nhac: 'nhạc' };
 
 const CAI_DAT_MAC_DINH = {
   thuMucAnh: '',          // trống = Tài liệu/AI Automation Studio (thư mục chung của Muse và Flow)
@@ -29,6 +33,9 @@ const CAI_DAT_MAC_DINH = {
   tenVideo: hd.MAU_TEN_MAC_DINH,
   videoCanhAnh: true,     // video nối từ ảnh: lưu cạnh ảnh nguồn, cùng tên (325.jpg → 325.mp4)
   thuMucVideoAnh: '',     // 1.0.4: tắt "cạnh ảnh" + chọn thư mục này → video nối từ ảnh lưu ở đây, vẫn cùng tên ảnh
+  thuMucNhac: '',         // 1.1.0: mục Tạo nhạc (Suno) — trống = Tài liệu/AI Automation Studio
+  tenNhac: hd.MAU_TEN_ANH_MAC_DINH,   // {stt}: bài của prompt 12 → 012.mp3
+  choNhacGiay: 600,       // chờ tối đa Suno tạo xong một bài (bình thường 1–3 phút)
   xoaChatKhiXong: false,  // chạy hết hàng chờ → xoá chat Muse của các việc đã xong
   xoaDuAnFlowKhiXong: false, // chạy hết hàng chờ → xoá dự án Flow đã dùng (lần sau app tự mở dự án mới)
   luongMoiTK: 3,          // số luồng chạy song song mỗi tài khoản
@@ -102,7 +109,7 @@ class DieuPhoi {
 
   log(m, c) { this.o.log(m, c); }
   thuMucRa(loai) {
-    return (loai === 'video' ? this.caiDat.thuMucVideo : this.caiDat.thuMucAnh) || this.o.thuMucRaMacDinh;
+    return ({ video: this.caiDat.thuMucVideo, nhac: this.caiDat.thuMucNhac }[loai] ?? this.caiDat.thuMucAnh) || this.o.thuMucRaMacDinh;
   }
 
   luu() {
@@ -115,10 +122,10 @@ class DieuPhoi {
     return {
       duAn: this.duAn, viec: this.viec, nhanVat: this.nhanVat, caiDat: this.caiDat,
       mauPrompt: this.mauPrompt, dangChay: this.dangChay,
-      thuMuc: { anh: this.thuMucRa('anh'), video: this.thuMucRa('video') },
+      thuMuc: { anh: this.thuMucRa('anh'), video: this.thuMucRa('video'), nhac: this.thuMucRa('nhac') },
       luong: this.luong.map((x) => ({ id: x.luong.id, taiKhoanId: x.taiKhoanId, nen: x.luong.nen || 'muse',
         viecId: x.luong.viec ? x.luong.viec.id : null })),
-      duKien: { anh: hd.thoiGianDuKien(this.viec, 'anh'), video: hd.thoiGianDuKien(this.viec, 'video') }
+      duKien: { anh: hd.thoiGianDuKien(this.viec, 'anh'), video: hd.thoiGianDuKien(this.viec, 'video'), nhac: hd.thoiGianDuKien(this.viec, 'nhac') }
     };
   }
 
@@ -155,7 +162,13 @@ class DieuPhoi {
   _dsTk(duAnId, nen = 'muse') {
     return this._dsTkGoc(duAnId, nen).filter((id) => { const a = this.o.taiKhoan.tim(id); return a && a.trangThai !== 'can-dang-nhap'; });
   }
-  _nghi(id) { return (this.nghiDen[id] || 0) > Date.now(); }
+  _nghi(id) {
+    if ((this.nghiDen[id] || 0) > Date.now()) return true;
+    // Hết lượt Suno: nhớ trên tài khoản (qua cả lần tắt app, bấm Chạy lại cũng không xoá — tạo lại ở
+    // tài khoản hết lượt tải chỉ phí credit). "Kiểm tra" tài khoản đó thì xoá.
+    const a = this.o.taiKhoan.tim(id);
+    return !!(a && (a.hetLuotDen || 0) > Date.now());
+  }
   _tenTk(id) { const a = this.o.taiKhoan.tim(id); return a ? a.ten : id; }
 
   doiTenDuAn(id, ten) {
@@ -186,8 +199,9 @@ class DieuPhoi {
     const chon = hd.chonKhoang(tatCa, p.tuSo, p.denSo);
     if (!chon.length) return { ok: false, loi: `Khoảng prompt không hợp lệ (chỉ có ${tatCa.length} prompt)` };
     const soBan = Math.max(1, Math.min(10, parseInt(p.soBan, 10) || 1));
-    const loai = p.loai === 'video' ? 'video' : 'anh';
-    const nen = p.nen === 'flow' ? 'flow' : 'muse';
+    // Suno chỉ tạo nhạc, và nhạc chỉ tạo ở Suno.
+    const nen = p.loai === 'nhac' ? 'suno' : chuanNen(p.nen) === 'flow' ? 'flow' : 'muse';
+    const loai = nen === 'suno' ? 'nhac' : p.loai === 'video' ? 'video' : 'anh';
     // Ảnh xong → tự tạo video, chạy ở Muse hoặc Flow tuỳ người dùng chọn (mặc định cùng nền tảng với ảnh).
     const cv = p.chuoiVideo && String(p.chuoiVideo.prompt || '').trim() && loai === 'anh'
       ? { prompt: String(p.chuoiVideo.prompt).trim(), tyLe: hd.TY_LE.includes(p.chuoiVideo.tyLe) ? p.chuoiVideo.tyLe : '',
@@ -205,7 +219,7 @@ class DieuPhoi {
     this.viec.push(...moi);
     this.luu();
     const khoang = chon.length < tatCa.length ? ` (prompt ${chon[0].stt}–${chon[chon.length - 1].stt})` : '';
-    this.log('info', `➕ Thêm ${moi.length} việc ${loai === 'video' ? 'video' : 'ảnh'} ${TEN_NEN[nen]}${khoang} vào "${d.ten}"` +
+    this.log('info', `➕ Thêm ${moi.length} việc ${TEN_LOAI[loai]} ${TEN_NEN[nen]}${khoang} vào "${d.ten}"` +
       (cv ? ` — ảnh xong sẽ tự tạo video ở ${TEN_NEN[cv.nen]}` : ''));
     if (p.chay) this.chayTatCa();
     return { ok: true, so: moi.length };
@@ -214,7 +228,7 @@ class DieuPhoi {
   _viecMoi(d, v) {
     d.so += 1;
     return {
-      id: this.idMoi++, nen: v.nen === 'flow' ? 'flow' : 'muse', duAn: d.id, so: d.so, stt: v.stt || d.so, loai: v.loai,
+      id: this.idMoi++, nen: chuanNen(v.nen), duAn: d.id, so: d.so, stt: v.stt || d.so, loai: v.loai,
       prompt: v.prompt, tyLe: hd.TY_LE.includes(v.tyLe) ? v.tyLe : '9:16', thamChieu: v.thamChieu || [],
       nhanVat: v.nhanVat || [], chuoi: v.chuoi || null, tuAnh: v.tuAnh || 0,
       trangThai: 'cho', buoc: '', thread: '', taiKhoan: '', files: [], tam: false, loi: '', thu: 0,
@@ -310,6 +324,9 @@ class DieuPhoi {
     m.taiAnh = m.taiAnh !== false; m.taiVideo = m.taiVideo !== false; m.tatMayKhiXong = !!m.tatMayKhiXong;
     m.videoCanhAnh = m.videoCanhAnh !== false; m.xoaChatKhiXong = !!m.xoaChatKhiXong; m.xoaDuAnFlowKhiXong = !!m.xoaDuAnFlowKhiXong;
     m.thuMucVideoAnh = String(m.thuMucVideoAnh || '').trim();
+    m.thuMucNhac = String(m.thuMucNhac || '').trim();
+    m.tenNhac = String(m.tenNhac || '').trim() || hd.MAU_TEN_ANH_MAC_DINH;
+    m.choNhacGiay = so(m.choNhacGiay, 120, 3600, 600);
     m.nghiGiuaLanGui = so(m.nghiGiuaLanGui, 0, 120, 3);
     m.choAnhGiay = so(m.choAnhGiay, 60, 1800, 180);
     m.choVideoGiay = so(m.choVideoGiay, 120, 3600, 300);
@@ -367,7 +384,8 @@ class DieuPhoi {
    *  dự phòng chưa cần thì không mở luồng — khỏi tốn máy, khỏi đụng token. */
   _canLuong(can) {
     // Muse: N luồng mỗi tài khoản; Flow: N tab mỗi tài khoản (mỗi tab chạy một mẻ).
-    const muon = (id) => { const a = this.o.taiKhoan.tim(id); return a && a.nen === 'flow' ? this.caiDat.flow.tabMoiTK : this.caiDat.luongMoiTK; };
+    // Suno: 1 luồng mỗi tài khoản — các bài mới hiện chung một danh sách, hai luồng cùng tài khoản dễ nhận nhầm bài.
+    const muon = (id) => { const a = this.o.taiKhoan.tim(id); return !a ? 0 : a.nen === 'flow' ? this.caiDat.flow.tabMoiTK : a.nen === 'suno' ? 1 : this.caiDat.luongMoiTK; };
     for (const x of [...this.luong]) {
       const dem = this.luong.filter((y) => y.taiKhoanId === x.taiKhoanId).indexOf(x);
       if (x.luong.ranh && (!can.has(x.taiKhoanId) || dem >= muon(x.taiKhoanId))) {
@@ -457,10 +475,17 @@ class DieuPhoi {
       // Còn việc chờ mà không tài khoản nào của dự án chạy được (chưa đăng nhập / đang tạm nghỉ).
       this.dangChay = false;
       const ly = [...new Set([...nhamToi.keys()].flatMap((j) => this._dsTkGoc(j.duAn, j.nen)))]
-        .map((id) => { const a = this.o.taiKhoan.tim(id); return a ? `"${a.ten}": ${this.lyDoNghi[id] || (a.trangThai === 'can-dang-nhap' ? 'chưa đăng nhập' : 'đang lỗi')}` : null; })
+        .map((id) => {
+          const a = this.o.taiKhoan.tim(id);
+          if (!a) return null;
+          const hetLuot = (a.hetLuotDen || 0) > Date.now() ? `hết lượt, nghỉ đến ${new Date(a.hetLuotDen).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}` : '';
+          return `"${a.ten}": ${hetLuot || this.lyDoNghi[id] || (a.trangThai === 'can-dang-nhap' ? 'chưa đăng nhập' : 'đang lỗi')}`;
+        })
         .filter(Boolean);
+      const coSuno = [...nhamToi.keys()].some((j) => j.nen === 'suno');
       this.log('error', `⏸ Không còn tài khoản nào chạy được việc đang chờ (${ly.join(' · ') || 'chưa có tài khoản'}) — đã TẠM DỪNG hàng chờ (không phí lượt). ` +
-        'Kiểm tra Muse / Flow, đăng nhập lại rồi bấm Chạy tất cả — việc Muse đã gửi sẽ lấy tiếp kết quả từ chat cũ.');
+        'Kiểm tra Muse / Flow, đăng nhập lại rồi bấm Chạy tất cả — việc Muse đã gửi sẽ lấy tiếp kết quả từ chat cũ.' +
+        (coSuno ? ' Suno hết lượt: thêm tài khoản Suno dự phòng, hoặc bấm Kiểm tra ở tài khoản đã có lượt lại.' : ''));
       this.o.bao();
     }
   }
@@ -482,10 +507,10 @@ class DieuPhoi {
     }
     const cd = this.caiDat;
     const r = await x.luong.chay(j, {
-      tinNhan: hd.taoTinNhan(j, nv, cd.mau),
+      tinNhan: j.loai === 'nhac' ? j.prompt : hd.taoTinNhan(j, nv, cd.mau),   // Suno: prompt nguyên văn vào ô Styles
       files,
       png: cd.png,
-      choToiDaGiay: j.loai === 'video' ? cd.choVideoGiay : cd.choAnhGiay,
+      choToiDaGiay: j.loai === 'nhac' ? cd.choNhacGiay : j.loai === 'video' ? cd.choVideoGiay : cd.choAnhGiay,
       choChuGiay: j.loai === 'video' ? cd.choChuGiay * 2 : cd.choChuGiay,
       choGui: () => this.choGui(x.taiKhoanId),
       capNhat: (thay) => { Object.assign(j, thay); this.luu(); }
@@ -529,10 +554,10 @@ class DieuPhoi {
     const d = this.duAn.find((x) => x.id === j.duAn) || { ten: 'Du_an' };
     if (r.ok) {
       try {
-        const video = j.loai === 'video';
-        const tai = video ? this.caiDat.taiVideo : this.caiDat.taiAnh;
+        const video = j.loai === 'video', nhac = j.loai === 'nhac';
+        const tai = nhac || (video ? this.caiDat.taiVideo : this.caiDat.taiAnh);   // nhạc luôn tải về
         let goc = tai ? this.thuMucRa(j.loai) : this.o.thuMucTam;
-        let mau = video ? this.caiDat.tenVideo : this.caiDat.tenAnh;
+        let mau = nhac ? this.caiDat.tenNhac : video ? this.caiDat.tenVideo : this.caiDat.tenAnh;
         // Video nối từ ảnh (Flow ⇄ Muse): lưu NGAY CẠNH ảnh nguồn, cùng tên — 325.jpg → 325.mp4. Người dùng
         // đặt thư mục ảnh riêng mà video vẫn vào thư mục mặc định thì tưởng video không được tải về
         // (nhật ký 15/10/2026: ảnh "325.jpg", video "Mac_dinh\Mac_dinh_270.mp4" ở chỗ khác).
@@ -565,7 +590,7 @@ class DieuPhoi {
         Object.assign(j, { trangThai: 'xong', buoc: '', xongLuc: Date.now(), loi: '', tam: !tai });
         if (r.flowTen) j.flowTen = { tk: j.taiKhoan, ten: r.flowTen };
         this.loiLienTiep[j.taiKhoan] = 0;
-        this.log('success', `✅ [HỆ THỐNG] Việc #${j.so} xong ${video ? 'video' : 'ảnh'}: ` +
+        this.log('success', `✅ [HỆ THỐNG] Việc #${j.so} xong ${TEN_LOAI[j.loai] || 'ảnh'}${r.ghiChu ? ` (${r.ghiChu})` : ''}: ` +
           (tai ? j.files[0] : `${path.basename(j.files[0])} (không tải về — chỉ giữ trong app)`));
         this._noiVideo(j, d);
       } catch (err) {
@@ -581,6 +606,16 @@ class DieuPhoi {
       Object.assign(j, { trangThai: 'cho', buoc: '', loi: r.loi });
       if (!r.giuThread) j.thread = '';
       if (!r.daNghi) this._choNghi(j.taiKhoan, r.loi);
+    } else if (r.hetLuot) {
+      // Suno báo tài khoản hết lượt tạo / tải về: không phải lỗi của việc — tài khoản nghỉ lâu, việc về
+      // hàng chờ và TẠO LẠI ở tài khoản dự phòng kế tiếp (không tính lần thử). Không còn tài khoản nào
+      // → _vong tạm dừng hàng chờ.
+      const tkId = j.taiKhoan;
+      Object.assign(j, { trangThai: 'cho', buoc: '', loi: r.loi, thread: '' });
+      if (tk) this.o.taiKhoan.sua(tkId, { hetLuotDen: Date.now() + NGHI_HET_LUOT_MS, lyDoHetLuot: r.loi });
+      this.lyDoNghi[tkId] = r.loi;
+      const sang = hd.taiKhoanChoViec({ tkLoi: [] }, this._dsTk(j.duAn, j.nen), (id) => this._nghi(id));
+      this.log('warning', `↪ #${j.so} ${r.loi} (ở "${this._tenTk(tkId)}")${sang ? ` — tạo lại ở "${this._tenTk(sang)}"` : ' — không còn tài khoản dự phòng nào còn lượt'}`);
     } else if (r.canDangNhap) {
       Object.assign(j, { trangThai: 'cho', buoc: '' });
       if (!r.giuThread) j.thread = '';
@@ -634,10 +669,11 @@ class DieuPhoi {
     if (!id || this._nghi(id)) return;
     this.nghiDen[id] = Date.now() + ms;
     this.lyDoNghi[id] = lyDo;
-    this.log('warning', `⚠ "${this._tenTk(id)}": ${lyDo} — tạm nghỉ tài khoản này ${Math.round(ms / 60000)} phút, việc chuyển sang tài khoản dự phòng (nếu có).`);
+    const lau = ms >= 2 * 3600000 ? `${Math.round(ms / 3600000)} giờ` : `${Math.round(ms / 60000)} phút`;
+    this.log('warning', `⚠ "${this._tenTk(id)}": ${lyDo} — tạm nghỉ tài khoản này ${lau}, việc chuyển sang tài khoản dự phòng (nếu có).`);
   }
 
   dong() { clearInterval(this.hen); for (const x of this.luong) x.luong.dung(); }
 }
 
-module.exports = { DieuPhoi, CAI_DAT_MAC_DINH };
+module.exports = { DieuPhoi, CAI_DAT_MAC_DINH, NGHI_HET_LUOT_MS };

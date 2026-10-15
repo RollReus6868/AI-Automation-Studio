@@ -16,6 +16,7 @@
     <nav id="nav">
       <button data-trang="anh"><i data-icon="image"></i><span>Tạo ảnh</span></button>
       <button data-trang="video"><i data-icon="video"></i><span>Tạo video</span></button>
+      <button data-trang="nhac"><i data-icon="music"></i><span>Tạo nhạc</span></button>
       <button data-trang="nhanvat"><i data-icon="user-plus"></i><span>Nhân vật</span></button>
       <button data-trang="thuvien"><i data-icon="layout-grid"></i><span>Thư viện</span></button>
       <button data-trang="taikhoan"><i data-icon="contact"></i><span>Tài khoản</span></button>
@@ -45,7 +46,7 @@
       <div class="gian"></div>
       <button class="chip chip-moi" id="chipCapNhat" hidden><i data-icon="sparkles"></i><span></span></button>
       <span class="chip" id="chipChay"><span class="cham"></span><span>Đang nghỉ</span></span>
-      <span class="chip" id="chipHomNay"><i data-icon="crown"></i><span>Hôm nay 0 ảnh · 0 video</span></span>
+      <span class="chip" id="chipHomNay"><i data-icon="crown"></i><span>Hôm nay 0 ảnh · 0 video · 0 nhạc</span></span>
       <button class="nut-gradient" id="nutChayTatCa"><i data-icon="play"></i><span>Chạy tất cả</span></button>
     </header>
 
@@ -58,19 +59,19 @@
           <div class="menu menu-phai menu-mau" id="menuMau" hidden></div>
         </div>
         <div class="cuon">
-          <label class="nhan">Chạy trên</label>
-          <div class="phan-doan" id="nenTao">
+          <label class="nhan khong-nhac">Chạy trên</label>
+          <div class="phan-doan khong-nhac" id="nenTao">
             <button data-v="muse" class="on">Muse</button>
             <button data-v="flow">Google Flow</button>
           </div>
           <small class="mo ghi-nen" id="ghiNen"></small>
 
-          <label class="nhan">Chế độ tạo</label>
-          <div class="phan-doan" id="cheDo">
+          <label class="nhan khong-nhac">Chế độ tạo</label>
+          <div class="phan-doan khong-nhac" id="cheDo">
             <button data-v="tudo" class="on">Tự do</button>
             <button data-v="nguoimau">Người mẫu</button>
           </div>
-          <div id="khuNguoiMau" hidden>
+          <div id="khuNguoiMau" class="khong-nhac" hidden>
             <label class="nhan">Chọn nhân vật gắn vào mọi prompt</label>
             <div class="chips-nv" id="chonNhanVat"></div>
           </div>
@@ -86,15 +87,15 @@
             <span class="mo" id="ghiKhoang"></span>
           </div>
 
-          <label class="nhan">Ảnh tham chiếu <small>(tùy chọn)</small></label>
-          <div class="tha-anh" id="thaAnh">
+          <label class="nhan khong-nhac">Ảnh tham chiếu <small>(tùy chọn)</small></label>
+          <div class="tha-anh khong-nhac" id="thaAnh">
             <i data-icon="image"></i>
             <div>Kéo thả ảnh vào đây</div>
             <small><a id="nutChonAnh">hoặc nhấn để chọn ảnh</a> · <a id="nutChonThuMuc">chọn thư mục</a></small>
           </div>
-          <div class="ds-tham-chieu" id="dsThamChieu"></div>
+          <div class="ds-tham-chieu khong-nhac" id="dsThamChieu"></div>
 
-          <div class="dong-cong-tac">
+          <div class="dong-cong-tac khong-nhac">
             <div>
               <b>Giữ nguyên nhân vật</b> <i data-icon="info" title="Prompt nhắc tên nhân vật nào thì tự gửi kèm ảnh nhân vật đó"></i>
               <small>Tự gửi kèm ảnh nhân vật khi prompt nhắc tên, giữ khuôn mặt và đặc điểm.</small>
@@ -102,8 +103,8 @@
             <label class="cong-tac"><input type="checkbox" id="tuNhanVat" checked><span></span></label>
           </div>
 
-          <label class="nhan">Tỷ lệ khung hình</label>
-          <div class="ty-le" id="tyLe">
+          <label class="nhan khong-nhac">Tỷ lệ khung hình</label>
+          <div class="ty-le khong-nhac" id="tyLe">
             <button data-v="9:16" class="on"><i data-icon="rectangle-vertical"></i>9:16</button>
             <button data-v="16:9"><i data-icon="rectangle-horizontal"></i>16:9</button>
             <button data-v="1:1"><i data-icon="square"></i>1:1</button>
@@ -111,7 +112,7 @@
             <button data-v="3:4"><i data-icon="rectangle-vertical"></i>3:4</button>
           </div>
 
-          <div class="khoi-chuoi" id="khuVideoThuMuc">
+          <div class="khoi-chuoi khong-nhac" id="khuVideoThuMuc">
             <div class="dong-cong-tac">
               <div>
                 <b>Tạo video từ thư mục ảnh</b>
@@ -123,7 +124,7 @@
             <textarea id="promptThuMuc" rows="3" spellcheck="false" placeholder="Prompt dùng chung cho mọi ảnh trong thư mục, vd: nhân vật quay đầu mỉm cười, tóc bay nhẹ trong gió"></textarea>
           </div>
 
-          <div class="khoi-chuoi" id="khuChuoi">
+          <div class="khoi-chuoi khong-nhac" id="khuChuoi">
             <div class="dong-cong-tac">
               <div>
                 <b>Ảnh xong → tự tạo video</b>
@@ -157,16 +158,16 @@
               <label>đến prompt số<input type="number" id="denSo" min="1" placeholder="cuối"></label>
             </div>
             <label>Thêm vào cuối mỗi prompt<input type="text" id="hauTo" placeholder="vd: phong cách điện ảnh, ánh sáng mềm"></label>
-            <label>Số luồng mỗi tài khoản <small>(áp dụng ngay, cả khi đang chạy)</small><input type="number" id="luongNhanh" min="1" max="20"></label>
-            <small class="mo">Ảnh trong "chọn thư mục" được gán lần lượt: ảnh 1 → prompt 1, ảnh 2 → prompt 2… (xếp theo tên).</small>
+            <label class="khong-nhac">Số luồng mỗi tài khoản <small>(áp dụng ngay, cả khi đang chạy)</small><input type="number" id="luongNhanh" min="1" max="20"></label>
+            <small class="mo khong-nhac">Ảnh trong "chọn thư mục" được gán lần lượt: ảnh 1 → prompt 1, ảnh 2 → prompt 2… (xếp theo tên).</small>
 
             <div class="nhom-tai">
-              <div class="dong-cong-tac"><div><b id="ncNhanTai">Tải ảnh về</b><small>Tắt: chỉ giữ trong app (vẫn xem, vẫn làm video được).</small></div><label class="cong-tac"><input type="checkbox" id="ncTai"><span></span></label></div>
+              <div class="dong-cong-tac khong-nhac"><div><b id="ncNhanTai">Tải ảnh về</b><small>Tắt: chỉ giữ trong app (vẫn xem, vẫn làm video được).</small></div><label class="cong-tac"><input type="checkbox" id="ncTai"><span></span></label></div>
               <label id="ncNhanThuMuc">Thư mục lưu ảnh</label>
               <div class="dong-o"><input id="ncThuMuc" readonly><button class="nut-vien nho" id="ncChonThuMuc">Đổi…</button><button class="nut-vien nho" id="ncMoThuMuc">Mở</button></div>
               <label id="ncNhanTen">Tên file ảnh<input id="ncTen" placeholder="{duAn}/{duAn}_{so}"></label>
               <small class="mo" id="ncViDu"></small>
-              <small class="mo">Ký hiệu: <code>{duAn}</code> tên dự án · <code>{so}</code> số trong hàng đợi · <code>{stt}</code> dòng prompt thứ mấy · <code>{prompt}</code> vài chữ đầu · <code>{ngay}</code> ngày · <code>{loai}</code> anh/video · <code>{tenAnh}</code> tên ảnh nguồn (video từ ảnh). <code>/</code> = thư mục con. Trùng tên tự thêm (2), không ghi đè.</small>
+              <small class="mo">Ký hiệu: <code>{duAn}</code> tên dự án · <code>{so}</code> số trong hàng đợi · <code>{stt}</code> dòng prompt thứ mấy · <code>{prompt}</code> vài chữ đầu · <code>{ngay}</code> ngày · <code>{loai}</code> anh/video · <code>{tenAnh}</code> tên ảnh nguồn (video từ ảnh).<span class="chi-nhac"> Trang nhạc: <code>{loai}</code> = nhac, file là .mp3.</span> <code>/</code> = thư mục con. Trùng tên tự thêm (2), không ghi đè.</small>
             </div>
           </details>
         </div>
@@ -188,7 +189,7 @@
           <label class="chon-het" title="Chọn / bỏ chọn mọi việc đang hiện trong danh sách"><input type="checkbox" id="chonHet"><span>Chọn hết</span></label>
           <div class="tabs-loc" id="tabsLoc"></div>
           <div class="gian"></div>
-          <select class="loc-nen" id="locNen" title="Lọc theo nơi chạy"><option value="">Muse + Flow</option><option value="muse">Chỉ Muse</option><option value="flow">Chỉ Flow</option></select>
+          <select class="loc-nen khong-nhac" id="locNen" title="Lọc theo nơi chạy"><option value="">Muse + Flow</option><option value="muse">Chỉ Muse</option><option value="flow">Chỉ Flow</option></select>
           <button class="nut-vien nho" id="nutDatLai" title="Đưa mọi việc của hàng đợi này về Chờ như lúc mới thêm"><i data-icon="rotate-ccw"></i><span>Đặt lại</span></button>
           <button class="nut-vien nho" id="nutSapXep"><i data-icon="arrow-down-up"></i><span>Mới nhất</span></button>
         </div>
@@ -196,7 +197,7 @@
           <span id="soChon">0 đã chọn</span>
           <button class="nut-vien nho" id="chonTai" title="Chép file kết quả của các việc đã chọn vào một thư mục"><i data-icon="download"></i>Tải về</button>
           <button class="nut-vien nho" id="chonChayLai"><i data-icon="rotate-ccw"></i>Tạo lại</button>
-          <button class="nut-vien nho" id="chonXoaChat" title="Xoá đoạn chat trên muse.ai của các việc đã chọn"><i data-icon="message-square-x"></i>Xoá chat Muse</button>
+          <button class="nut-vien nho khong-nhac" id="chonXoaChat" title="Xoá đoạn chat trên muse.ai của các việc đã chọn"><i data-icon="message-square-x"></i>Xoá chat Muse</button>
           <button class="nut-vien nho do" id="chonXoa"><i data-icon="trash-2"></i>Xoá</button>
           <button class="nut-vien nho" id="chonBo"><i data-icon="x"></i>Bỏ chọn</button>
         </div>
@@ -230,7 +231,7 @@
         <div class="panel-dau">
           <h2><i data-icon="layout-grid"></i>Thư viện</h2>
           <div class="tabs-loc" id="locThuVien">
-            <button data-v="tat" class="on">Tất cả</button><button data-v="anh">Ảnh</button><button data-v="video">Video</button>
+            <button data-v="tat" class="on">Tất cả</button><button data-v="anh">Ảnh</button><button data-v="video">Video</button><button data-v="nhac">Nhạc</button>
           </div>
           <div class="gian"></div>
           <label class="o-chon">Dự án <select id="duAnThuVien"></select></label>
@@ -248,9 +249,10 @@
             <button class="nut-vien nho" id="nutCapNhatToken" title="Đọc lại mức dùng token của mọi tài khoản Muse"><i data-icon="refresh-cw"></i>Cập nhật token</button>
             <button class="nut-gradient nho" id="nutThemTK"><i data-icon="plus"></i>Thêm Muse</button>
             <button class="nut-gradient nho" id="nutThemTKFlow"><i data-icon="plus"></i>Thêm Flow</button>
+            <button class="nut-gradient nho" id="nutThemTKSuno"><i data-icon="plus"></i>Thêm Suno</button>
           </div>
         </div>
-        <p class="mo">Mỗi tài khoản đăng nhập riêng một lần trong khung bên phải, app nhớ phiên (app không bao giờ hỏi hay lưu mật khẩu). Mỗi dự án chọn một tài khoản <b>chính</b> và các tài khoản <b>dự phòng</b> cho từng nơi chạy — bấm nút tài khoản cạnh tên dự án. Muse: <b id="soLuongTK">3</b> luồng mỗi tài khoản; Flow: <b id="soTabFlow">1</b> tab mỗi tài khoản. Việc lỗi ở tài khoản chính thì chuyển ngay sang dự phòng.</p>
+        <p class="mo">Mỗi tài khoản đăng nhập riêng một lần trong khung bên phải, app nhớ phiên (app không bao giờ hỏi hay lưu mật khẩu). Mỗi dự án chọn một tài khoản <b>chính</b> và các tài khoản <b>dự phòng</b> cho từng nơi chạy — bấm nút tài khoản cạnh tên dự án. Muse: <b id="soLuongTK">3</b> luồng mỗi tài khoản; Flow: <b id="soTabFlow">1</b> tab mỗi tài khoản; Suno: 1 luồng mỗi tài khoản. Việc lỗi ở tài khoản chính thì chuyển ngay sang dự phòng; tài khoản Suno hết lượt tạo / tải thì bài được tạo lại ở tài khoản Suno dự phòng.</p>
         <div class="cuon" id="dsTaiKhoan"></div>
       </section>
       <section class="panel cot-trinh-duyet">
@@ -259,7 +261,7 @@
           <button class="nut-gradient nho" id="nutXongDangNhap" hidden><i data-icon="check"></i>Xong, đóng lại</button>
         </div>
         <div class="o-trinh-duyet" id="oTrinhDuyet">
-          <div class="trong"><i data-icon="log-in"></i><div>Bấm <b>Đăng nhập</b> ở một tài khoản bên trái — trang muse.ai hoặc Google Flow sẽ mở ở đây để bạn đăng nhập.<br><small>Tài khoản Flow: đăng nhập Google, mở (hoặc tạo) một dự án Flow rồi bấm <b>Xong</b> — app nhớ dự án đó để chạy.</small></div></div>
+          <div class="trong"><i data-icon="log-in"></i><div>Bấm <b>Đăng nhập</b> ở một tài khoản bên trái — trang muse.ai, Google Flow hoặc suno.com sẽ mở ở đây để bạn đăng nhập.<br><small>Tài khoản Flow: đăng nhập Google, mở (hoặc tạo) một dự án Flow rồi bấm <b>Xong</b> — app nhớ dự án đó để chạy.</small></div></div>
         </div>
       </section>
     </main>
@@ -291,6 +293,8 @@
           <li><b>Google Flow:</b> Tài khoản → <i>Thêm Flow</i> → <i>Đăng nhập</i> → đăng nhập Google, mở (hoặc tạo) một dự án Flow → <i>Xong</i>. Ở trang Tạo ảnh / Tạo video chọn <i>Chạy trên: Google Flow</i> rồi Tạo &amp; chạy như Muse. Flow nhận việc theo mẻ (mặc định 10 prompt), engine Flow tự dán, bấm Tạo, thử lại, tải về; từng việc vẫn hiện riêng trên hàng đợi.</li>
           <li><b>Flow ⇄ Muse tự động:</b> bật <i>Ảnh xong → tự tạo video</i> và chọn <i>Video chạy ở</i>: ảnh Flow → video Muse, ảnh Muse → video Flow, hoặc cùng một nơi. Ảnh lưu vào thư mục chung (mặc định <code>Tài liệu/AI Automation Studio</code>), video tự lấy ảnh từ đó. Video Flow gắn ảnh bằng <code>@tên</code> (Character Sync) — ảnh chưa có trên Flow thì app tự tải lên.</li>
           <li><b>Flow nhắc "hoạt động bất thường":</b> chế độ an toàn cho tài khoản đó nghỉ; dự án có tài khoản Flow dự phòng thì việc chuyển ngay sang dự phòng, không thì tự chạy lại khi hết giờ nghỉ.</li>
+          <li><b>Tạo nhạc (Suno):</b> Tài khoản → <i>Thêm Suno</i> → <i>Đăng nhập</i> → đăng nhập suno.com → <i>Xong</i>. Trang <i>Tạo nhạc</i>: mỗi dòng một prompt mô tả phong cách (vd <code>lofi chill piano, mưa nhẹ, 80 bpm</code>). App mở Create ở chế độ Advanced, điền prompt vào ô <i>Styles</i>, để trống lời (nhạc không lời), bấm Create. Suno free ra 4 bài: app chỉ xét 2 bài đầu và tải bản MP3 của bài <b>dài hơn</b>, đặt tên theo mẫu (mặc định <code>{stt}</code> → <code>001.mp3</code>) vào thư mục chọn ở Cài đặt nâng cao của trang Tạo nhạc. Chạy song song với ảnh / video.</li>
+          <li><b>Suno hết lượt:</b> tài khoản Suno báo hết credit / hết lượt tải thì bài đó được tạo lại và tải ở tài khoản Suno dự phòng; tài khoản hết lượt nghỉ 6 giờ (bấm <i>Kiểm tra</i> ở tài khoản đó để cho chạy lại sớm). Suno hỏi captcha thì cửa sổ Suno hiện lên để bạn tự giải — app không giải hộ.</li>
           <li><b>Lỗi lạ:</b> Cài đặt → bật <i>Hiện các luồng chạy ngầm</i> để nhìn thấy trang Muse / Flow của từng luồng; nhật ký đầy đủ ở thư mục dữ liệu (<code>nhat-ky.txt</code>).</li>
         </ol>
       </section>
@@ -310,6 +314,7 @@
             <label>Chờ tối đa 1 ảnh (giây) — quá thì chuyển tài khoản dự phòng<input type="number" id="cdChoAnh" min="60" max="1800"></label>
             <label>Chờ tối đa 1 video (giây) — quá thì chuyển tài khoản dự phòng<input type="number" id="cdChoVideo" min="120" max="3600"></label>
             <label>Muse trả chữ bao lâu thì coi là lỗi (giây)<input type="number" id="cdChoChu" min="15" max="600"></label>
+            <label>Chờ tối đa 1 lần tạo nhạc Suno (giây)<input type="number" id="cdChoNhac" min="120" max="3600"></label>
           </div>
           <div class="dong-cong-tac"><div><b>Lưu ảnh dạng PNG</b><small>Muse trả webp; bật để đổi sang png (nặng hơn, dễ dùng hơn).</small></div><label class="cong-tac"><input type="checkbox" id="cdPng"><span></span></label></div>
           <div class="dong-cong-tac"><div><b>Hiện các luồng chạy ngầm</b><small>Để soi lỗi: trang Muse / Flow của các luồng sẽ hiện đè lên app.</small></div><label class="cong-tac"><input type="checkbox" id="cdXemLuong"><span></span></label></div>

@@ -17,6 +17,7 @@ const { Store } = require('./src/main/store');
 const { QuanLyTaiKhoan } = require('./src/main/tai-khoan');
 const { DieuPhoi } = require('./src/main/dieu-phoi');
 const { Luong } = require('./src/main/luong');
+const { LuongSuno } = require('./src/main/luong-suno');
 const { BoCapNhat, layRepo } = require('./src/main/cap-nhat');
 const hd = require('./src/main/hang-doi');
 const { QuanLyTabFlow, FLOW_URL } = require('./src/flow/tab-flow');
@@ -32,6 +33,9 @@ app.setPath('userData', process.env.MUSE_DATA_DIR ||
 
 const GOC_MUSE = (process.env.MUSE_URL || 'https://muse.ai').replace(/\/$/, '');
 const NGUON_TRANG = fs.readFileSync(path.join(__dirname, 'src/inject/muse-trang.js'), 'utf8');
+// Suno (mục Tạo nhạc, 1.1.0): luồng mở thẳng trang Create.
+const SUNO_URL = process.env.SUNO_URL || 'https://suno.com/create';
+const NGUON_SUNO = fs.readFileSync(path.join(__dirname, 'src/inject/suno-trang.js'), 'utf8');
 const DUOI_ANH = /\.(png|jpe?g|webp|gif|bmp)$/i;
 const MIME = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif', bmp: 'image/bmp' };
 
@@ -81,12 +85,50 @@ function phien(tk) {
       // tab: Electron đưa webContents vào will-download nên biết chắc file nào của tab nào.
       taiVeFlow.attach(ses);
     } else {
+      if (tk.nen === 'suno') ganTaiSuno(ses);
       // Bỏ chữ "Electron/…" khỏi user agent: nhiều trang chặn đăng nhập trong webview.
       // Xin Muse giao diện tiếng Anh (nhãn đã đo); Muse vẫn hiện tiếng Việt thì muse-trang.js cũng hiểu.
       ses.setUserAgent(ses.getUserAgent().replace(/\s(Electron|AIAutomationStudio|ai-automation-studio|MuseAutomationStudio|muse-automation-studio)\/\S+/gi, ''), 'en-US,en');
     }
   }
   return ses;
+}
+
+/**
+ * Tải về của luồng Suno: luồng đăng ký chờ trước khi bấm Download (theo webContents của cửa sổ luồng),
+ * will-download của phiên đó lưu file vào thư mục tạm rồi báo đường dẫn. Tải không ai chờ (người dùng
+ * tự bấm trong khung đăng nhập) thì để Electron làm như thường (hỏi chỗ lưu).
+ */
+const choTaiSuno = new Map();   // webContents.id → { thuMuc, xong(kq) }
+function ganTaiSuno(ses) {
+  ses.on('will-download', (_e, item, wc) => {
+    const c = wc && choTaiSuno.get(wc.id);
+    if (!c) return;
+    choTaiSuno.delete(wc.id);
+    c.batDau();
+    fs.mkdirSync(c.thuMuc, { recursive: true });
+    const ten = slugThuMuc(item.getFilename().replace(/\.[^.]+$/, '')) || 'suno';
+    const duoi = (item.getFilename().match(/\.[a-z0-9]{2,4}$/i) || ['.mp3'])[0];
+    const p = path.join(c.thuMuc, `${Date.now()}-${ten}${duoi}`);
+    item.setSavePath(p);
+    item.once('done', (_ev, st) => {
+      const mime = hd.mimeTuDuoi(p);
+      c.xong(st === 'completed' ? { ok: true, duongDan: p, mime: /octet/.test(mime) ? item.getMimeType() || 'audio/mpeg' : mime }
+        : { ok: false, loi: `Tải file từ Suno không xong (${st})` });
+    });
+  });
+}
+function choTaiVeSuno(wc, ms) {
+  let hen = null;
+  const hua = new Promise((res) => {
+    hen = setTimeout(() => { choTaiSuno.delete(wc.id); res({ ok: false, hetGio: true }); }, ms);
+    choTaiSuno.set(wc.id, {
+      thuMuc: path.join(app.getPath('userData'), 'suno-tai-tam'),
+      batDau: () => clearTimeout(hen),   // đã bắt đầu tải → chờ tới khi xong, không cắt giữa chừng
+      xong: res
+    });
+  });
+  return { hua, huy: () => { clearTimeout(hen); choTaiSuno.delete(wc.id); } };
 }
 
 const WEB_PREFS = (tk) => (tk.nen === 'flow'
@@ -163,6 +205,19 @@ function taoLuong(tk, stt) {
         baoTrangThai();
       } });
   }
+  if (tk.nen === 'suno') {
+    const w = taoCuaSoAn(tk, `Suno · ${id}`);
+    // Suno mở file tải về trong cửa sổ mới → tải file đó (đừng mở trang mp3 thay cho trang Create).
+    w.webContents.setWindowOpenHandler(({ url }) => {
+      if (/\.(mp3|wav|m4a)(\?|$)/i.test(url) || /cdn\d*\.suno\.ai\//i.test(url)) w.webContents.downloadURL(url);
+      return { action: 'deny' };
+    });
+    if (xemLuong) w.showInactive();
+    const l = new LuongSuno({ id, taiKhoan: tk, wc: w.webContents, nguon: NGUON_SUNO, url: SUNO_URL, log,
+      choTaiVe: (ms) => choTaiVeSuno(w.webContents, ms), hienCuaSo: () => { if (!w.isDestroyed()) w.show(); } });
+    viewCuaLuong.set(l, w);
+    return l;
+  }
   // Giữ kích thước thật 1280×800 (không thu nhỏ): trang quá nhỏ có thể không vẽ ảnh.
   const w = taoCuaSoAn(tk, `Muse · ${id}`);
   if (xemLuong) w.showInactive();
@@ -189,7 +244,7 @@ function moDangNhap(id, khung) {
   win.contentView.addChildView(v);
   dangNhap = { id, view: v };
   datKhungDangNhap(khung);
-  v.webContents.loadURL(tk.nen === 'flow' ? (tk.flowUrl || FLOW_URL) : GOC_MUSE).catch(() => {});
+  v.webContents.loadURL(tk.nen === 'flow' ? (tk.flowUrl || FLOW_URL) : tk.nen === 'suno' ? SUNO_URL : GOC_MUSE).catch(() => {});
   baoTrangThai();
   return { ok: true };
 }
@@ -213,6 +268,8 @@ async function dongDangNhap(kiem = true) {
       if (taiKhoan.tim(id).flowUrl === url) log('info', `📁 Nhớ trang dự án Flow của "${tk.ten}": ${url}`);
       else log('warning', `⚠ Không nhận được địa chỉ dự án Flow "${url}" — báo cho người phát triển.`);
     }
+    await kiemTaiKhoan(id);
+  } else if (kiem && tk && tk.nen === 'suno') {
     await kiemTaiKhoan(id);
   } else if (kiem) {
     const tt = await docTrangThai(view.webContents, 4000);
@@ -257,6 +314,28 @@ async function kiemTaiKhoan(id) {
     baoTrangThai();
     return co ? 'da-dang-nhap' : 'can-dang-nhap';
   }
+  if (tk.nen === 'suno') {
+    const w = taoCuaSoAn(tk, 'Suno · kiểm tài khoản');
+    w.webContents.loadURL(SUNO_URL).catch(() => {});
+    let tt = null;
+    for (const het = Date.now() + 25000; Date.now() < het;) {
+      try {
+        await w.webContents.executeJavaScript(NGUON_SUNO, true);
+        tt = await w.webContents.executeJavaScript('window.__suno.trangThai()', true);
+        if (tt.daDangNhap || tt.canDangNhap) break;
+      } catch (_) {}
+      await new Promise((r) => setTimeout(r, 500));
+    }
+    dongCuaSoAn(w);
+    const kq = tt && tt.daDangNhap ? 'da-dang-nhap' : tt && tt.canDangNhap ? 'can-dang-nhap' : 'chua-kiem';
+    // Bấm Kiểm tra = người dùng muốn thử lại tài khoản: bỏ mốc "hết lượt" Suno đã nhớ.
+    const coHetLuot = (tk.hetLuotDen || 0) > Date.now();
+    taiKhoan.sua(id, { trangThai: kq, hetLuotDen: 0 });
+    log(kq === 'da-dang-nhap' ? 'success' : 'warning', `👤 "${tk.ten}": ${kq === 'da-dang-nhap' ? 'đã đăng nhập Suno' : kq === 'can-dang-nhap' ? 'CHƯA đăng nhập Suno' : 'không kiểm được (mạng?)'}` +
+      (coHetLuot ? ' · đã bỏ đánh dấu "hết lượt", lần chạy sau dùng lại tài khoản này' : ''));
+    baoTrangThai();
+    return kq;
+  }
   const w = taoCuaSoAn(tk, 'Muse · kiểm tài khoản');
   w.webContents.loadURL(GOC_MUSE).catch(() => {});
   const tt = await docTrangThai(w.webContents, 25000);
@@ -276,7 +355,7 @@ async function kiemTaiKhoan(id) {
 let dangCapNhatToken = null;
 function capNhatToken() {
   dangCapNhatToken = dangCapNhatToken || (async () => {
-    try { for (const a of taiKhoan.list()) if (a.nen !== 'flow') await kiemTaiKhoan(a.id); } finally { dangCapNhatToken = null; }
+    try { for (const a of taiKhoan.list()) if (a.nen === 'muse') await kiemTaiKhoan(a.id); } finally { dangCapNhatToken = null; }
   })();
   return dangCapNhatToken;
 }
@@ -290,7 +369,7 @@ let dangTaiNhieu = false;
 async function xoaChat(id, threads) {
   const tk = taiKhoan.tim(id);
   if (!tk) return { ok: false, loi: 'Không tìm thấy tài khoản' };
-  if (tk.nen === 'flow') return { ok: false, loi: 'Xoá chat chỉ dành cho tài khoản Muse' };
+  if (tk.nen !== 'muse') return { ok: false, loi: 'Xoá chat chỉ dành cho tài khoản Muse' };
   if (dangXoaChat) return { ok: false, loi: 'Đang xoá chat — đợi xong đã' };
   if (!threads && dieuPhoi.coViecDangChay()) return { ok: false, loi: 'Đang chạy hàng chờ — bấm Dừng trước khi xoá toàn bộ chat' };
   dangXoaChat = true;
@@ -487,7 +566,7 @@ const LENH = {
   chonThuMucRa: async ({ loai }) => {
     const r = await dialog.showOpenDialog(win, { properties: ['openDirectory', 'createDirectory'] });
     if (r.canceled || !r.filePaths[0]) return null;
-    dieuPhoi.datCaiDat({ [loai === 'video' ? 'thuMucVideo' : 'thuMucAnh']: r.filePaths[0] });
+    dieuPhoi.datCaiDat({ [{ video: 'thuMucVideo', nhac: 'thuMucNhac' }[loai] || 'thuMucAnh']: r.filePaths[0] });
     return r.filePaths[0];
   },
   nhapPrompt: async () => {
@@ -714,7 +793,7 @@ app.whenReady().then(() => {
     donDep: (don) => donDep(don),
     hetLuot: () => {
       if (dieuPhoi.caiDat.tatMayKhiXong) mayFlow.handleEngineMessage({ action: 'TRIGGER_SHUTDOWN', delay: 60 }, { id: -1 });
-      if (taiKhoan.ds.some((a) => a.nen !== 'flow')) capNhatToken();   // chạy xong hàng chờ → cập nhật mức token Muse
+      if (taiKhoan.ds.some((a) => a.nen === 'muse')) capNhatToken();   // chạy xong hàng chờ → cập nhật mức token Muse
     }
   });
 

@@ -120,8 +120,9 @@ function tenFile(duAn, job, mime, thuTu, mau) {
   const doan = m.replace(/\{(\w+)\}/g, (x, k) => (k in giaTri ? giaTri[k] : x))
     .split(/[\\/]+/).map(sachDoan).filter(Boolean);
   if (!doan.length) doan.push(`${giaTri.duAn}_${giaTri.so}`);
-  const duoi = /mp4/.test(mime) ? 'mp4' : /webm/.test(mime) ? 'webm' : /quicktime/.test(mime) ? 'mov' : /png/.test(mime) ? 'png'
-    : /jpe?g/.test(mime) ? 'jpg' : /webp/.test(mime) ? 'webp' : (/video/.test(mime) ? 'mp4' : 'png');
+  const duoi = /audio\/(mpeg|mp3)/.test(mime) ? 'mp3' : /wav/.test(mime) ? 'wav' : /audio\/(mp4|x-m4a|aac)/.test(mime) ? 'm4a'
+    : /mp4/.test(mime) ? 'mp4' : /webm/.test(mime) ? 'webm' : /quicktime/.test(mime) ? 'mov' : /png/.test(mime) ? 'png'
+    : /jpe?g/.test(mime) ? 'jpg' : /webp/.test(mime) ? 'webp' : (/video/.test(mime) ? 'mp4' : /audio/.test(mime) ? 'mp3' : 'png');
   doan[doan.length - 1] += `${thuTu > 0 ? '_' + (thuTu + 1) : ''}.${duoi}`;
   return doan.join('/');
 }
@@ -130,7 +131,7 @@ function tenFile(duAn, job, mime, thuTu, mau) {
 function mimeTuDuoi(p) {
   const d = String(p || '').split('.').pop().toLowerCase();
   return { mp4: 'video/mp4', webm: 'video/webm', mov: 'video/quicktime', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg',
-    webp: 'image/webp', gif: 'image/gif' }[d] || 'application/octet-stream';
+    webp: 'image/webp', gif: 'image/gif', mp3: 'audio/mpeg', wav: 'audio/wav', m4a: 'audio/mp4' }[d] || 'application/octet-stream';
 }
 
 /**
@@ -170,7 +171,7 @@ function viecKeTiep(jobs, uuTien, boQua) {
 function thoiGianDuKien(jobs, loai) {
   const xong = jobs.filter((j) => j.loai === loai && j.trangThai === 'xong' && j.batDauLuc && j.xongLuc)
     .sort((a, b) => b.xongLuc - a.xongLuc).slice(0, 10);
-  if (!xong.length) return loai === 'video' ? 80 : 35;
+  if (!xong.length) return loai === 'nhac' ? 150 : loai === 'video' ? 80 : 35;   // Suno free ~2–3 phút một lần Create
   const tb = xong.reduce((s, j) => s + (j.xongLuc - j.batDauLuc), 0) / xong.length / 1000;
   return Math.max(10, Math.round(tb));
 }

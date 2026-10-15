@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Suno giả — Create</title>
+<style>
+  body { font-family: sans-serif; background: #111; color: #eee; margin: 0; display: flex; }
+  aside { width: 200px; padding: 12px; }
+  main { flex: 1; padding: 12px; display: flex; gap: 16px; }
+  .form { width: 380px; }
+  textarea, [contenteditable] { width: 100%; min-height: 60px; background: #222; color: #eee; border: 1px solid #444; display: block; margin: 6px 0; }
+  [role="tab"][aria-selected="true"] { background: #555; }
+  .ds { flex: 1; }
+  [data-testid="clip-row"] { display: flex; gap: 10px; align-items: center; padding: 6px; border-bottom: 1px solid #333; position: relative; }
+  .bia { width: 48px; height: 48px; background: #345; position: relative; }
+  .bia span { position: absolute; bottom: 0; right: 0; font-size: 11px; }
+  [role="menu"] { position: absolute; right: 0; top: 40px; background: #333; z-index: 5; min-width: 160px; }
+  [role="menu"] [role="menuitem"] { display: block; padding: 6px 10px; }
+  .toast { position: fixed; bottom: 10px; left: 10px; }
+</style>
+</head>
+<body>
+<!--
+  Trang Suno GIẢ cho e2e (node tests/e2e.js suno). Chép cấu trúc trang Create thật (lưu 15/10/2026):
+  tablist "What to create" + "Create form mode", ô Styles trong create-form-styles-wrapper (chỉ hiện ở
+  Advanced), ô "Lyrics editor" (contenteditable, CÓ SẴN lời cũ — app phải xoá), nút "Clear all form inputs",
+  nút "Create song" (data-disabled khi Styles trống), hàng bài clip-row (data-clip-status, /song/<id>,
+  thời lượng m:ss trên ảnh bìa, nút "More options" → Download (menu con khi rê chuột) → MP3 Audio).
+  Bài lưu ở MÁY CHỦ test theo tài khoản (cookie suno_tk). Một lần Create ra 4 bài: 2 bài đủ dài + 2 bản nghe thử
+  (bài 3 dài 4:00 làm mồi — app không được xét). Máy chủ bật được "hết lượt tải" / "hết credit" cho từng tài khoản.
+-->
+<aside id="ben"></aside>
+<main>
+  <section class="form">
+    <div role="tablist" aria-label="What to create"><button role="tab" aria-selected="true">Songs</button><button role="tab" aria-selected="false">Speech</button></div>
+    <div role="tablist" aria-label="Create form mode"><button role="tab" id="tabSimple" aria-selected="true">Simple</button><button role="tab" id="tabAdv" aria-selected="false">Advanced</button></div>
+    <button aria-label="Clear all form inputs" id="nutXoa">⟲</button>
+    <div id="simple"><textarea placeholder="Describe the song you want"></textarea></div>
+    <div id="adv" hidden>
+      <div aria-label="Lyrics editor" contenteditable="true" id="loi">[Verse] lời bài cũ còn sót</div>
+      <div data-testid="create-form-styles-wrapper"><textarea id="styles" placeholder="Enter style of music, bpm…"></textarea></div>
+    </div>
+    <button aria-label="Create song" id="nutTao" data-disabled="">Create</button>
+  </section>
+  <section class="ds" id="ds"></section>
+</main>
+<div class="toast" id="suno-toast-viewport-bottom"></div>
+<script>
+  const tk = (document.cookie.match(/(?:^|; )suno_tk=([^;]+)/) || [])[1] || '';
+  const $ = (s) => document.querySelector(s);
+  $('#ben').innerHTML = tk ? '<button data-testid="profile-menu-button">' + tk + '</button>' : '<button>Sign in</button>';
+  let cauHinh = { hetTai: [], hetTao: [] };
+
+  function chonTab(nhom, tab) {
+    for (const t of nhom.querySelectorAll('[role="tab"]')) t.setAttribute('aria-selected', String(t === tab));
+  }
+  for (const nhom of document.querySelectorAll('[role="tablist"]')) {
+    nhom.addEventListener('click', (e) => { const t = e.target.closest('[role="tab"]'); if (t) chonTab(nhom, t); veForm(); });
+  }
+  function veForm() {
+    const adv = $('#tabAdv').getAttribute('aria-selected') === 'true';
+    $('#simple').hidden = adv; $('#adv').hidden = !adv;
+    if ($('#styles').value.trim()) $('#nutTao').removeAttribute('data-disabled'); else $('#nutTao').setAttribute('data-disabled', '');
+  }
+  $('#styles').addEventListener('input', veForm);
+  $('#nutXoa').onclick = () => { $('#styles').value = ''; $('#loi').textContent = ''; veForm(); };
+  function toast(chu) { const t = $('#suno-toast-viewport-bottom'); t.textContent = chu; clearTimeout(toast.h); toast.h = setTimeout(() => { t.textContent = ''; }, 8000); }
+
+  $('#nutTao').onclick = async () => {
+    if ($('#nutTao').hasAttribute('data-disabled')) return;
+    const r = await (await fetch('/__suno-tao', { method: 'POST', body: JSON.stringify({
+      tk, styles: $('#styles').value, loi: $('#loi').innerText.trim(), cheDo: $('#tabAdv').getAttribute('aria-selected') === 'true' ? 'advanced' : 'simple'
+    }) })).json();
+    if (r.loi) toast('Not enough credits. Upgrade to Pro to get more credits.');
+    nap();
+  };
+
+  const mmss = (g) => Math.floor(g / 60) + ':' + String(g % 60).padStart(2, '0');
+  let menuMo = '';
+  async function nap() {
+    const r = await (await fetch('/__suno-ds?tk=' + encodeURIComponent(tk))).json();
+    cauHinh = r;
+    const html = r.clips.map((c) => `<div data-testid="clip-row" data-clip-status="${c.trangThai}" aria-label="${c.ten}">
+        <div class="bia">${c.trangThai === 'complete' ? `<span>${mmss(c.giay)}</span>` : ''}</div>
+        <a href="/song/${c.id}">${c.ten}</a>${c.thu ? '<small>Upgrade for full song</small>' : ''}
+        <button aria-label="More options" data-id="${c.id}">⋯</button>
+        ${menuMo === c.id ? `<div role="menu"><div role="menuitem">Remix/Edit</div><div role="menuitem" data-tai>Download ›</div>
+          <div data-con hidden><div role="menuitem" data-mp3="${c.id}">MP3 Audio</div><div role="menuitem">WAV Audio</div><div role="menuitem">Video</div></div>
+          <div role="menuitem">Share</div></div>` : ''}
+      </div>`).join('');
+    if ($('#ds').__h !== html) { $('#ds').__h = html; $('#ds').innerHTML = html; }
+  }
+  $('#ds').addEventListener('click', (e) => {
+    const m = e.target.closest('button[aria-label="More options"]');
+    if (m) { menuMo = menuMo === m.dataset.id ? '' : m.dataset.id; nap(); return; }
+    const mp3 = e.target.closest('[data-mp3]');
+    if (mp3) {
+      menuMo = '';
+      if (cauHinh.hetTai.includes(tk)) { toast('Download limit reached. Upgrade your plan to download more songs.'); nap(); return; }
+      const a = document.createElement('a');
+      a.href = '/__suno-mp3/' + mp3.dataset.mp3; a.download = '';
+      document.body.appendChild(a); a.click(); a.remove();
+      nap();
+    }
+  });
+  // Menu con "Download" mở khi rê chuột (như menu Suno thật).
+  $('#ds').addEventListener('mouseover', (e) => {
+    const t = e.target.closest('[data-tai]');
+    if (t) { const con = t.parentElement.querySelector('[data-con]'); if (con) con.hidden = false; }
+  });
+  veForm();
+  nap();
+  setInterval(nap, 500);
+</script>
+</body>
+</html>

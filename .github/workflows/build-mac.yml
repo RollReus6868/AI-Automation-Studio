@@ -38,6 +38,11 @@ jobs:
         timeout-minutes: 10
         run: node tests/e2e.js flow
 
+      # Muc Tao nhac: trang Suno Create gia (chon bai dai hon, het luot -> tai khoan Suno phu)
+      - name: Kiem thu dau-cuoi (trang Suno gia)
+        timeout-minutes: 10
+        run: node tests/e2e.js suno
+
       - name: Dong goi
         run: npx electron-builder --mac --arm64 --x64 --publish never
         env:

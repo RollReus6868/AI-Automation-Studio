@@ -14,13 +14,14 @@
   let S = null;
   const U = Object.assign({
     trang: 'anh', duAn: '', loc: 'tat', tim: '', moiNhat: true, cheDo: 'tudo', tyLe: { anh: '9:16', video: '9:16' },
-    nhap: { anh: '', video: '' }, tvLoc: 'tat', tvDuAn: '', chuoi: { bat: false, prompt: '', tyLe: '', nen: '' }, promptThuMuc: '',
+    nhap: { anh: '', video: '', nhac: '' }, tvLoc: 'tat', tvDuAn: '', chuoi: { bat: false, prompt: '', tyLe: '', nen: '' }, promptThuMuc: '',
     nen: { anh: 'muse', video: 'muse' }, locNen: ''
   }, docLuu());
   if (!U.nen || typeof U.nen !== 'object') U.nen = { anh: 'muse', video: 'muse' };
+  if (!U.nhap || typeof U.nhap !== 'object') U.nhap = { anh: '', video: '', nhac: '' };
   U.chon = new Set(); U.chiTiet = null; U.nvChon = new Set(); U.log = []; U.dangNhapMo = false;
   // Ảnh tham chiếu / thư mục ảnh RIÊNG cho từng trang: ảnh gắn ở trang video không được dính sang trang ảnh.
-  U.tc = { anh: { ds: [], thuMuc: null }, video: { ds: [], thuMuc: null } };
+  U.tc = { anh: { ds: [], thuMuc: null }, video: { ds: [], thuMuc: null }, nhac: { ds: [], thuMuc: null } };
   const TC = () => U.tc[loaiTrang()];
 
   function docLuu() { try { return JSON.parse(localStorage.getItem(KHOA)) || {}; } catch (_) { return {}; } }
@@ -48,12 +49,15 @@
     el.innerHTML = html;
     return true;
   }
-  const loaiTrang = () => (U.trang === 'video' ? 'video' : 'anh');
-  /** Nơi chạy đang chọn ở cột Tạo của trang hiện tại: 'muse' | 'flow'. */
-  const nenTrang = () => (U.nen[loaiTrang()] === 'flow' ? 'flow' : 'muse');
-  const TEN_NEN = { muse: 'Muse', flow: 'Google Flow' };
+  const loaiTrang = () => (U.trang === 'video' || U.trang === 'nhac' ? U.trang : 'anh');
+  /** Nơi chạy đang chọn ở cột Tạo của trang hiện tại: 'muse' | 'flow' — trang nhạc luôn là 'suno'. */
+  const nenTrang = () => (loaiTrang() === 'nhac' ? 'suno' : U.nen[loaiTrang()] === 'flow' ? 'flow' : 'muse');
+  const TEN_NEN = { muse: 'Muse', flow: 'Google Flow', suno: 'Suno' };
+  const DS_NEN = ['muse', 'flow', 'suno'];
+  const TEN_LOAI = { anh: 'ảnh', video: 'video', nhac: 'nhạc' };
+  const ICON_LOAI = { anh: 'image', video: 'film', nhac: 'music' };
   const TY_LE_FLOW = ['16:9', '9:16'];
-  const nenTk = (a) => (a && a.nen === 'flow' ? 'flow' : 'muse');
+  const nenTk = (a) => (a && (a.nen === 'flow' || a.nen === 'suno') ? a.nen : 'muse');
   const so3 = (n) => String(n).padStart(3, '0');
   function gio(t) {
     if (!t) return '';
@@ -80,7 +84,7 @@
   const tenTk = (id) => (S.taiKhoan.find((a) => a.id === id) || { ten: id }).ten;
   /** Ô chọn tài khoản trong hộp thoại: mỗi nơi chạy một tài khoản CHÍNH + các tài khoản DỰ PHÒNG. */
   function htmlChonTk(d) {
-    return ['muse', 'flow'].map((nen) => {
+    return DS_NEN.map((nen) => {
       const tk = S.taiKhoan.filter((a) => nenTk(a) === nen);
       if (!tk.length) return `<div class="chon-tk"><b>${TEN_NEN[nen]}</b><span>Chưa có tài khoản ${TEN_NEN[nen]} — thêm ở mục Tài khoản.</span></div>`;
       const ds = tkCuaDuAn(d, nen), chinh = ds[0];
@@ -91,12 +95,14 @@
         ${tk.map((a) => `<label class="hang-tk" data-du="${esc(a.id)}" data-nen="${nen}" ${a.id === chinh ? 'hidden' : ''}><input type="checkbox" name="du_${esc(a.id)}" ${ds.slice(1).includes(a.id) ? 'checked' : ''}>${esc(a.ten)}</label>`).join('')}</div>`;
     }).join('');
   }
-  const layTk = (v) => ['muse', 'flow'].flatMap((nen) => {
+  const layTk = (v) => DS_NEN.flatMap((nen) => {
     const chinh = v['tkChinh_' + nen];
     if (!chinh) return [];
     return [chinh, ...S.taiKhoan.filter((a) => nenTk(a) === nen).map((a) => a.id).filter((id) => id !== chinh && v['du_' + id])];
   });
   const viecTheoId = (id) => S && S.viec.find((j) => j.id === id);
+  /** Khoá cài đặt Tải về / Tên file của từng trang Tạo (nhạc luôn tải về: không có khoá công tắc). */
+  const khoaTai = (loai = loaiTrang()) => ({ video: { tai: 'taiVideo', ten: 'tenVideo' }, nhac: { tai: '', ten: 'tenNhac' } }[loai] || { tai: 'taiAnh', ten: 'tenAnh' });
 
   // ── Hộp thoại (Electron không có window.prompt) ───────────────────────────
   async function hoi({ tieuDe, html, ok = 'OK', huy = 'Huỷ', nguyHiem = false }) {
@@ -130,25 +136,27 @@
     hoi({ tieuDe, html: `<p>${chu}</p>`, ok, nguyHiem }).then((v) => !!v);
 
   // ── Điều hướng ──────────────────────────────────────────────────────────
-  const TEN_TRANG = { anh: 'Tạo ảnh', video: 'Tạo video', nhanvat: 'Nhân vật', thuvien: 'Thư viện', taikhoan: 'Tài khoản', huongdan: 'Hướng dẫn', caidat: 'Cài đặt' };
+  const TEN_TRANG = { anh: 'Tạo ảnh', video: 'Tạo video', nhac: 'Tạo nhạc', nhanvat: 'Nhân vật', thuvien: 'Thư viện', taikhoan: 'Tài khoản', huongdan: 'Hướng dẫn', caidat: 'Cài đặt' };
   function diToi(trang) {
     if (U.trang === 'taikhoan' && trang !== 'taikhoan' && U.dangNhapMo) dongDangNhap();
     const cu = U.trang;
     U.trang = trang;
     for (const b of $$('#nav button')) b.classList.toggle('on', b.dataset.trang === trang);
     $('#tieuDeTrang').textContent = TEN_TRANG[trang];
-    const tao = trang === 'anh' || trang === 'video';
+    const tao = trang === 'anh' || trang === 'video' || trang === 'nhac';
+    document.body.classList.toggle('trang-nhac', trang === 'nhac');
     $('#trang-tao').hidden = !tao;
     for (const t of ['nhanvat', 'thuvien', 'taikhoan', 'huongdan', 'caidat']) $(`#trang-${t}`).hidden = t !== trang;
     $('#khuDuAn').style.visibility = tao ? 'visible' : 'hidden';
     if (tao) {
       if (cu !== trang) { U.chon.clear(); U.chiTiet = null; }
-      const v = trang === 'video';
-      $('#tieuDeTao').textContent = v ? 'Tạo video' : 'Tạo ảnh';
-      $('#tieuDeHang').textContent = v ? 'Hàng đợi video' : 'Hàng đợi ảnh';
-      $('#oPrompt').placeholder = v
-        ? 'Mô tả video bạn muốn tạo (cảnh, chuyển động, âm thanh)…\nMỗi dòng là một prompt. Muse tạo clip khoảng 10 giây.'
-        : 'Mô tả chi tiết ảnh bạn muốn tạo…\nMỗi dòng là một prompt. Gõ tên nhân vật (vd: Lan) để tự gửi kèm ảnh nhân vật.';
+      $('#tieuDeTao').textContent = TEN_TRANG[trang];
+      $('#tieuDeHang').textContent = `Hàng đợi ${TEN_LOAI[trang]}`;
+      $('#oPrompt').placeholder = {
+        video: 'Mô tả video bạn muốn tạo (cảnh, chuyển động, âm thanh)…\nMỗi dòng là một prompt. Muse tạo clip khoảng 10 giây.',
+        nhac: 'Mô tả phong cách bài nhạc (thể loại, nhạc cụ, tâm trạng, nhịp)…\nMỗi dòng là một prompt, vd: lofi chill piano, tiếng mưa nhẹ, 80 bpm',
+        anh: 'Mô tả chi tiết ảnh bạn muốn tạo…\nMỗi dòng là một prompt. Gõ tên nhân vật (vd: Lan) để tự gửi kèm ảnh nhân vật.'
+      }[trang];
       $('#oPrompt').value = U.nhap[loaiTrang()] || '';
       for (const b of $$('#tyLe button')) b.classList.toggle('on', b.dataset.v === U.tyLe[loaiTrang()]);
       $('#promptVideoChung').value = U.chuoi.prompt;
@@ -166,7 +174,7 @@
   function ve() {
     if (!S) return;
     veTopbar();
-    if (U.trang === 'anh' || U.trang === 'video') { veTao(); veHang(); veChiTiet(); }
+    if (U.trang === 'anh' || U.trang === 'video' || U.trang === 'nhac') { veTao(); veHang(); veChiTiet(); }
     if (U.trang === 'nhanvat') veNhanVat();
     if (U.trang === 'thuvien') veThuVien();
     if (U.trang === 'taikhoan') veTaiKhoan();
@@ -189,7 +197,7 @@
     const homNay = new Date().toDateString();
     const xongHN = S.viec.filter((j) => j.trangThai === 'xong' && new Date(j.xongLuc).toDateString() === homNay);
     $('#chipHomNay').lastElementChild.textContent =
-      `Hôm nay ${xongHN.filter((j) => j.loai === 'anh').length} ảnh · ${xongHN.filter((j) => j.loai === 'video').length} video`;
+      `Hôm nay ${['anh', 'video', 'nhac'].map((l) => `${xongHN.filter((j) => j.loai === l).length} ${TEN_LOAI[l]}`).join(' · ')}`;
     const n = $('#nutChayTatCa');
     n.classList.toggle('dung', S.dangChay);
     n.innerHTML = S.dangChay ? `${ic('pause')}<span>Dừng</span>` : `${ic('play')}<span>Chạy tất cả</span>`;
@@ -208,7 +216,9 @@
       ? (k.length ? `Sẽ chạy prompt ${k[0].stt}–${k[k.length - 1].stt} (${k.length}/${ds.length})` : 'Khoảng prompt không hợp lệ') : '';
     const nen = nenTrang();
     for (const b of $$('#nenTao button')) b.classList.toggle('on', b.dataset.v === nen);
-    $('#ghiNen').textContent = nen === 'flow'
+    $('#ghiNen').textContent = nen === 'suno'
+      ? `Suno: prompt vào ô Styles (chế độ Advanced, không lời). Mỗi lần Create ra 4 bài — app tải MP3 của bài dài hơn trong 2 bài đầu; tài khoản hết lượt thì tạo lại ở tài khoản Suno dự phòng. ${S.taiKhoan.some((a) => nenTk(a) === 'suno') ? '' : 'Chưa có tài khoản Suno — thêm ở mục Tài khoản.'}`
+      : nen === 'flow'
       ? `Google Flow nhận việc theo mẻ (tối đa ${S.caiDat.flow.meToiDa} prompt), chỉ có tỷ lệ 16:9 và 9:16. ${S.taiKhoan.some((a) => nenTk(a) === 'flow') ? '' : 'Chưa có tài khoản Flow — thêm ở mục Tài khoản.'}`
       : `Muse: mỗi prompt một chat mới, ${S.caiDat.luongMoiTK} luồng mỗi tài khoản. ${S.taiKhoan.some((a) => nenTk(a) === 'muse') ? '' : 'Chưa có tài khoản Muse — thêm ở mục Tài khoản.'}`;
     // Flow chỉ có 16:9 / 9:16 → ẩn các tỷ lệ khác (đang chọn tỷ lệ khác thì về 9:16).
@@ -252,7 +262,7 @@
   function locViec() {
     const d = duAnHienTai();
     const loai = loaiTrang();
-    return S.viec.filter((j) => j.duAn === (d && d.id) && j.loai === loai && (!U.locNen || (j.nen || 'muse') === U.locNen));
+    return S.viec.filter((j) => j.duAn === (d && d.id) && j.loai === loai && (loai === 'nhac' || !U.locNen || (j.nen || 'muse') === U.locNen));
   }
 
   function veHang() {
@@ -280,7 +290,7 @@
 
     const hop = $('#dsHang');
     if (!ds.length) {
-      datHtml(hop, `<div class="trong">${ic(loaiTrang() === 'video' ? 'film' : 'image')}<div>${tatCa.length
+      datHtml(hop, `<div class="trong">${ic(ICON_LOAI[loaiTrang()])}<div>${tatCa.length
         ? 'Không có việc nào khớp bộ lọc.' : 'Hàng đợi trống — dán prompt bên trái rồi bấm <b>Tạo &amp; chạy</b>.'}</div></div>`);
       return;
     }
@@ -294,6 +304,7 @@
   function thumbHtml(j) {
     const f = j.files && j.files[0];
     if (f && j.loai === 'video') return `<div class="thumb"><video src="${esc(fileUrl(f))}#t=0.5" preload="metadata" muted></video></div>`;
+    if (j.loai === 'nhac') return `<div class="thumb">${ic('music')}</div>`;
     if (f) return `<div class="thumb"><img loading="lazy" src="${esc(fileUrl(f))}"></div>`;
     if (j.thamChieu && j.thamChieu[0]) return `<div class="thumb"><img loading="lazy" style="opacity:.45" src="${esc(fileUrl(j.thamChieu[0]))}"></div>`;
     return `<div class="thumb">${ic(j.loai === 'video' ? 'film' : 'image')}</div>`;
@@ -308,7 +319,7 @@
       ${thumbHtml(j)}
       <div class="noi-dung">
         <div class="p" title="${esc(j.prompt)}">${j.so}. ${esc(j.prompt)}</div>
-        <div class="the-nho"><span class="tag nen-${j.nen === 'flow' ? 'flow' : 'muse'}">${j.nen === 'flow' ? 'FLOW' : 'MUSE'}</span><span class="tag">${j.loai === 'video' ? 'VIDEO' : 'ẢNH'}</span><span class="tag">${esc(j.tyLe)}</span>${
+        <div class="the-nho"><span class="tag nen-${nenTk(j)}">${nenTk(j).toUpperCase()}</span><span class="tag">${{ video: 'VIDEO', nhac: 'NHẠC' }[j.loai] || 'ẢNH'}</span>${j.loai === 'nhac' ? '' : `<span class="tag">${esc(j.tyLe)}</span>`}${
           j.nhanVat && j.nhanVat.length ? `<span class="tag nv">${j.nhanVat.length} NV</span>` : ''}${
           j.tuAnh ? `<span class="tag nv" title="Video tạo từ ảnh">TỪ ẢNH</span>` : ''}${
           j.chuoi && !j.daNoiVideo ? `<span class="tag nv" title="Ảnh xong sẽ tự tạo video">→ VIDEO ${(j.chuoi.nen || j.nen) === 'flow' ? 'FLOW' : 'MUSE'}</span>` : ''}${
@@ -341,17 +352,18 @@
     }
     const f = j.files && j.files[0];
     const xem = f
-      ? (j.loai === 'video' ? `<video src="${esc(fileUrl(f))}" controls loop></video>` : `<img src="${esc(fileUrl(f))}">`)
-      : `<div class="trong">${ic(j.loai === 'video' ? 'film' : 'image')}<div>${j.trangThai === 'chay' ? `${j.nen === 'flow' ? 'Flow' : 'Muse'} đang tạo…` : j.trangThai === 'loi' ? 'Chưa có kết quả' : 'Đang chờ đến lượt'}</div></div>`;
+      ? (j.loai === 'video' ? `<video src="${esc(fileUrl(f))}" controls loop></video>`
+        : j.loai === 'nhac' ? `<div class="nhac">${ic('music')}<audio src="${esc(fileUrl(f))}" controls preload="metadata"></audio></div>` : `<img src="${esc(fileUrl(f))}">`)
+      : `<div class="trong">${ic(ICON_LOAI[j.loai] || 'image')}<div>${j.trangThai === 'chay' ? `${TEN_NEN[nenTk(j)]} đang tạo…` : j.trangThai === 'loi' ? 'Chưa có kết quả' : 'Đang chờ đến lượt'}</div></div>`;
     const [cls, nhan] = nhanTrangThai(j);
     datHtml(hop, `
       <div class="xem-truoc">${xem}</div>
       <div class="ct-prompt">${j.so}. ${esc(j.prompt)}</div>
-      <div class="ct-meta">#${so3(j.so)} · ${j.nen === 'flow' ? 'Google Flow' : 'Muse'}${j.taiKhoan ? ` (${esc(tenTk(j.taiKhoan))})` : ''} · ${esc(gio(j.xongLuc || j.taoLuc))}${f && j.files.length > 1 ? ` · ${j.files.length} file` : ''}${j.tam ? ' · không tải về (chỉ trong app)' : ''}</div>
+      <div class="ct-meta">#${so3(j.so)} · ${TEN_NEN[nenTk(j)]}${j.taiKhoan ? ` (${esc(tenTk(j.taiKhoan))})` : ''} · ${esc(gio(j.xongLuc || j.taoLuc))}${f && j.files.length > 1 ? ` · ${j.files.length} file` : ''}${j.tam ? ' · không tải về (chỉ trong app)' : ''}</div>
       <span class="pill ${cls}">${nhan}</span>
       ${j.loi && j.trangThai !== 'xong' ? `<div class="ct-loi">${esc(j.loi)}</div>` : ''}
       <div class="ct-nut">
-        <button class="nut-vien" data-ct="xem" ${f ? '' : 'disabled'}>${ic('maximize-2')}${j.loai === 'video' ? 'Phát' : 'Xem'}</button>
+        <button class="nut-vien" data-ct="xem" ${f ? '' : 'disabled'}>${ic('maximize-2')}${j.loai === 'anh' ? 'Xem' : 'Phát'}</button>
         <button class="nut-vien" data-ct="thuMuc" ${f ? '' : 'disabled'}>${ic('folder')}Thư mục</button>
         <button class="nut-vien do" data-ct="xoa">${ic('x')}Xoá</button>
       </div>
@@ -361,7 +373,7 @@
       <div class="ct-nut">
         <button class="nut-vien" data-ct="tai" ${f ? '' : 'disabled'}>${ic('download')}Tải xuống</button>
         <button class="nut-vien" data-ct="taoLai" ${j.trangThai === 'chay' ? 'disabled' : ''}>${ic('rotate-ccw')}Tạo lại</button>
-        <button class="nut-gradient" data-ct="sua" ${j.trangThai === 'chay' ? 'disabled' : ''}>${ic('wand-sparkles')}Chỉnh sửa</button>
+        <button class="nut-gradient" data-ct="sua" ${j.trangThai === 'chay' ? 'disabled' : ''}>${ic('wand-sparkles')}${j.loai === 'anh' ? 'Chỉnh sửa' : 'Sửa'}</button>
       </div>
       ${f && j.loai === 'anh' ? `<div class="ct-nut" style="grid-template-columns:1fr"><button class="nut-vien" data-ct="video">${ic('film')}Tạo video từ ảnh này</button></div>` : ''}`);
   }
@@ -391,10 +403,10 @@
         if (r && r.ok) toast('Đã thêm việc chỉnh sửa'); else toast((r && r.loi) || 'Không thêm được', true);
       } else {
         const v = await hoi({ tieuDe: `Sửa prompt #${so3(j.so)}`, ok: 'Lưu',
-          html: `<label>Prompt<textarea name="p" rows="6">${esc(j.prompt)}</textarea></label>
-                 <label>Tỷ lệ<select name="t">${HD.TY_LE.map((t) => `<option ${t === j.tyLe ? 'selected' : ''}>${t}</option>`).join('')}</select></label>` });
+          html: `<label>Prompt<textarea name="p" rows="6">${esc(j.prompt)}</textarea></label>` + (j.loai === 'nhac' ? ''
+            : `<label>Tỷ lệ<select name="t">${HD.TY_LE.map((t) => `<option ${t === j.tyLe ? 'selected' : ''}>${t}</option>`).join('')}</select></label>`) });
         if (!v) return;
-        await api.call('suaViec', { id: j.id, thay: { prompt: v.p, tyLe: v.t } });
+        await api.call('suaViec', { id: j.id, thay: { prompt: v.p, tyLe: v.t || j.tyLe } });
         if (j.trangThai !== 'cho' && await xacNhan('Chạy lại?', 'Đưa việc này về hàng chờ để tạo lại với prompt mới?', 'Tạo lại')) {
           await api.call('taoLai', { ids: [j.id] });
         }
@@ -437,8 +449,8 @@
   }
 
   function moXemLon(f, loai) {
-    $('#xemLonNoiDung').innerHTML = loai === 'video'
-      ? `<video src="${esc(fileUrl(f))}" controls autoplay loop></video>` : `<img src="${esc(fileUrl(f))}">`;
+    $('#xemLonNoiDung').innerHTML = loai === 'video' ? `<video src="${esc(fileUrl(f))}" controls autoplay loop></video>`
+      : loai === 'nhac' ? `<audio src="${esc(fileUrl(f))}" controls autoplay></audio>` : `<img src="${esc(fileUrl(f))}">`;
     $('#xemLon').hidden = false;
   }
 
@@ -464,6 +476,8 @@
     }
     const nen = nenTrang();
     if (!S.taiKhoan.some((a) => nenTk(a) === nen)) { toast(`Chưa có tài khoản ${TEN_NEN[nen]} — vào mục Tài khoản để thêm và đăng nhập`, true); return null; }
+    // Nhạc Suno: chỉ prompt (ô Styles) — không ảnh, nhân vật, tỷ lệ hay chuỗi video.
+    if (loai === 'nhac') return { nen, loai, soBan: $('#soBan').value, hauTo: $('#hauTo').value, tuSo: $('#tuSo').value, denSo: $('#denSo').value };
     return {
       nen, loai, tyLe: U.tyLe[loai], thamChieu: TC().ds, thamChieuTheoDong: theoDong,
       nhanVatIds: U.cheDo === 'nguoimau' ? [...U.nvChon] : [], tuNhanVat: $('#tuNhanVat').checked,
@@ -500,7 +514,7 @@
     if (!ids.length) { toast(chay ? 'Các việc đang chạy — bấm Dừng trước rồi đặt lại' : 'Hàng đợi trống', true); return; }
     const d = S.duAn.find((x) => x.id === U.duAn);
     if (!(await xacNhan('Đặt lại hàng đợi?',
-      `Đưa <b>${ids.length}</b> việc ${loai === 'video' ? 'video' : 'ảnh'} của dự án <b>${esc(d ? d.ten : '')}</b> về <b>Chờ</b> như lúc mới thêm. ` +
+      `Đưa <b>${ids.length}</b> việc ${TEN_LOAI[loai]} của dự án <b>${esc(d ? d.ten : '')}</b> về <b>Chờ</b> như lúc mới thêm. ` +
       'Bấm chạy là tạo lại từ đầu (gửi prompt mới); kết quả mới ghi đè file cũ cùng tên.' +
       (chay ? `<br><br>Bỏ qua ${chay} việc đang chạy.` : ''), 'Đặt lại'))) return;
     const n = await api.call('taoLai', { ids });
@@ -519,7 +533,7 @@
     const k = (f) => HD.chonKhoang(f.prompts, $('#tuSo').value, $('#denSo').value).length;
     const tong = dung.reduce((n, f) => n + k(f), 0);
     const ok = await xacNhan(`Tạo ${dung.length} dự án mới?`,
-      `Mỗi file thành một dự án (tên theo tên file) với tuỳ chọn đang chọn ở cột ${loaiTrang() === 'video' ? 'Tạo video' : 'Tạo ảnh'}, tổng <b>${tong}</b> ${loaiTrang() === 'video' ? 'video' : 'ảnh'}:<br>` +
+      `Mỗi file thành một dự án (tên theo tên file) với tuỳ chọn đang chọn ở cột ${TEN_TRANG[loaiTrang()]}, tổng <b>${tong}</b> ${TEN_LOAI[loaiTrang()]}:<br>` +
       dung.map((f) => `• <b>${esc(f.ten)}</b> — ${k(f)} prompt`).join('<br>') +
       (rong.length ? `<br><br>Bỏ qua (không có prompt): ${rong.map((f) => esc(f.ten)).join(', ')}` : ''), 'Tạo & chạy');
     if (!ok) return;
@@ -598,8 +612,9 @@
       (U.tvLoc === 'tat' || j.loai === U.tvLoc) && (!U.tvDuAn || j.duAn === U.tvDuAn))
       .sort((a, b) => b.xongLuc - a.xongLuc).slice(0, 500);
     datHtml($('#dsThuVien'), ds.length ? ds.map((j) => `<div class="o-tv" data-tv="${j.id}" title="${esc(j.prompt)}">${
-      j.loai === 'video' ? `<video src="${esc(fileUrl(j.files[0]))}#t=0.5" preload="metadata" muted></video>` : `<img loading="lazy" src="${esc(fileUrl(j.files[0]))}">`
-    }<span>#${so3(j.so)} · ${j.loai === 'video' ? 'VIDEO' : 'ẢNH'}</span></div>`).join('')
+      j.loai === 'video' ? `<video src="${esc(fileUrl(j.files[0]))}#t=0.5" preload="metadata" muted></video>`
+        : j.loai === 'nhac' ? `<div class="nhac-tv">${ic('music')}</div>` : `<img loading="lazy" src="${esc(fileUrl(j.files[0]))}">`
+    }<span>#${so3(j.so)} · ${{ video: 'VIDEO', nhac: 'NHẠC' }[j.loai] || 'ẢNH'}</span></div>`).join('')
       : `<div class="trong" style="grid-column:1/-1">${ic('layout-grid')}<div>Chưa có kết quả nào.</div></div>`);
   }
 
@@ -608,20 +623,21 @@
   function veTaiKhoan() {
     $('#soLuongTK').textContent = S.caiDat.luongMoiTK;
     $('#soTabFlow').textContent = S.caiDat.flow.tabMoiTK;
-    const ds = [...S.taiKhoan].sort((a, b) => (nenTk(a) === nenTk(b) ? 0 : nenTk(a) === 'muse' ? -1 : 1));
+    const ds = [...S.taiKhoan].sort((a, b) => DS_NEN.indexOf(nenTk(a)) - DS_NEN.indexOf(nenTk(b)));
     datHtml($('#dsTaiKhoan'), ds.map((a) => {
       const [cls, nhan] = NHAN_TK[a.trangThai] || NHAN_TK['chua-kiem'];
       const dang = S.dangNhap && S.dangNhap.id === a.id;
-      const flow = nenTk(a) === 'flow';
-      return `<div class="the-tk${flow ? ' tk-flow' : ''}">
+      const nen = nenTk(a), flow = nen === 'flow';
+      return `<div class="the-tk tk-${nen}">
         <div class="av">${esc((a.ten || '?').trim().charAt(0).toUpperCase())}</div>
-        <div class="tt"><b>${esc(a.ten)}</b><span class="tag nen-${flow ? 'flow' : 'muse'}">${flow ? 'GOOGLE FLOW' : 'MUSE'}</span><span class="pill ${cls}">${nhan}</span>${flow
-          ? `<div class="han-muc mo du-an-flow" title="${esc(a.flowUrl || '')}">Dự án Flow: ${a.flowUrl ? esc(a.flowUrl.replace(/^https:\/\/labs\.google\/fx\/(\w+\/)?tools\/flow\//, '…/')) : 'chưa chọn — app tự mở dự án mới (hoặc Đăng nhập → mở một dự án → Xong)'}</div>`
+        <div class="tt"><b>${esc(a.ten)}</b><span class="tag nen-${nen}">${TEN_NEN[nen].toUpperCase()}</span><span class="pill ${cls}">${nhan}</span>${nen === 'suno'
+          ? veHetLuot(a)
+          : flow ? `<div class="han-muc mo du-an-flow" title="${esc(a.flowUrl || '')}">Dự án Flow: ${a.flowUrl ? esc(a.flowUrl.replace(/^https:\/\/labs\.google\/fx\/(\w+\/)?tools\/flow\//, '…/')) : 'chưa chọn — app tự mở dự án mới (hoặc Đăng nhập → mở một dự án → Xong)'}</div>`
           : veHanMuc(a.hanMuc)}
           <div class="hang-nut">
             <button class="nut-vien nho" data-tk="dangNhap" data-id="${esc(a.id)}" ${dang ? 'disabled' : ''}>${ic('log-in')}Đăng nhập</button>
             <button class="nut-vien nho" data-tk="kiem" data-id="${esc(a.id)}">${ic('refresh-cw')}Kiểm tra</button>
-            ${flow ? `<button class="nut-vien nho" data-tk="duAnFlow" data-id="${esc(a.id)}" title="Đổi trang dự án Flow mà tài khoản này chạy">${ic('folder')}Dự án</button>`
+            ${nen === 'suno' ? '' : flow ? `<button class="nut-vien nho" data-tk="duAnFlow" data-id="${esc(a.id)}" title="Đổi trang dự án Flow mà tài khoản này chạy">${ic('folder')}Dự án</button>`
               : `<button class="nut-vien nho" data-tk="xoaChat" data-id="${esc(a.id)}" title="Xoá toàn bộ đoạn chat của tài khoản này trên Muse">${ic('message-square-x')}Xoá chat</button>`}
             <button class="nut-vien nho" data-tk="doiTen" data-id="${esc(a.id)}">${ic('pencil')}</button>
             <button class="nut-vien nho" data-tk="dangXuat" data-id="${esc(a.id)}" title="Đăng xuất">${ic('log-out')}</button>
@@ -630,9 +646,15 @@
       </div>`;
     }).join(''));
     const tk = S.dangNhap && S.taiKhoan.find((a) => a.id === S.dangNhap.id);
-    $('#tieuDeDangNhap').textContent = tk ? `Đăng nhập ${nenTk(tk) === 'flow' ? 'Google Flow' : 'Muse'}: ${tk.ten}${nenTk(tk) === 'flow' ? ' — mở một dự án rồi bấm Xong' : ''}` : 'Đăng nhập';
+    $('#tieuDeDangNhap').textContent = tk ? `Đăng nhập ${TEN_NEN[nenTk(tk)]}: ${tk.ten}${nenTk(tk) === 'flow' ? ' — mở một dự án rồi bấm Xong' : ''}` : 'Đăng nhập';
     $('#nutXongDangNhap').hidden = !tk;
     U.dangNhapMo = !!tk;
+  }
+  /** Tài khoản Suno: còn đang nghỉ vì hết lượt tạo / tải không (nhớ qua cả lần tắt app). */
+  function veHetLuot(a) {
+    if (!a.hetLuotDen || a.hetLuotDen <= Date.now()) return '<div class="han-muc mo">Suno: chạy được. Hết lượt tạo / tải thì bài tự tạo lại ở tài khoản Suno dự phòng.</div>';
+    const t = new Date(a.hetLuotDen), hai = (n) => String(n).padStart(2, '0');
+    return `<div class="han-muc het-luot" title="${esc(a.lyDoHetLuot || '')}">Hết lượt — nghỉ đến ${hai(t.getHours())}:${hai(t.getMinutes())} ngày ${hai(t.getDate())}/${hai(t.getMonth() + 1)}${a.lyDoHetLuot ? ` (${esc(a.lyDoHetLuot)})` : ''}. Bấm Kiểm tra để cho chạy lại sớm.</div>`;
   }
   /** Mức dùng token Muse (Cài đặt → Chung → Usage), chữ giữ nguyên như Muse hiện. */
   function veHanMuc(hm) {
@@ -669,7 +691,7 @@
       const v = await hoi({ tieuDe: 'Đổi tên tài khoản', html: `<label>Tên<input name="ten" value="${esc(a.ten)}"></label>`, ok: 'Lưu' });
       if (v && v.ten.trim()) api.call('suaTaiKhoan', { id, thay: { ten: v.ten } });
     } else if (lenh === 'dangXuat') {
-      if (await xacNhan('Đăng xuất?', `Xoá phiên đăng nhập ${nenTk(a) === 'flow' ? 'Google' : 'Muse'} của "${esc(a.ten)}" trong app.`, 'Đăng xuất', true)) api.call('dangXuat', { id });
+      if (await xacNhan('Đăng xuất?', `Xoá phiên đăng nhập ${{ flow: 'Google', suno: 'Suno', muse: 'Muse' }[nenTk(a)]} của "${esc(a.ten)}" trong app.`, 'Đăng xuất', true)) api.call('dangXuat', { id });
     } else if (lenh === 'xoa') {
       if (await xacNhan('Xoá tài khoản?', `Xoá "${esc(a.ten)}" và phiên đăng nhập của nó khỏi app.`, 'Xoá', true)) {
         const r = await api.call('xoaTaiKhoan', { id });
@@ -683,7 +705,7 @@
     if (!S) return;
     const c = S.caiDat;
     $('#cdLuong').value = c.luongMoiTK; $('#cdNghi').value = c.nghiGiuaLanGui; $('#cdThuLai').value = c.tuThuLai; $('#cdChayLaiLoi').value = c.tuChayLaiLoi;
-    $('#cdChoAnh').value = c.choAnhGiay; $('#cdChoVideo').value = c.choVideoGiay; $('#cdChoChu').value = c.choChuGiay;
+    $('#cdChoAnh').value = c.choAnhGiay; $('#cdChoVideo').value = c.choVideoGiay; $('#cdChoChu').value = c.choChuGiay; $('#cdChoNhac').value = c.choNhacGiay;
     $('#cdPng').checked = !!c.png;
     $('#cdTatMay').checked = !!c.tatMayKhiXong;
     $('#cdVideoCanhAnh').checked = c.videoCanhAnh !== false;
@@ -739,18 +761,18 @@
     const loai = loaiTrang();
     const d = duAnHienTai() || { ten: 'Mặc định' };
     const mau = { so: 83, stt: 5, prompt: 'Tranh truyện người que tối giản bố cục dọc', taoLuc: Date.now(), loai };
-    $('#ncViDu').textContent = 'Ví dụ: ' + HD.tenFile(d, mau, loai === 'video' ? 'video/mp4' : 'image/png', 0, $('#ncTen').value);
+    $('#ncViDu').textContent = 'Ví dụ: ' + HD.tenFile(d, mau, { video: 'video/mp4', nhac: 'audio/mpeg' }[loai] || 'image/png', 0, $('#ncTen').value);
   }
   /** Khối "Tải về & tên file" trong Cài đặt nâng cao: hiện đúng phần của trang đang mở (ảnh / video). */
   function veTaiVe() {
-    const v = loaiTrang() === 'video', c = S.caiDat;
-    $('#ncNhanTai').textContent = v ? 'Tải video về' : 'Tải ảnh về';
-    $('#ncNhanThuMuc').textContent = v ? 'Thư mục lưu video' : 'Thư mục lưu ảnh';
-    $('#ncNhanTen').firstChild.textContent = v ? 'Tên file video' : 'Tên file ảnh';
-    $('#ncTai').checked = v ? c.taiVideo : c.taiAnh;
-    $('#ncThuMuc').value = S.thuMuc[loaiTrang()];
-    if (document.activeElement !== $('#ncTen')) $('#ncTen').value = v ? c.tenVideo : c.tenAnh;
-    $('#ncTen').placeholder = v ? HD.MAU_TEN_MAC_DINH : HD.MAU_TEN_ANH_MAC_DINH;
+    const loai = loaiTrang(), v = loai === 'video', c = S.caiDat, ten = TEN_LOAI[loai];
+    $('#ncNhanTai').textContent = `Tải ${ten} về`;
+    $('#ncNhanThuMuc').textContent = `Thư mục lưu ${ten}`;
+    $('#ncNhanTen').firstChild.textContent = `Tên file ${ten}`;
+    $('#ncTai').checked = v ? c.taiVideo : c.taiAnh;   // nhạc luôn tải về (công tắc ẩn)
+    $('#ncThuMuc').value = S.thuMuc[loai];
+    if (document.activeElement !== $('#ncTen')) $('#ncTen').value = c[khoaTai(loai).ten];
+    $('#ncTen').placeholder = loai === 'nhac' ? '{stt}' : v ? HD.MAU_TEN_MAC_DINH : HD.MAU_TEN_ANH_MAC_DINH;
     viDuTen();
   }
   function veCapNhat() {
@@ -1056,15 +1078,16 @@
       try { await api.call('capNhatToken'); toast('Đã cập nhật mức token'); } finally { b.disabled = false; }
     };
     const themTk = async (nen) => {
-      const v = await hoi({ tieuDe: `Thêm tài khoản ${TEN_NEN[nen]}`, html: `<label>Tên gợi nhớ<input name="ten" placeholder="vd: ${nen === 'flow' ? 'Flow 2' : 'Muse 2'}"></label>`, ok: 'Thêm' });
+      const v = await hoi({ tieuDe: `Thêm tài khoản ${TEN_NEN[nen]}`, html: `<label>Tên gợi nhớ<input name="ten" placeholder="vd: ${TEN_NEN[nen].split(' ').pop()} 2"></label>`, ok: 'Thêm' });
       if (!v) return;
       const a = await api.call('themTaiKhoan', { ten: v.ten, nen });
       if (a && a.id && await xacNhan('Đăng nhập luôn?', nen === 'flow'
         ? `Mở Google Flow để đăng nhập "${esc(a.ten)}"? Đăng nhập xong, mở (hoặc tạo) một dự án Flow rồi bấm <b>Xong</b>.`
-        : `Mở muse.ai để đăng nhập "${esc(a.ten)}"?`, 'Đăng nhập')) lenhTaiKhoan('dangNhap', a.id);
+        : `Mở ${nen === 'suno' ? 'suno.com' : 'muse.ai'} để đăng nhập "${esc(a.ten)}"?`, 'Đăng nhập')) lenhTaiKhoan('dangNhap', a.id);
     };
     $('#nutThemTK').onclick = () => themTk('muse');
     $('#nutThemTKFlow').onclick = () => themTk('flow');
+    $('#nutThemTKSuno').onclick = () => themTk('suno');
     $('#dsTaiKhoan').addEventListener('click', (e) => { const b = e.target.closest('[data-tk]'); if (b) lenhTaiKhoan(b.dataset.tk, b.dataset.id); });
     $('#nutXongDangNhap').onclick = () => dongDangNhap();
     const baoKhung = () => { if (U.dangNhapMo && U.trang === 'taikhoan') api.call('khungDangNhap', { khung: khungTrinhDuyet() }); };
@@ -1073,8 +1096,7 @@
 
     // Cài đặt
     // Tải về & tên file (Cài đặt nâng cao của cột Tạo) — lưu ngay, theo trang ảnh / video.
-    const khoaTai = () => (loaiTrang() === 'video' ? { tai: 'taiVideo', ten: 'tenVideo' } : { tai: 'taiAnh', ten: 'tenAnh' });
-    $('#ncTai').onchange = (e) => api.call('datCaiDat', { [khoaTai().tai]: e.target.checked });
+    $('#ncTai').onchange = (e) => { if (khoaTai().tai) api.call('datCaiDat', { [khoaTai().tai]: e.target.checked }); };
     $('#ncTen').addEventListener('input', viDuTen);
     $('#ncTen').onchange = (e) => { api.call('datCaiDat', { [khoaTai().ten]: e.target.value }); toast('Đã lưu mẫu tên file'); };
     $('#ncChonThuMuc').onclick = async () => { const d = await api.call('chonThuMucRa', { loai: loaiTrang() }); if (d) $('#ncThuMuc').value = d; };
@@ -1094,7 +1116,7 @@
     $('#cdLuu').onclick = async () => {
       await api.call('datCaiDat', {
         luongMoiTK: $('#cdLuong').value, nghiGiuaLanGui: $('#cdNghi').value, tuThuLai: $('#cdThuLai').value, tuChayLaiLoi: $('#cdChayLaiLoi').value,
-        choAnhGiay: $('#cdChoAnh').value, choVideoGiay: $('#cdChoVideo').value, choChuGiay: $('#cdChoChu').value,
+        choAnhGiay: $('#cdChoAnh').value, choVideoGiay: $('#cdChoVideo').value, choChuGiay: $('#cdChoChu').value, choNhacGiay: $('#cdChoNhac').value,
         png: $('#cdPng').checked, tatMayKhiXong: $('#cdTatMay').checked,
         videoCanhAnh: $('#cdVideoCanhAnh').checked, xoaChatKhiXong: $('#cdXoaChat').checked, xoaDuAnFlowKhiXong: $('#cdXoaDuAnFlow').checked,
         mau: { anh: $('#cdMauAnh').value, video: $('#cdMauVideo').value },

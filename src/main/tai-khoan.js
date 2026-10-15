@@ -10,6 +10,11 @@ const { laUrlDuAnFlow } = require('../flow/tab-flow');
 // ============================================================================
 
 const KHOA = 'taiKhoan';
+// 1.1.0: thêm Suno (mục Tạo nhạc) — phiên 'persist:suno-<id>'.
+const NEN = ['muse', 'flow', 'suno'];
+const TEN_NEN = { muse: 'Muse', flow: 'Flow', suno: 'Suno' };
+const TEN_DAY_DU = { muse: 'Muse', flow: 'Google Flow', suno: 'Suno' };
+const chuanNen = (n) => (NEN.includes(n) ? n : 'muse');
 
 function slugId(raw) {
   return String(raw || '').toLowerCase()
@@ -26,7 +31,11 @@ class QuanLyTaiKhoan {
       { id: 'tk-1', ten: 'Muse 1', nen: 'muse', partition: 'persist:muse-tk-1', bat: true, trangThai: 'chua-kiem' },
       { id: 'flow-1', ten: 'Flow 1', nen: 'flow', partition: 'persist:flow-flow-1', bat: true, trangThai: 'chua-kiem', flowUrl: '' }
     ];
-    for (const a of this.ds) if (a.nen !== 'flow') a.nen = 'muse';   // dữ liệu của Muse Automation Studio cũ
+    for (const a of this.ds) a.nen = chuanNen(a.nen);   // dữ liệu của Muse Automation Studio cũ: không có nen = Muse
+    // 1.1.0: máy chưa có tài khoản Suno nào thì tạo sẵn "Suno 1" (người dùng tự đăng nhập trong app).
+    if (!this.ds.some((a) => a.nen === 'suno') && !this.tim('suno-1')) {
+      this.ds.push({ id: 'suno-1', ten: 'Suno 1', nen: 'suno', partition: 'persist:suno-suno-1', bat: true, trangThai: 'chua-kiem' });
+    }
     this.luu();
   }
 
@@ -36,8 +45,8 @@ class QuanLyTaiKhoan {
   dangBat() { return this.ds.filter((a) => a.bat); }
 
   them(ten, nen) {
-    nen = nen === 'flow' ? 'flow' : 'muse';
-    const tenMd = `${nen === 'flow' ? 'Flow' : 'Muse'} ${this.ds.filter((a) => a.nen === nen).length + 1}`;
+    nen = chuanNen(nen);
+    const tenMd = `${TEN_NEN[nen]} ${this.ds.filter((a) => a.nen === nen).length + 1}`;
     const goc = slugId(ten || tenMd);
     let id = goc, n = 2;
     while (this.tim(id)) id = `${goc}-${n++}`;
@@ -46,7 +55,7 @@ class QuanLyTaiKhoan {
     if (nen === 'flow') a.flowUrl = '';
     this.ds.push(a);
     this.luu();
-    this.log('success', `👤 Đã thêm tài khoản ${nen === 'flow' ? 'Google Flow' : 'Muse'} "${a.ten}"`);
+    this.log('success', `👤 Đã thêm tài khoản ${TEN_DAY_DU[nen]} "${a.ten}"`);
     return a;
   }
 
@@ -57,6 +66,8 @@ class QuanLyTaiKhoan {
     if (typeof thay.bat === 'boolean') a.bat = thay.bat;
     if (typeof thay.trangThai === 'string') a.trangThai = thay.trangThai;
     if (thay.hanMuc && Array.isArray(thay.hanMuc.muc)) a.hanMuc = thay.hanMuc;   // mức token đọc từ Muse
+    // Suno hết lượt tạo / tải về: nghỉ tới lúc này (0 = bỏ).
+    if (typeof thay.hetLuotDen === 'number') { a.hetLuotDen = thay.hetLuotDen; a.lyDoHetLuot = thay.hetLuotDen ? String(thay.lyDoHetLuot || '') : ''; }
     // Trang dự án Flow: chỉ nhận địa chỉ dự án Flow (flow.google.com hoặc labs.google; rỗng = app tự mở dự án mới).
     if (typeof thay.flowUrl === 'string' && a.nen === 'flow') {
       const u = thay.flowUrl.trim();
@@ -77,4 +88,4 @@ class QuanLyTaiKhoan {
   }
 }
 
-module.exports = { QuanLyTaiKhoan, slugId };
+module.exports = { QuanLyTaiKhoan, slugId, NEN, chuanNen };
