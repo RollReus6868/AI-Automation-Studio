@@ -64,7 +64,9 @@
     mp3: /\bmp3\b/i,
     nutTai: /^(download|tải xuống|tải về)$/i,
     // Suno báo hết lượt tạo / tải: hết credit, chạm giới hạn, mời nâng cấp gói…
-    hetLuot: /credit|limit|quota|upgrade|subscribe|subscription|out of|not enough|insufficient|reached|pro plan|premier|hết lượt|hết credit|giới hạn|nâng cấp/i,
+    hetLuot: /credit|limit|quota|upgrade|subscribe|subscription|out of|not enough|insufficient|reached|pro plan|premier|downloads? left|hết lượt|hết credit|giới hạn|nâng cấp/i,
+    // Hộp "Out of Downloads" (ảnh người dùng gửi 15/10/2026): "You don't have any downloads left. Subscribe…".
+    hetTai: /out of downloads|(don't|do not) have any downloads left|no downloads left|hết lượt tải/i,
     xacNhanXoa: /^(clear|clear all|confirm|yes|ok|xoá|xóa|đồng ý)$/i
   };
 
@@ -172,6 +174,21 @@
 
   const mucMenu = () => $$('[role="menuitem"], [role="menuitemradio"], [role="menu"] button, [role="menu"] a').filter(nhinThay);
 
+  /**
+   * Suno hết lượt tải: bấm Download mở hộp "Out of Downloads" (Plan Free · Downloads 0 · Upgrade to Pro ·
+   * Buy download packs) thay cho hộp chọn định dạng. Dò theo chữ trên MỌI phần tử đang hiện (hộp có thể
+   * không mang role=dialog). Trả câu Suno báo, '' = không thấy.
+   */
+  function hetLuotTai() {
+    const goc = $$('h1, h2, h3, h4, p, div, span').find((e) => nhinThay(e) && !e.closest('[data-testid="clip-row"]') &&
+      NHAN.hetTai.test(chu(e)) && chu(e).length < 400 && ![...e.children].some((c) => NHAN.hetTai.test(chu(c))));
+    if (!goc) return '';
+    // Lấy tiêu đề + câu giải thích trong cùng hộp (đi lên vài cấp tới khối có cả hai).
+    let hop = goc;
+    for (let i = 0; i < 4 && hop.parentElement && chu(hop.parentElement).length < 700; i++) hop = hop.parentElement;
+    return dongChu(hop).filter((d) => NHAN.hetTai.test(d) || /^out of downloads$/i.test(d)).join(' — ').slice(0, 200) || chu(goc).slice(0, 200);
+  }
+
   /** Nút / ô có chữ đúng bằng mẫu (bỏ dấu ✓ và khoảng trắng). */
   const dungChu = (e, mau) => mau.test(chu(e).replace(/[✓✔]/g, '').trim());
   /**
@@ -215,8 +232,9 @@
     const con = mucMenu().find((m) => !truoc.has(m) && NHAN.mp3.test(chu(m)));
     if (con) { bam(con); await ngu(600); return { ok: true, cach: 'menu-con', chu: thongBao() }; }
     bam(tai);
-    let hop = null;
-    for (let i = 0; i < 25 && !hop; i++) { await ngu(200); hop = hopTai(); }
+    let hop = null, het = '';
+    for (let i = 0; i < 25 && !hop && !het; i++) { await ngu(200); hop = hopTai(); het = hop ? '' : hetLuotTai(); }
+    if (het) return { ok: false, hetLuotTai: true, loi: 'het-luot-tai', buoc: 'hop', chu: het };
     if (!hop) {
       const mc = mucMenu().find((m) => m !== tai && NHAN.mp3.test(chu(m)));
       if (mc) { bam(mc); await ngu(600); return { ok: true, cach: 'menu-con', chu: thongBao() }; }
@@ -230,6 +248,9 @@
     if (tatCa(nutTai)) return { ok: false, loi: 'nut-download-bi-tat', buoc: 'hop', chu: chuHop };
     bam(nutTai);
     await ngu(800);
+    // Có bản Suno chỉ báo "Out of Downloads" sau khi bấm nút Download trong hộp.
+    const het2 = hetLuotTai();
+    if (het2) return { ok: false, hetLuotTai: true, loi: 'het-luot-tai', buoc: 'hop', chu: het2 };
     return { ok: true, cach: 'hop', chu: chuHop };
   }
 
@@ -243,7 +264,7 @@
     return true;
   }
 
-  window.__suno = { phienBan: 1, trangThai, dsClip, chuanBi, bamTao, taiMp3, dongHop, thongBao, captcha,
+  window.__suno = { phienBan: 1, trangThai, dsClip, chuanBi, bamTao, taiMp3, dongHop, hetLuotTai, thongBao, captcha,
     laHetLuot: (t) => NHAN.hetLuot.test(String(t || '')),
     // Chỉ câu nói về hết lượt (hộp Download có cả tên bài, các định dạng… — không đưa hết vào nhật ký).
     cauHetLuot: (t) => String(t || '').split(/ · |(?<=[.!?])\s+/).filter((c) => NHAN.hetLuot.test(c)).join(' ').slice(0, 200) };

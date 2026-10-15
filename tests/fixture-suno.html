@@ -100,7 +100,22 @@
   // Định dạng chọn sẵn là M4A (Suno nhớ lựa chọn lần trước) → app phải tự chọn MP3.
   let dinhDang = 'M4A';
   function moHop(id) {
-    const het = cauHinh.hetTai.includes(tk);
+    // Hết lượt tải: Suno thật (ảnh 15/10/2026) KHÔNG mở hộp chọn định dạng mà mở hộp "Out of Downloads".
+    // Ở đây cố ý KHÔNG gắn role=dialog — app phải nhận ra bằng chữ.
+    if (cauHinh.hetTai.includes(tk)) {
+      const h = document.createElement('div');
+      h.id = 'hopHetTai'; h.style.cssText = 'position:fixed;left:30%;top:15%;background:#222;padding:20px;z-index:9;width:380px';
+      h.innerHTML = `<button aria-label="Close">✕</button><h2>Out of Downloads</h2>
+        <p>You don't have any downloads left. Subscribe for a monthly allowance, or buy downloads for the songs you want. <a href="#">Learn more.</a></p>
+        <div><div>Plan<br><b>Free</b></div><div>Downloads<br><b>0</b></div></div>
+        <div><b>Pro Plan</b> <span>$10 /month</span><ul><li>Access to our best models</li><li>2,500 credits per month</li><li>20 song downloads per month</li><li>Commercial use rights</li></ul>
+        <button>Upgrade to Pro Plan</button></div><button>Buy download packs</button>
+        <div>https://suno.com/song/${id} <button>Copy share link</button></div>`;
+      h.querySelector('[aria-label="Close"]').onclick = () => h.remove();
+      document.body.appendChild(h);
+      return;
+    }
+    const het = false;
     const c = document.createElement('div');
     c.setAttribute('role', 'dialog'); c.id = 'hopTai';
     c.style.cssText = 'position:fixed;left:30%;top:20%;background:#222;padding:20px;z-index:9';

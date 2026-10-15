@@ -91,9 +91,9 @@ module.exports = function e2eSuno({ win, app, LENH, dieuPhoi, taiKhoan }) {
       // {stt} = số dòng prompt trong lần thêm (bài này là dòng 1) → trùng 001.mp3 của mục 1 thì thêm (2), không ghi đè.
       kiem(path.basename(v2[0].files[0] || '') === '001 (2).mp3' && docBai(f1[0]).giay === 161, `không ghi đè bài cũ cùng tên (${path.basename(v2[0].files[0] || '')})`);
       const luu = (id) => (taiKhoan.store.get('taiKhoan').taiKhoan || []).find((a) => a.id === id) || {};
-      kiem(luu('suno-1').hetLuotDen > Date.now() + 5 * 3600e3 && /download limit/i.test(luu('suno-1').lyDoHetLuot || ''),
+      kiem(luu('suno-1').hetLuotDen > Date.now() + 5 * 3600e3 && /Out of Downloads — You don't have any downloads left/.test(luu('suno-1').lyDoHetLuot || ''),
         `"Suno 1" được đánh dấu hết lượt (đã LƯU): ${luu('suno-1').lyDoHetLuot}`);
-      kiem(LENH.trangThai().nhatKy.slice(nk).some((d) => /↪ #\d+ Suno hết lượt tải về.*download limit.*\(ở "Suno 1"\) — tạo lại ở "Suno 2"/.test(d.chu)), 'nhật ký báo chuyển sang Suno 2');
+      kiem(LENH.trangThai().nhatKy.slice(nk).some((d) => /↪ #\d+ Suno hết lượt tải về: "Out of Downloads — You don't have any downloads left\..*\(ở "Suno 1"\) — tạo lại ở "Suno 2"/.test(d.chu)), 'nhật ký báo chuyển sang Suno 2');
 
       // 3) Bài sau chạy thẳng Suno 2 (Suno 1 đang nghỉ); Suno 2 hết credit → không còn tài khoản → tạm dừng, việc về Chờ.
       ghi('-- 3. "Suno 2" hết credit → hết tài khoản → tạm dừng');

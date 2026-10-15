@@ -171,6 +171,8 @@ class LuongSuno {
     const tbSauBam = await this._thongBaoMoi(tbGocTai);
     if (!tm || !tm.ok) {
       cho.huy();
+      // Hộp "Out of Downloads" của Suno: tài khoản hết lượt tải → tạo lại ở tài khoản Suno dự phòng.
+      if (tm && tm.hetLuotTai) return { ok: false, hetLuot: true, loi: `Suno hết lượt tải về: "${tm.chu || 'Out of Downloads'}"` };
       const tbLoi = tbSauBam || (tm && tm.chu) || '';
       { const c = await this._laHetLuot(tbSauBam) || await this._laHetLuot(tm && tm.chu); if (c) return { ok: false, hetLuot: true, loi: `Suno hết lượt tải về: "${c}"` }; }
       return { ok: false, loi: `Không bấm được Download của Suno (${tm ? tm.loi : '?'}${tm && tm.menu ? ` · menu: ${tm.menu.join(' | ')}` : ''}${tbLoi ? ` · Suno: "${tbLoi.slice(0, 200)}"` : ''})` };
@@ -185,6 +187,8 @@ class LuongSuno {
       const tb = await this._thongBaoMoi(tbGocTai);
       if (tb) tbTai = tb;
       { const c = f ? '' : await this._laHetLuot(tb); if (c) { cho.huy(); return { ok: false, hetLuot: true, loi: `Suno hết lượt tải về: "${c}"` }; } }
+      const het = f ? '' : await this.goi('window.__suno.hetLuotTai()').catch(() => '');
+      if (het) { cho.huy(); return { ok: false, hetLuot: true, loi: `Suno hết lượt tải về: "${het}"` }; }
     }
     if (!f.ok) return { ok: false, loi: f.hetGio ? `Bấm Download MP3 nhưng Suno không gửi file nào${tbTai ? ` ("${tbTai}")` : ''}` : f.loi };
     return { ok: true, files: [{ duongDan: f.duongDan, mime: f.mime }], ghiChu, clip: chon.id };

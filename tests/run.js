@@ -977,7 +977,7 @@ test('Suno: trình trợ giúp — Styles + Lyrics trống, chỉ xét 2 bài m�
   assert.ok(/will-download/.test(m) && /choTaiSuno/.test(m), 'main.js bắt file tải về của phiên Suno');
   assert.ok(/hetLuotDen: 0/.test(m), 'Kiểm tra tài khoản Suno xoá mốc hết lượt');
 });
-test('Suno: câu báo hết lượt — nhận hộp Download / toast hết lượt, KHÔNG nhận chữ thường của hộp Download thật', () => {
+test('Suno: câu báo hết lượt — nhận hộp Out of Downloads / toast hết lượt, KHÔNG nhận chữ thường của hộp Download thật', () => {
   const vm = require('vm');
   const ctx = { window: {} };
   vm.runInNewContext(docNguon('src/inject/suno-trang.js', true), ctx);
@@ -988,6 +988,7 @@ test('Suno: câu báo hết lượt — nhận hộp Download / toast hết lư�
   assert.strictEqual(s.cauHetLuot("Download 'X' · MP3 · Download · You've reached your download limit for this month. Upgrade to Pro for more downloads."),
     "You've reached your download limit for this month. Upgrade to Pro for more downloads.");
   assert.ok(s.cauHetLuot('Not enough credits. Upgrade to Pro to get more credits.'));
+  assert.ok(s.cauHetLuot("Out of Downloads · You don't have any downloads left. Subscribe for a monthly allowance, or buy downloads for the songs you want."));
   const t = docNguon('src/inject/suno-trang.js');
   assert.ok(/function hopTai\(\)/.test(t) && /dungChu\(e, \/\^mp3\$\/i\)/.test(t) && /NHAN\.nutTai/.test(t), 'tải: hộp chọn định dạng → ô MP3 → nút Download');
 });
