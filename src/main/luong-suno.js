@@ -4,7 +4,7 @@
 //  của một tài khoản. Mỗi việc: mở trang Create → tab Songs + Advanced → xoá form →
 //  điền prompt vào ô Styles (lời để trống = nhạc không lời) → Create → chờ các bài
 //  MỚI hiện ra → trong 2 bài mới đầu tiên, lấy bài DÀI HƠN → tải MP3 bằng menu
-//  ⋯ → Download của chính Suno.
+//  ⋯ → Download → hộp chọn MP3 → nút Download của chính Suno.
 //
 //  Tài khoản free: một lần Create ra 4 bài — 2 bài đủ dài (v6-mini) ở trên, 2 bản
 //  nghe thử 1:00 ("Upgrade for full song") ở dưới — nên chỉ xét 2 bài đầu.
@@ -72,9 +72,10 @@ class LuongSuno {
     }
   }
 
-  /** Chữ Suno báo có phải "hết lượt" (hết credit / giới hạn tải / mời nâng cấp) không — luật nằm ở suno-trang.js. */
+  /** Câu Suno báo "hết lượt" trong chữ đang hiện ('' = không phải) (hết credit / giới hạn tải / mời nâng cấp) không — luật nằm ở suno-trang.js. */
   async _laHetLuot(chu) {
-    return !!chu && !!(await this.goi(`window.__suno.laHetLuot(${JSON.stringify(String(chu))})`).catch(() => false));
+    if (!chu) return '';
+    return String(await this.goi(`window.__suno.cauHetLuot(${JSON.stringify(String(chu))})`).catch(() => '') || '');
   }
 
   /**
@@ -126,7 +127,7 @@ class LuongSuno {
     const bt = await this.goi('window.__suno.bamTao()');
     if (!bt || !bt.ok) {
       const tb = await this._thongBaoMoi(tbGoc) || (bt && bt.chu);
-      if (await this._laHetLuot(tb)) return { ok: false, hetLuot: true, loi: `Suno hết lượt tạo bài: "${tb}"` };
+      { const c = await this._laHetLuot(tb); if (c) return { ok: false, hetLuot: true, loi: `Suno hết lượt tạo bài: "${c}"` }; }
       return { ok: false, loi: `Nút Create của Suno không bấm được${tb ? ` ("${tb}")` : ''}` };
     }
 
@@ -139,7 +140,7 @@ class LuongSuno {
       if (moi.length) break;
       const tb = await this._thongBaoMoi(tbGoc);
       if (tb) tbCuoi = tb;
-      if (await this._laHetLuot(tb)) return { ok: false, hetLuot: true, loi: `Suno hết lượt tạo bài: "${tb}"` };
+      { const c = await this._laHetLuot(tb); if (c) return { ok: false, hetLuot: true, loi: `Suno hết lượt tạo bài: "${c}"` }; }
       if (!(await this._choCaptcha(job, ctx, huyLuc))) return { ok: false, loi: 'Suno hỏi captcha mà chưa được giải' };
     }
     if (!moi.length) return { ok: false, loi: `Bấm Create nhưng Suno không tạo bài nào${tbCuoi ? ` ("${tbCuoi}")` : ''}` };
@@ -170,19 +171,20 @@ class LuongSuno {
     const tbSauBam = await this._thongBaoMoi(tbGocTai);
     if (!tm || !tm.ok) {
       cho.huy();
-      if (await this._laHetLuot(tbSauBam)) return { ok: false, hetLuot: true, loi: `Suno hết lượt tải về: "${tbSauBam}"` };
-      return { ok: false, loi: `Không bấm được Download của Suno (${tm ? tm.loi : '?'}${tm && tm.menu ? ` · menu: ${tm.menu.join(' | ')}` : ''})` };
+      const tbLoi = tbSauBam || (tm && tm.chu) || '';
+      { const c = await this._laHetLuot(tbSauBam) || await this._laHetLuot(tm && tm.chu); if (c) return { ok: false, hetLuot: true, loi: `Suno hết lượt tải về: "${c}"` }; }
+      return { ok: false, loi: `Không bấm được Download của Suno (${tm ? tm.loi : '?'}${tm && tm.menu ? ` · menu: ${tm.menu.join(' | ')}` : ''}${tbLoi ? ` · Suno: "${tbLoi.slice(0, 200)}"` : ''})` };
     }
     // Chờ file; trong lúc chờ, Suno báo hết lượt tải (toast vài giây) thì thôi chờ ngay.
     let f = null, tbTai = tbSauBam;
-    if (await this._laHetLuot(tbSauBam)) { cho.huy(); return { ok: false, hetLuot: true, loi: `Suno hết lượt tải về: "${tbSauBam}"` }; }
+    { const c = await this._laHetLuot(tbSauBam); if (c) { cho.huy(); return { ok: false, hetLuot: true, loi: `Suno hết lượt tải về: "${c}"` }; } }
     cho.hua.then((x) => { f = x; });
     while (!f) {
       if (!(await this.ngu(1000, huyLuc))) { cho.huy(); return { ok: false, dung: true }; }
       if (f) break;
       const tb = await this._thongBaoMoi(tbGocTai);
       if (tb) tbTai = tb;
-      if (!f && await this._laHetLuot(tb)) { cho.huy(); return { ok: false, hetLuot: true, loi: `Suno hết lượt tải về: "${tb}"` }; }
+      { const c = f ? '' : await this._laHetLuot(tb); if (c) { cho.huy(); return { ok: false, hetLuot: true, loi: `Suno hết lượt tải về: "${c}"` }; } }
     }
     if (!f.ok) return { ok: false, loi: f.hetGio ? `Bấm Download MP3 nhưng Suno không gửi file nào${tbTai ? ` ("${tbTai}")` : ''}` : f.loi };
     return { ok: true, files: [{ duongDan: f.duongDan, mime: f.mime }], ghiChu, clip: chon.id };

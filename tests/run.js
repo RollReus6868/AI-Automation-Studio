@@ -977,6 +977,20 @@ test('Suno: trình trợ giúp — Styles + Lyrics trống, chỉ xét 2 bài m�
   assert.ok(/will-download/.test(m) && /choTaiSuno/.test(m), 'main.js bắt file tải về của phiên Suno');
   assert.ok(/hetLuotDen: 0/.test(m), 'Kiểm tra tài khoản Suno xoá mốc hết lượt');
 });
+test('Suno: câu báo hết lượt — nhận hộp Download / toast hết lượt, KHÔNG nhận chữ thường của hộp Download thật', () => {
+  const vm = require('vm');
+  const ctx = { window: {} };
+  vm.runInNewContext(docNguon('src/inject/suno-trang.js', true), ctx);
+  const s = ctx.window.__suno;
+  // Chữ thật trong hộp Download (ảnh người dùng gửi 15/10/2026) khi tải được.
+  const thuong = "Download 'Morning Light Breaks Throu…' · M4A · MP3 · WAV · MP4 video asset · Stems & MIDI · Manage · Download · You've unlocked this song. You can return and download at any time. Learn more.";
+  assert.strictEqual(s.cauHetLuot(thuong), '');
+  assert.strictEqual(s.cauHetLuot("Download 'X' · MP3 · Download · You've reached your download limit for this month. Upgrade to Pro for more downloads."),
+    "You've reached your download limit for this month. Upgrade to Pro for more downloads.");
+  assert.ok(s.cauHetLuot('Not enough credits. Upgrade to Pro to get more credits.'));
+  const t = docNguon('src/inject/suno-trang.js');
+  assert.ok(/function hopTai\(\)/.test(t) && /dungChu\(e, \/\^mp3\$\/i\)/.test(t) && /NHAN\.nutTai/.test(t), 'tải: hộp chọn định dạng → ô MP3 → nút Download');
+});
 test('Suno: giao diện có mục Tạo nhạc, nút Thêm Suno, ô chờ tối đa; trang nhạc ẩn phần chỉ dành cho ảnh / video', () => {
   const h = docNguon('src/ui/index.html'), a = docNguon('src/ui/app.js'), c = docNguon('src/ui/style.css');
   assert.ok(/data-trang="nhac"[\s\S]{0,80}data-icon="music"/.test(h));

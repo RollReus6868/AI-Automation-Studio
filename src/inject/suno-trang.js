@@ -11,8 +11,9 @@
 //   - danh sách bài: [data-testid="clip-row"] (data-clip-status="complete"…), mỗi hàng có
 //     a[href="/song/<id>"], thời lượng "3:18", nút button[aria-label="More options"];
 //   - thông báo: #suno-toast-viewport-top / -bottom / -bottomEdge.
-//  Menu "More options" → "Download" → "MP3 Audio" CHƯA thấy trên trang thật (menu đóng lúc lưu) —
-//  dò theo chữ, khớp nhiều cách gọi; thiếu thì trả danh sách mục menu để nhật ký ghi lại.
+//  Tải về (ảnh người dùng gửi 15/10/2026): ⋯ → menu Remix / Edit / Publish / Share / Download / Manage…
+//  → "Download" mở hộp "Download '<tên bài>'" chọn M4A / MP3 (✓ sẵn) / WAV / MP4 video asset / Stems & MIDI
+//  → nút "Download". Không thấy thì trả danh sách mục menu để nhật ký ghi lại.
 // ============================================================================
 (function () {
   if (window.__suno && window.__suno.phienBan === 1) return;
@@ -21,6 +22,8 @@
   const nhinThay = (e) => !!(e && e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden' && getComputedStyle(e).display !== 'none');
   const chu = (e) => String((e && (e.innerText || e.textContent)) || '').replace(/\s+/g, ' ').trim();
   const ngu = (ms) => new Promise((r) => setTimeout(r, ms));
+  /** Chữ theo từng dòng hiển thị (để tách câu báo lỗi khỏi tên bài, nút…). */
+  const dongChu = (e) => String((e && (e.innerText || e.textContent)) || '').split(/\n+/).map((d) => d.replace(/\s+/g, ' ').trim()).filter(Boolean);
 
   /** Bấm như chuột thật: một chuỗi sự kiện, MỘT click (base-ui nghe pointerdown hoặc click). */
   function bam(e) {
@@ -59,6 +62,7 @@
     advanced: /^(advanced|custom|nâng cao|tuỳ chỉnh|tùy chỉnh)$/i,
     taiVe: /^(download|tải xuống|tải về)\b/i,
     mp3: /\bmp3\b/i,
+    nutTai: /^(download|tải xuống|tải về)$/i,
     // Suno báo hết lượt tạo / tải: hết credit, chạm giới hạn, mời nâng cấp gói…
     hetLuot: /credit|limit|quota|upgrade|subscribe|subscription|out of|not enough|insufficient|reached|pro plan|premier|hết lượt|hết credit|giới hạn|nâng cấp/i,
     xacNhanXoa: /^(clear|clear all|confirm|yes|ok|xoá|xóa|đồng ý)$/i
@@ -84,7 +88,8 @@
   function thongBao() {
     const ds = $$('#suno-toast-viewport-top, #suno-toast-viewport-bottom, #suno-toast-viewport-bottomEdge, [role="alertdialog"], [role="dialog"], [role="alert"]:not(#__next-route-announcer__), [role="status"]')
       .filter((e) => nhinThay(e) && !e.closest('[data-testid="clip-row"]'))   // "Upgrade for full song" của bản nghe thử không phải thông báo
-      .map(chu).filter((t) => t && t.length > 3);
+      // Giữ từng dòng (nối bằng ' · ') để tách được câu báo hết lượt khỏi tên bài / nút trong hộp.
+      .flatMap(dongChu).filter((t) => t.length > 3);
     return [...new Set(ds)].join(' · ').slice(0, 400);
   }
 
@@ -167,9 +172,28 @@
 
   const mucMenu = () => $$('[role="menuitem"], [role="menuitemradio"], [role="menu"] button, [role="menu"] a').filter(nhinThay);
 
+  /** Nút / ô có chữ đúng bằng mẫu (bỏ dấu ✓ và khoảng trắng). */
+  const dungChu = (e, mau) => mau.test(chu(e).replace(/[✓✔]/g, '').trim());
   /**
-   * Tải MP3 của một bài bằng nút của chính Suno: ⋯ (More options) → Download → MP3 Audio.
-   * Tiến trình chính đã chờ sẵn sự kiện tải về của cửa sổ này.
+   * Hộp "Download '<tên bài>'" (đo 15/10/2026): các ô M4A / MP3 / WAV / MP4 video asset / Stems & MIDI,
+   * rồi nút "Download" to ở dưới. Tìm theo role=dialog; không có role thì đi ngược từ ô "MP3" lên tới
+   * khối chứa cả nút "Download".
+   */
+  function hopTai() {
+    const laHop = (h) => $$('button, [role="button"], [role="radio"], [role="option"], label, div', h).some((e) => nhinThay(e) && dungChu(e, /^mp3$/i));
+    const hop = $$('[role="dialog"], [role="alertdialog"]').filter((h) => nhinThay(h) && laHop(h)).pop();
+    if (hop) return hop;
+    const oMp3 = $$('button, [role="button"], [role="radio"], [role="option"], label').find((e) => nhinThay(e) && dungChu(e, /^mp3$/i) && !e.closest('[role="menu"]'));
+    for (let e = oMp3 && oMp3.parentElement, n = 0; e && n < 8; e = e.parentElement, n++) {
+      if ($$('button', e).some((b) => nhinThay(b) && dungChu(b, NHAN.nutTai))) return e;
+    }
+    return null;
+  }
+
+  /**
+   * Tải MP3 của một bài bằng nút của chính Suno: ⋯ (More options) → Download → hộp chọn định dạng →
+   * ô MP3 → nút Download. Tiến trình chính đã chờ sẵn sự kiện tải về của cửa sổ này.
+   * Bản Suno cũ / khác có menu con "MP3 Audio" thay cho hộp — vẫn hiểu.
    */
   async function taiMp3(id) {
     const a = $$('[data-testid="clip-row"] a[href*="/song/"]').find((x) => (x.getAttribute('href') || '').includes(`/song/${id}`));
@@ -182,27 +206,46 @@
     if (!nut) return { ok: false, loi: 'khong-thay-nut-more-options', buoc: 'menu' };
     bam(nut);
     let tai = null;
-    for (let i = 0; i < 20 && !tai; i++) { await ngu(150); tai = mucMenu().find((m) => NHAN.taiVe.test(chu(m))); }
+    for (let i = 0; i < 20 && !tai; i++) { await ngu(150); tai = mucMenu().find((m) => NHAN.taiVe.test(chu(m).replace(/^[^\p{L}]+/u, ''))); }   // bỏ biểu tượng 🔒 đứng trước
     if (!tai) return { ok: false, loi: 'menu-khong-co-download', buoc: 'menu', menu: mucMenu().map(chu).slice(0, 15), chu: thongBao() };
-    // "Download" có thể là mục mở menu con (rê chuột / bấm) hoặc tải thẳng.
+    // "Download" mở hộp chọn định dạng (Suno 10/2026); bản khác có thể mở menu con khi rê chuột.
     const truoc = new Set(mucMenu());
     re(tai);
-    await ngu(400);
-    let mp3 = mucMenu().find((m) => !truoc.has(m) && NHAN.mp3.test(chu(m))) || mucMenu().find((m) => m !== tai && NHAN.mp3.test(chu(m)));
-    if (!mp3) {
-      bam(tai);
-      for (let i = 0; i < 12 && !mp3; i++) { await ngu(200); mp3 = mucMenu().find((m) => m !== tai && NHAN.mp3.test(chu(m))); }
+    await ngu(300);
+    const con = mucMenu().find((m) => !truoc.has(m) && NHAN.mp3.test(chu(m)));
+    if (con) { bam(con); await ngu(600); return { ok: true, cach: 'menu-con', chu: thongBao() }; }
+    bam(tai);
+    let hop = null;
+    for (let i = 0; i < 25 && !hop; i++) { await ngu(200); hop = hopTai(); }
+    if (!hop) {
+      const mc = mucMenu().find((m) => m !== tai && NHAN.mp3.test(chu(m)));
+      if (mc) { bam(mc); await ngu(600); return { ok: true, cach: 'menu-con', chu: thongBao() }; }
+      return { ok: false, loi: 'khong-mo-duoc-hop-download', buoc: 'hop', chu: thongBao() };
     }
-    if (mp3) bam(mp3);
-    // Một số bản Suno hỏi lại trong hộp thoại ("Download MP3") — bấm nút tải trong hộp đó.
-    await ngu(600);
-    const hop = $$('[role="dialog"], [role="alertdialog"]').filter(nhinThay).pop();
-    const nutHop = hop && $$('button, a', hop).find((b) => nhinThay(b) && (NHAN.taiVe.test(chu(b)) || NHAN.mp3.test(chu(b))));
-    if (nutHop) bam(nutHop);
-    return { ok: true, quaMenuCon: !!mp3, quaHop: !!nutHop, chu: thongBao() };
+    const chuHop = dongChu(hop).join(' · ').slice(0, 400);
+    const oMp3 = $$('button, [role="button"], [role="radio"], [role="option"], label', hop).find((e) => nhinThay(e) && dungChu(e, /^mp3$/i));
+    if (oMp3 && oMp3.getAttribute('aria-checked') !== 'true' && oMp3.getAttribute('aria-selected') !== 'true') { bam(oMp3); await ngu(300); }
+    const nutTai = $$('button', hop).filter((b) => nhinThay(b) && dungChu(b, NHAN.nutTai)).pop();
+    if (!nutTai) return { ok: false, loi: 'hop-khong-co-nut-download', buoc: 'hop', chu: chuHop };
+    if (tatCa(nutTai)) return { ok: false, loi: 'nut-download-bi-tat', buoc: 'hop', chu: chuHop };
+    bam(nutTai);
+    await ngu(800);
+    return { ok: true, cach: 'hop', chu: chuHop };
   }
 
-  window.__suno = { phienBan: 1, trangThai, dsClip, chuanBi, bamTao, taiMp3, thongBao, captcha,
-    laHetLuot: (t) => NHAN.hetLuot.test(String(t || '')) };
+  /** Đóng hộp Download nếu còn mở (nút ✕ / Escape) — tránh che trang ở việc sau. */
+  async function dongHop() {
+    const hop = hopTai();
+    if (!hop) return false;
+    const x = $$('button', hop).find((b) => nhinThay(b) && (/close|đóng/i.test(b.getAttribute('aria-label') || '') || /^[×✕x]$/i.test(chu(b))));
+    if (x) bam(x); else document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await ngu(300);
+    return true;
+  }
+
+  window.__suno = { phienBan: 1, trangThai, dsClip, chuanBi, bamTao, taiMp3, dongHop, thongBao, captcha,
+    laHetLuot: (t) => NHAN.hetLuot.test(String(t || '')),
+    // Chỉ câu nói về hết lượt (hộp Download có cả tên bài, các định dạng… — không đưa hết vào nhật ký).
+    cauHetLuot: (t) => String(t || '').split(/ · |(?<=[.!?])\s+/).filter((c) => NHAN.hetLuot.test(c)).join(' ').slice(0, 200) };
 })();
 ;undefined;

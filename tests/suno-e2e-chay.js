@@ -67,6 +67,7 @@ module.exports = function e2eSuno({ win, app, LENH, dieuPhoi, taiKhoan }) {
       kiem(b1[1] && b1[1].giay === 200 && /^s2-1-/.test(b1[1].id), `bài 2: tải bài dài hơn (3:20, bài thứ 1) — tải được ${JSON.stringify(b1[1])}`);
       kiem(!g1.tai.some((id) => /^s\d+-[34]-/.test(id)), 'không bao giờ tải bài 3–4 (bản nghe thử), kể cả bài 3 dài 4:00');
       kiem(g1.tai.length === 2, `mỗi việc tải đúng 1 file (${g1.tai.join(', ')})`);
+      kiem(g1.dinhDang.join() === 'MP3,MP3', `hộp Download: app tự chọn MP3 (trang chọn sẵn M4A) rồi bấm Download (${g1.dinhDang.join(', ')})`);
       kiem(LENH.trangThai().nhatKy.slice(nk).some((d) => /Việc #\d+ xong nhạc \(bài dài hơn: 2:41 \(bài kia 2:05\)\)/.test(d.chu)), 'nhật ký ghi thời lượng 2 bài và bài được chọn');
       kiem(fs.existsSync(path.join(app.getPath('userData'), 'suno-tai-tam')) && !fs.readdirSync(path.join(app.getPath('userData'), 'suno-tai-tam')).length,
         'file tạm đã được chuyển hết sang thư mục nhạc');
@@ -90,9 +91,9 @@ module.exports = function e2eSuno({ win, app, LENH, dieuPhoi, taiKhoan }) {
       // {stt} = số dòng prompt trong lần thêm (bài này là dòng 1) → trùng 001.mp3 của mục 1 thì thêm (2), không ghi đè.
       kiem(path.basename(v2[0].files[0] || '') === '001 (2).mp3' && docBai(f1[0]).giay === 161, `không ghi đè bài cũ cùng tên (${path.basename(v2[0].files[0] || '')})`);
       const luu = (id) => (taiKhoan.store.get('taiKhoan').taiKhoan || []).find((a) => a.id === id) || {};
-      kiem(luu('suno-1').hetLuotDen > Date.now() + 5 * 3600e3 && /Download limit/.test(luu('suno-1').lyDoHetLuot || ''),
+      kiem(luu('suno-1').hetLuotDen > Date.now() + 5 * 3600e3 && /download limit/i.test(luu('suno-1').lyDoHetLuot || ''),
         `"Suno 1" được đánh dấu hết lượt (đã LƯU): ${luu('suno-1').lyDoHetLuot}`);
-      kiem(LENH.trangThai().nhatKy.slice(nk).some((d) => /↪ #\d+ Suno hết lượt tải về.*\(ở "Suno 1"\) — tạo lại ở "Suno 2"/.test(d.chu)), 'nhật ký báo chuyển sang Suno 2');
+      kiem(LENH.trangThai().nhatKy.slice(nk).some((d) => /↪ #\d+ Suno hết lượt tải về.*download limit.*\(ở "Suno 1"\) — tạo lại ở "Suno 2"/.test(d.chu)), 'nhật ký báo chuyển sang Suno 2');
 
       // 3) Bài sau chạy thẳng Suno 2 (Suno 1 đang nghỉ); Suno 2 hết credit → không còn tài khoản → tạm dừng, việc về Chờ.
       ghi('-- 3. "Suno 2" hết credit → hết tài khoản → tạm dừng');

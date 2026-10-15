@@ -25,7 +25,7 @@
   tablist "What to create" + "Create form mode", ô Styles trong create-form-styles-wrapper (chỉ hiện ở
   Advanced), ô "Lyrics editor" (contenteditable, CÓ SẴN lời cũ — app phải xoá), nút "Clear all form inputs",
   nút "Create song" (data-disabled khi Styles trống), hàng bài clip-row (data-clip-status, /song/<id>,
-  thời lượng m:ss trên ảnh bìa, nút "More options" → Download (menu con khi rê chuột) → MP3 Audio).
+  thời lượng m:ss trên ảnh bìa, nút "More options" → Download → hộp chọn định dạng (M4A chọn sẵn, MP3, WAV…) → nút Download).
   Bài lưu ở MÁY CHỦ test theo tài khoản (cookie suno_tk). Một lần Create ra 4 bài: 2 bài đủ dài + 2 bản nghe thử
   (bài 3 dài 4:00 làm mồi — app không được xét). Máy chủ bật được "hết lượt tải" / "hết credit" cho từng tài khoản.
 -->
@@ -84,30 +84,48 @@
         <div class="bia">${c.trangThai === 'complete' ? `<span>${mmss(c.giay)}</span>` : ''}</div>
         <a href="/song/${c.id}">${c.ten}</a>${c.thu ? '<small>Upgrade for full song</small>' : ''}
         <button aria-label="More options" data-id="${c.id}">⋯</button>
-        ${menuMo === c.id ? `<div role="menu"><div role="menuitem">Remix/Edit</div><div role="menuitem" data-tai>Download ›</div>
-          <div data-con hidden><div role="menuitem" data-mp3="${c.id}">MP3 Audio</div><div role="menuitem">WAV Audio</div><div role="menuitem">Video</div></div>
-          <div role="menuitem">Share</div></div>` : ''}
+        ${menuMo === c.id ? `<div role="menu"><div role="menuitem">Remix ›</div><div role="menuitem">Edit ›</div><div role="menuitem">Publish</div>
+          <div role="menuitem">Share</div><div role="menuitem" data-tai="${c.id}">🔒 Download</div><div role="menuitem">Manage ›</div>
+          <div role="menuitem">Add to Queue</div><div role="menuitem">Move to Trash</div></div>` : ''}
       </div>`).join('');
     if ($('#ds').__h !== html) { $('#ds').__h = html; $('#ds').innerHTML = html; }
   }
   $('#ds').addEventListener('click', (e) => {
     const m = e.target.closest('button[aria-label="More options"]');
     if (m) { menuMo = menuMo === m.dataset.id ? '' : m.dataset.id; nap(); return; }
-    const mp3 = e.target.closest('[data-mp3]');
-    if (mp3) {
-      menuMo = '';
-      if (cauHinh.hetTai.includes(tk)) { toast('Download limit reached. Upgrade your plan to download more songs.'); nap(); return; }
-      const a = document.createElement('a');
-      a.href = '/__suno-mp3/' + mp3.dataset.mp3; a.download = '';
-      document.body.appendChild(a); a.click(); a.remove();
-      nap();
-    }
-  });
-  // Menu con "Download" mở khi rê chuột (như menu Suno thật).
-  $('#ds').addEventListener('mouseover', (e) => {
     const t = e.target.closest('[data-tai]');
-    if (t) { const con = t.parentElement.querySelector('[data-con]'); if (con) con.hidden = false; }
+    if (t) { menuMo = ''; moHop(t.dataset.tai); nap(); }
   });
+  // Hộp "Download '<tên>'" như Suno thật (15/10/2026): chọn định dạng rồi bấm nút Download to.
+  // Định dạng chọn sẵn là M4A (Suno nhớ lựa chọn lần trước) → app phải tự chọn MP3.
+  let dinhDang = 'M4A';
+  function moHop(id) {
+    const het = cauHinh.hetTai.includes(tk);
+    const c = document.createElement('div');
+    c.setAttribute('role', 'dialog'); c.id = 'hopTai';
+    c.style.cssText = 'position:fixed;left:30%;top:20%;background:#222;padding:20px;z-index:9';
+    const ve = () => {
+      c.innerHTML = `<button aria-label="Close" data-dong>✕</button><h2>Download 'Bai ${id}'</h2>` +
+        ['M4A', 'MP3', 'WAV', 'MP4 video asset'].map((d) => `<button data-dd="${d}">${d}${d === dinhDang ? ' ✓' : ''}</button>`).join('') +
+        `<div><span>Stems &amp; MIDI</span> <button>Manage</button></div>` +
+        `<button data-tai-ve ${het ? 'aria-disabled="true" data-disabled=""' : ''}>Download</button>` +
+        `<p>${het ? "You've reached your download limit for this month. Upgrade to Pro for more downloads." : "You've unlocked this song. You can return and download at any time. Learn more."}</p>`;
+    };
+    ve();
+    c.onclick = (e) => {
+      const d = e.target.closest('[data-dd]');
+      if (d) { dinhDang = d.dataset.dd; ve(); return; }
+      if (e.target.closest('[data-dong]')) { c.remove(); return; }
+      const b = e.target.closest('[data-tai-ve]');
+      if (b && !b.hasAttribute('data-disabled')) {
+        const a = document.createElement('a');
+        a.href = '/__suno-mp3/' + id + '?dd=' + encodeURIComponent(dinhDang); a.download = '';
+        document.body.appendChild(a); a.click(); a.remove();
+      }
+    };
+    document.body.appendChild(c);
+  }
+  $('#ds').addEventListener('mouseover', () => {});
   veForm();
   nap();
   setInterval(nap, 500);
