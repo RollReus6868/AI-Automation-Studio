@@ -28,6 +28,7 @@ const CAI_DAT_MAC_DINH = {
   tenAnh: hd.MAU_TEN_ANH_MAC_DINH,
   tenVideo: hd.MAU_TEN_MAC_DINH,
   videoCanhAnh: true,     // video nối từ ảnh: lưu cạnh ảnh nguồn, cùng tên (325.jpg → 325.mp4)
+  thuMucVideoAnh: '',     // 1.0.4: tắt "cạnh ảnh" + chọn thư mục này → video nối từ ảnh lưu ở đây, vẫn cùng tên ảnh
   xoaChatKhiXong: false,  // chạy hết hàng chờ → xoá chat Muse của các việc đã xong
   xoaDuAnFlowKhiXong: false, // chạy hết hàng chờ → xoá dự án Flow đã dùng (lần sau app tự mở dự án mới)
   luongMoiTK: 3,          // số luồng chạy song song mỗi tài khoản
@@ -308,6 +309,7 @@ class DieuPhoi {
     m.tenVideo = String(m.tenVideo || '').trim() || hd.MAU_TEN_MAC_DINH;
     m.taiAnh = m.taiAnh !== false; m.taiVideo = m.taiVideo !== false; m.tatMayKhiXong = !!m.tatMayKhiXong;
     m.videoCanhAnh = m.videoCanhAnh !== false; m.xoaChatKhiXong = !!m.xoaChatKhiXong; m.xoaDuAnFlowKhiXong = !!m.xoaDuAnFlowKhiXong;
+    m.thuMucVideoAnh = String(m.thuMucVideoAnh || '').trim();
     m.nghiGiuaLanGui = so(m.nghiGiuaLanGui, 0, 120, 3);
     m.choAnhGiay = so(m.choAnhGiay, 60, 1800, 180);
     m.choVideoGiay = so(m.choVideoGiay, 120, 3600, 300);
@@ -534,10 +536,18 @@ class DieuPhoi {
         // Video nối từ ảnh (Flow ⇄ Muse): lưu NGAY CẠNH ảnh nguồn, cùng tên — 325.jpg → 325.mp4. Người dùng
         // đặt thư mục ảnh riêng mà video vẫn vào thư mục mặc định thì tưởng video không được tải về
         // (nhật ký 15/10/2026: ảnh "325.jpg", video "Mac_dinh\Mac_dinh_270.mp4" ở chỗ khác).
-        const anhNguon = video && j.tuAnh && tai && this.caiDat.videoCanhAnh ? (j.thamChieu || []).slice(-1)[0] : '';
-        if (anhNguon && !path.resolve(anhNguon).startsWith(path.resolve(this.o.thuMucTam))) {
-          goc = path.dirname(anhNguon);
-          mau = '{tenAnh}';
+        // 1.0.4: tắt "cạnh ảnh" mà đã chọn thư mục riêng cho video nối từ ảnh → lưu vào đó, vẫn cùng tên ảnh.
+        if (video && j.tuAnh && tai) {
+          const anhNguon = (j.thamChieu || []).slice(-1)[0] || '';
+          if (this.caiDat.videoCanhAnh) {
+            if (anhNguon && !path.resolve(anhNguon).startsWith(path.resolve(this.o.thuMucTam))) {
+              goc = path.dirname(anhNguon);
+              mau = '{tenAnh}';
+            }
+          } else if (this.caiDat.thuMucVideoAnh) {
+            goc = this.caiDat.thuMucVideoAnh;
+            mau = '{tenAnh}';
+          }
         }
         const cu = j.files || [];
         j.files = r.files.map((f, i) => {

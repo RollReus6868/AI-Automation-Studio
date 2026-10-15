@@ -426,6 +426,31 @@ test('video nối từ ảnh: lưu cạnh ảnh nguồn, cùng tên (325.jpg →
   dp._ketThuc(v2, { ok: true, files: [{ mime: 'video/mp4', b64: 'AA==' }] }, null);
   assert.ok(v2.files[0].replace(/\\/g, '/').startsWith('/video/Mac_dinh/'), v2.files[0]);
 });
+test('1.0.4: tắt "cạnh ảnh" + chọn thư mục riêng → video nối từ ảnh vào thư mục đó, cùng tên ảnh; bật lại thì về cạnh ảnh', () => {
+  const { dp } = dungDieuPhoi();
+  dp.datCaiDat({ thuMucAnh: '/anh', thuMucVideo: '/video', videoCanhAnh: false, thuMucVideoAnh: '  /video-tu-anh ' });
+  assert.strictEqual(dp.caiDat.thuMucVideoAnh, '/video-tu-anh');
+  dp.them({ prompts: ['a', 'b', 'c'], chuoiVideo: { prompt: 'zoom' } });
+  const chay = (a) => {
+    dp._ketThuc(a, { ok: true, files: [{ mime: 'image/jpeg', b64: 'AA==' }] }, null);
+    const v = dp.viec.find((j) => j.tuAnh === a.id);
+    dp._ketThuc(v, { ok: true, files: [{ mime: 'video/mp4', b64: 'AA==' }] }, null);
+    return v.files[0].replace(/\\/g, '/');
+  };
+  const [a1, a2, a3] = dp.viec.filter((j) => j.loai === 'anh');
+  assert.strictEqual(chay(a1), '/video-tu-anh/001.mp4');
+  dp.datCaiDat({ videoCanhAnh: true });
+  assert.strictEqual(chay(a2), '/anh/002.mp4', 'bật lại cạnh ảnh → thư mục riêng nằm im');
+  dp.datCaiDat({ videoCanhAnh: false, thuMucVideoAnh: '' });
+  assert.ok(chay(a3).startsWith('/video/Mac_dinh/'), 'bỏ thư mục riêng → theo trang Tạo video');
+});
+test('1.0.4: Cài đặt có nút chọn thư mục video tạo từ ảnh, nối lệnh chonThuMucVideoAnh (lưu ngay, tắt cạnh ảnh)', () => {
+  const ui = docNguon('src/ui/app.js'), m = docNguon('main.js');
+  const html = docNguon('src/ui/index.html', true);
+  for (const id of ['cdThuMucVideoAnh', 'cdChonThuMucVideoAnh', 'cdMoThuMucVideoAnh', 'cdBoThuMucVideoAnh']) assert.ok(html.includes(`id="${id}"`), id);
+  assert.ok(/\$\('#cdChonThuMucVideoAnh'\)\.onclick[\s\S]{0,120}api\.call\('chonThuMucVideoAnh'\)/.test(ui));
+  assert.ok(/chonThuMucVideoAnh: async[\s\S]{0,400}datCaiDat\(\{ thuMucVideoAnh: r\.filePaths\[0\], videoCanhAnh: false \}\)/.test(m));
+});
 test('video nối từ ảnh KHÔNG tải về (ảnh ở bộ nhớ tạm) → video theo thư mục video như cũ', () => {
   const { dp } = dungDieuPhoi();
   dp.datCaiDat({ taiAnh: false, thuMucVideo: '/video' });

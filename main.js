@@ -477,6 +477,13 @@ const LENH = {
     if (r.canceled || !r.filePaths[0]) return null;
     return { thuMuc: r.filePaths[0], anh: anhTrongThuMuc(r.filePaths[0]) };
   },
+  /** Thư mục riêng cho video nối từ ảnh: chọn xong là thôi lưu cạnh ảnh. */
+  chonThuMucVideoAnh: async () => {
+    const r = await dialog.showOpenDialog(win, { title: 'Thư mục lưu video tạo từ ảnh', properties: ['openDirectory', 'createDirectory'] });
+    if (r.canceled || !r.filePaths[0]) return null;
+    dieuPhoi.datCaiDat({ thuMucVideoAnh: r.filePaths[0], videoCanhAnh: false });
+    return r.filePaths[0];
+  },
   chonThuMucRa: async ({ loai }) => {
     const r = await dialog.showOpenDialog(win, { properties: ['openDirectory', 'createDirectory'] });
     if (r.canceled || !r.filePaths[0]) return null;

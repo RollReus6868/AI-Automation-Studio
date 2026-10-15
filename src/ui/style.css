@@ -315,6 +315,9 @@ select option { background: var(--panel-dac); }
 .the-cai h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; font-size: 14px; }
 .the-cai h3 i { color: var(--tim); }
 .the-cai .dong-cong-tac { margin-top: 4px; margin-bottom: 8px; }
+.o-thu-muc-video { margin: 0 0 12px 54px; }
+.o-thu-muc-video b { display: block; font-size: 12px; margin-bottom: 4px; }
+.o-thu-muc-video.mo-di { opacity: .45; }
 .the-cai textarea { font-size: 13px; resize: vertical; }
 .the-cai > small.mo { display: block; margin-bottom: 10px; }
 .dong-o { display: flex; gap: 8px; align-items: center; margin-top: 8px; }

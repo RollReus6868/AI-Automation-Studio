@@ -687,6 +687,8 @@
     $('#cdPng').checked = !!c.png;
     $('#cdTatMay').checked = !!c.tatMayKhiXong;
     $('#cdVideoCanhAnh').checked = c.videoCanhAnh !== false;
+    $('#cdThuMucVideoAnh').value = c.thuMucVideoAnh || '';
+    $('#khoiThuMucVideoAnh').classList.toggle('mo-di', c.videoCanhAnh !== false);
     $('#cdXoaChat').checked = !!c.xoaChatKhiXong;
     $('#cdXoaDuAnFlow').checked = !!c.xoaDuAnFlowKhiXong;
     $('#cdMauAnh').value = c.mau.anh; $('#cdMauVideo').value = c.mau.video;
@@ -1078,6 +1080,14 @@
     $('#ncChonThuMuc').onclick = async () => { const d = await api.call('chonThuMucRa', { loai: loaiTrang() }); if (d) $('#ncThuMuc').value = d; };
     $('#ncMoThuMuc').onclick = () => api.call('moThuMuc', { dir: S.thuMuc[loaiTrang()] });
     $('#cdMoDuLieu').onclick = () => api.call('moThuMucDuLieu');
+    // Thư mục video nối từ ảnh: chọn = lưu ngay + tắt "cạnh ảnh"; bật lại "cạnh ảnh" thì thư mục này nằm im.
+    $('#cdChonThuMucVideoAnh').onclick = async () => {
+      const d = await api.call('chonThuMucVideoAnh');
+      if (d) { $('#cdVideoCanhAnh').checked = false; $('#cdThuMucVideoAnh').value = d; $('#khoiThuMucVideoAnh').classList.remove('mo-di'); toast('Video tạo từ ảnh sẽ lưu vào thư mục này'); }
+    };
+    $('#cdMoThuMucVideoAnh').onclick = () => { const d = $('#cdThuMucVideoAnh').value; if (d) api.call('moThuMuc', { dir: d }); };
+    $('#cdBoThuMucVideoAnh').onclick = async () => { await api.call('datCaiDat', { thuMucVideoAnh: '' }); $('#cdThuMucVideoAnh').value = ''; };
+    $('#cdVideoCanhAnh').addEventListener('change', (e) => $('#khoiThuMucVideoAnh').classList.toggle('mo-di', e.target.checked));
     $('#cdKiemCapNhat').onclick = () => api.call('kiemCapNhat');
     $('#cdXemLuong').onchange = (e) => api.call('xemLuong', { bat: e.target.checked });
     $('#cdMauGoc').onclick = () => { $('#cdMauAnh').value = HD.MAU_MAC_DINH.anh; $('#cdMauVideo').value = HD.MAU_MAC_DINH.video; };
