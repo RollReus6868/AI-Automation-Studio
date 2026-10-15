@@ -231,8 +231,17 @@ function taoMayFlow(o) {
   async function datModelAnh(tab, settings) {
     const ten = String((settings && settings.modelAnh) || '').trim();
     if (!ten) { log('info', `🍌 [${tab.id}] Model ảnh: giữ nguyên model đang chọn trên Flow.`); return null; }
+    // Đã trượt 2 mẻ liền với đúng model này → thôi thử ở tab này (mỗi lần thử mở/đóng bảng cài đặt
+    // tốn vài giây và lặp một dòng cảnh báo cho mọi mẻ — nhật ký 15/10/2026).
+    if (tab.boModelAnh === ten) return null;
     const r = await datModel(tab, ten, 'model ảnh', true);
     tab.modelHienTai = null;           // biến đó thuộc kế hoạch model VIDEO
+    if (r && r.ok) tab.loiModelAnh = 0;
+    else if ((tab.loiModelAnh = (tab.loiModelAnh || 0) + 1) >= 2) {
+      tab.boModelAnh = ten;
+      log('warning', `⚠️ [${tab.id}] Đổi model ảnh sang "${ten}" trượt 2 mẻ liền — tab này thôi thử, chạy bằng model đang chọn trên Flow. ` +
+        'Muốn chắc model: chọn tay trên trang Flow một lần (Flow nhớ cho các lần sau), hoặc để trống ô Model ảnh.');
+    }
     return r;
   }
 
@@ -512,7 +521,9 @@ function taoMayFlow(o) {
       // ── Hàng đợi tên file — theo TỪNG TAB ───────────────────────────────
       case 'SET_NEXT_FILENAME': {
         if (!tabId) return { success: false, error: 'Không rõ tab' };
-        if (tab) await theoDoiAnhThamChieu(tab, 'mở menu thẻ để tải về').catch(() => {});
+        // Lúc menu tải về đang mở, Flow 10/2026 hiện ảnh của thẻ cạnh ô nhập rồi tự gỡ khi menu đóng
+        // (nhật ký 15/10: mẻ sau ô nhập trống) → chỉ báo nếu 5 giây sau ảnh VẪN còn.
+        if (tab) setTimeout(() => theoDoiAnhThamChieu(tab, 'mở menu thẻ để tải về (5 giây sau vẫn còn)').catch(() => {}), 5000);
         if (tab) await nhipTT.nghi(tab, 'truocTai', ghiNghiCua(tab));
         return { success: true, queueSize: taiVe.pushName(tabId, message.filename) };
       }

@@ -30,7 +30,9 @@ Chạy thẳng từ mã nguồn (Windows): bấm đúp `CHAY_TU_NGUON.bat` (tự
 - **Muse**: mỗi prompt một chat mới, nhiều luồng mỗi tài khoản, ảnh tham chiếu, nhân vật, chế độ Người mẫu, xoá chat, xem mức token.
 - **Google Flow**: mỗi tài khoản một (đến 4) tab chạy ngầm; app gom việc thành mẻ và giao cho engine Flow (dán prompt, bấm Tạo, thử lại, tải về). Giữ đủ chế độ an toàn, chọn model ảnh/video, model dự phòng, nghỉ giữa thao tác, gỡ ảnh tham chiếu dính.
 - **Tự động qua lại**: ảnh xong → tự tạo video ở **Muse hoặc Google Flow** (chọn ở ô "Video chạy ở"). Ví dụ: Flow tạo ảnh → Muse tạo video, hoặc Muse tạo ảnh → Flow tạo video. Ảnh nằm sẵn trong thư mục kết quả trên máy.
-- **Nhiều tài khoản, lỗi là đổi ngay**: mỗi dự án chọn tài khoản **chính** và **dự phòng** cho từng nơi chạy (nút tài khoản cạnh tên dự án). Việc lỗi chuyển ngay sang tài khoản dự phòng; tài khoản lỗi liên tiếp hoặc bị nhắc thì tạm nghỉ.
+- **Nhiều tài khoản, lỗi là đổi ngay**: mỗi dự án chọn tài khoản **chính** và **dự phòng** cho từng nơi chạy (nút tài khoản cạnh tên dự án). Việc lỗi chuyển lần lượt sang các tài khoản dự phòng, hết dự phòng thì quay về tài khoản chính, cứ thế theo vòng tới khi xong; tài khoản lỗi liên tiếp hoặc bị nhắc thì tạm nghỉ, mọi tài khoản cùng lỗi thì hàng chờ tạm dừng.
+- **Video từ ảnh nằm cạnh ảnh, cùng tên** (`325.jpg` → `325.mp4`). Tên ảnh mặc định `{stt}`.
+- **Tải về hàng loạt** (tick nhiều việc → Tải về), **xuất Nhật ký ra .txt**, tuỳ chọn **tự xoá chat Muse / dự án Flow** khi chạy xong hàng chờ.
 - Mẫu tên file, thư mục riêng cho ảnh/video, nhập nhiều file .txt (mỗi file một dự án), tạo video từ thư mục ảnh có sẵn, tự thử lại, tắt máy khi chạy xong.
 
 ## Giới hạn cần biết
@@ -41,7 +43,7 @@ Chạy thẳng từ mã nguồn (Windows): bấm đúp `CHAY_TU_NGUON.bat` (tự
 
 ## Nhật ký và dữ liệu
 
-- Nút **Nhật ký** góc dưới trái (số đỏ = lỗi chưa xem).
+- Nút **Nhật ký** góc dưới trái (số đỏ = lỗi chưa xem); **Xuất .txt** để lưu ra file gửi cho người phát triển.
 - Dữ liệu app: Windows `%APPDATA%\AIAutomationStudio`, macOS `~/Library/Application Support/AIAutomationStudio`.
 
 ## Dành cho người phát triển

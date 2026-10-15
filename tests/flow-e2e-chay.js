@@ -158,6 +158,34 @@ module.exports = function e2eFlow({ win, app, LENH, dieuPhoi, taiKhoan }) {
       kiem(v6.every((j) => j.trangThai === 'cho'), 'việc về hàng chờ (không thành lỗi)');
       kiem(LENH.trangThai().nhatKy.slice(nk).some((d) => /"Flow 3" chưa đăng nhập Flow/.test(d.chu)), 'nhật ký nói rõ tài khoản Flow nào chưa đăng nhập');
       LENH.dung();
+      LENH.xoaViec({ ids: v6.map((j) => j.id) });
+
+      // 7) 1.0.2: chạy hết hàng chờ → tự xoá dự án Flow vừa dùng (đúng dự án đó, dự án khác của người dùng
+      //    giữ nguyên); tài khoản quên địa chỉ dự án → lần chạy sau tự mở dự án mới.
+      ghi('-- 7. Tự xoá dự án Flow khi chạy xong');
+      const dsDuAn = async () => (await net.fetch(`${process.env.MUSE_URL}/__flow-du-an`)).json();
+      LENH.datCaiDat({ xoaDuAnFlowKhiXong: true });
+      const d7id = LENH.taoDuAn({ ten: 'Xoa du an', taiKhoan: ['flow-1'] }).id;
+      nk = LENH.trangThai().nhatKy.length;
+      LENH.them({ duAn: d7id, loai: 'anh', nen: 'flow', tyLe: '9:16', prompts: ['xoá dự án sau khi xong'], chay: true });
+      const v7 = viec().filter((j) => j.duAn === d7id);
+      await cho(() => LENH.trangThai().nhatKy.slice(nk).some((d) => /đã xoá dự án Flow|không tự xoá được dự án Flow/.test(d.chu)), 120000, 'tự xoá dự án Flow');
+      const url7 = (LENH.trangThai().nhatKy.slice(nk).map((d) => d.chu.match(/tự xoá dự án Flow (\S+)…/)).find(Boolean) || [])[1] || '';
+      const ma7 = (url7.match(/\/project\/([^/?#]+)/) || [])[1];
+      inViec(v7);
+      dongNhatKy(nk);
+      const con7 = await dsDuAn();
+      kiem(v7.every((j) => j.trangThai === 'xong'), 'việc Flow xong trước khi dọn');
+      kiem(ma7 && !con7.includes(ma7), `dự án Flow vừa dùng (${ma7}) đã bị xoá trên trang chủ Flow`);
+      kiem(con7.includes('gia-khac'), 'dự án khác của người dùng (gia-khac) vẫn còn');
+      kiem(!taiKhoan.store.get('taiKhoan').taiKhoan.find((a) => a.id === 'flow-1').flowUrl, 'tài khoản quên địa chỉ dự án đã xoá');
+      // Lần chạy sau tự mở dự án mới.
+      LENH.datCaiDat({ xoaDuAnFlowKhiXong: false });
+      LENH.them({ duAn: d7id, loai: 'anh', nen: 'flow', tyLe: '9:16', prompts: ['chạy sau khi xoá dự án'], chay: true });
+      const v7b = viec().filter((j) => j.duAn === d7id && !v7.includes(j));
+      await cho(xongHet(v7b), 120000, 'chạy lại sau khi xoá dự án');
+      const url7b = taiKhoan.store.get('taiKhoan').taiKhoan.find((a) => a.id === 'flow-1').flowUrl;
+      kiem(v7b.every((j) => j.trangThai === 'xong') && /\/project\//.test(url7b) && !url7b.includes(ma7), `lần sau tự mở dự án mới (${url7b})`);
       dongNhatKy(Math.max(0, LENH.trangThai().nhatKy.length - 8));
     } catch (err) {
       ghi('LỖI KỊCH BẢN: ' + err.stack);

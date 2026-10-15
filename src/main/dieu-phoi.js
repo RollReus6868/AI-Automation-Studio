@@ -25,15 +25,20 @@ const CAI_DAT_MAC_DINH = {
   thuMucVideo: '',
   taiAnh: true,           // tắt: file chỉ giữ trong bộ nhớ tạm của app (vẫn xem được, vẫn làm video được)
   taiVideo: true,
-  tenAnh: hd.MAU_TEN_MAC_DINH,
+  tenAnh: hd.MAU_TEN_ANH_MAC_DINH,
   tenVideo: hd.MAU_TEN_MAC_DINH,
+  videoCanhAnh: true,     // video nối từ ảnh: lưu cạnh ảnh nguồn, cùng tên (325.jpg → 325.mp4)
+  xoaChatKhiXong: false,  // chạy hết hàng chờ → xoá chat Muse của các việc đã xong
+  xoaDuAnFlowKhiXong: false, // chạy hết hàng chờ → xoá dự án Flow đã dùng (lần sau app tự mở dự án mới)
   luongMoiTK: 3,          // số luồng chạy song song mỗi tài khoản
   nghiGiuaLanGui: 3,      // giây nghỉ giữa 2 lần gửi prompt của CÙNG tài khoản
   // Bình thường ảnh ~35 s, video ~80 s. Quá lâu chừng này coi là lỗi → chuyển sang tài khoản dự phòng.
   choAnhGiay: 180,        // chờ tối đa một ảnh
   choVideoGiay: 300,      // chờ tối đa một video
   choChuGiay: 60,         // Muse trả chữ không kèm ảnh bao lâu thì coi là hỏi lại (video ×2)
-  tuThuLai: 1,            // tự thử lại mấy lần khi lỗi (ngay lúc lỗi; có tài khoản dự phòng thì thử thêm ở mỗi tài khoản)
+  // Lỗi → lần lượt các tài khoản dự phòng → quay về tài khoản chính → … (một vòng = thử qua mọi tài khoản
+  // của dự án). Việc lỗi ở MỌI tài khoản thêm chừng này vòng nữa thì mới đánh Lỗi.
+  tuThuLai: 2,
   tuChayLaiLoi: 2,        // hết hàng chờ mà còn việc lỗi → tự đưa về chạy lại, tối đa mấy lượt
   tatMayKhiXong: false,   // chạy hết hàng chờ thì tắt máy (Windows, macOS) — như Flow Automation Studio
   png: true,              // đổi ảnh webp của Muse sang png
@@ -74,6 +79,12 @@ class DieuPhoi {
       if (this.caiDat.choVideoGiay === 600) this.caiDat.choVideoGiay = 300;
       this.caiDat.moc = 1;
     }
+    // 1.0.2: tên ảnh mặc định {stt}; thử lại thành vòng lặp qua mọi tài khoản (mặc định 2 vòng thêm).
+    if (this.caiDat.moc < 2) {
+      if (this.caiDat.tenAnh === hd.MAU_TEN_MAC_DINH) this.caiDat.tenAnh = hd.MAU_TEN_ANH_MAC_DINH;
+      if (this.caiDat.tuThuLai === 1) this.caiDat.tuThuLai = 2;
+      this.caiDat.moc = 2;
+    }
     // Việc đang chạy lúc app tắt → về hàng chờ, GIỮ thread để lấy lại kết quả.
     for (const j of this.viec) if (j.trangThai === 'chay') { j.trangThai = 'cho'; j.buoc = ''; }
     this.luong = [];          // [{luong, taiKhoanId}]
@@ -82,6 +93,7 @@ class DieuPhoi {
     this.lyDoNghi = {};       // taiKhoanId → lý do tạm nghỉ
     this.loiLienTiep = {};    // taiKhoanId → số việc lỗi liên tiếp
     this.dangChay = false;
+    this.tkFlowDaChay = new Set();   // tài khoản Flow đã chạy trong lượt này (để tự xoá dự án khi xong)
     this.idMoi = this.viec.reduce((m, j) => Math.max(m, j.id || 0), 0) + 1;
     this.luu();
     this.hen = setInterval(() => this._vong(), 1000);
@@ -222,6 +234,30 @@ class DieuPhoi {
     this.log('info', `🎬 Ảnh #${j.so} (${TEN_NEN[j.nen || 'muse']}) xong → thêm video #${v.so} chạy ở ${TEN_NEN[nen]} từ ảnh đó`);
   }
 
+  /** Việc cần dọn khi chạy hết hàng chờ (theo tuỳ chọn): chat Muse của việc đã xong, dự án Flow đã dùng. */
+  _canDonDep() {
+    const muse = new Map();
+    if (this.caiDat.xoaChatKhiXong) {
+      for (const j of this.viec) {
+        if ((j.nen || 'muse') !== 'muse' || j.trangThai !== 'xong' || !j.thread || !j.taiKhoan) continue;
+        if (!muse.has(j.taiKhoan)) muse.set(j.taiKhoan, []);
+        muse.get(j.taiKhoan).push({ id: j.id, thread: j.thread });
+      }
+    }
+    const flow = this.caiDat.xoaDuAnFlowKhiXong ? [...this.tkFlowDaChay] : [];
+    this.tkFlowDaChay = new Set();
+    return muse.size || flow.length ? { muse, flow } : null;
+  }
+
+  /** Dự án Flow của tài khoản đã bị xoá → ảnh trên Flow không còn để video Flow dùng lại. */
+  boFlowTen(tkId) {
+    for (const j of this.viec) {
+      if (j.flowTen && j.flowTen.tk === tkId) j.flowTen = null;
+      if (j.flowAnh && j.flowAnh.tk === tkId) delete j.flowAnh;
+    }
+    this.luu();
+  }
+
   /** Bỏ đường dẫn chat Muse của các việc (chat đã bị xoá trên Muse). */
   boThread(ids) {
     for (const j of this.viec) if (ids.includes(j.id) && j.trangThai !== 'chay') j.thread = '';
@@ -233,7 +269,7 @@ class DieuPhoi {
     let n = 0;
     for (const j of this.viec) {
       if (!ids.includes(j.id) || j.trangThai === 'chay') continue;
-      Object.assign(j, { trangThai: 'cho', buoc: '', thread: '', taiKhoan: '', loi: '', thu: 0, tkLoi: [], batDauLuc: 0, xongLuc: 0, vongLai: 0 });
+      Object.assign(j, { trangThai: 'cho', buoc: '', thread: '', taiKhoan: '', loi: '', thu: 0, tkLoi: [], vongTk: 0, batDauLuc: 0, xongLuc: 0, vongLai: 0 });
       n++;
     }
     this.luu();
@@ -268,13 +304,15 @@ class DieuPhoi {
     const so = (v, min, max, md) => Math.max(min, Math.min(max, parseInt(v, 10) || md));
     const m = { ...this.caiDat, ...c };
     m.luongMoiTK = so(m.luongMoiTK, 1, 20, 3);
-    for (const k of ['tenAnh', 'tenVideo']) m[k] = String(m[k] || '').trim() || hd.MAU_TEN_MAC_DINH;
+    m.tenAnh = String(m.tenAnh || '').trim() || hd.MAU_TEN_ANH_MAC_DINH;
+    m.tenVideo = String(m.tenVideo || '').trim() || hd.MAU_TEN_MAC_DINH;
     m.taiAnh = m.taiAnh !== false; m.taiVideo = m.taiVideo !== false; m.tatMayKhiXong = !!m.tatMayKhiXong;
+    m.videoCanhAnh = m.videoCanhAnh !== false; m.xoaChatKhiXong = !!m.xoaChatKhiXong; m.xoaDuAnFlowKhiXong = !!m.xoaDuAnFlowKhiXong;
     m.nghiGiuaLanGui = so(m.nghiGiuaLanGui, 0, 120, 3);
     m.choAnhGiay = so(m.choAnhGiay, 60, 1800, 180);
     m.choVideoGiay = so(m.choVideoGiay, 120, 3600, 300);
     m.choChuGiay = so(m.choChuGiay, 15, 600, 60);
-    m.tuThuLai = Math.max(0, Math.min(5, parseInt(m.tuThuLai, 10) || 0));
+    m.tuThuLai = Math.max(0, Math.min(10, parseInt(m.tuThuLai, 10) || 0));
     m.tuChayLaiLoi = Math.max(0, Math.min(10, parseInt(m.tuChayLaiLoi, 10) || 0));
     m.mau = { ...hd.MAU_MAC_DINH, ...(m.mau || {}) };
     for (const k of ['anh', 'video']) if (!String(m.mau[k] || '').includes('{prompt}')) m.mau[k] = hd.MAU_MAC_DINH[k];
@@ -297,6 +335,7 @@ class DieuPhoi {
       this.log('success', '▶ Bắt đầu chạy hàng chờ');
       // Bấm chạy lại = cho mọi tài khoản cơ hội mới (người dùng đã kiểm Muse).
       this.nghiDen = {}; this.lyDoNghi = {}; this.loiLienTiep = {};
+      this.tkFlowDaChay = new Set();   // tự xoá dự án Flow chỉ tính tài khoản chạy trong lượt NÀY
     }
     this.dangChay = true;
     this.o.bao();
@@ -356,14 +395,19 @@ class DieuPhoi {
     for (const j of this.viec) {
       if (j.trangThai !== 'cho') continue;
       const t = hd.taiKhoanChoViec(j, this._dsTk(j.duAn, j.nen), (id) => this._nghi(id));
-      // Tài khoản dự phòng định chuyển sang lại không dùng được (chưa đăng nhập…) mà việc đã hết lượt
-      // thử ở tài khoản cũ → Lỗi luôn, đừng gửi lại ở tài khoản đã lỗi.
-      if (t && (j.tkLoi || []).includes(t) && !(j.thread && j.taiKhoan === t) && (j.thu || 0) > this.caiDat.tuThuLai) {
-        // Lần chạy dở ở tài khoản dự phòng đã xoá chữ lỗi và đổi tài khoản → trả lại lỗi gốc.
-        Object.assign(j, { trangThai: 'loi', buoc: '', xongLuc: Date.now(), loi: j.loi || j.loiTruoc || '', taiKhoan: j.tkLoi[j.tkLoi.length - 1] });
-        this.log('error', `❌ #${j.so} ${j.loi} (không còn tài khoản dự phòng dùng được)`);
-        this.luu();
-        continue;
+      // Các tài khoản việc này chưa thử đều đang nghỉ / chưa đăng nhập → chỉ còn tài khoản đã lỗi:
+      // coi như hết vòng, quay lại từ đầu (tài khoản chính). Hết số vòng → Lỗi luôn.
+      if (t && (j.tkLoi || []).includes(t) && !(j.thread && j.taiKhoan === t)) {
+        const tkCu = j.tkLoi[j.tkLoi.length - 1];
+        j.vongTk = (j.vongTk || 0) + 1;
+        j.tkLoi = [];
+        if (j.vongTk > this.caiDat.tuThuLai) {
+          // Lần chạy dở ở tài khoản dự phòng đã xoá chữ lỗi và đổi tài khoản → trả lại lỗi gốc + tài khoản đã lỗi.
+          Object.assign(j, { trangThai: 'loi', buoc: '', xongLuc: Date.now(), loi: j.loi || j.loiTruoc || '', taiKhoan: tkCu });
+          this.log('error', `❌ #${j.so} ${j.loi} (không còn tài khoản dự phòng dùng được)`);
+          this.luu();
+          continue;
+        }
       }
       nhamToi.set(j, t);
     }
@@ -381,6 +425,7 @@ class DieuPhoi {
         const me = [j, ...this.viec.filter((v) => v !== j && v.trangThai === 'cho' && nhamToi.get(v) === x.taiKhoanId && khoaMe(v) === k)
           .sort((a, b) => a.taoLuc - b.taoLuc || a.id - b.id)].slice(0, this.caiDat.flow.meToiDa);
         for (const v of me) nhamToi.delete(v);
+        this.tkFlowDaChay.add(x.taiKhoanId);
         this._giaoMe(x, me);
         continue;
       }
@@ -393,7 +438,7 @@ class DieuPhoi {
       const lai = this.viec.filter((j) => j.trangThai === 'loi' && (j.vongLai || 0) < this.caiDat.tuChayLaiLoi);
       if (lai.length) {
         for (const j of lai) {
-          Object.assign(j, { trangThai: 'cho', buoc: '', thread: '', taiKhoan: '', thu: 0, tkLoi: [], batDauLuc: 0, xongLuc: 0, vongLai: (j.vongLai || 0) + 1 });
+          Object.assign(j, { trangThai: 'cho', buoc: '', thread: '', taiKhoan: '', thu: 0, tkLoi: [], vongTk: 0, batDauLuc: 0, xongLuc: 0, vongLai: (j.vongLai || 0) + 1 });
         }
         this.log('warning', `↻ Hết lượt — tự chạy lại ${lai.length} việc lỗi (lượt ${Math.max(...lai.map((j) => j.vongLai))}/${this.caiDat.tuChayLaiLoi})`);
         this.luu();
@@ -402,7 +447,10 @@ class DieuPhoi {
       this.dangChay = false;
       this.log('success', '✅ [HỆ THỐNG] Đã chạy hết hàng chờ.');
       this.o.bao();
-      if (this.o.hetLuot) this.o.hetLuot();
+      // Dọn dẹp (xoá chat Muse / dự án Flow) xong rồi mới tới tắt máy, cập nhật token.
+      const don = this._canDonDep();
+      Promise.resolve(don && this.o.donDep ? this.o.donDep(don) : null).catch((err) => this.log('error', `❌ Dọn dẹp: ${err.message}`))
+        .then(() => { if (this.o.hetLuot) this.o.hetLuot(); });
     } else if (!can.size && !this.coViecDangChay()) {
       // Còn việc chờ mà không tài khoản nào của dự án chạy được (chưa đăng nhập / đang tạm nghỉ).
       this.dangChay = false;
@@ -481,8 +529,16 @@ class DieuPhoi {
       try {
         const video = j.loai === 'video';
         const tai = video ? this.caiDat.taiVideo : this.caiDat.taiAnh;
-        const goc = tai ? this.thuMucRa(j.loai) : this.o.thuMucTam;
-        const mau = video ? this.caiDat.tenVideo : this.caiDat.tenAnh;
+        let goc = tai ? this.thuMucRa(j.loai) : this.o.thuMucTam;
+        let mau = video ? this.caiDat.tenVideo : this.caiDat.tenAnh;
+        // Video nối từ ảnh (Flow ⇄ Muse): lưu NGAY CẠNH ảnh nguồn, cùng tên — 325.jpg → 325.mp4. Người dùng
+        // đặt thư mục ảnh riêng mà video vẫn vào thư mục mặc định thì tưởng video không được tải về
+        // (nhật ký 15/10/2026: ảnh "325.jpg", video "Mac_dinh\Mac_dinh_270.mp4" ở chỗ khác).
+        const anhNguon = video && j.tuAnh && tai && this.caiDat.videoCanhAnh ? (j.thamChieu || []).slice(-1)[0] : '';
+        if (anhNguon && !path.resolve(anhNguon).startsWith(path.resolve(this.o.thuMucTam))) {
+          goc = path.dirname(anhNguon);
+          mau = '{tenAnh}';
+        }
         const cu = j.files || [];
         j.files = r.files.map((f, i) => {
           if (f.duongDan && !f.mime) f.mime = hd.mimeTuDuoi(f.duongDan);
@@ -500,7 +556,7 @@ class DieuPhoi {
         if (r.flowTen) j.flowTen = { tk: j.taiKhoan, ten: r.flowTen };
         this.loiLienTiep[j.taiKhoan] = 0;
         this.log('success', `✅ [HỆ THỐNG] Việc #${j.so} xong ${video ? 'video' : 'ảnh'}: ` +
-          (tai ? path.relative(goc, j.files[0]) : `${path.basename(j.files[0])} (không tải về — chỉ giữ trong app)`));
+          (tai ? j.files[0] : `${path.basename(j.files[0])} (không tải về — chỉ giữ trong app)`));
         this._noiVideo(j, d);
       } catch (err) {
         Object.assign(j, { trangThai: 'loi', buoc: '', loi: `Không ghi được file: ${err.message}` });
@@ -523,7 +579,10 @@ class DieuPhoi {
         this.log('error', `🔒 Tài khoản "${tk.ten}" chưa đăng nhập ${TEN_NEN[tk.nen || 'muse']} — tạm bỏ qua. Vào mục Tài khoản để đăng nhập.`);
       }
     } else {
-      // Lỗi (kể cả quá lâu) → NGAY LẬP TỨC chuyển việc sang tài khoản kế tiếp của dự án.
+      // Lỗi (kể cả quá lâu) → NGAY LẬP TỨC chuyển việc sang tài khoản kế tiếp: chính → dự phòng 1 →
+      // dự phòng 2 → … → quay về chính (vòng mới) → … Việc lỗi ở MỌI tài khoản thêm `tuThuLai` vòng
+      // nữa mới đánh Lỗi. Tài khoản lỗi liên tiếp thì tạm nghỉ; mọi tài khoản đều nghỉ → _vong tạm
+      // dừng hàng chờ (lỗi liên tục ở tất cả tài khoản thì mới dừng).
       const tkId = j.taiKhoan;
       const ds = this._dsTk(j.duAn, j.nen);
       j.tkLoi = [...new Set([...(j.tkLoi || []), tkId])];
@@ -532,23 +591,28 @@ class DieuPhoi {
       // Tài khoản lỗi liên tiếp → cả dự án sang tài khoản dự phòng một thời gian (chỉ khi có dự phòng).
       if (this.loiLienTiep[tkId] >= LOI_LIEN_TIEP_NGHI && ds.some((id) => id !== tkId)) this._choNghi(tkId, `lỗi ${this.loiLienTiep[tkId]} việc liên tiếp`);
       j.thu = (j.thu || 0) + 1;
-      const toiDa = Math.max(this.caiDat.tuThuLai, ds.length - 1);
-      const sang = hd.taiKhoanChoViec({ tkLoi: j.tkLoi }, ds, (id) => this._nghi(id));
-      if (j.thu <= toiDa) {
+      // Mọi tài khoản của dự án đều đã lỗi việc này → hết một vòng, vòng sau bắt đầu lại từ tài khoản chính.
+      if (!ds.some((id) => !j.tkLoi.includes(id))) { j.vongTk = (j.vongTk || 0) + 1; j.tkLoi = []; }
+      const vong = j.vongTk || 0, soVong = this.caiDat.tuThuLai + 1;
+      if (vong < soVong) {
+        const sang = hd.taiKhoanChoViec({ tkLoi: j.tkLoi }, ds, (id) => this._nghi(id));
+        const nhan = ds.length > 1 ? `vòng ${vong + 1}/${soVong}` : `${j.thu}/${soVong - 1}`;
         if (sang && sang !== tkId) {
           j.thread = '';
-          this.log('warning', `↪ #${j.so} ${r.loi} (ở "${this._tenTk(tkId)}") — chuyển sang "${this._tenTk(sang)}" (${j.thu}/${toiDa})`);
+          this.log('warning', `↪ #${j.so} ${r.loi} (ở "${this._tenTk(tkId)}") — chuyển sang "${this._tenTk(sang)}" (${nhan})`);
+        } else if (!sang) {
+          j.thread = '';
+          this.log('warning', `⏸ #${j.so} ${r.loi} — mọi tài khoản của dự án đều đang nghỉ (${nhan})`);
         } else {
-          // Không còn tài khoản nào khác: thử lại từ đầu. Lần thử lại đầu: chat còn dùng được (hết giờ
+          // Chỉ còn đúng tài khoản này: thử lại từ đầu. Lần thử lại đầu: chat còn dùng được (hết giờ
           // chờ…) thì chờ tiếp chat đó; sau đó gửi mới.
-          j.tkLoi = [];
           if (!(r.giuThread && j.thu === 1)) j.thread = '';
-          this.log('warning', `↻ #${j.so} ${r.loi} — thử lại (${j.thu}/${toiDa})`);
+          this.log('warning', `↻ #${j.so} ${r.loi} — thử lại ở "${this._tenTk(sang)}" (${nhan})`);
         }
         Object.assign(j, { trangThai: 'cho', buoc: '', loi: r.loi });
       } else {
         Object.assign(j, { trangThai: 'loi', buoc: '', loi: r.loi, xongLuc: Date.now() });
-        this.log('error', `❌ #${j.so} ${r.loi}`);
+        this.log('error', `❌ #${j.so} ${r.loi}${ds.length > 1 ? ` (đã thử ${soVong} vòng qua ${ds.length} tài khoản)` : ''}`);
       }
     }
     if (tk && r.ok && tk.trangThai !== 'da-dang-nhap') this.o.taiKhoan.sua(tk.id, { trangThai: 'da-dang-nhap' });

@@ -165,7 +165,11 @@
       const du = await cho(() => nutGo() >= files.length ||
         $$('img', k).length >= soAnhTruoc + files.length, 20000);
       if (!du) return { ok: false, loi: 'khong-dinh-kem-duoc', chu: chuLoiTrenTrang() };
-      await ngu(800);
+      // Ảnh thu nhỏ hiện ra TRƯỚC khi tải lên xong; Muse có lúc trả lời "ảnh chưa tải lên được"
+      // (nhật ký 15/10/2026) → chờ thêm cho vòng tải / ảnh thu nhỏ nạp xong.
+      await cho(() => !$$('[role="progressbar"], [aria-busy="true"]', k).length &&
+        $$('img', k).every((i) => i.complete), 30000);
+      await ngu(1500);
     }
 
     // React giữ giá trị riêng: phải gán qua setter gốc rồi bắn sự kiện input.

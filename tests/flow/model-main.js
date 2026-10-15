@@ -66,7 +66,7 @@ async function kiem(ui) {
   ok('chọn Lower Priority: báo thành công', r1 && r1.ok && r1.daDoi, JSON.stringify(r1));
   ok('trang thật sự ở Lower Priority', (await js('window.__fixtureModel()')) === 'Veo 3.1 - Lite [Lower Priority]');
   ok('credit đọc lại = 0', r1 && r1.tinDung === 0, `tinDung=${r1 && r1.tinDung}`);
-  ok('mở danh sách đúng MỘT cú bấm', (await js('window.__soLanBamHop')) - b0 === 1,
+  if (ui !== 'nut') ok('mở danh sách đúng MỘT cú bấm', (await js('window.__soLanBamHop')) - b0 === 1,
      `số cú bấm hộp = ${(await js('window.__soLanBamHop')) - b0}`);
   const mo1 = await js('window.__fixtureMo()');
   ok('chọn xong bảng và danh sách đều đóng', !mo1.bang && !mo1.ds, JSON.stringify(mo1));
@@ -107,7 +107,7 @@ async function kiem(ui) {
 
 app.whenReady().then(async () => {
   try {
-    for (const ui of ['mat', 'radix', 'tron']) await kiem(ui);
+    for (const ui of ['mat', 'radix', 'tron', 'moi', 'nut']) await kiem(ui);
   } catch (e) {
     failures.push('Lỗi: ' + (e && e.stack || e));
   }

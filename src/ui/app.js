@@ -686,6 +686,9 @@
     $('#cdChoAnh').value = c.choAnhGiay; $('#cdChoVideo').value = c.choVideoGiay; $('#cdChoChu').value = c.choChuGiay;
     $('#cdPng').checked = !!c.png;
     $('#cdTatMay').checked = !!c.tatMayKhiXong;
+    $('#cdVideoCanhAnh').checked = c.videoCanhAnh !== false;
+    $('#cdXoaChat').checked = !!c.xoaChatKhiXong;
+    $('#cdXoaDuAnFlow').checked = !!c.xoaDuAnFlowKhiXong;
     $('#cdMauAnh').value = c.mau.anh; $('#cdMauVideo').value = c.mau.video;
     const f = c.flow;
     datChonModel('fModelAnh', f.modelAnh);
@@ -745,6 +748,7 @@
     $('#ncTai').checked = v ? c.taiVideo : c.taiAnh;
     $('#ncThuMuc').value = S.thuMuc[loaiTrang()];
     if (document.activeElement !== $('#ncTen')) $('#ncTen').value = v ? c.tenVideo : c.tenAnh;
+    $('#ncTen').placeholder = v ? HD.MAU_TEN_MAC_DINH : HD.MAU_TEN_ANH_MAC_DINH;
     viDuTen();
   }
   function veCapNhat() {
@@ -998,6 +1002,11 @@
       U.chon.clear(); veHang();
       toast(r && r.ok ? `Đã xoá ${r.da} đoạn chat${r.hong ? ` · ${r.hong} không xoá được` : ''}${r.boQua ? ` · ${r.boQua} việc không có chat` : ''}` : (r && r.loi) || 'Không xoá được', !(r && r.ok) || !!r.hong);
     };
+    $('#chonTai').onclick = async () => {
+      const r = await api.call('taiNhieu', { ids: [...U.chon] });
+      if (r && r.ok) toast(`Đã tải ${r.da} file về ${r.thuMuc}`);
+      else if (r && r.loi) toast(r.loi, true);
+    };
     $('#chonChayLai').onclick = async () => {
       const n = await api.call('taoLai', { ids: [...U.chon] });
       U.chon.clear();
@@ -1068,7 +1077,9 @@
       await api.call('datCaiDat', {
         luongMoiTK: $('#cdLuong').value, nghiGiuaLanGui: $('#cdNghi').value, tuThuLai: $('#cdThuLai').value, tuChayLaiLoi: $('#cdChayLaiLoi').value,
         choAnhGiay: $('#cdChoAnh').value, choVideoGiay: $('#cdChoVideo').value, choChuGiay: $('#cdChoChu').value,
-        png: $('#cdPng').checked, tatMayKhiXong: $('#cdTatMay').checked, mau: { anh: $('#cdMauAnh').value, video: $('#cdMauVideo').value },
+        png: $('#cdPng').checked, tatMayKhiXong: $('#cdTatMay').checked,
+        videoCanhAnh: $('#cdVideoCanhAnh').checked, xoaChatKhiXong: $('#cdXoaChat').checked, xoaDuAnFlowKhiXong: $('#cdXoaDuAnFlow').checked,
+        mau: { anh: $('#cdMauAnh').value, video: $('#cdMauVideo').value },
         flow: docCaiDatFlow()
       });
       veCaiDat();
@@ -1080,6 +1091,11 @@
       const n = $('#nganLog'); n.hidden = !n.hidden;
       $('#nutNhatKy').classList.toggle('on', !n.hidden);
       if (!n.hidden) { veLog(); U.loiChuaXem = 0; veDemLoi(); }
+    };
+    $('#nutXuatLog').onclick = async () => {
+      if (!U.log.length) { toast('Nhật ký đang trống', true); return; }
+      const r = await api.call('xuatNhatKy', { chu: U.log.map(dongLogText).join('\n') });
+      if (r && r.ok) toast(`Đã lưu nhật ký: ${r.file}`);
     };
     $('#nutSaoChepLog').onclick = async () => { await navigator.clipboard.writeText(U.log.map(dongLogText).join('\n')); toast('Đã sao chép nhật ký'); };
     $('#nutXoaLog').onclick = () => { U.log = []; api.call('xoaNhatKy'); $('#dongCuoi').textContent = ''; veLog(); };

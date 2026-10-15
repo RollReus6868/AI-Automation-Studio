@@ -90,6 +90,7 @@ function taoTinNhan(job, nhanVat, mau) {
 }
 
 const MAU_TEN_MAC_DINH = '{duAn}/{duAn}_{so}';
+const MAU_TEN_ANH_MAC_DINH = '{stt}';   // 1.0.2: người dùng muốn ảnh tải về mặc định tên là số thứ tự prompt
 const PROMPT_VIDEO_MAC_DINH = 'Làm cho ảnh chuyển động tự nhiên, máy quay chuyển động nhẹ, giữ nguyên bố cục, nhân vật và phong cách của ảnh.';
 
 /** Một đoạn đường dẫn an toàn trên Windows lẫn Mac: bỏ ký tự cấm, bỏ '..', bỏ dấu chấm/cách cuối. */
@@ -219,7 +220,7 @@ function soSanhTuNhien(a, b) {
 }
 
 const HD = {
-  TY_LE, MAU_MAC_DINH, MAU_TEN_MAC_DINH, PROMPT_VIDEO_MAC_DINH, slugTen, tachPrompt, timNhanVat, taoTinNhan, tenFile, mimeTuDuoi, chonKhoang,
+  TY_LE, MAU_MAC_DINH, MAU_TEN_MAC_DINH, MAU_TEN_ANH_MAC_DINH, PROMPT_VIDEO_MAC_DINH, slugTen, tachPrompt, timNhanVat, taoTinNhan, tenFile, mimeTuDuoi, chonKhoang,
   viecKeTiep, taiKhoanChoViec, thoiGianDuKien, tienDoUoc, daXong, laTraLoiChu, soSanhTuNhien
 };
 // Dùng chung cho tiến trình chính (require) và giao diện (<script> → window.HD).

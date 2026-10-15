@@ -172,7 +172,8 @@ select option { background: var(--panel-dac); }
 .anh-nho button i { width: 11px; height: 11px; }
 .ghi-thu-muc { display: flex; align-items: center; gap: 8px; width: 100%; font-size: 12.5px; color: var(--chu-phu); padding: 6px 10px; border-radius: 8px; background: var(--the); }
 .ghi-thu-muc b { color: var(--chu); }
-.dong-cong-tac { display: flex; align-items: center; gap: 12px; margin: 14px 0 0; }
+/* Công tắc đứng TRƯỚC chữ, sát lề trái (1.0.2 — người dùng: công tắc nằm xa bên phải khó nhìn). */
+.dong-cong-tac { display: flex; flex-direction: row-reverse; justify-content: flex-end; align-items: center; gap: 12px; margin: 14px 0 0; text-align: left; }
 .dong-cong-tac > div { flex: 1; min-width: 0; }
 .dong-cong-tac b { font-size: 13px; }
 .dong-cong-tac i { width: 13px; height: 13px; color: var(--chu-mo); vertical-align: -2px; }

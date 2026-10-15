@@ -14,6 +14,7 @@ const fixture = fs.readFileSync(path.join(__dirname, 'fixture-muse.html'));
 const trangFlow = fs.readFileSync(path.join(__dirname, 'flow-gia', 'trang-flow.html'));
 const daGui = [];
 const flowGhi = [];   // mọi thứ engine Flow giả nhận được (mẻ, kho ảnh, chế độ…)
+let duAnFlow = ['gia-khac'];
 const sv = http.createServer((req, res) => {
   if (req.method === 'POST' && req.url === '/__flow-ghi') {
     let b = '';
@@ -23,6 +24,22 @@ const sv = http.createServer((req, res) => {
     return;
   }
   if (req.url === '/__flow-ghi') { res.setHeader('content-type', 'application/json'); res.end(JSON.stringify(flowGhi)); return; }
+  // Danh sách dự án Flow giả (trang chủ Flow đọc / thêm / xoá). "gia-khac" là dự án của người dùng — không được bị xoá.
+  if (req.url === '/__flow-du-an' || req.url === '/__flow-xoa-du-an') {
+    if (req.method !== 'POST') { res.setHeader('content-type', 'application/json'); res.end(JSON.stringify(duAnFlow)); return; }
+    let b = '';
+    req.setEncoding('utf8');
+    req.on('data', (d) => { b += d; });
+    req.on('end', () => {
+      try {
+        const { id } = JSON.parse(b);
+        if (req.url === '/__flow-du-an') { if (!duAnFlow.includes(id)) duAnFlow.unshift(id); }
+        else duAnFlow = duAnFlow.filter((x) => x !== id);
+      } catch (_) {}
+      res.end('ok');
+    });
+    return;
+  }
   if (req.url.startsWith('/fx/')) { res.setHeader('content-type', 'text/html; charset=utf-8'); res.end(trangFlow); return; }
   if (req.url.startsWith('/signin/')) { res.setHeader('content-type', 'text/html; charset=utf-8'); res.end('<!doctype html><title>Đăng nhập Google giả</title><input type=email>'); return; }
   if (req.method === 'POST' && req.url === '/__gui') {
@@ -70,7 +87,7 @@ sv.listen(0, '127.0.0.1', () => {
   let raChu = '';
   p.stdout.on('data', (d) => { raChu += d; process.stdout.write(d); });
   p.stderr.on('data', (d) => { const s = String(d); if (!/dbus|bus\.cc|viz_main|command_buffer|Fontconfig|gpu/i.test(s)) process.stderr.write(s); });
-  const hen = setTimeout(() => { console.log('E2E: QUÁ GIỜ (480s)'); p.kill('SIGKILL'); }, 480000);
+  const hen = setTimeout(() => { console.log('E2E: QUÁ GIỜ (720s)'); p.kill('SIGKILL'); }, 720000);
   p.on('exit', (code) => {
     clearTimeout(hen);
     sv.close();

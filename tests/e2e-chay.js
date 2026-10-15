@@ -84,7 +84,8 @@ module.exports = function e2e({ win, app, LENH, dieuPhoi }) {
       kiem(conLai.every((j) => j.trangThai === 'xong'), `mọi việc khác xong (${conLai.filter((j) => j.trangThai === 'xong').length}/${conLai.length})`);
       kiem(conLai.every((j) => j.files.length && fs.existsSync(j.files[0])), 'file kết quả có trên đĩa');
       const anh = conLai.filter((j) => j.loai === 'anh');
-      kiem(anh.every((j) => /Mac_dinh[\\/]Mac_dinh_\d{3}\.png$/.test(j.files[0])), 'tên file Mac_dinh/Mac_dinh_NNN.png');
+      // 1.0.2: tên ảnh mặc định {stt} → 001.png… (trùng số thì thêm " (2)").
+      kiem(anh.every((j) => path.dirname(j.files[0]) === ra && /^\d{3}( \(\d+\))?\.png$/.test(path.basename(j.files[0]))), 'tên file mặc định {stt} (001.png…)');
       kiem(anh.every((j) => fs.readFileSync(j.files[0]).slice(0, 4).toString('hex') === '89504e47'), 'ảnh đã đổi sang PNG thật');
       const ihdr = (f) => { const b = fs.readFileSync(f); return [b.readUInt32BE(16), b.readUInt32BE(20)]; };
       const meo = anh.find((j) => /mèo cam số 1/.test(j.prompt));
@@ -170,7 +171,8 @@ module.exports = function e2e({ win, app, LENH, dieuPhoi }) {
       // 4) 1.1.0: chạy prompt 2–3, ảnh xong tự tạo video chung prompt, tên file + thư mục video riêng.
       ghi('-- 4. Khoảng prompt + ảnh→video tự động + tên file');
       const rv = path.join(tam, 'video-rieng');
-      LENH.datCaiDat({ thuMucVideo: rv, tenAnh: '{duAn}/anh_{stt}', tenVideo: 'clip_{stt}' });
+      // Bài này kiểm thư mục + mẫu tên VIDEO riêng → tắt "video cạnh ảnh" (bài 16 kiểm phần đó).
+      LENH.datCaiDat({ thuMucVideo: rv, tenAnh: '{duAn}/anh_{stt}', tenVideo: 'clip_{stt}', videoCanhAnh: false });
       const soGuiTruoc = (await daGui()).length;
       const truoc4 = viec().length;
       await js(`window.__diToi('anh')`);
@@ -419,6 +421,32 @@ module.exports = function e2e({ win, app, LENH, dieuPhoi }) {
         LENH.trangThai().nhatKy.some((d) => /"Muse 1": lỗi 2 việc liên tiếp — tạm nghỉ/.test(d.chu)), 'nhật ký báo chuyển tài khoản + tạm nghỉ');
       kiem(!viec().some((j) => j.duAn === d15.id && j.taiKhoan === tk2.id), 'tài khoản ngoài dự án không chạy việc nào');
       await tk1.cookies.remove(process.env.MUSE_URL, 'muse_hong');
+
+      // 16) 1.0.2: ảnh xong → video nối tiếp tải về NGAY CẠNH ảnh, cùng tên ({stt}); chạy hết hàng chờ thì
+      //     tự xoá chat Muse của các việc đã xong (tuỳ chọn trong Cài đặt).
+      ghi('-- 16. Video cạnh ảnh + tự xoá chat khi xong');
+      LENH.xoaViec({ ids: viec().map((j) => j.id) });   // việc cũ (còn chat) của các mục trước — chỉ đo việc mục này
+      const thuMuc16 = path.join(tam, 'anh-16');
+      LENH.datCaiDat({ xoaChatKhiXong: true, videoCanhAnh: true, thuMucAnh: thuMuc16, tenAnh: '' });
+      const d16 = LENH.taoDuAn({ ten: 'Tu xoa', taiKhoan: ['tk-1'] });
+      const nk16 = LENH.trangThai().nhatKy.length;
+      LENH.them({ duAn: d16.id, loai: 'anh', tyLe: '1:1', prompts: ['tự xoá một', 'tự xoá hai'], chuoiVideo: { prompt: 'chuyển động', nen: 'muse' }, chay: true });
+      await cho(() => LENH.trangThai().nhatKy.slice(nk16).some((d) => /đã xoá \d+ đoạn chat trên Muse/.test(d.chu)), 240000, 'chạy xong + tự xoá chat');
+      const v16 = viec().filter((j) => j.duAn === d16.id);
+      for (const j of v16) ghi(`   #${j.so} ${j.loai} ${j.trangThai} ${j.files[0] || ''} thread=${j.thread || '-'}`);
+      const anh16 = v16.filter((j) => j.loai === 'anh'), vid16 = v16.filter((j) => j.loai === 'video');
+      kiem(anh16.length === 2 && anh16.every((j) => j.trangThai === 'xong' && path.dirname(j.files[0]) === thuMuc16 && /^00\d\.(png|webp)$/.test(path.basename(j.files[0]))),
+        'ảnh tải về thư mục ảnh, tên mặc định {stt} (001.png…)');
+      kiem(vid16.length === 2 && vid16.every((v) => {
+        const a = anh16.find((x) => x.id === v.tuAnh);
+        return v.trangThai === 'xong' && a && fs.existsSync(v.files[0]) &&
+          v.files[0] === a.files[0].replace(/\.[^.]+$/, '.mp4');
+      }), 'video nối tiếp tải về ngay cạnh ảnh nguồn, cùng tên (001.png → 001.mp4)');
+      const con16 = (await dsThread()).map((t) => t.thread);
+      const da16 = (await daGui()).filter((g) => g.prompt && /tự xoá|chuyển động/.test(g.prompt)).map((g) => g.thread);
+      kiem(v16.every((j) => !j.thread) && da16.length >= 4 && !da16.some((t) => con16.includes(t)),
+        `chat Muse của 4 việc đã xong bị xoá trên Muse (${da16.length} chat của mục này, còn ${da16.filter((t) => con16.includes(t)).length})`);
+      LENH.datCaiDat({ xoaChatKhiXong: false });
     } catch (err) {
       ghi('LỖI KỊCH BẢN: ' + err.stack);
       loi.push('ngoại lệ');

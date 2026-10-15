@@ -194,6 +194,7 @@
         </div>
         <div class="thanh-chon" id="thanhChon" hidden>
           <span id="soChon">0 đã chọn</span>
+          <button class="nut-vien nho" id="chonTai" title="Chép file kết quả của các việc đã chọn vào một thư mục"><i data-icon="download"></i>Tải về</button>
           <button class="nut-vien nho" id="chonChayLai"><i data-icon="rotate-ccw"></i>Tạo lại</button>
           <button class="nut-vien nho" id="chonXoaChat" title="Xoá đoạn chat trên muse.ai của các việc đã chọn"><i data-icon="message-square-x"></i>Xoá chat Muse</button>
           <button class="nut-vien nho do" id="chonXoa"><i data-icon="trash-2"></i>Xoá</button>
@@ -304,7 +305,7 @@
           <div class="luoi-3">
             <label>Số luồng mỗi tài khoản<input type="number" id="cdLuong" min="1" max="20"></label>
             <label>Nghỉ giữa 2 lần gửi (giây, mỗi tài khoản)<input type="number" id="cdNghi" min="0" max="120"></label>
-            <label>Tự thử lại ngay khi lỗi (lần)<input type="number" id="cdThuLai" min="0" max="5"></label>
+            <label>Lỗi ở mọi tài khoản thì thử thêm (vòng)<input type="number" id="cdThuLai" min="0" max="10"></label>
             <label>Hết lượt → tự chạy lại việc lỗi (số lượt)<input type="number" id="cdChayLaiLoi" min="0" max="10"></label>
             <label>Chờ tối đa 1 ảnh (giây) — quá thì chuyển tài khoản dự phòng<input type="number" id="cdChoAnh" min="60" max="1800"></label>
             <label>Chờ tối đa 1 video (giây) — quá thì chuyển tài khoản dự phòng<input type="number" id="cdChoVideo" min="120" max="3600"></label>
@@ -312,7 +313,14 @@
           </div>
           <div class="dong-cong-tac"><div><b>Lưu ảnh dạng PNG</b><small>Muse trả webp; bật để đổi sang png (nặng hơn, dễ dùng hơn).</small></div><label class="cong-tac"><input type="checkbox" id="cdPng"><span></span></label></div>
           <div class="dong-cong-tac"><div><b>Hiện các luồng chạy ngầm</b><small>Để soi lỗi: trang Muse / Flow của các luồng sẽ hiện đè lên app.</small></div><label class="cong-tac"><input type="checkbox" id="cdXemLuong"><span></span></label></div>
+          <small class="mo">Lỗi → chuyển lần lượt sang các tài khoản dự phòng → hết dự phòng thì quay về tài khoản chính thử lại, cứ thế theo vòng. Việc chỉ báo Lỗi khi đã hỏng ở mọi tài khoản thêm số vòng trên; tài khoản lỗi liên tiếp được cho nghỉ 15 phút, mọi tài khoản đều nghỉ thì hàng chờ tạm dừng.</small>
           <div class="dong-cong-tac"><div><b>Tắt máy khi chạy hết hàng chờ</b><small>Windows, macOS. Tắt sau 60 giây; Windows huỷ bằng lệnh <code>shutdown /a</code>.</small></div><label class="cong-tac"><input type="checkbox" id="cdTatMay"><span></span></label></div>
+        </div>
+        <div class="the-cai">
+          <h3><i data-icon="download"></i>Tải về &amp; dọn dẹp</h3>
+          <div class="dong-cong-tac"><div><b>Video tạo từ ảnh lưu cạnh ảnh, cùng tên</b><small>Ảnh xong → tự tạo video (Flow ⇄ Muse): video tải về ngay cạnh ảnh nguồn, ví dụ <code>325.jpg</code> → <code>325.mp4</code>. Tắt: theo thư mục và mẫu tên của trang Tạo video.</small></div><label class="cong-tac"><input type="checkbox" id="cdVideoCanhAnh"><span></span></label></div>
+          <div class="dong-cong-tac"><div><b>Chạy xong thì tự xoá chat Muse</b><small>Chạy hết hàng chờ → xoá đoạn chat trên muse.ai của các việc đã xong (file đã tải vẫn giữ, không khôi phục được chat).</small></div><label class="cong-tac"><input type="checkbox" id="cdXoaChat"><span></span></label></div>
+          <div class="dong-cong-tac"><div><b>Chạy xong thì tự xoá dự án Flow</b><small>Chạy hết hàng chờ → xoá dự án Google Flow mà các tài khoản Flow vừa dùng (không khôi phục được); lần chạy sau app tự mở dự án mới.</small></div><label class="cong-tac"><input type="checkbox" id="cdXoaDuAnFlow"><span></span></label></div>
         </div>
         <div class="the-cai" id="cdFlow">
           <h3><i data-icon="sparkles"></i>Google Flow</h3>
@@ -380,6 +388,7 @@
     <footer class="logbar">
       <button class="nhat-ky-mo" id="nutNhatKy" title="Xem nhật ký chạy"><i data-icon="scroll-text"></i>Nhật ký<span class="dem-loi" id="demLoiLog" hidden></span></button>
       <span class="dong-cuoi" id="dongCuoi">[HỆ THỐNG] Sẵn sàng.</span>
+      <button class="lien-ket" id="nutXuatLog" title="Lưu nhật ký ra file .txt">Xuất .txt</button>
       <button class="lien-ket" id="nutSaoChepLog">Sao chép</button>
       <button class="lien-ket" id="nutXoaLog">Xoá</button>
     </footer>

@@ -24,6 +24,7 @@ const { taoMayFlow } = require('./src/flow/may-flow');
 const { LuongFlow } = require('./src/flow/luong-flow');
 const { DownloadManager } = require('./src/flow/main/downloads');
 const { locVeoSettings } = require('./src/flow/main/kiem-truoc');
+const { xoaDuAnFlow } = require('./src/flow/main/xoa-du-an');
 
 // Thư mục dữ liệu riêng (phiên đăng nhập, cài đặt, hàng đợi) — PHẢI trước whenReady.
 app.setPath('userData', process.env.MUSE_DATA_DIR ||
@@ -320,6 +321,43 @@ async function xoaChat(id, threads) {
   return { ok: true, da, hong };
 }
 
+/**
+ * Chạy hết hàng chờ → dọn theo tuỳ chọn trong Cài đặt: xoá chat Muse của các việc đã xong, xoá dự án
+ * Flow đã dùng (lần chạy sau app tự mở dự án mới). Lỗi chỉ ghi nhật ký, không chặn tắt máy.
+ */
+async function donDep({ muse, flow }) {
+  for (const [tkId, ds] of muse) {
+    const tk = taiKhoan.tim(tkId);
+    if (!tk) continue;
+    log('info', `🗑 "${tk.ten}": tự xoá ${ds.length} đoạn chat Muse của việc đã xong…`);
+    const r = await xoaChat(tkId, ds.map((x) => x.thread));
+    if (r.ok) dieuPhoi.boThread(ds.map((x) => x.id));
+    else log('warning', `⚠ "${tk.ten}": không tự xoá được chat Muse — ${r.loi}`);
+  }
+  for (const tkId of flow) {
+    const tk = taiKhoan.tim(tkId);
+    if (!tk || !tk.flowUrl) continue;
+    // Đợi luồng Flow của tài khoản đóng tab (điều phối đóng ở nhịp kế tiếp) — tab còn mở trên dự án
+    // sẽ nhớ lại đúng địa chỉ dự án vừa xoá.
+    for (let i = 0; i < 20 && dieuPhoi.luong.some((x) => x.taiKhoanId === tkId); i++) await new Promise((r) => setTimeout(r, 500));
+    if (dieuPhoi.dangChay) { log('warning', `⚠ "${tk.ten}": hàng chờ đang chạy lại — bỏ qua tự xoá dự án Flow.`); continue; }
+    log('info', `🗑 "${tk.ten}": tự xoá dự án Flow ${tk.flowUrl}…`);
+    const r = await xoaDuAnFlow(tk.flowUrl, {
+      taoCuaSo: () => taoCuaSoAn(tk, 'Flow · xoá dự án'), dongCuaSo: dongCuaSoAn, trangChu: FLOW_URL,
+      choMs: Number(process.env.FLOW_CHO_SAN_SANG_MS) || 25000
+    });
+    if (r.ok) {
+      taiKhoan.sua(tkId, { flowUrl: '' });
+      dieuPhoi.boFlowTen(tkId);
+      log('success', `🗑 "${tk.ten}": đã xoá dự án Flow — lần chạy sau app tự mở dự án mới.`);
+    } else {
+      log('warning', `⚠ "${tk.ten}": không tự xoá được dự án Flow — ${r.lyDo}. Dự án vẫn giữ nguyên.` +
+        (r.chiTiet ? ` Chẩn đoán: ${JSON.stringify(r.chiTiet)}` : ''));
+    }
+    baoTrangThai();
+  }
+}
+
 // ── File ──────────────────────────────────────────────────────────────────
 function docFile(p) {
   const duoi = path.extname(p).slice(1).toLowerCase();
@@ -469,6 +507,34 @@ const LENH = {
   moLink: ({ url }) => { if (/^https:\/\//.test(url)) shell.openExternal(url); },
   tonTai: ({ files }) => (files || []).map((f) => fs.existsSync(f)),
   xoaNhatKy: () => { nhatKy.length = 0; },
+  /** Xuất nhật ký đang hiện ra file .txt (người dùng chọn chỗ lưu). */
+  xuatNhatKy: async ({ chu }) => {
+    const d = new Date(), h = (n) => String(n).padStart(2, '0');
+    const ten = `nhat-ky-${d.getFullYear()}${h(d.getMonth() + 1)}${h(d.getDate())}-${h(d.getHours())}${h(d.getMinutes())}.txt`;
+    const r = await dialog.showSaveDialog(win, { defaultPath: path.join(app.getPath('documents'), ten),
+      filters: [{ name: 'Văn bản', extensions: ['txt'] }] });
+    if (r.canceled || !r.filePath) return { ok: false };
+    const xd = process.platform === 'win32' ? '\r\n' : '\n';
+    fs.writeFileSync(r.filePath, '\uFEFF' + String(chu || '').split(/\r?\n/).join(xd) + xd, 'utf8');
+    return { ok: true, file: r.filePath };
+  },
+  /** Tải về hàng loạt: chép file kết quả của các việc đã chọn vào một thư mục người dùng chọn. */
+  taiNhieu: async ({ ids }) => {
+    const files = dieuPhoi.viec.filter((j) => ids.includes(j.id)).flatMap((j) => j.files || []).filter((f) => fs.existsSync(f));
+    if (!files.length) return { ok: false, loi: 'Các việc đã chọn chưa có file kết quả nào' };
+    const r = await dialog.showOpenDialog(win, { title: `Chọn thư mục lưu ${files.length} file`, properties: ['openDirectory', 'createDirectory'] });
+    if (r.canceled || !r.filePaths[0]) return { ok: false };
+    let da = 0;
+    for (const f of files) {
+      let dich = path.join(r.filePaths[0], path.basename(f));
+      if (path.resolve(dich) === path.resolve(f)) { da++; continue; }
+      for (let n = 2; fs.existsSync(dich); n++) dich = path.join(r.filePaths[0], path.basename(f).replace(/(\.[^.]+)?$/, ` (${n})$1`));
+      fs.copyFileSync(f, dich);
+      da++;
+    }
+    log('success', `⬇ Đã tải ${da} file về ${r.filePaths[0]}`);
+    return { ok: true, da, thuMuc: r.filePaths[0] };
+  },
 
   kiemCapNhat: () => capNhat && capNhat.kiemTra(),
   caiCapNhat: ({ epBuoc }) => capNhat && capNhat.caiDat({ moLai: true, epBuoc: !!epBuoc })
@@ -576,6 +642,7 @@ app.whenReady().then(() => {
     thuMucRaMacDinh: path.join(app.getPath('documents'), 'AI Automation Studio'),
     thuMucTam: path.join(app.getPath('userData'), 'ket-qua-tam'),
     tonTai: (p) => fs.existsSync(p),
+    donDep: (don) => donDep(don),
     hetLuot: () => {
       if (dieuPhoi.caiDat.tatMayKhiXong) mayFlow.handleEngineMessage({ action: 'TRIGGER_SHUTDOWN', delay: 60 }, { id: -1 });
       if (taiKhoan.ds.some((a) => a.nen !== 'flow')) capNhatToken();   // chạy xong hàng chờ → cập nhật mức token Muse

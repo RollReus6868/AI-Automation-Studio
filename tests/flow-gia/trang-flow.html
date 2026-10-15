@@ -12,10 +12,44 @@
     location.replace(location.href.replace(/\/fx\/.*/, '/signin/v2/identifier'));
   } else {
     // Như Flow thật: biểu tượng là CHỮ (font google-symbols) đứng trước nhãn → innerText "add_2 Dự án mới".
-    document.body.innerHTML = '<h3>Flow</h3><button id="moi"><i class="google-symbols">add_2</i> Dự án mới</button>';
-    document.getElementById('moi').onclick = () => {
-      location.href = location.pathname.replace(/\/$/, '') + '/project/gia-' + Math.random().toString(36).slice(2, 8);
+    document.body.innerHTML = '<h3>Flow</h3><button id="moi"><i class="google-symbols">add_2</i> Dự án mới</button><div id="dsDuAn"></div>';
+    const goc = location.pathname.replace(/\/$/, '');
+    document.getElementById('moi').onclick = async () => {
+      const id = 'gia-' + Math.random().toString(36).slice(2, 8);
+      await fetch('/__flow-du-an', { method: 'POST', body: JSON.stringify({ id }) }).catch(() => {});
+      location.href = goc + '/project/' + id;
     };
+    // Danh sách dự án (lưu ở máy chủ test): mỗi thẻ có nút ⋮ (chỉ nhận pointerdown, như Radix) → menu
+    // → "Delete project" → hộp xác nhận "Cancel / Delete" → máy chủ xoá.
+    const ve = async () => {
+      const ds = await (await fetch('/__flow-du-an')).json();
+      const h = document.getElementById('dsDuAn');
+      h.innerHTML = ds.map((id) => `<div class="the" style="border:1px solid #444;margin:6px;padding:6px">
+        <a href="${goc}/project/${id}">Dự án ${id}</a>
+        <button class="tuy" aria-label="More options" data-id="${id}"><i class="google-symbols">more_vert</i></button></div>`).join('');
+      for (const b of h.querySelectorAll('.tuy')) b.addEventListener('pointerdown', () => moMenu(b.dataset.id, b));
+    };
+    const moMenu = (id, b) => {
+      document.querySelectorAll('[role="menu"]').forEach((m) => m.remove());
+      const m = document.createElement('div');
+      m.setAttribute('role', 'menu');
+      m.innerHTML = '<button role="menuitem"><i class="google-symbols">edit</i> Rename</button>' +
+        '<button role="menuitem" class="xoa"><i class="google-symbols">delete</i> Delete project</button>';
+      b.parentElement.appendChild(m);
+      m.querySelector('.xoa').addEventListener('click', () => {
+        m.remove();
+        const d = document.createElement('div');
+        d.setAttribute('role', 'alertdialog');
+        d.innerHTML = '<p>Delete project?</p><button class="huy">Cancel</button><button class="ok">Delete</button>';
+        document.body.appendChild(d);
+        d.querySelector('.huy').onclick = () => d.remove();
+        d.querySelector('.ok').onclick = async () => {
+          await fetch('/__flow-xoa-du-an', { method: 'POST', body: JSON.stringify({ id }) }).catch(() => {});
+          d.remove(); ve();
+        };
+      });
+    };
+    ve();
   }
 </script>
 </body></html>

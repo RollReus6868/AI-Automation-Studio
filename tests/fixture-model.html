@@ -31,6 +31,11 @@
             danh sách [role="listbox"] > [role="option"]. Mở ở POINTERDOWN,
             chọn ở POINTERUP. Chọn xong: đóng CẢ bảng (để thử nhánh mở lại
             bảng mới đọc được model).
+    moi   — như mat nhưng chữ có thứ đứng TRƯỚC tên model: "🍌 " và nhãn
+            "Model" trong hộp (kiểu flow.google.com 10/2026 — đoán, chưa thấy
+            DOM thật; nhật ký người dùng 15/10 chỉ cho biết hộp cũ không khớp).
+    nut   — không có hộp mở danh sách: mọi model bày sẵn thành nút
+            role="radio" aria-checked trong bảng.
     tron  — như mat nhưng các dòng KHÔNG có role, chỉ là <div> chứa hai <span>
             ("Veo 3.1 - Lite" + "[Lower Priority]") — thử lưới an toàn và
             cái bẫy đọc cụt thành tiền tố.
@@ -86,6 +91,7 @@ function dong(t) {
   }
   return `<i class="google-symbols">volume_up</i><span>${t}</span>`;
 }
+const truocTen = () => (UI === 'moi' ? '<span>🍌</span> ' : '');
 
 function ve() {
   const ph = document.getElementById('panelHost');
@@ -94,7 +100,9 @@ function ve() {
 
   const hop = UI === 'radix'
     ? `<div role="combobox" tabindex="0" id="hop" aria-expanded="${moDs}"><span>${model}</span><i class="google-symbols">arrow_drop_down</i></div>`
-    : `<button id="hop" aria-haspopup="listbox"><span>${model}</span><i class="google-symbols">arrow_drop_down</i></button>`;
+    : UI === 'nut'
+      ? `<div role="radiogroup">${MODELS.map(([t]) => `<button role="radio" class="nutm" data-m="${t}" aria-checked="${t === model}">${dong(t)}</button>`).join('')}</div>`
+      : `<button id="hop" aria-haspopup="listbox"><span style="opacity:.6">Model</span> ${truocTen()}<span>${model}</span><i class="google-symbols">arrow_drop_down</i></button>`;
   const vo = UI === 'radix'
     ? `<div class="panel" data-radix-menu-content data-state="open">`
     : `<flow-prompt-box-settings class="panel">`;
@@ -109,6 +117,7 @@ function ve() {
     const cac = MODELS.map(([t]) => {
       if (UI === 'mat')   return `<mat-option role="option" class="opt" data-m="${t}">${dong(t)}</mat-option>`;
       if (UI === 'radix') return `<div role="option" class="opt" data-m="${t}">${dong(t)}</div>`;
+      if (UI === 'moi')   return `<mat-option role="option" class="opt" data-m="${t}">${truocTen()}${dong(t)}</mat-option>`;
       return `<div class="opt" data-m="${t}">${dong(t)}</div>`;
     }).join('');
     oh.innerHTML = `<div class="overlay ${UI === 'mat' ? 'cdk-overlay-pane' : ''}" ${UI === 'radix' ? 'role="listbox"' : ''}>${cac}</div>`;
@@ -126,6 +135,12 @@ function ve() {
     oh.innerHTML = '';
   }
 
+  if (UI === 'nut') {
+    for (const el of ph.querySelectorAll('.nutm')) {
+      el.addEventListener('click', () => { model = el.getAttribute('data-m'); ve(); });
+    }
+    return;
+  }
   const h = document.getElementById('hop');
   const batTatDs = () => { window.__soLanBamHop++; moDs = !moDs; ve(); };
   if (UI === 'radix') h.addEventListener('pointerdown', batTatDs);
@@ -144,7 +159,7 @@ document.addEventListener('keydown', (e) => {
 }, true);
 
 window.__fixtureSetUI = (u) => {
-  UI = ['mat', 'radix', 'tron'].includes(u) ? u : 'mat';
+  UI = ['mat', 'radix', 'tron', 'moi', 'nut'].includes(u) ? u : 'mat';
   MODELS.sort((a, b) => THU_TU.indexOf(a[0]) - THU_TU.indexOf(b[0]));
   model = 'Veo 3.1 - Fast'; moBang = false; moDs = false;
   window.__soLanBamHop = 0; window.__soLanBamMoi = 0;

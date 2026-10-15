@@ -87,6 +87,27 @@
   // Tên model video/ảnh Flow đang dùng. Đủ rộng để Google thêm model mới vẫn
   // nhận ra, đủ hẹp để không nhầm một dòng chữ bất kỳ.
   const MAU_TEN_MODEL = /^(veo|omni|imagen|nano ?banana|gemini|lyria)\b/i;
+  const TU_MODEL = /\b(veo|omni|imagen|nano ?banana|gemini|lyria)\b/i;
+
+  /**
+   * Tên model nằm trong chữ của một phần tử, hoặc null.
+   * Flow 10/2026 (flow.google.com) ghi tên model kèm thứ đứng TRƯỚC: biểu tượng
+   * cảm xúc "🍌 Nano Banana 2", nhãn "Model · Nano Banana 2 Lite"… — đòi chữ
+   * BẮT ĐẦU bằng tên model là không thấy hộp chọn nào (nhật ký 15/10/2026:
+   * "Bảng cài đặt đã mở nhưng không thấy hộp chọn model"). Nên cắt bỏ mọi thứ
+   * trước từ khoá model, nhưng chỉ khi phần trước đó ngắn (nhãn / biểu tượng),
+   * để một câu dài nhắc tới "Veo" không bị coi là tên model.
+   */
+  function tenModel(t) {
+    t = String(t || '').replace(/\s+/g, ' ').trim();
+    if (!t || t.length > 60) return null;
+    const m = t.match(TU_MODEL);
+    if (!m) return null;
+    const truoc = t.slice(0, m.index);
+    if (truoc.replace(/[^\p{L}\p{N}]/gu, '').length > 12) return null;
+    const ten = t.slice(m.index).replace(/\s*(arrow_drop_down|expand_more|keyboard_arrow_down|check|done)\s*$/i, '').trim();
+    return MAU_TEN_MODEL.test(ten) ? ten : null;
+  }
 
   const trongThe = (el) => !!(el && el.closest && el.closest('[role="article"]'));
 
@@ -101,14 +122,15 @@
     for (const el of ds) {
       if (!nhinThay(el) || trongThe(el)) continue;
       const t = chuKhongBieuTuong(el);
-      if (!t || t.length > 60) continue;
-      if (!MAU_TEN_MODEL.test(t)) continue;
+      if (!tenModel(t)) continue;
       // Nút mở bảng ("Video · 720p · 8s x1") KHÔNG phải hộp chọn model.
-      if (/\bx[1-9]\b|\b\d+x\b|720p|1080p/i.test(t)) continue;
+      if (/\bx[1-9]\b|\b\d+x\b|720p|1080p|\b\d+:\d+\b/i.test(t)) continue;
       const diem =
         (el.getAttribute('role') === 'combobox' || el.tagName === 'MAT-SELECT' ? 3 : 0) +
         (el.hasAttribute('aria-haspopup') ? 2 : 0) +
         (el.tagName === 'BUTTON' ? 1 : 0);
+      // Ô lựa chọn trơn đang hiện cả danh sách (nút radio / tab) không phải hộp mở danh sách.
+      if (/^(radio|tab|option|menuitemradio)$/.test(el.getAttribute('role') || '')) continue;
       hop.push({ el, diem, t });
     }
     if (!hop.length) return null;
@@ -118,8 +140,7 @@
   }
 
   function docTenTrenHop(hop) {
-    const t = chuKhongBieuTuong(hop);
-    return t || null;
+    return tenModel(chuKhongBieuTuong(hop));
   }
 
   // ── 3. Danh sách lựa chọn đang mở ───────────────────────────────────────
@@ -143,8 +164,8 @@
     const ra = [];
     const daCo = new Set();
     const them = (el) => {
-      const ten = chuKhongBieuTuong(el);
-      if (!ten || ten.length > 70 || !MAU_TEN_MODEL.test(ten)) return;
+      const ten = tenModel(chuKhongBieuTuong(el));
+      if (!ten) return;
       const k = khoa(ten);
       if (daCo.has(k)) return;
       daCo.add(k);
@@ -177,9 +198,54 @@
   function laMotDong(el) {
     if (!el || el === document.body) return false;
     const t = chuKhongBieuTuong(el);
-    if (!t || t.length > 70 || !MAU_TEN_MODEL.test(t)) return false;
+    if (!tenModel(t)) return false;
     // Thẻ bọc nhiều dòng: chữ của nó chứa tên model thứ hai.
     return (t.match(/\b(veo|omni|imagen|nano ?banana|gemini|lyria)\b/gi) || []).length === 1;
+  }
+
+  // ── 3b. Model bày sẵn thành hàng nút trong bảng (không có hộp mở danh sách) ─
+  //
+  //  Dự phòng cho kiểu giao diện "nút radio / tab": mọi model hiện sẵn, cái
+  //  đang chọn mang aria-checked / aria-selected / aria-pressed hoặc lớp
+  //  selected/active. Cần ít nhất HAI tên khác nhau mới coi là danh sách.
+
+  function dangChon(el) {
+    for (const a of ['aria-checked', 'aria-selected', 'aria-pressed', 'aria-current']) {
+      const v = el.getAttribute(a);
+      if (v && v !== 'false') return true;
+    }
+    return /(^|[\s_-])(selected|active|checked|mdc-tab--active)($|[\s_-])/i.test(String(el.className || ''));
+  }
+
+  function luaChonTrongBang(bang) {
+    if (!bang) return [];
+    const ung = [...bang.querySelectorAll('[role="radio"], [role="tab"], [role="option"], [role="menuitemradio"], mat-button-toggle, button, [tabindex]')]
+      .filter((el) => nhinThay(el) && !trongThe(el) && laMotDong(el));
+    const ra = [];
+    const daCo = new Set();
+    // Phần tử bấm được NGOÀI CÙNG của mỗi tên (nút bọc span cũng là ứng viên).
+    for (const el of ung.filter((el) => !ung.some((x) => x !== el && x.contains(el)))) {
+      const ten = tenModel(chuKhongBieuTuong(el));
+      const k = khoa(ten);
+      if (!ten || daCo.has(k)) continue;
+      daCo.add(k);
+      ra.push({ el, ten, k, chon: dangChon(el) || !!el.querySelector('[aria-checked="true"], [aria-selected="true"]') });
+    }
+    return ra.length >= 2 ? ra : [];
+  }
+
+  /** Những gì bấm được trong bảng — để nhật ký cho thấy Flow đang bày model kiểu gì. */
+  function nutTrongBang(bang) {
+    if (!bang) return [];
+    const ra = [];
+    for (const el of bang.querySelectorAll('button, [role], [tabindex], mat-select, select, input')) {
+      if (!nhinThay(el)) continue;
+      const t = chuKhongBieuTuong(el).slice(0, 40);
+      const vt = el.getAttribute('role');
+      ra.push(`${el.tagName.toLowerCase()}${vt ? `[${vt}]` : ''}${el.hasAttribute('aria-haspopup') ? '^' : ''}:${t}`);
+      if (ra.length >= 24) break;
+    }
+    return ra;
   }
 
   // ── 4. Đọc số credit ghi dưới bảng ──────────────────────────────────────
@@ -245,7 +311,8 @@
       bangDangMo: bang ? { tag: bang.tagName, lop: String(bang.className || '').slice(0, 100) } : null,
       hopModel: hop ? { tag: hop.tagName, role: hop.getAttribute('role'), chu: docTenTrenHop(hop) } : null,
       luaChon: ds.map((x) => x.ten).slice(0, 12),
-      tinDung: docTinDung(bang)
+      tinDung: docTinDung(bang),
+      nutTrongBang: nutTrongBang(bang)
     };
   }
   window.__flowModelDebug = () => chanDoan('');
@@ -257,7 +324,8 @@
       const bang = await moBangCaiDat();
       if (!bang) return { ok: false, model: null, lyDo: 'Không mở được bảng cài đặt cạnh ô nhập prompt' };
       const hop = timHopModel(bang) || timHopModel(null);
-      const model = hop ? docTenTrenHop(hop) : null;
+      let model = hop ? docTenTrenHop(hop) : null;
+      if (!model) { const c = luaChonTrongBang(bang).find((x) => x.chon); model = c ? c.ten : null; }
       const tinDung = docTinDung(bang);
       if (!daMoSan) await dongHet();
       if (!model) return { ok: false, model: null, tinDung, lyDo: 'Bảng cài đặt đã mở nhưng không thấy hộp chọn model', chiTiet: chanDoan() };
@@ -274,7 +342,12 @@
       const bang = await moBangCaiDat();
       if (!bang) return { ok: false, ds: [], lyDo: 'Không mở được bảng cài đặt' };
       const hop = timHopModel(bang) || timHopModel(null);
-      if (!hop) { await dongHet(); return { ok: false, ds: [], lyDo: 'Không thấy hộp chọn model', chiTiet: chanDoan() }; }
+      if (!hop) {
+        const bay = luaChonTrongBang(bang).map((x) => x.ten);
+        const ct = bay.length ? null : chanDoan();
+        await dongHet();
+        return bay.length ? { ok: true, ds: bay } : { ok: false, ds: [], lyDo: 'Không thấy hộp chọn model', chiTiet: ct };
+      }
       const ds = await moDanhSach(hop);
       const ten = ds.map((x) => x.ten);
       const chiTiet = ten.length ? null : chanDoan('bấm hộp model nhưng không thấy danh sách');
@@ -285,6 +358,43 @@
       return { ok: false, ds: [], lyDo: e && e.message ? e.message : String(e) };
     }
   };
+
+  /** Chọn model khi Flow bày sẵn các model thành hàng nút trong bảng (mục 3b). */
+  async function chonTrongBang(tenMuon, muon) {
+    const docLai = () => luaChonTrongBang((window.__flowTimBang && window.__flowTimBang()) || null);
+    let ds = docLai();
+    const dau = ds.find((x) => x.chon);
+    if (dau && dau.k === muon) {
+      const tinDung = docTinDung(window.__flowTimBang && window.__flowTimBang());
+      await dongHet();
+      return { ok: true, daDoi: false, model: dau.ten, tinDung };
+    }
+    if (!ds.some((x) => x.k === muon)) {
+      const coGi = ds.map((x) => x.ten).join(' · ');
+      await dongHet();
+      return { ok: false, daDoi: false, lyDo: `Flow không có model "${tenMuon}" (đang có: ${coGi})` };
+    }
+    for (const kieu of ['chuot', 'click', 'phim']) {
+      const dich = ds.find((x) => x.k === muon);
+      if (!dich) break;
+      await bamMotLan(dich.el, kieu);
+      for (let i = 0; i < 6; i++) {
+        await wait(300);
+        // Bảng đóng theo cú bấm → mở lại để đọc.
+        if (!(window.__flowTimBang && window.__flowTimBang())) await moBangCaiDat();
+        ds = docLai();
+        const c = ds.find((x) => x.chon);
+        if (c && c.k === muon) {
+          const tinDung = docTinDung(window.__flowTimBang && window.__flowTimBang());
+          await dongHet();
+          return { ok: true, daDoi: true, model: c.ten, tinDung };
+        }
+      }
+    }
+    const ct = chanDoan('bấm nút model trong bảng mà không thấy chuyển sang được chọn');
+    await dongHet();
+    return { ok: false, daDoi: false, lyDo: `Đã bấm chọn "${tenMuon}" 3 kiểu nhưng Flow không đổi model`, chiTiet: ct };
+  }
 
   /**
    * Chọn model theo TÊN (so bằng nhau sau chuẩn hoá, không so "có chứa").
@@ -298,7 +408,11 @@
       if (!bang) return { ok: false, daDoi: false, lyDo: 'Không mở được bảng cài đặt cạnh ô nhập prompt', chiTiet: chanDoan() };
 
       let hop = timHopModel(bang) || timHopModel(null);
-      if (!hop) { const ct = chanDoan(); await dongHet(); return { ok: false, daDoi: false, lyDo: 'Bảng cài đặt đã mở nhưng không thấy hộp chọn model', chiTiet: ct }; }
+      if (!hop) {
+        if (luaChonTrongBang(bang).length) return await chonTrongBang(tenMuon, muon);
+        const ct = chanDoan(); await dongHet();
+        return { ok: false, daDoi: false, lyDo: 'Bảng cài đặt đã mở nhưng không thấy hộp chọn model', chiTiet: ct };
+      }
 
       const dangDung = docTenTrenHop(hop);
       if (khoa(dangDung) === muon) {
