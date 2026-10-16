@@ -124,16 +124,16 @@ function ganTaiSuno(ses) {
   });
 }
 function choTaiVeSuno(wc, ms) {
-  let hen = null;
+  let hen = null, daBatDau = false;
   const hua = new Promise((res) => {
     hen = setTimeout(() => { choTaiSuno.delete(wc.id); res({ ok: false, hetGio: true }); }, ms);
     choTaiSuno.set(wc.id, {
       thuMuc: path.join(app.getPath('userData'), 'suno-tai-tam'),
-      batDau: () => clearTimeout(hen),   // đã bắt đầu tải → chờ tới khi xong, không cắt giữa chừng
+      batDau: () => { daBatDau = true; clearTimeout(hen); },   // đã bắt đầu tải → chờ tới khi xong, không cắt giữa chừng
       xong: res
     });
   });
-  return { hua, huy: () => { clearTimeout(hen); choTaiSuno.delete(wc.id); } };
+  return { hua, huy: () => { clearTimeout(hen); choTaiSuno.delete(wc.id); }, daBatDau: () => daBatDau };
 }
 
 const WEB_PREFS = (tk) => (tk.nen === 'flow'

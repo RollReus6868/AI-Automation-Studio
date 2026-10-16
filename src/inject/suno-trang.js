@@ -14,6 +14,8 @@
 //  Tải về (ảnh người dùng gửi 15/10/2026): ⋯ → menu Remix / Edit / Publish / Share / Download / Manage…
 //  → "Download" mở hộp "Download '<tên bài>'" chọn M4A / MP3 (✓ sẵn) / WAV / MP4 video asset / Stems & MIDI
 //  → nút "Download". Không thấy thì trả danh sách mục menu để nhật ký ghi lại.
+//  16/10/2026 (ảnh + HTML người dùng gửi): nút to đổi thành "Unlock & Download" (Plan Free · Downloads 7) —
+//  bản 1.2.3 chỉ nhận đúng chữ "Download" nên báo "hop-khong-co-nut-download".
 // ============================================================================
 (function () {
   if (window.__suno && window.__suno.phienBan === 1) return;
@@ -62,7 +64,11 @@
     advanced: /^(advanced|custom|nâng cao|tuỳ chỉnh|tùy chỉnh)$/i,
     taiVe: /^(download|tải xuống|tải về)\b/i,
     mp3: /\bmp3\b/i,
-    nutTai: /^(download|tải xuống|tải về)$/i,
+    // Nút to cuối hộp: "Download", hoặc "Unlock & Download" (16/10/2026, tài khoản free: mở khoá bài = trừ 1 lượt tải).
+    nutTai: /^((unlock|mở khoá|mở khóa)\s*(&|and|và)\s*)?(download|tải xuống|tải về)$/i,
+    moKhoa: /^(unlock|mở khoá|mở khóa)/i,
+    // Sau khi mở khoá, Suno có thể đổi hộp sang nút "Download “<tên bài>”" (chuỗi modal.downloadSuccessButton).
+    nutTaiSauMoKhoa: /^(download|tải xuống|tải về)\s*[“"'‘«]/i,
     // Suno báo hết lượt tạo / tải: hết credit, chạm giới hạn, mời nâng cấp gói…
     hetLuot: /credit|limit|quota|upgrade|subscribe|subscription|out of|not enough|insufficient|reached|pro plan|premier|downloads? left|hết lượt|hết credit|giới hạn|nâng cấp/i,
     // Hộp "Out of Downloads" (ảnh người dùng gửi 15/10/2026): "You don't have any downloads left. Subscribe…".
@@ -246,12 +252,21 @@
     const nutTai = $$('button', hop).filter((b) => nhinThay(b) && dungChu(b, NHAN.nutTai)).pop();
     if (!nutTai) return { ok: false, loi: 'hop-khong-co-nut-download', buoc: 'hop', chu: chuHop };
     if (tatCa(nutTai)) return { ok: false, loi: 'nut-download-bi-tat', buoc: 'hop', chu: chuHop };
+    const moKhoa = NHAN.moKhoa.test(chu(nutTai));
     bam(nutTai);
     await ngu(800);
     // Có bản Suno chỉ báo "Out of Downloads" sau khi bấm nút Download trong hộp.
     const het2 = hetLuotTai();
     if (het2) return { ok: false, hetLuotTai: true, loi: 'het-luot-tai', buoc: 'hop', chu: het2 };
-    return { ok: true, cach: 'hop', chu: chuHop };
+    return { ok: true, cach: moKhoa ? 'mo-khoa' : 'hop', moKhoa, chu: chuHop };
+  }
+
+  /** Sau "Unlock & Download": hộp đổi sang nút "Download “<tên bài>”" mà chưa tải → bấm nút đó (một lần). */
+  function bamTaiSauMoKhoa() {
+    const b = $$('button, a').find((e) => nhinThay(e) && NHAN.nutTaiSauMoKhoa.test(chu(e)) && !e.closest('[data-testid="clip-row"]'));
+    if (!b || tatCa(b)) return { ok: false };
+    bam(b);
+    return { ok: true, chu: chu(b).slice(0, 120) };
   }
 
   /** Đóng hộp Download nếu còn mở (nút ✕ / Escape) — tránh che trang ở việc sau. */
@@ -264,7 +279,7 @@
     return true;
   }
 
-  window.__suno = { phienBan: 1, trangThai, dsClip, chuanBi, bamTao, taiMp3, dongHop, hetLuotTai, thongBao, captcha,
+  window.__suno = { phienBan: 1, trangThai, dsClip, chuanBi, bamTao, taiMp3, bamTaiSauMoKhoa, dongHop, hetLuotTai, thongBao, captcha,
     laHetLuot: (t) => NHAN.hetLuot.test(String(t || '')),
     // Chỉ câu nói về hết lượt (hộp Download có cả tên bài, các định dạng… — không đưa hết vào nhật ký).
     cauHetLuot: (t) => String(t || '').split(/ · |(?<=[.!?])\s+/).filter((c) => NHAN.hetLuot.test(c)).join(' ').slice(0, 200) };

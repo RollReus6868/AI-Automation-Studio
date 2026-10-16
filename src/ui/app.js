@@ -262,7 +262,7 @@
       const b = j.buoc === 'tao' ? `Muse đang tạo ${j.loai === 'video' ? 'video' : 'ảnh'}` : (NHAN_BUOC[j.buoc] || j.buoc || 'Đang chuẩn bị');
       return ['chay', 'Đang chạy', b];
     }
-    return ['cho', 'Đang chờ', j.thread ? 'Sẽ lấy tiếp kết quả' : (j.loi ? `Thử lại: ${j.loi}` : 'Trong hàng chờ')];
+    return ['cho', 'Đang chờ', j.thread ? 'Sẽ lấy tiếp kết quả' : j.sunoBai && j.loi ? `Tải lại bài đã tạo: ${j.loi}` : (j.loi ? `Thử lại: ${j.loi}` : 'Trong hàng chờ')];
   }
 
   function locViec() {

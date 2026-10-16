@@ -316,7 +316,8 @@ class DieuPhoi {
     let n = 0;
     for (const j of this.viec) {
       if (!ids.includes(j.id) || j.trangThai === 'chay') continue;
-      Object.assign(j, { trangThai: 'cho', buoc: '', thread: '', taiKhoan: '', loi: '', thu: 0, tkLoi: [], vongTk: 0, batDauLuc: 0, xongLuc: 0, vongLai: 0 });
+      // Suno: bỏ luôn bài đã tạo (sunoBai) — Tạo lại là tạo bài mới.
+      Object.assign(j, { trangThai: 'cho', buoc: '', thread: '', sunoBai: null, taiKhoan: '', loi: '', thu: 0, tkLoi: [], vongTk: 0, batDauLuc: 0, xongLuc: 0, vongLai: 0 });
       n++;
     }
     this.luu();

@@ -140,6 +140,29 @@ module.exports = function e2eSuno({ win, app, LENH, dieuPhoi, taiKhoan }) {
       await cho(xongHet(v3), 150000, 'việc chờ chạy lại ở Suno 1');
       inViec(v3);
       kiem(v3[0] && v3[0].trangThai === 'xong' && v3[0].taiKhoan === 'suno-1' && fs.existsSync(v3[0].files[0] || ''), 'việc nhạc còn chờ xong ở "Suno 1"');
+
+      // 5) Nhật ký 16/10/2026: hộp Download có nút "Unlock & Download" (app 1.2.3 không nhận → "hop-khong-co-nut-download"),
+      // tải hỏng thì app GỬI LẠI prompt (Suno đẻ thêm bài, "đang tạo 14 bài" vì danh sách bài nạp muộn bị coi là bài mới).
+      // Trang giả: danh sách nạp chậm 3 s, lần mở hộp đầu không có nút tải, Unlock xong phải bấm "Download “<tên>”".
+      ghi('-- 5. Unlock & Download, tải lại không gửi lại prompt, danh sách bài nạp muộn');
+      await cauHinh({ hetTao: [], moKhoa: 'nut', hongTai: 1, treoDs: 3000 });
+      const g5 = await sunoGui();
+      const truoc5 = new Set((g5.clips['suno-1'] || []).map((c) => c.id));
+      nk = LENH.trangThai().nhatKy.length;
+      LENH.them({ duAn: 'mac-dinh', loai: 'nhac', nen: 'suno', prompts: ['piano mưa đêm'], chay: true });
+      const v5 = viec().filter((j) => j.loai === 'nhac' && j.prompt === 'piano mưa đêm');
+      await cho(xongHet(v5), 150000, 'bài nhạc mục 5 xong');
+      inViec(v5);
+      dongNhatKy(nk);
+      const g5b = await sunoGui();
+      const gui5 = g5b.gui.slice(g5.gui.length), nk5 = LENH.trangThai().nhatKy.slice(nk).map((d) => d.chu);
+      kiem(gui5.length === 1 && gui5[0].tk === 'suno-1', `chỉ bấm Create MỘT lần dù lần tải đầu hỏng (${gui5.map((g) => g.tk)})`);
+      const bai5 = v5[0] && fs.existsSync(v5[0].files[0] || '') ? docBai(v5[0].files[0]) : null;
+      kiem(v5[0] && v5[0].trangThai === 'xong' && bai5 && !truoc5.has(bai5.id) && /-suno-1$/.test(bai5.id), `tải đúng bài VỪA tạo (${JSON.stringify(bai5)})`);
+      kiem(nk5.some((x) => /tải lại bài này \(lần 2\/3\), không gửi lại prompt/.test(x)), 'nhật ký: tải lại đúng bài, không gửi lại prompt');
+      kiem(nk5.some((x) => /Đã bấm "Unlock & Download"/.test(x)) && nk5.some((x) => /Bấm "Download “Bai /.test(x)), 'bấm "Unlock & Download" rồi nút "Download “<tên bài>”"');
+      kiem(nk5.some((x) => /Suno đang tạo 4 bài/.test(x)) && !nk5.some((x) => /đang tạo ([5-9]|\d\d) bài/.test(x)), 'danh sách nạp muộn: không coi bài cũ là bài mới');
+      kiem(g5b.dinhDang.slice(-1)[0] === 'MP3', `tải định dạng MP3 (${g5b.dinhDang.slice(-1)[0]})`);
     } catch (err) {
       ghi('LỖI KỊCH BẢN: ' + err.stack);
       loi.push('ngoại lệ');

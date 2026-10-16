@@ -1208,6 +1208,100 @@ test('Suno: câu báo hết lượt — nhận hộp Out of Downloads / toast h�
   const t = docNguon('src/inject/suno-trang.js');
   assert.ok(/function hopTai\(\)/.test(t) && /dungChu\(e, \/\^mp3\$\/i\)/.test(t) && /NHAN\.nutTai/.test(t), 'tải: hộp chọn định dạng → ô MP3 → nút Download');
 });
+// ── 1.2.4: nhật ký 16/10/2026 — hộp Download có nút "Unlock & Download"; tải hỏng thì app GỬI LẠI prompt ──
+function sunoGia({ cu = [], taiHong = 0, dsTre = 0 } = {}) {
+  // Trang Suno giả ở mức lệnh window.__suno.*: danh sách bài, Create đẻ 4 bài (đang tạo → xong sau vài lần hỏi).
+  const tp = { ds: cu.map((id) => ({ id, trangThai: 'complete', giay: 180 })), tao: 0, taiMp3: [], dsGoi: 0, taiHong };
+  const goi = async (bt) => {
+    if (/trangThai\(\)/.test(bt)) return { coForm: true };
+    if (/captcha\(\)/.test(bt)) return false;
+    if (/dsClip\(\)/.test(bt)) {
+      tp.dsGoi++;
+      if (tp.dsGoi <= dsTre) return [];                       // danh sách nạp muộn
+      for (const c of tp.ds) if (c.trangThai !== 'complete' && ++c.hoi > 2) Object.assign(c, { trangThai: 'complete' });
+      return tp.ds.map((c) => ({ ...c }));
+    }
+    if (/chuanBi\(/.test(bt)) return { ok: true };
+    if (/bamTao\(\)/.test(bt)) {
+      tp.tao++;
+      tp.ds = [130, 170, 240, 60].map((giay, i) => ({ id: `moi${tp.tao}-${i + 1}`, trangThai: 'streaming', giay, hoi: 0 })).concat(tp.ds);
+      return { ok: true };
+    }
+    if (/taiMp3\(/.test(bt)) {
+      const id = JSON.parse(bt.match(/taiMp3\((.*)\)$/)[1]);
+      tp.taiMp3.push(id);
+      if (tp.taiHong > 0) { tp.taiHong--; return { ok: false, loi: 'hop-khong-co-nut-download', chu: 'Download · Unlock & Download' }; }
+      tp.choTai && tp.choTai({ ok: true, duongDan: `/tam/${id}.mp3`, mime: 'audio/mpeg' });
+      return { ok: true, moKhoa: true, cach: 'mo-khoa' };
+    }
+    if (/thongBao\(\)|hetLuotTai\(\)|cauHetLuot\(/.test(bt)) return '';
+    return { ok: false };
+  };
+  return { tp, goi };
+}
+function luongSunoGia(tp, goi, nhatKy) {
+  const { LuongSuno } = require('../src/main/luong-suno');
+  const l = new LuongSuno({ id: 'S1', taiKhoan: { id: 'suno-1' }, wc: {}, nguon: '', url: 'x', log: (m, c) => nhatKy.push(`[${m}] ${c}`),
+    choTaiVe: () => { let res; const hua = new Promise((r) => { res = r; }); tp.choTai = res; return { hua, huy: () => {}, daBatDau: () => false }; } });
+  l.goi = goi; l.moTrang = async () => {}; l.ngu = async () => true;
+  return l;
+}
+const ctxSuno = (j) => ({ choToiDaGiay: 600, choGui: async () => {}, capNhat: (t) => Object.assign(j, t) });
+
+testAsync('1.2.4 Suno tải hỏng → nạp lại trang, tải lại ĐÚNG bài đã tạo, không bấm Create lần nữa', async () => {
+  const nhatKy = [];
+  const { tp, goi } = sunoGia({ cu: ['cu-1', 'cu-2'], taiHong: 1 });
+  const j = { so: 348, prompt: 'lofi' };
+  const r = await luongSunoGia(tp, goi, nhatKy)._chay(j, ctxSuno(j), 0);
+  assert.ok(r.ok, JSON.stringify(r) + '\n' + nhatKy.join('\n'));
+  assert.strictEqual(tp.tao, 1, 'chỉ bấm Create MỘT lần');
+  assert.deepStrictEqual(tp.taiMp3, ['moi1-2', 'moi1-2'], 'tải lại đúng bài dài hơn trong 2 bài mới');
+  assert.ok(nhatKy.some((x) => /tải lại bài này \(lần 2\/3\), không gửi lại prompt/.test(x)), nhatKy.join('\n'));
+  assert.ok(nhatKy.some((x) => /Suno đang tạo 4 bài \(moi1-1, moi1-2, moi1-3, moi1-4\)/.test(x)), nhatKy.join('\n'));
+  assert.deepStrictEqual(j.sunoBai, { tk: 'suno-1', ids: ['moi1-1', 'moi1-2'] }, 'nhớ bài của việc trên tài khoản này');
+});
+
+testAsync('1.2.4 Suno tải hỏng cả 3 lần → việc lỗi; lần chạy sau ở CÙNG tài khoản tải lại bài cũ, KHÔNG gửi lại prompt; tài khoản khác thì tạo mới', async () => {
+  const nhatKy = [];
+  const { tp, goi } = sunoGia({ cu: ['cu-1'], taiHong: 3 });
+  const j = { so: 348, prompt: 'lofi' };
+  const l = luongSunoGia(tp, goi, nhatKy);
+  let r = await l._chay(j, ctxSuno(j), 0);
+  assert.ok(!r.ok && /hop-khong-co-nut-download/.test(r.loi) && !r.hetLuot, JSON.stringify(r));
+  assert.strictEqual(tp.tao, 1);
+  r = await l._chay(j, ctxSuno(j), 0);
+  assert.ok(r.ok && tp.tao === 1, `lần sau không bấm Create (đã bấm ${tp.tao} lần)`);
+  assert.ok(nhatKy.some((x) => /dùng lại 2 bài đã tạo lần trước \(moi1-1, moi1-2\) — không gửi lại prompt/.test(x)), nhatKy.join('\n'));
+  // Bài của tài khoản khác → không dùng được ở đây, tạo mới.
+  const j2 = { so: 349, prompt: 'jazz', sunoBai: { tk: 'suno-2', ids: ['moi1-1'] } };
+  r = await l._chay(j2, ctxSuno(j2), 0);
+  assert.ok(r.ok && tp.tao === 2, 'bài ở tài khoản khác → tạo mới ở tài khoản này');
+});
+
+testAsync('1.2.4 Suno: danh sách bài nạp muộn → KHÔNG tính bài cũ là bài mới (nhật ký: "Suno đang tạo 14 bài")', async () => {
+  const nhatKy = [];
+  const { tp, goi } = sunoGia({ cu: ['c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8', 'c9', 'c10'], dsTre: 4 });
+  const j = { so: 349, prompt: 'x' };
+  const r = await luongSunoGia(tp, goi, nhatKy)._chay(j, ctxSuno(j), 0);
+  assert.ok(r.ok, JSON.stringify(r));
+  assert.ok(nhatKy.some((x) => /Suno đang tạo 4 bài/.test(x)) && !nhatKy.some((x) => /đang tạo 14 bài/.test(x)), nhatKy.join('\n'));
+  assert.deepStrictEqual(tp.taiMp3, ['moi1-2']);
+});
+
+test('1.2.4 Suno: nhận nút "Unlock & Download" và nút "Download “<tên bài>”" sau khi mở khoá; Tạo lại bỏ bài đã nhớ', () => {
+  const vm = require('vm');
+  const ctx = { window: {} };
+  vm.runInNewContext(docNguon('src/inject/suno-trang.js', true), ctx);
+  assert.strictEqual(typeof ctx.window.__suno.bamTaiSauMoKhoa, 'function');
+  const t = docNguon('src/inject/suno-trang.js');
+  const NUT = eval(t.match(/nutTai: (\/.*\/i),/)[1]), SAU = eval(t.match(/nutTaiSauMoKhoa: (\/.*\/i),/)[1]);
+  for (const c of ['Download', 'Unlock & Download', 'Unlock and Download', 'Tải xuống']) assert.ok(NUT.test(c), c);
+  for (const c of ['Download all', 'Downloads', "Download 'First Light in the Room'", 'Unlock']) assert.ok(!NUT.test(c), c);
+  assert.ok(SAU.test('Download “First Light in the Room”') && !SAU.test('Download') && !SAU.test('Downloads'));
+  const dp = docNguon('src/main/dieu-phoi.js');
+  assert.ok(/sunoBai: null/.test(dp.slice(dp.indexOf('taoLai(ids) {'), dp.indexOf('taoLai(ids) {') + 600)), 'Tạo lại phải bỏ sunoBai');
+});
+
 test('Suno: giao diện có mục Tạo nhạc, nút Thêm Suno, ô chờ tối đa; trang nhạc ẩn phần chỉ dành cho ảnh / video', () => {
   const h = docNguon('src/ui/index.html'), a = docNguon('src/ui/app.js'), c = docNguon('src/ui/style.css');
   assert.ok(/data-trang="nhac"[\s\S]{0,80}data-icon="music"/.test(h));
