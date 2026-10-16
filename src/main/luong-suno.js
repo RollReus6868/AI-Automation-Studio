@@ -16,7 +16,7 @@
 
 const CHO_BAI_MOI_MS = 60000;     // bấm Create mà chừng này chưa thấy bài mới → đọc lý do Suno báo
 const CHO_CAPTCHA_MS = 5 * 60000;
-const CHO_TAI_MS = 60000;
+const CHO_TAI_MS = 240000;      // Unlock & Download → "Preparing..." ~40 s (video 16/10/2026) rồi mới có file
 const CHO_DS_MS = 15000;          // chờ danh sách bài của trang Create nạp xong (tài khoản trống: thôi chờ sau chừng này)
 const SO_LAN_TAI = 3;             // tải hỏng → nạp lại trang, tải lại ĐÚNG bài đó (không gửi lại prompt)
 const CHO_SAU_MO_KHOA_MS = 5000;  // sau "Unlock & Download" chừng này chưa có file → bấm nút "Download “<tên bài>”" nếu có
@@ -138,6 +138,8 @@ class LuongSuno {
     }
 
     if (!ids) {
+      // Hết credit trong ngày: nút Create ghi "Create again in 9:44:35" → tài khoản nghỉ tới lúc đó, bài sang tài khoản khác.
+      { const h = await this.goi('window.__suno.hetGioTao()').catch(() => null); if (h && h.chu) return this._hetGioTao(h); }
       const cb = await this.goi(`window.__suno.chuanBi(${JSON.stringify({ styles: job.prompt })})`);
       if (!cb || !cb.ok) return { ok: false, loi: `Không điền được prompt vào ô Styles của Suno (${cb ? cb.loi : '?'})` };
       if (cb.coLoi) this.log('warning', `[${this.id}] #${job.so}: ô Lời của Suno còn chữ cũ, không xoá được — bài có thể có lời`);
@@ -148,6 +150,7 @@ class LuongSuno {
       if (this.huy !== huyLuc) return { ok: false, dung: true };
       ctx.capNhat({ buoc: 'Đang gửi prompt' });
       const bt = await this.goi('window.__suno.bamTao()');
+      if (bt && bt.hetGioTao && bt.hetGioTao.chu) return this._hetGioTao(bt.hetGioTao);
       if (!bt || !bt.ok) {
         const tb = await this._thongBaoMoi(tbGoc) || (bt && bt.chu);
         { const c = await this._laHetLuot(tb); if (c) return { ok: false, hetLuot: true, loi: `Suno hết lượt tạo bài: "${c}"` }; }
@@ -209,6 +212,10 @@ class LuongSuno {
     return kq;
   }
 
+  _hetGioTao(h) {
+    return { ok: false, hetLuot: true, nghiMs: (Math.max(0, h.giay) + 60) * 1000, loi: `Suno hết credit tạo bài: "${h.chu}"` };
+  }
+
   /**
    * Chờ danh sách bài của trang Create nạp xong: có bài và giữ nguyên ~1,5 s (tài khoản chưa có bài nào thì
    * thôi chờ sau CHO_DS_MS). Trả danh sách, null = bị dừng.
@@ -238,9 +245,10 @@ class LuongSuno {
       if (tm && tm.hetLuotTai) return { ok: false, hetLuot: true, loi: `Suno hết lượt tải về: "${tm.chu || 'Out of Downloads'}"` };
       const tbLoi = tbSauBam || (tm && tm.chu) || '';
       { const c = await this._laHetLuot(tbSauBam) || await this._laHetLuot(tm && tm.chu); if (c) return { ok: false, hetLuot: true, loi: `Suno hết lượt tải về: "${c}"` }; }
-      return { ok: false, loi: `Không bấm được Download của Suno (${tm ? tm.loi : '?'}${tm && tm.menu ? ` · menu: ${tm.menu.join(' | ')}` : ''}${tbLoi ? ` · Suno: "${tbLoi.slice(0, 200)}"` : ''})` };
+      return { ok: false, loi: `Không bấm được Download của Suno (${tm ? tm.loi : '?'}${tm && tm.nut ? ` · nút ${tm.nut}` : ''}${tm && tm.menu ? ` · menu: ${tm.menu.join(' | ')}` : ''}${tbLoi ? ` · Suno: "${tbLoi.slice(0, 200)}"` : ''})` };
     }
-    if (tm.moKhoa) this.log('info', `[${this.id}] Đã bấm "Unlock & Download" của Suno (mở khoá bài = trừ 1 lượt tải của tài khoản)`);
+    if (tm.moKhoa) this.log('info', `[${this.id}] Đã bấm "Unlock & Download" của Suno (mở khoá bài = trừ 1 lượt tải của tài khoản)${tm.dangChuanBi ? ' — Suno đang chuẩn bị file (Preparing…), chờ tải về' : ''}`);
+    else if (tm.cach === 'dang-chuan-bi') this.log('info', `[${this.id}] Bài đã mở khoá, Suno đang chuẩn bị file (Preparing…) — chờ tải về`);
     // Chờ file; trong lúc chờ, Suno báo hết lượt tải (toast vài giây) thì thôi chờ ngay.
     let f = null, tbTai = tbSauBam, daBamLai = false;
     const batDau = Date.now();

@@ -69,6 +69,11 @@
     moKhoa: /^(unlock|mở khoá|mở khóa)/i,
     // Sau khi mở khoá, Suno có thể đổi hộp sang nút "Download “<tên bài>”" (chuỗi modal.downloadSuccessButton).
     nutTaiSauMoKhoa: /^(download|tải xuống|tải về)\s*[“"'‘«]/i,
+    // Bấm "Unlock & Download" xong: nút đổi thành "Preparing..." (mờ) ~40 s rồi Suno tự tải file và đóng hộp
+    // (video người dùng 16/10/2026).
+    dangChuanBi: /^(preparing|đang chuẩn bị)/i,
+    // Hết credit trong ngày: nút Create đổi chữ thành "Create again in 9:44:35" (đếm ngược tới lúc nạp lại).
+    choTaoLai: /(create again in|tạo lại sau)\s*((\d+:)?\d+:\d+)/i,
     // Suno báo hết lượt tạo / tải: hết credit, chạm giới hạn, mời nâng cấp gói…
     hetLuot: /credit|limit|quota|upgrade|subscribe|subscription|out of|not enough|insufficient|reached|pro plan|premier|downloads? left|hết lượt|hết credit|giới hạn|nâng cấp/i,
     // Hộp "Out of Downloads" (ảnh người dùng gửi 15/10/2026): "You don't have any downloads left. Subscribe…".
@@ -168,8 +173,22 @@
     return { ok: true, coLoi: !!(l && chu(l) && !/start writing lyrics/i.test(chu(l))) };
   }
 
+  /**
+   * Hết credit tạo bài: nút Create ghi "Create again in 9:44:35" (video người dùng 16/10/2026).
+   * Trả { chu, giay } (số giây còn phải chờ) hoặc null.
+   */
+  function hetGioTao() {
+    const b = $$('button[aria-label="Create song"]').find(nhinThay) ||
+      $$('button').find((x) => nhinThay(x) && NHAN.choTaoLai.test(chu(x)) && !x.closest('[data-testid="clip-row"]'));
+    const m = b && chu(b).match(NHAN.choTaoLai);
+    if (!m) return null;
+    const giay = m[2].split(':').reduce((t, x) => t * 60 + (+x || 0), 0);
+    return { chu: chu(b).slice(0, 60), giay };
+  }
+
   /** Bấm Create (chờ nút bật tối đa 10 giây). */
   async function bamTao() {
+    { const h = hetGioTao(); if (h) return { ok: false, loi: 'het-credit', hetGioTao: h, chu: h.chu }; }
     for (let i = 0; i < 40; i++) {
       const b = nutTao();
       if (b && !tatCa(b)) { bam(b); return { ok: true }; }
@@ -249,16 +268,43 @@
     const chuHop = dongChu(hop).join(' · ').slice(0, 400);
     const oMp3 = $$('button, [role="button"], [role="radio"], [role="option"], label', hop).find((e) => nhinThay(e) && dungChu(e, /^mp3$/i));
     if (oMp3 && oMp3.getAttribute('aria-checked') !== 'true' && oMp3.getAttribute('aria-selected') !== 'true') { bam(oMp3); await ngu(300); }
-    const nutTai = $$('button', hop).filter((b) => nhinThay(b) && dungChu(b, NHAN.nutTai)).pop();
-    if (!nutTai) return { ok: false, loi: 'hop-khong-co-nut-download', buoc: 'hop', chu: chuHop };
-    if (tatCa(nutTai)) return { ok: false, loi: 'nut-download-bi-tat', buoc: 'hop', chu: chuHop };
+    // Hộp vừa mở: nút "Unlock & Download" còn MỜ và ô "Downloads" chưa có số trong lúc Suno nạp lượt tải
+    // (nhật ký 16/10/2026: 1.2.4 bấm ngay nên báo "nut-download-bi-tat" mãi). Chờ nút sáng, tối đa 30 s.
+    // Nút ghi "Preparing..." = bài đã mở khoá, Suno đang chuẩn bị file → chỉ cần chờ file về.
+    const timNut = () => {
+      const h = hopTai() || hop;
+      return $$('button', h).filter((b) => nhinThay(b) && (dungChu(b, NHAN.nutTai) || NHAN.dangChuanBi.test(chu(b)))).pop();
+    };
+    let nutTai = timNut();
+    for (let i = 0; i < 60 && (!nutTai || tatCa(nutTai)) && !(nutTai && NHAN.dangChuanBi.test(chu(nutTai))); i++) {
+      await ngu(500);
+      nutTai = timNut();
+      if (!nutTai && !hopTai()) break;   // hộp tự đóng
+    }
+    const chuHop2 = dongChu(hopTai() || hop).join(' · ').slice(0, 400) || chuHop;
+    if (nutTai && NHAN.dangChuanBi.test(chu(nutTai))) return { ok: true, cach: 'dang-chuan-bi', dangChuanBi: true, chu: chuHop2 };
+    if (!nutTai) return { ok: false, loi: 'hop-khong-co-nut-download', buoc: 'hop', chu: chuHop2 };
+    if (tatCa(nutTai)) return { ok: false, loi: 'nut-download-bi-tat', buoc: 'hop', chu: chuHop2, nut: moTaNut(nutTai) };
     const moKhoa = NHAN.moKhoa.test(chu(nutTai));
     bam(nutTai);
     await ngu(800);
+    const sau = timNut();
     // Có bản Suno chỉ báo "Out of Downloads" sau khi bấm nút Download trong hộp.
     const het2 = hetLuotTai();
     if (het2) return { ok: false, hetLuotTai: true, loi: 'het-luot-tai', buoc: 'hop', chu: het2 };
-    return { ok: true, cach: moKhoa ? 'mo-khoa' : 'hop', moKhoa, chu: chuHop };
+    return { ok: true, cach: moKhoa ? 'mo-khoa' : 'hop', moKhoa, dangChuanBi: !!(sau && NHAN.dangChuanBi.test(chu(sau))), chu: chuHop };
+  }
+
+  /** Mô tả ngắn một nút (chữ + thuộc tính) cho nhật ký khi bấm không được. */
+  function moTaNut(b) {
+    const tt = [...b.attributes].filter((a) => !/^(class|style|id)$/.test(a.name)).map((a) => a.value ? `${a.name}="${a.value.slice(0, 30)}"` : a.name);
+    return `"${chu(b).slice(0, 40)}" ${tt.join(' ')}`.slice(0, 200);
+  }
+
+  /** Hộp Download đang "Preparing..." (Suno đang chuẩn bị file sau khi mở khoá)? */
+  function dangChuanBi() {
+    const h = hopTai();
+    return !!(h && $$('button', h).some((b) => nhinThay(b) && NHAN.dangChuanBi.test(chu(b))));
   }
 
   /** Sau "Unlock & Download": hộp đổi sang nút "Download “<tên bài>”" mà chưa tải → bấm nút đó (một lần). */
@@ -279,7 +325,7 @@
     return true;
   }
 
-  window.__suno = { phienBan: 1, trangThai, dsClip, chuanBi, bamTao, taiMp3, bamTaiSauMoKhoa, dongHop, hetLuotTai, thongBao, captcha,
+  window.__suno = { phienBan: 1, trangThai, dsClip, chuanBi, bamTao, taiMp3, bamTaiSauMoKhoa, dongHop, dangChuanBi, hetGioTao, hetLuotTai, thongBao, captcha,
     laHetLuot: (t) => NHAN.hetLuot.test(String(t || '')),
     // Chỉ câu nói về hết lượt (hộp Download có cả tên bài, các định dạng… — không đưa hết vào nhật ký).
     cauHetLuot: (t) => String(t || '').split(/ · |(?<=[.!?])\s+/).filter((c) => NHAN.hetLuot.test(c)).join(' ').slice(0, 200) };

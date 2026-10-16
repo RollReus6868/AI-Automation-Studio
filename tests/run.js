@@ -1209,7 +1209,7 @@ test('Suno: câu báo hết lượt — nhận hộp Out of Downloads / toast h�
   assert.ok(/function hopTai\(\)/.test(t) && /dungChu\(e, \/\^mp3\$\/i\)/.test(t) && /NHAN\.nutTai/.test(t), 'tải: hộp chọn định dạng → ô MP3 → nút Download');
 });
 // ── 1.2.4: nhật ký 16/10/2026 — hộp Download có nút "Unlock & Download"; tải hỏng thì app GỬI LẠI prompt ──
-function sunoGia({ cu = [], taiHong = 0, dsTre = 0 } = {}) {
+function sunoGia({ cu = [], taiHong = 0, dsTre = 0, hetGio = null } = {}) {
   // Trang Suno giả ở mức lệnh window.__suno.*: danh sách bài, Create đẻ 4 bài (đang tạo → xong sau vài lần hỏi).
   const tp = { ds: cu.map((id) => ({ id, trangThai: 'complete', giay: 180 })), tao: 0, taiMp3: [], dsGoi: 0, taiHong };
   const goi = async (bt) => {
@@ -1222,6 +1222,7 @@ function sunoGia({ cu = [], taiHong = 0, dsTre = 0 } = {}) {
       return tp.ds.map((c) => ({ ...c }));
     }
     if (/chuanBi\(/.test(bt)) return { ok: true };
+    if (/hetGioTao\(\)/.test(bt)) return hetGio;
     if (/bamTao\(\)/.test(bt)) {
       tp.tao++;
       tp.ds = [130, 170, 240, 60].map((giay, i) => ({ id: `moi${tp.tao}-${i + 1}`, trangThai: 'streaming', giay, hoi: 0 })).concat(tp.ds);
@@ -1288,6 +1289,33 @@ testAsync('1.2.4 Suno: danh sách bài nạp muộn → KHÔNG tính bài cũ l�
   assert.deepStrictEqual(tp.taiMp3, ['moi1-2']);
 });
 
+testAsync('1.2.5 Suno hết credit ("Create again in 9:44:35") → KHÔNG bấm Create, tài khoản nghỉ đúng tới giờ Suno ghi; bài đã tạo vẫn tải được', async () => {
+  const nhatKy = [];
+  const hetGio = { chu: 'Create again in 9:44:35', giay: 9 * 3600 + 44 * 60 + 35 };
+  const { tp, goi } = sunoGia({ cu: ['c1'], hetGio });
+  const j = { so: 354, prompt: 'x' };
+  const l = luongSunoGia(tp, goi, nhatKy);
+  let r = await l._chay(j, ctxSuno(j), 0);
+  assert.ok(!r.ok && r.hetLuot && /Suno hết credit tạo bài: "Create again in 9:44:35"/.test(r.loi), JSON.stringify(r));
+  assert.strictEqual(r.nghiMs, (hetGio.giay + 60) * 1000);
+  assert.strictEqual(tp.tao, 0, 'không bấm Create khi Suno ghi "Create again in"');
+  // Bài đã tạo trước đó (tải hỏng) vẫn tải lại được dù hết credit tạo bài.
+  const j2 = { so: 353, prompt: 'y', sunoBai: { tk: 'suno-1', ids: ['c1'] } };
+  r = await l._chay(j2, ctxSuno(j2), 0);
+  assert.ok(r.ok && tp.tao === 0 && tp.taiMp3.join() === 'c1', JSON.stringify(r));
+  // Điều phối: tài khoản nghỉ theo nghiMs của luồng (không phải 6 giờ cố định).
+  const NGHI = 3 * 3600e3;
+  const { dp, tk } = dungDieuPhoi({ taoLuong: (a, stt) => (a.nen === 'suno' ? { id: `${a.id}-${stt}`, nen: 'suno', ranh: true, viec: null, dung() {},
+    async chay() { await new Promise((x) => setTimeout(x, 5)); return { ok: false, hetLuot: true, nghiMs: NGHI, loi: 'Suno hết credit tạo bài: "Create again in 2:59:00"' }; } } : luongGiaHaiNen([])(a, stt)) });
+  dp.datCaiDat({ nghiGiuaLanGui: 0, tuThuLai: 0, tuChayLaiLoi: 0 });
+  dp.them({ loai: 'nhac', prompts: ['a'] });
+  dp.chayTatCa();
+  await chayHet(dp);
+  const a1 = tk.tim('suno-1');
+  assert.ok(Math.abs(a1.hetLuotDen - (Date.now() + NGHI)) < 60e3, `nghỉ ~3 giờ (còn ${((a1.hetLuotDen - Date.now()) / 3600e3).toFixed(2)} giờ)`);
+  assert.ok(/Create again in/.test(a1.lyDoHetLuot));
+});
+
 test('1.2.4 Suno: nhận nút "Unlock & Download" và nút "Download “<tên bài>”" sau khi mở khoá; Tạo lại bỏ bài đã nhớ', () => {
   const vm = require('vm');
   const ctx = { window: {} };
@@ -1298,6 +1326,10 @@ test('1.2.4 Suno: nhận nút "Unlock & Download" và nút "Download “<tên b�
   for (const c of ['Download', 'Unlock & Download', 'Unlock and Download', 'Tải xuống']) assert.ok(NUT.test(c), c);
   for (const c of ['Download all', 'Downloads', "Download 'First Light in the Room'", 'Unlock']) assert.ok(!NUT.test(c), c);
   assert.ok(SAU.test('Download “First Light in the Room”') && !SAU.test('Download') && !SAU.test('Downloads'));
+  // 1.2.5 (video 16/10/2026): nút "Preparing..." sau Unlock; nút Create "Create again in 9:44:35" khi hết credit.
+  const CB = eval(t.match(/dangChuanBi: (\/.*\/i),/)[1]), TL = eval(t.match(/choTaoLai: (\/.*\/i),/)[1]);
+  assert.ok(CB.test('Preparing...') && CB.test('Preparing…') && !CB.test('Unlock & Download'));
+  assert.ok(TL.test('Create again in 9:44:35') && TL.exec('Create again in 9:44:35')[2] === '9:44:35' && TL.test('Create again in 05:12') && !TL.test('Create'));
   const dp = docNguon('src/main/dieu-phoi.js');
   assert.ok(/sunoBai: null/.test(dp.slice(dp.indexOf('taoLai(ids) {'), dp.indexOf('taoLai(ids) {') + 600)), 'Tạo lại phải bỏ sunoBai');
 });

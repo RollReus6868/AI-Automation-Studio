@@ -61,13 +61,16 @@
     const adv = $('#tabAdv').getAttribute('aria-selected') === 'true';
     $('#simple').hidden = adv; $('#adv').hidden = !adv;
     if ($('#styles').value.trim()) $('#nutTao').removeAttribute('data-disabled'); else $('#nutTao').setAttribute('data-disabled', '');
+    // Video người dùng 16/10/2026: hết credit trong ngày → nút Create đổi chữ "Create again in 9:44:35" (đếm ngược
+    // tới 0h UTC), aria-label vẫn "Create song", bấm không tạo gì.
+    $('#nutTao').textContent = (cauHinh.choTaoLai || []).includes(tk) ? 'Create again in 9:44:35' : 'Create';
   }
   $('#styles').addEventListener('input', veForm);
   $('#nutXoa').onclick = () => { $('#styles').value = ''; $('#loi').textContent = ''; veForm(); };
   function toast(chu) { const t = $('#suno-toast-viewport-bottom'); t.textContent = chu; clearTimeout(toast.h); toast.h = setTimeout(() => { t.textContent = ''; }, 8000); }
 
   $('#nutTao').onclick = async () => {
-    if ($('#nutTao').hasAttribute('data-disabled')) return;
+    if ($('#nutTao').hasAttribute('data-disabled') || /again/.test($('#nutTao').textContent)) return;
     const r = await (await fetch('/__suno-tao', { method: 'POST', body: JSON.stringify({
       tk, styles: $('#styles').value, loi: $('#loi').innerText.trim(), cheDo: $('#tabAdv').getAttribute('aria-selected') === 'true' ? 'advanced' : 'simple'
     }) })).json();
@@ -82,6 +85,7 @@
     // Lần nạp đầu có thể chậm (máy chủ giữ lại treoDs ms) — như Suno thật: form hiện trước, danh sách bài nạp sau.
     const r = await (await fetch('/__suno-ds?tk=' + encodeURIComponent(tk) + (lanNap++ ? '' : '&dau=1'))).json();
     cauHinh = r;
+    veForm();
     const html = r.clips.map((c) => `<div data-testid="clip-row" data-clip-status="${c.trangThai}" aria-label="${c.ten}">
         <div class="bia">${c.trangThai === 'complete' ? `<span>${mmss(c.giay)}</span>` : ''}</div>
         <a href="/song/${c.id}">${c.ten}</a>${c.thu ? '<small>Upgrade for full song</small>' : ''}
@@ -127,7 +131,21 @@
     // moKhoa === 'nut': bấm Unlock chỉ mở khoá ("Unlocking song...") rồi hộp đổi sang nút "Download “<tên>”" — phải bấm tiếp.
     const daMo = () => (cauHinh.daMo || []).includes(id);
     let dangMo = false;
+    // moKhoa === 'chuanBi' (video người dùng 16/10/2026, Suno thật): mở hộp → nút "Unlock & Download" mờ và ô
+    // "Downloads" chưa có số trong tatMs ms; bấm → nút "Preparing..." mờ, ô MP3 quay vòng, chân hộp "You've
+    // unlocked this song…"; ~40 s sau Suno tự tải file và đóng hộp (ở đây chuanBiMs).
+    const CB = cauHinh.moKhoa === 'chuanBi';
+    let sanSang = !CB || !cauHinh.tatMs, chuanBi = false;
+    if (!sanSang) setTimeout(() => { sanSang = true; if (c.isConnected) ve(); }, cauHinh.tatMs);
     const ve = () => {
+      if (CB && !hong) {
+        c.innerHTML = `<button aria-label="Close" data-dong>✕</button><h2>Download 'Bai ${id}'</h2>` +
+          ['M4A', 'MP3', 'WAV', 'MP4 video asset'].map((d) => `<button data-dd="${d}">${d}${d === dinhDang ? (chuanBi ? '<span aria-busy="true"></span>' : ' ✓') : ''}</button>`).join('') +
+          `<div><span>Stems &amp; MIDI</span> <button>Manage</button></div>` +
+          (chuanBi ? '<button data-tai-ve data-disabled="" disabled>Preparing...</button><p>You\'ve unlocked this song. You can return and download at any time. Learn more.</p>'
+            : `<button data-tai-ve ${sanSang ? '' : 'data-disabled="" disabled'}>Unlock &amp; Download</button><div><div>Plan<br>Free</div><div>Downloads<br>${sanSang ? '5' : ''}</div></div>`);
+        return;
+      }
       if (hong) { c.innerHTML = `<button aria-label="Close" data-dong>✕</button><h2>Download 'Bai ${id}'</h2><p>Loading…</p>`; return; }
       if (cauHinh.moKhoa === 'nut' && daMo() && dangMo) {
         c.innerHTML = `<button aria-label="Close" data-dong>✕</button><h2>Download 'Bai ${id}'</h2><button data-tai-ve>Download “Bai ${id}”</button>`;
@@ -145,6 +163,17 @@
       if (d) { dinhDang = d.dataset.dd; ve(); return; }
       if (e.target.closest('[data-dong]')) { c.remove(); return; }
       const b = e.target.closest('[data-tai-ve]');
+      if (b && !b.hasAttribute('data-disabled') && CB) {
+        chuanBi = true; ve();
+        fetch('/__suno-mo-khoa/' + id, { method: 'POST' });
+        setTimeout(() => {
+          const a = document.createElement('a');
+          a.href = '/__suno-mp3/' + id + '?dd=' + encodeURIComponent(dinhDang); a.download = '';
+          document.body.appendChild(a); a.click(); a.remove();
+          c.remove();
+        }, cauHinh.chuanBiMs || 0);
+        return;
+      }
       if (b && !b.hasAttribute('data-disabled') && cauHinh.moKhoa === 'nut' && !daMo()) {
         b.textContent = 'Unlocking song...';
         fetch('/__suno-mo-khoa/' + id, { method: 'POST' }).then(() => nap()).then(() => { dangMo = true; ve(); });

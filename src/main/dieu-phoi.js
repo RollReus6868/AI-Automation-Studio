@@ -720,7 +720,7 @@ class DieuPhoi {
       // → _vong tạm dừng hàng chờ.
       const tkId = j.taiKhoan;
       Object.assign(j, { trangThai: 'cho', buoc: '', loi: r.loi, thread: '' });
-      if (tk) this.o.taiKhoan.sua(tkId, { hetLuotDen: Date.now() + NGHI_HET_LUOT_MS, lyDoHetLuot: r.loi });
+      if (tk) this.o.taiKhoan.sua(tkId, { hetLuotDen: Date.now() + (r.nghiMs > 0 ? r.nghiMs : NGHI_HET_LUOT_MS), lyDoHetLuot: r.loi });
       this.lyDoNghi[tkId] = r.loi;
       const sang = hd.taiKhoanChoViec({ tkLoi: [] }, this._dsTk(j.duAn, j.nen), (id) => this._nghi(id));
       this.log('warning', `↪ #${j.so} ${r.loi} (ở "${this._tenTk(tkId)}")${sang ? ` — tạo lại ở "${this._tenTk(sang)}"` : ' — không còn tài khoản dự phòng nào còn lượt'}`);

@@ -1,4 +1,13 @@
-# AI Automation Studio 1.2.4
+# AI Automation Studio 1.2.5
+
+- **Sửa lỗi Suno vẫn không tải được** (nhật ký 16/10/2026 tối: *"Không bấm được Download của Suno (nut-download-bi-tat …)"* ở mọi bài). Theo video bạn quay:
+  - Hộp *Download* vừa mở thì nút **Unlock & Download** còn **mờ** vài giây (Suno đang nạp số lượt tải, ô *Downloads* chưa có số). Bản 1.2.4 bấm ngay lúc nút còn mờ nên báo lỗi. Giờ app **chờ nút sáng** (tối đa 30 giây) rồi mới bấm.
+  - Bấm xong, nút đổi thành **"Preparing..."** khoảng 40 giây rồi Suno mới tự tải file MP3 và đóng hộp. Giờ app chờ tới **4 phút** cho file về (trước 1 phút). Nhật ký ghi *Suno đang chuẩn bị file (Preparing…), chờ tải về*.
+- **Suno hết credit trong ngày**: nút Create đổi thành *"Create again in 9:44:35"* (nhật ký cũ: *"Bấm Create nhưng Suno không tạo bài nào"* ×3). Giờ app nhận ra ngay, **không bấm Create**, cho tài khoản đó nghỉ **đúng tới giờ Suno ghi** rồi tạo bài ở tài khoản Suno dự phòng; hết tài khoản thì tạm dừng hàng chờ. Bài đã tạo xong mà chưa tải vẫn tải tiếp được ở tài khoản đó.
+
+Lưu ý: đã kiểm trên trang Suno giả dựng lại theo video của bạn, chưa chạy trên suno.com thật. Mỗi lần *Unlock* vẫn trừ 1 lượt tải của tài khoản.
+
+## Bản 1.2.4
 
 - **Sửa lỗi Suno gửi nhiều prompt một lúc mà không tải được bài nào** (nhật ký 16/10/2026: *"Không bấm được Download của Suno (hop-khong-co-nut-download … Unlock & Download …)"* rồi *"Suno đang tạo 14 bài"*). Có ba chỗ hỏng:
   - Hộp *Download* của Suno đã đổi nút to thành **"Unlock & Download"** (kèm chân hộp *Plan Free · Downloads 7*). Bản 1.2.3 chỉ nhận nút tên đúng "Download" nên báo không có nút. Giờ app bấm được **Unlock & Download**; nếu Suno mở khoá xong lại hiện nút *Download "<tên bài>"* thì app bấm tiếp nút đó. Lưu ý: mỗi lần Unlock trừ **1 lượt tải** của tài khoản Suno (tài khoản free trong ảnh còn 7).
