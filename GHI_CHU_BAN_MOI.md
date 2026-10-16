@@ -9,6 +9,12 @@
   - *Thử lại cùng tài khoản* mặc định còn 1 lần (trước 2) — lỗi là sang tài khoản khác thay vì gõ mãi một tài khoản. Nếu bạn đã tự đặt số khác, app giữ nguyên số của bạn.
 - **Bỏ khỏi Cài đặt → Google Flow** (không còn hợp kiểu chạy mới): công tắc *Bật chế độ an toàn* (giờ luôn bật), *trong (phút)*, *Nghỉ tối đa*, *Bị chặn lại thì nghỉ gấp đôi* (giờ tự động), *Giải lao sau mỗi … prompt* và *Giải lao (phút)* (nghỉ giải lao giữ việc đứng chờ trong khi tài khoản khác chạy được).
 
+- **Mục Tài khoản tách riêng Muse / Flow / Suno**: ba thẻ ở đầu danh sách (kèm số tài khoản mỗi nơi), mỗi thẻ chỉ hiện tài khoản và nút *Thêm* của nơi đó; app nhớ thẻ bạn mở lần trước.
+- **Sửa theo nhật ký 16/10/2026:**
+  - Flow tạo xong mà **tải về bị kẹt** ("Chờ 120s mà Google chưa xuất file" lặp ~16 phút ở cùng một tài khoản): giờ quá **5 phút** chưa tải được là app bỏ, việc chạy lại ở tài khoản khác, và tính là một lỗi của tài khoản đó.
+  - Thẻ lỗi Flow ghi "hoạt động bất thường" (Flow 4 trong nhật ký) → đổi tài khoản ngay, không thử lại 3 lần như trước.
+  - Muse trả lời **"lỗi 403 / tạo video không khả dụng tại khu vực này"** (Muse 3 trong nhật ký): app nhận ra ngay (không chờ 2 phút), tài khoản đó thôi nhận **video** 60 phút (ảnh vẫn chạy), video chuyển ngay sang tài khoản Muse khác.
+
 Lưu ý: phần mới được kiểm trên trang Muse / Flow giả. Lần đầu hãy chạy vài prompt với 2 tài khoản cùng lúc và xem Nhật ký.
 
 ## Bản 1.1.3

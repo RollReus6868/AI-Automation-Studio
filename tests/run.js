@@ -925,6 +925,45 @@ testAsync('1.2.0 tắt "Flow hỏng → Muse": ảnh Flow không sang Muse', asy
   assert.ok(dp.viec.every((j) => j.nen === 'flow' && j.trangThai === 'loi'), dp.viec.map((j) => j.trangThai + j.nen).join());
   assert.ok(!daChay.some((x) => Array.isArray(x)), 'không tài khoản Muse nào chạy');
 });
+test('nhật ký 16/10/2026: Muse báo chặn 403 / chặn khu vực → nhận ra là lỗi TÀI KHOẢN', () => {
+  assert.ok(HD.laChanKhuVuc('Block vẫn còn (lỗi 403, tạo video không khả dụng tại khu vực này). Ảnh + prompt đã lưu vào hàng chờ, sẽ chạy lại khi block được gỡ.'));
+  assert.ok(HD.laChanKhuVuc('Đã lưu request vào hàng đợi (44 video chờ). Video vẫn bị chặn khu vực (lỗi 403), sẽ tạo ngay khi giới hạn được gỡ.'));
+  assert.ok(HD.laChanKhuVuc('Video generation is not available in your region yet.'));
+  for (const c of ['Bạn muốn ảnh theo phong cách nào?', 'Mình không thể tạo ảnh này vì vi phạm chính sách nội dung.', 'Khu vực biển xanh, bãi cát trắng như bạn mô tả', 'Ảnh 403 x 600 pixel', '']) {
+    assert.ok(!HD.laChanKhuVuc(c), c);
+  }
+});
+testAsync('Muse chặn video (403) ở một tài khoản → tài khoản đó thôi nhận VIDEO ngay, video sang tài khoản khác, ảnh vẫn chạy ở nó', async () => {
+  const daChay = [];
+  const taoLuong = (a, stt) => ({ id: `${a.id}-${stt}`, ranh: true, viec: null, dung() {},
+    async chay(j) {
+      this.ranh = false; this.viec = j; daChay.push([a.id, j.loai, j.so]);
+      await new Promise((r) => setTimeout(r, 10)); this.ranh = true; this.viec = null;
+      if (a.id === 'tk-1' && j.loai === 'video') return { ok: false, chanLoai: true, loi: 'Muse báo tài khoản bị chặn tạo video: "lỗi 403"' };
+      return { ok: true, files: [{ mime: j.loai === 'video' ? 'video/mp4' : 'image/png', b64: 'AA==' }] };
+    } });
+  const { dp, tk, nhatKy } = dungDieuPhoi({ taoLuong });
+  tk.them('Hai');
+  dp.datCaiDat({ luongMoiTK: 1, nghiGiuaLanGui: 0, tuThuLai: 0, tuChayLaiLoi: 0 });
+  dp.them({ loai: 'video', prompts: ['v1', 'v2', 'v3'] });
+  dp.chayTatCa();
+  await chayHet(dp);
+  assert.ok(dp.viec.every((j) => j.trangThai === 'xong' && j.taiKhoan === 'hai' && !j.thu), dp.viec.map((j) => j.trangThai + j.taiKhoan + j.thu).join());
+  assert.strictEqual(daChay.filter((x) => x[0] === 'tk-1' && x[1] === 'video').length, 1, 'chỉ phí đúng MỘT lần ở tài khoản bị chặn');
+  assert.ok(nhatKy.some((x) => /thôi nhận việc video/.test(x)));
+  assert.ok(!dp._nghi('tk-1'), 'không nghỉ cả tài khoản');
+  dp.them({ loai: 'anh', prompts: ['a1'] });
+  dp.chayTatCa();
+  await chayHet(dp);
+  assert.strictEqual(dp.viec.find((j) => j.loai === 'anh').taiKhoan, 'tk-1', 'ảnh vẫn chạy ở tài khoản chính');
+});
+test('1.2.0 mục Tài khoản: thẻ riêng Muse / Google Flow / Suno, mỗi thẻ chỉ hiện tài khoản và nút Thêm của nơi đó', () => {
+  const h = docNguon('src/ui/index.html'), a = docNguon('src/ui/app.js');
+  for (const n of ['muse', 'flow', 'suno']) assert.ok(new RegExp(`id="nenTk"[\\s\\S]*data-v="${n}"`).test(h), `thiếu thẻ ${n}`);
+  assert.ok(/class="nut-gradient nho chi-flow" id="nutThemTKFlow"/.test(h) && /class="nut-gradient nho chi-suno" id="nutThemTKSuno"/.test(h));
+  assert.ok(/S\.taiKhoan\.filter\(\(a\) => nenTk\(a\) === U\.nenTk\)/.test(a), 'danh sách chưa lọc theo thẻ đang chọn');
+  assert.ok(/nenTk: U\.nenTk/.test(a), 'thẻ đang chọn chưa được nhớ');
+});
 testAsync('Flow: lỗi mất kết nối / tạm nghỉ an toàn (daNghi) → việc về hàng chờ, không tính lần thử, không nghỉ chồng', async () => {
   const { dp } = dungDieuPhoi();
   dp.them({ nen: 'flow', loai: 'anh', prompts: ['1'] });

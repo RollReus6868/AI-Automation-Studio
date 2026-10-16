@@ -15,7 +15,7 @@
   const U = Object.assign({
     trang: 'anh', duAn: '', loc: 'tat', tim: '', moiNhat: true, cheDo: 'tudo', tyLe: { anh: '9:16', video: '9:16' },
     nhap: { anh: '', video: '', nhac: '' }, tvLoc: 'tat', tvDuAn: '', chuoi: { bat: false, prompt: '', tyLe: '', nen: '' }, promptThuMuc: '',
-    nen: { anh: 'muse', video: 'muse' }, locNen: ''
+    nen: { anh: 'muse', video: 'muse' }, locNen: '', nenTk: 'muse'
   }, docLuu());
   if (!U.nen || typeof U.nen !== 'object') U.nen = { anh: 'muse', video: 'muse' };
   if (!U.nhap || typeof U.nhap !== 'object') U.nhap = { anh: '', video: '', nhac: '' };
@@ -28,7 +28,7 @@
   function luuUi() {
     try {
       localStorage.setItem(KHOA, JSON.stringify({ trang: U.trang, duAn: U.duAn, loc: U.loc, moiNhat: U.moiNhat, cheDo: U.cheDo,
-        tyLe: U.tyLe, nhap: U.nhap, tvLoc: U.tvLoc, tvDuAn: U.tvDuAn, chuoi: U.chuoi, promptThuMuc: U.promptThuMuc, nen: U.nen, locNen: U.locNen, mauTai: U.mauTai }));
+        tyLe: U.tyLe, nhap: U.nhap, tvLoc: U.tvLoc, tvDuAn: U.tvDuAn, chuoi: U.chuoi, promptThuMuc: U.promptThuMuc, nen: U.nen, locNen: U.locNen, nenTk: U.nenTk, mauTai: U.mauTai }));
     } catch (_) {}
   }
 
@@ -629,8 +629,15 @@
   function veTaiKhoan() {
     $('#soLuongTK').textContent = S.caiDat.luongMoiTK;
     $('#soTabFlow').textContent = S.caiDat.flow.tabMoiTK;
-    const ds = [...S.taiKhoan].sort((a, b) => DS_NEN.indexOf(nenTk(a)) - DS_NEN.indexOf(nenTk(b)));
-    datHtml($('#dsTaiKhoan'), ds.map((a) => {
+    // Mỗi nơi chạy một thẻ riêng (Muse / Google Flow / Suno) cho khỏi lẫn tài khoản với nhau.
+    if (!DS_NEN.includes(U.nenTk)) U.nenTk = 'muse';
+    for (const b of $$('#nenTk button')) b.classList.toggle('on', b.dataset.v === U.nenTk);
+    for (const n of DS_NEN) {
+      $(`#nenTk [data-dem="${n}"]`).textContent = S.taiKhoan.filter((a) => nenTk(a) === n).length;
+      for (const el of $$(`.chi-${n}`)) el.hidden = n !== U.nenTk;
+    }
+    const ds = S.taiKhoan.filter((a) => nenTk(a) === U.nenTk);
+    datHtml($('#dsTaiKhoan'), ds.length ? ds.map((a) => {
       const [cls, nhan] = NHAN_TK[a.trangThai] || NHAN_TK['chua-kiem'];
       const dang = S.dangNhap && S.dangNhap.id === a.id;
       const nen = nenTk(a), flow = nen === 'flow';
@@ -650,7 +657,7 @@
             <button class="nut-vien nho do" data-tk="xoa" data-id="${esc(a.id)}" title="Xoá">${ic('trash-2')}</button>
           </div></div>
       </div>`;
-    }).join(''));
+    }).join('') : `<div class="trong">Chưa có tài khoản ${TEN_NEN[U.nenTk]} — bấm <b>Thêm ${U.nenTk === 'flow' ? 'Flow' : TEN_NEN[U.nenTk]}</b> ở trên.</div>`);
     const tk = S.dangNhap && S.taiKhoan.find((a) => a.id === S.dangNhap.id);
     $('#tieuDeDangNhap').textContent = tk ? `Đăng nhập ${TEN_NEN[nenTk(tk)]}: ${tk.ten}${nenTk(tk) === 'flow' ? ' — mở một dự án rồi bấm Xong' : ''}` : 'Đăng nhập';
     $('#nutXongDangNhap').hidden = !tk;
@@ -1087,10 +1094,12 @@
       const v = await hoi({ tieuDe: `Thêm tài khoản ${TEN_NEN[nen]}`, html: `<label>Tên gợi nhớ<input name="ten" placeholder="vd: ${TEN_NEN[nen].split(' ').pop()} 2"></label>`, ok: 'Thêm' });
       if (!v) return;
       const a = await api.call('themTaiKhoan', { ten: v.ten, nen });
+      if (a && a.id) { U.nenTk = nen; luuUi(); veTaiKhoan(); }
       if (a && a.id && await xacNhan('Đăng nhập luôn?', nen === 'flow'
         ? `Mở Google Flow để đăng nhập "${esc(a.ten)}"? Đăng nhập xong, mở (hoặc tạo) một dự án Flow rồi bấm <b>Xong</b>.`
         : `Mở ${nen === 'suno' ? 'suno.com' : 'muse.ai'} để đăng nhập "${esc(a.ten)}"?`, 'Đăng nhập')) lenhTaiKhoan('dangNhap', a.id);
     };
+    $('#nenTk').onclick = (e) => { const b = e.target.closest('[data-v]'); if (b) { U.nenTk = b.dataset.v; luuUi(); veTaiKhoan(); } };
     $('#nutThemTK').onclick = () => themTk('muse');
     $('#nutThemTKFlow').onclick = () => themTk('flow');
     $('#nutThemTKSuno').onclick = () => themTk('suno');

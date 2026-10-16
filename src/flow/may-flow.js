@@ -107,6 +107,19 @@ function taoMayFlow(o) {
         }
       }
     }
+    await xetTaiKhoan(tab);
+  }
+
+  /** Prompt tạo xong mà tải về hỏng (luồng Flow bỏ cuộc) — cũng là dấu hiệu tài khoản lỗi (nhật ký 16/10/2026:
+   *  "Chờ 120s mà Google chưa xuất file" lặp 16 phút ở cùng một tài khoản). */
+  async function ghiLoiTai(tab, chiSo) {
+    if (!tab) return;
+    soAnToanCua(tab.accountId).promptLoi.add(`${tab.id}#${tab._meKhoa || 0}#tai${chiSo}`);
+    await xetTaiKhoan(tab);
+  }
+
+  async function xetTaiKhoan(tab) {
+    const so = soAnToanCua(tab.accountId);
     if (so.dangXuLy) return;          // bảng đến dồn dập — một lần đổi / nghỉ là đủ
     const qd = anToan.canNghi(so, Date.now(), caiDatAnToan);
     if (!qd.nghi) return;
@@ -130,7 +143,9 @@ function taoMayFlow(o) {
     const so = soAnToanCua(accountId);
     if (so.dangNghi) return;
     const ds = tabCungTaiKhoan(accountId).filter((t) => t.busy);
-    if (!ds.length) return;
+    // Không còn tab nào đang chạy (các việc đã báo lỗi về điều phối, điều phối tự lo) → bỏ dấu lỗi, kẻo
+    // mẻ SAU của tài khoản này bị đổi oan ngay từ bảng đầu tiên (e2e Flow mục 10).
+    if (!ds.length) { anToan.xoaDauLoi(so); return; }
     so.soLanBiChan += 1;
     const ten = ds[0].accountName || accountId || 'tài khoản';
 
@@ -651,7 +666,7 @@ function taoMayFlow(o) {
   }
 
   return {
-    handleEngineMessage, theoDoiAnToan, datCaiDatAnToan, huyNghi, chuanBiMe, chuanBiModel, datCheDo,
+    handleEngineMessage, theoDoiAnToan, ghiLoiTai, datCaiDatAnToan, huyNghi, chuanBiMe, chuanBiModel, datCheDo,
     datModelAnh, docModel, soAnToanCua, lpChan, selectorNguoiDung, tabCungTaiKhoan, theoDoiAnhThamChieu,
     _anToan: () => caiDatAnToan
   };

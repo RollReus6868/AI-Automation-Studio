@@ -236,6 +236,19 @@ function taiKhoanChoViecDs(j, dsTk, nghi, soSong = 1) {
   return duoc.length ? [duoc[0]] : [];
 }
 
+/**
+ * Muse trả chữ báo TÀI KHOẢN bị chặn tạo loại này (nhật ký 16/10/2026: "Block vẫn còn (lỗi 403, tạo video
+ * không khả dụng tại khu vực này)…", "Video vẫn bị chặn khu vực (lỗi 403)…"). Lỗi của tài khoản chứ không
+ * phải của prompt: nhận ra NGAY (khỏi chờ choChuGiay) và cho tài khoản nghỉ loại việc đó.
+ */
+function laChanKhuVuc(chu) {
+  const t = String(chu || '').toLowerCase();
+  if (!t) return false;
+  if (/(lỗi|error|code|mã)\s*:?\s*403\b|\b403\s*(forbidden|error)/.test(t)) return true;
+  return /(khu vực|vùng|quốc gia|region|country|your area|location)/.test(t) &&
+    /(bị chặn|chặn|không khả dụng|không hỗ trợ|chưa hỗ trợ|blocked|not available|unavailable|not supported|restricted)/.test(t);
+}
+
 /** Thứ tự tự nhiên: anh2 < anh10. */
 function soSanhTuNhien(a, b) {
   return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' });
@@ -263,7 +276,7 @@ function keHoachTai(viec, tonTai) {
 
 const HD = {
   TY_LE, MAU_MAC_DINH, MAU_TEN_MAC_DINH, MAU_TEN_ANH_MAC_DINH, PROMPT_VIDEO_MAC_DINH, slugTen, tachPrompt, timNhanVat, taoTinNhan, tenFile, mimeTuDuoi, chonKhoang,
-  viecKeTiep, taiKhoanChoViec, taiKhoanChoViecDs, thoiGianDuKien, tienDoUoc, daXong, laTraLoiChu, soSanhTuNhien, keHoachTai
+  viecKeTiep, taiKhoanChoViec, taiKhoanChoViecDs, thoiGianDuKien, tienDoUoc, daXong, laTraLoiChu, laChanKhuVuc, soSanhTuNhien, keHoachTai
 };
 // Dùng chung cho tiến trình chính (require) và giao diện (<script> → window.HD).
 if (typeof module !== 'undefined' && module.exports) module.exports = HD;

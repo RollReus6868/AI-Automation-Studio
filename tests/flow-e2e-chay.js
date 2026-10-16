@@ -220,6 +220,24 @@ module.exports = function e2eFlow({ win, app, LENH, dieuPhoi, taiKhoan }) {
       kiem(v9.every((j) => j.trangThai === 'xong' && j.nen === 'muse' && j.taiKhoan === 'tk-1' && fs.existsSync(j.files[0])), 'ảnh hỏng ở Flow được tạo xong ở Muse');
       kiem(LENH.trangThai().nhatKy.slice(nk).some((d) => /🔀 Flow:.*Muse/.test(d.chu)), 'nhật ký báo chuyển sang Muse');
       await session.fromPartition('persist:flow-flow-1').cookies.remove(process.env.MUSE_URL, 'flow_hong');
+
+      // 10) Nhật ký 16/10/2026: Flow tạo xong mà tải về kẹt mãi (engine tự thử tải lại ~16 phút) → app thôi chờ
+      //     sau FLOW_CHO_TAI_MS, việc sang tài khoản khác.
+      ghi('-- 10. Tạo xong mà tải về kẹt → sang tài khoản khác');
+      await session.fromPartition('persist:flow-flow-1').cookies.set({ url: process.env.MUSE_URL, name: 'flow_khong_tai', value: '1' });
+      const d10id = LENH.taoDuAn({ ten: 'Tai ket', taiKhoan: ['flow-1', tk2.id] }).id;
+      nk = LENH.trangThai().nhatKy.length;
+      const bd10 = Date.now();
+      dieuPhoi.nghiDen = {}; dieuPhoi.loiLienTiep = {};   // Flow 1 vừa nghỉ ở mục 9 — cho chạy lại
+      LENH.them({ duAn: d10id, loai: 'anh', nen: 'flow', tyLe: '9:16', prompts: ['tải kẹt'], chay: true });
+      const v10 = viec().filter((j) => j.duAn === d10id);
+      await cho(xongHet(v10), 120000, 'việc tải kẹt chạy xong ở tài khoản khác');
+      inViec(v10);
+      dongNhatKy(nk);
+      kiem(v10.every((j) => j.trangThai === 'xong' && j.taiKhoan === tk2.id && (j.tkLoi || []).includes('flow-1')), 'tải kẹt ở "Flow 1" → xong ở "Flow 2"');
+      kiem(LENH.trangThai().nhatKy.slice(nk).some((d) => /chưa tải về được/.test(d.chu)), 'nhật ký nói rõ tải về bị kẹt');
+      kiem(Date.now() - bd10 < 90000, `không chờ tải kẹt quá lâu (${Math.round((Date.now() - bd10) / 1000)} giây)`);
+      await session.fromPartition('persist:flow-flow-1').cookies.remove(process.env.MUSE_URL, 'flow_khong_tai');
     } catch (err) {
       ghi('LỖI KỊCH BẢN: ' + err.stack);
       loi.push('ngoại lệ');

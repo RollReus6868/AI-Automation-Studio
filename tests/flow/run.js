@@ -1923,7 +1923,7 @@ testAsync('tài khoản lỗi (máy Flow): 2 prompt khác nhau hỏng → đổi
   const may = taoMayFlow({ tabs, taiVe: {}, log: (m, c) => nhatKy.push(c), thongBao: () => {},
     nghiTaiKhoan: (id, ms, lyDo) => { doi.push([id, ms, lyDo]); return true; } });
   may.datCaiDatAnToan({ nguong: 2, nghiPhut: 15 });
-  const bang = async (rows) => { await may.handleEngineMessage({ action: 'UPDATE_TABLE_DATA', data: { rows, isRunning: true } }, { id: 7 }); await new Promise((r) => setTimeout(r, 5)); };
+  const bang = async (rows, isRunning = true) => { await may.handleEngineMessage({ action: 'UPDATE_TABLE_DATA', data: { rows, isRunning } }, { id: 7 }); await new Promise((r) => setTimeout(r, 5)); };
   await bang([{ index: 1, status: 'ERROR', retries: 0, error: 'Không thành công (Policy/Error)' }]);
   await bang([{ index: 1, status: 'ERROR', retries: 1, error: 'Không thành công (Policy/Error)' }]);
   assert.strictEqual(doi.length, 0, 'MỘT prompt thử lại hỏng lần nữa chưa phải tài khoản hỏng');
@@ -1939,6 +1939,12 @@ testAsync('tài khoản lỗi (máy Flow): 2 prompt khác nhau hỏng → đổi
   assert.strictEqual(doi.length, 2, 'hết tín dụng ghi trên thẻ → đổi tài khoản ngay');
   assert.strictEqual(doi[1][1], 30 * 60000, 'bị lại → nghỉ gấp đôi');
   assert.ok(nhatKy.some((x) => /Not enough credits/.test(x)), 'chữ trên thẻ vẫn ghi vào nhật ký');
+  // Lỗi đến khi tab đã thôi chạy (việc đã về điều phối) → bỏ dấu lỗi, mẻ SAU không bị đổi oan.
+  theLoi = [];
+  await bang([{ index: 6, status: 'ERROR', retries: 0 }, { index: 7, status: 'ERROR', retries: 0 }], false);
+  assert.strictEqual(doi.length, 2, 'không tab nào chạy thì không đổi tài khoản');
+  await bang([{ index: 1, status: 'ERROR', retries: 0 }]);
+  assert.strictEqual(doi.length, 2, 'mẻ mới hỏng 1 prompt — dấu lỗi cũ không được cộng dồn vào');
 });
 
 // ── Kết luận ───────────────────────────────────────────────────────────────

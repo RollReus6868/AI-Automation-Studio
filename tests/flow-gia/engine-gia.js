@@ -10,6 +10,8 @@
 //    prompt chứa "LOI_FLOW"  → dòng đó ERROR (retries = maxRetries)
 //    prompt chứa "CHAM"      → dòng đó tạo chậm (8 giây) — để thử Dừng
 //    cookie flow_hong=1      → MỌI dòng ERROR (tài khoản này hỏng → chuyển dự phòng)
+//    cookie flow_khong_tai=1 → tạo xong (COMPLETED) nhưng KHÔNG BAO GIỜ tải về (như "Chờ 120s mà Google chưa
+//                              xuất file" lặp mãi ở nhật ký 16/10/2026) — đứng đó tới khi bị dừng
 //  Kho ảnh Flow của tài khoản = localStorage của trang (mỗi tài khoản một phiên).
 // ============================================================================
 const gui = (m) => chrome.runtime.sendMessage(m);
@@ -32,6 +34,7 @@ async function chayMe(d) {
   const s = d.settings || {};
   const ten = String(s.renameCustomList || '').split('\n');
   const hong = /(^|;\s*)flow_hong=1/.test(document.cookie);
+  const khongTai = /(^|;\s*)flow_khong_tai=1/.test(document.cookie);
   const rows = (d.videosToCreate || []).map((v) => ({ index: v.index, prompt: v.text, status: 'WAITING', retries: 0,
     progress: 0, downloaded: false, totalVideos: s.outputCount || 1, error: '' }));
   me = { dung: false };
@@ -51,6 +54,7 @@ async function chayMe(d) {
       continue;
     }
     r.status = 'COMPLETED'; r.progress = 100; bao();
+    if (khongTai) { while (!me.dung) { await ngu(500); bao(); } break; }
     const goc = ten[r.index - 1] || `flow_${r.index}`;
     const n = s.outputCount || 1;
     for (let k = 1; k <= n; k++) {

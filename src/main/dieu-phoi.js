@@ -17,7 +17,8 @@ const hd = require('./hang-doi');
 const { chuanHoaFlow, khoaMe } = require('../flow/cai-dat-flow');
 
 const NGHI_MS = 15 * 60 * 1000;   // tài khoản lỗi liên tiếp / mất kết nối → tạm nghỉ chừng này
-const LOI_LIEN_TIEP_NGHI = 2;      // lỗi liên tiếp bao nhiêu việc thì cho tài khoản tạm nghỉ
+const LOI_LIEN_TIEP_NGHI = 2;
+const NGHI_CHAN_LOAI_MS = 60 * 60 * 1000;  // Muse chặn tài khoản tạo video (403 / khu vực) → thôi giao video cho nó chừng này      // lỗi liên tiếp bao nhiêu việc thì cho tài khoản tạm nghỉ
 const TEN_NEN = { muse: 'Muse', flow: 'Flow', suno: 'Suno' };
 // Suno báo hết lượt (tạo / tải về) → tài khoản nghỉ lâu, việc tạo lại ở tài khoản dự phòng.
 const NGHI_HET_LUOT_MS = 6 * 60 * 60 * 1000;
@@ -109,6 +110,7 @@ class DieuPhoi {
     this.nghiDen = {};        // taiKhoanId → tạm nghỉ tới lúc (lỗi liên tiếp / mất kết nối)
     this.lyDoNghi = {};       // taiKhoanId → lý do tạm nghỉ
     this.loiLienTiep = {};    // taiKhoanId → số việc lỗi liên tiếp
+    this.nghiLoai = {};       // 'taiKhoanId:loai' → tài khoản bị chặn tạo loại này (vd Muse chặn video khu vực) tới lúc
     this.dangChay = false;
     this.tkFlowDaChay = new Set();   // tài khoản Flow đã chạy trong lượt này (để tự xoá dự án khi xong)
     this.idMoi = this.viec.reduce((m, j) => Math.max(m, j.id || 0), 0) + 1;
@@ -166,8 +168,9 @@ class DieuPhoi {
   }
   /** Tài khoản việc này được chạy ngay bây giờ (nhóm chạy cùng lúc của dự án, trừ tài khoản đã lỗi việc này). */
   _tkCho(j) {
-    return hd.taiKhoanChoViecDs(j, this._dsTk(j.duAn, j.nen), (id) => this._nghi(id), this._soSong(j.duAn, j.nen));
+    return hd.taiKhoanChoViecDs(j, this._dsTk(j.duAn, j.nen), (id) => this._nghi(id) || this._nghiLoai(id, j.loai), this._soSong(j.duAn, j.nen));
   }
+  _nghiLoai(id, loai) { return (this.nghiLoai[`${id}:${loai}`] || 0) > Date.now(); }
   /**
    * Tài khoản của dự án trên một nền tảng, theo thứ tự ưu tiên [chính, dự phòng…].
    * Dự án chưa chọn tài khoản nào của nền tảng đó = mọi tài khoản của nền tảng đó.
@@ -373,7 +376,7 @@ class DieuPhoi {
     if (!this.dangChay) {
       this.log('success', '▶ Bắt đầu chạy hàng chờ');
       // Bấm chạy lại = cho mọi tài khoản cơ hội mới (người dùng đã kiểm Muse).
-      this.nghiDen = {}; this.lyDoNghi = {}; this.loiLienTiep = {};
+      this.nghiDen = {}; this.lyDoNghi = {}; this.loiLienTiep = {}; this.nghiLoai = {};
       this.tkFlowDaChay = new Set();   // tự xoá dự án Flow chỉ tính tài khoản chạy trong lượt NÀY
     }
     this.dangChay = true;
@@ -665,6 +668,16 @@ class DieuPhoi {
     } else if (r.dung) {
       Object.assign(j, { trangThai: 'cho', buoc: '' });
       if (!r.giuThread) j.thread = '';
+    } else if (r.chanLoai) {
+      // Muse báo tài khoản bị chặn tạo loại việc này (403 / chặn khu vực): lỗi của TÀI KHOẢN — không tính lần
+      // thử, tài khoản thôi nhận loại việc này một lúc (loại khác vẫn chạy), việc sang tài khoản khác ngay.
+      const tkId = j.taiKhoan;
+      Object.assign(j, { trangThai: 'cho', buoc: '', loi: r.loi, thread: '' });
+      if (!this._nghiLoai(tkId, j.loai)) {
+        this.nghiLoai[`${tkId}:${j.loai}`] = Date.now() + NGHI_CHAN_LOAI_MS;
+        this.lyDoNghi[tkId] = r.loi;
+        this.log('warning', `⚠ "${this._tenTk(tkId)}": ${r.loi} — tài khoản này thôi nhận việc ${TEN_LOAI[j.loai] || j.loai} ${Math.round(NGHI_CHAN_LOAI_MS / 60000)} phút, việc chuyển sang tài khoản khác.`);
+      }
     } else if (r.matKetNoi) {
       // Muse của TÀI KHOẢN này hỏng chứ không phải việc hỏng: không tính lần thử, tài khoản tạm nghỉ,
       // việc sang tài khoản dự phòng (không còn tài khoản nào → _vong tạm dừng hàng chờ, khỏi phí lượt).

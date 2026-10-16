@@ -153,6 +153,10 @@ class Luong {
       }
 
       if (kq.chu && !coChuLuc) coChuLuc = Date.now();
+      // Muse nói tài khoản bị chặn khu vực / 403 → báo ngay, khỏi chờ đủ thời gian "trả chữ".
+      if (kq.chu && !kq.dangGo && !kq.soKhungAnh && !kq.soKhungVideo && hd.laChanKhuVuc(kq.chu)) {
+        return { ok: false, chanLoai: true, loi: `Muse báo tài khoản bị chặn tạo ${job.loai === 'video' ? 'video' : 'ảnh'}: "${kq.chu.slice(0, 200)}"` };
+      }
       const giay = coChuLuc ? (Date.now() - coChuLuc) / 1000 : 0;
       if (hd.laTraLoiChu(kq, giay, ctx.choChuGiay)) {
         return { ok: false, loi: `Muse trả lời chữ, không có ${job.loai === 'video' ? 'video' : 'ảnh'}: "${kq.chu.slice(0, 200)}"` };
