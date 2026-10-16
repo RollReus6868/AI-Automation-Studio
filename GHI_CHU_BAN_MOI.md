@@ -1,4 +1,11 @@
-# AI Automation Studio 1.2.2
+# AI Automation Studio 1.2.3
+
+- **Sửa lỗi Flow tạo video xong mà không tải về được** (nhật ký 16/10/2026: *"Chờ 120s mà Google chưa xuất file"* lặp 3 lần rồi *"5 phút chưa tải về được"*). Đúng như bạn đoán: menu *Tải xuống* của Flow vẫn hiện **1080p** và **4K** nhưng tài khoản thường bị khoá (mờ, kèm nút *Nâng cấp*). App thấy chữ "1080p" là bấm, mục khoá nên bấm không ra gì. Giờ app bỏ qua mục bị khoá và **tự hạ xuống 720p** (Kích thước gốc); nhật ký ghi *Không có 1080p, dùng "720p" thay thế.* Tài khoản được tải 1080p thì vẫn tải 1080p như cũ. Ảnh cũng vậy: 2K / 4K bị khoá thì tải cỡ gốc.
+- **Sửa lỗi "Không lưu được tệp chẩn đoán Flow: Script failed to execute"**: trang Flow chặn một cách ghi HTML mà bản 1.2.2 dùng khi chụp. Giờ tệp chẩn đoán lưu được. Khi tải về quá hạn, tệp này còn kèm menu *Tải xuống* gần nhất.
+
+Lưu ý: đã kiểm trên trang Flow giả dựng theo ảnh menu bạn gửi (chạy đúng đoạn chọn chất lượng của engine Flow), chưa chạy trên Flow thật. Lần đầu hãy chạy 2–3 video và gửi lại Nhật ký.
+
+## Bản 1.2.2
 
 - **Sửa lỗi Flow vẫn không tải ảnh lên được** (nhật ký 16/10/2026: *"Không đưa được ảnh lên kho Flow (371_68b883)"* ở mọi tài khoản). Dựa trên file HTML trang dự án và ảnh chụp bạn gửi, có ba chỗ hỏng:
   - Trong bảng [+] mới, bản 1.2.1 bấm nhầm mục lọc **"Tệp tải lên"** (danh sách bên trái) thay vì nút **"Tải nội dung nghe nhìn lên"** ở dưới cùng → không có hộp chọn file nào mở ra, app phải kéo-thả và Flow không nhận. Giờ app chỉ bấm nút có chữ bắt đầu bằng *Tải … lên* / *Upload*, bỏ qua các mục lọc.

@@ -49,6 +49,8 @@
   <!-- Chép NGUYÊN khối flow-prompt-box từ trang thật (bỏ svg, thuộc tính _ngcontent / ripple / describedby); thêm id cho bài kiểm và #chips. -->
   <flow-prompt-box class="prompt-box-container"><!----><flow-prompt-box-instruction-card-wrapper><div class="wrapper-container"><!----><div class="prompt-box-content"><!----><flow-base-prompt-box><div cdkoverlayorigin="" class="base-prompt-box"><flow-border-glow class="loop"></flow-border-glow><div class="prompt-top-row"><!----><flow-rich-text-editor class="prompt-input"><span aria-hidden="true" class="prosemirror-placeholder">Bạn muốn tạo những gì?</span><!----><div class="prosemirror-editor"><div role="textbox" aria-multiline="true" aria-label="Bạn muốn tạo những gì?" contenteditable="true" translate="no" class="ProseMirror"><p><br class="ProseMirror-trailingBreak"></p></div></div></flow-rich-text-editor><!----><!----><!----><div class="top-right-actions"><div id="chips"></div></div></div><!----><!----><div class="bottom-controls"><flow-add-menu><div cdkoverlayorigin="" class="add-menu-container"><button maticonbutton="" type="button" aria-haspopup="true" class="mdc-icon-button mat-mdc-icon-button mat-mdc-button-base mat-mdc-tooltip-trigger add-menu-trigger mat-unthemed" id="nutThem" aria-label="Thêm thành phần vào ô nhập câu lệnh" aria-expanded="false"><span class="mat-mdc-button-persistent-ripple mdc-icon-button__ripple"></span><mat-icon role="img" class="mat-icon notranslate add-menu-icon google-symbols mat-icon-no-color" aria-hidden="true" data-mat-icon-type="font">add</mat-icon><!----><span class="mat-focus-indicator"></span><span class="mat-mdc-button-touch-target"></span></button><!----><!----></div><!----><!----><!----></flow-add-menu><!----><flow-agent-mode-toggle-chip bottomcontrolextra=""><button class="agent-mode-chip" aria-pressed="false"><!----><span class="agent-mode-chip-label">Tác nhân</span></button></flow-agent-mode-toggle-chip><!----><div class="submit-controls"><button matbutton="" flow-button="" aria-label="Điều kiện kích hoạt cài đặt" cdkoverlayorigin="" id="nutCaiDat" class="mdc-button mat-mdc-button-base settings-trigger-button mdc-button--unelevated mat-mdc-unelevated-button mat-unthemed flow-button-primary flow-button-small flow-button-no-touch-target"><span class="mat-mdc-button-persistent-ripple mdc-button__ripple"></span><span class="mdc-button__label"><span settingstriggercontent="" class="settings-summary" id="chuCaiDat"></span></span><!----><span class="mat-focus-indicator"></span><span class="mat-mdc-button-touch-target"></span><span class="mat-ripple mat-mdc-button-ripple"></span></button><!----><!----><!----><flow-generate-icon-button class="mat-mdc-tooltip-trigger"><button flow-icon-button="" maticonbutton="" type="submit" aria-label="Bắt đầu tạo" cdkoverlayorigin="" class="mdc-icon-button mat-mdc-icon-button mat-mdc-button-base generate-icon-button mat-mdc-button-disabled mat-unthemed flow-icon-button-secondary flow-button-small flow-icon-button-no-touch-target" disabled="true"><span class="mat-mdc-button-persistent-ripple mdc-icon-button__ripple"></span><!----><mat-icon role="img" class="mat-icon notranslate flow-icon-m mat-icon-rtl-mirror google-symbols mat-icon-no-color" aria-hidden="true" data-mat-icon-type="font">arrow_forward</mat-icon><!----><!----><span class="mat-focus-indicator"></span><span class="mat-mdc-button-touch-target"></span></button><!----></flow-generate-icon-button><!----><!----><!----></div></div></div></flow-base-prompt-box><!----></div></div></flow-prompt-box-instruction-card-wrapper><!----></flow-prompt-box>
   <flow-media-upload></flow-media-upload>
+  <!-- Thẻ video đã tạo (ảnh chụp 16/10): chuột phải / ⋯ → menu thẻ → Tải xuống → 270p · 720p · 1080p (khoá) · 4K (khoá). -->
+  <div class="o-tai" id="oTai" style="position:absolute;left:200px;top:100px;width:186px;height:105px;background:#333">Du_an_4_347</div>
 </flow-project-page>
 <div class="cdk-overlay-container"></div>
 <script>
@@ -126,6 +128,40 @@
       i.click();
     });
     veDs(pane);
+  });
+
+  // ── Menu thẻ → Tải xuống (?khoa=nut|aria|khong: kiểu khoá 1080p / 4K) ──
+  window.__taiVe = [];
+  const KHOA = q.get('khoa') || 'nut';
+  const mucTai = (nhan, phu, khoa) => {
+    const m = `<button role="menuitem" class="mat-mdc-menu-item q${khoa && KHOA === 'aria' ? ' mat-mdc-menu-item-disabled' : ''}" data-q="${nhan}"` +
+      `${khoa && KHOA === 'aria' ? ' aria-disabled="true"' : ''}><span class="mat-mdc-menu-item-text">${nhan}<small>${phu}</small></span>` +
+      `${khoa && KHOA === 'aria' ? '<span class="nang-cap">Nâng cấp</span>' : ''}</button>`;
+    return khoa && KHOA === 'nut' ? `<div class="dong-khoa">${m}<button class="nang-cap">Nâng cấp</button></div>` : m;
+  };
+  const moMenuTai = () => {
+    if (oc.querySelector('.menu-con')) return;
+    const p2 = document.createElement('div');
+    p2.className = 'cdk-overlay-pane menu-con';
+    p2.innerHTML = `<div role="menu" class="mat-mdc-menu-panel"><div class="mat-mdc-menu-content">${mucTai('270p', 'Ảnh GIF động')}${mucTai('720p', 'Kích thước gốc')}` +
+      `${mucTai('1080p', 'Đã tăng độ phân giải', KHOA !== 'khong')}${mucTai('4K', 'Đã tăng độ phân giải', KHOA !== 'khong')}</div></div>`;
+    oc.appendChild(p2);
+    for (const b of p2.querySelectorAll('.q')) b.addEventListener('click', () => {
+      const khoa = KHOA !== 'khong' && /1080p|4K/.test(b.dataset.q);
+      if (!khoa) { window.__taiVe.push(b.dataset.q); dong(); }       // mục khoá: bấm không ra gì (như Flow thật)
+    });
+  };
+  document.getElementById('oTai').addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    const pane = moPane('menu-the', `<div role="menu" class="mat-mdc-menu-panel"><div class="mat-mdc-menu-content">` +
+      [['favorite', 'Yêu thích'], ['keyboard_return', 'Sử dụng lại câu lệnh'], ['movie', 'Thêm vào cảnh'], ['add', 'Thêm vào câu lệnh'],
+        ['download', 'Tải xuống'], ['content_copy', 'Sao chép'], ['edit', 'Đổi tên'], ['delete', 'Chuyển vào thùng rác']]
+        .map(([i, c]) => `<button role="menuitem" class="mat-mdc-menu-item${i === 'download' ? ' tai' : ''}"><mat-icon>${i}</mat-icon><span>${c}</span></button>`).join('') +
+      `</div></div>`);
+    const tai = pane.querySelector('.tai');
+    tai.addEventListener('click', moMenuTai);
+    tai.addEventListener('mouseenter', moMenuTai);
+    tai.addEventListener('keydown', (k) => { if (k.key === 'ArrowRight' || k.key === 'Enter') moMenuTai(); });
   });
 
   // ── Bảng cài đặt ────────────────────────────────────────────────────

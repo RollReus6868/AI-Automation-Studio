@@ -41,7 +41,8 @@ function docNguon(thay = {}) {
     model: thay.model || doc('flow-model.js'),
     bamTao: thay.bamTao || doc('flow-bam-tao.js'),
     thamChieu: thay.thamChieu || doc('flow-anh-tham-chieu.js'),
-    khoAnh: thay.khoAnh || doc('flow-kho-anh.js')
+    khoAnh: thay.khoAnh || doc('flow-kho-anh.js'),
+    taiVe: thay.taiVe || doc('flow-tai-ve.js')
   };
 }
 
@@ -162,6 +163,8 @@ try {
       ['trình dò ảnh tham chiếu', n.thamChieu],
       // Bảng kho [+] của Flow mới: đánh dấu mục kho cho engine dò ảnh / gắn ảnh @tên (1.2.2).
       ['trình nắn kho ảnh', n.khoAnh],
+      // Menu Tải xuống: ẩn mục chất lượng bị khoá (1080p / 4K "Nâng cấp") để engine tự hạ xuống 720p (1.2.3).
+      ['trình ẩn chất lượng bị khoá', n.taiVe],
       ['chốt hoàn tất', 'window.__flowEngineLoaded = true;']
     ];
     try {

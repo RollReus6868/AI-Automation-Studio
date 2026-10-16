@@ -252,7 +252,7 @@ class LuongFlow {
    * những gì hiện trong bảng) ra một tệp, để người dùng gửi khi Flow đổi giao diện mà app chưa theo kịp.
    * Mỗi luồng chụp tối đa một lần mỗi 30 phút.
    */
-  async _chupChanDoan(lyDo) {
+  async _chupChanDoan(lyDo, moBang = true) {
     const t = this.tab;
     if (!this.thuMucChanDoan || !t || !t.view || t.view.webContents.isDestroyed()) return null;
     if (this._lucChup && Date.now() - this._lucChup < 30 * 60000) return null;
@@ -260,7 +260,7 @@ class LuongFlow {
     try {
       const wc = t.view.webContents;
       // Mở bảng [+] (nếu đang đóng) để chụp được các mục kho, chụp xong đóng lại.
-      const daMo = await wc.executeJavaScript(`(function () {
+      const daMo = moBang && await wc.executeJavaScript(`(function () {
         var b = document.querySelector('button.add-menu-trigger, flow-add-menu button') ||
           Array.prototype.find.call(document.querySelectorAll('button[aria-label]'), function (x) { return /thêm thành phần|add (media|asset|ingredient)/i.test(x.getAttribute('aria-label')); });
         if (!b || b.getAttribute('aria-expanded') === 'true') return false;
@@ -447,6 +447,8 @@ class LuongFlow {
             if (!conLai.has(j) || files.get(j).length || Date.now() - Math.max(luc, taiGanNhat) < this.choTaiMs) continue;
             this.log('error', `❌ [${this.id}] #${j.so}: Flow tạo xong nhưng ${choTai} chưa tải về được — bỏ, chạy lại ở tài khoản khác.`);
             xong(j, { ok: false, loi: `Flow tạo xong nhưng quá ${choTai} chưa tải về được` });
+            // Giữ lại menu Tải xuống gần nhất (các mục chất lượng) để sửa tiếp nếu Flow lại đổi; không mở bảng nào.
+            this._chupChanDoan(`#${j.so} tạo xong nhưng quá ${choTai} chưa tải về được`, false).catch(() => {});
             if (this.may.ghiLoiTai) this.may.ghiLoiTai(t, [...theoSo].find(([, v]) => v === j)[0]).catch(() => {});
             if (!conLai.size) {
               nhipTT.huy(t);
