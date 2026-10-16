@@ -77,8 +77,10 @@
 
   const mmss = (g) => Math.floor(g / 60) + ':' + String(g % 60).padStart(2, '0');
   let menuMo = '';
+  let lanNap = 0;
   async function nap() {
-    const r = await (await fetch('/__suno-ds?tk=' + encodeURIComponent(tk))).json();
+    // Lần nạp đầu có thể chậm (máy chủ giữ lại treoDs ms) — như Suno thật: form hiện trước, danh sách bài nạp sau.
+    const r = await (await fetch('/__suno-ds?tk=' + encodeURIComponent(tk) + (lanNap++ ? '' : '&dau=1'))).json();
     cauHinh = r;
     const html = r.clips.map((c) => `<div data-testid="clip-row" data-clip-status="${c.trangThai}" aria-label="${c.ten}">
         <div class="bia">${c.trangThai === 'complete' ? `<span>${mmss(c.giay)}</span>` : ''}</div>
@@ -94,12 +96,14 @@
     const m = e.target.closest('button[aria-label="More options"]');
     if (m) { menuMo = menuMo === m.dataset.id ? '' : m.dataset.id; nap(); return; }
     const t = e.target.closest('[data-tai]');
-    if (t) { menuMo = ''; moHop(t.dataset.tai); nap(); }
+    if (t) { menuMo = ''; moHop(t.dataset.tai).then(nap); }
   });
   // Hộp "Download '<tên>'" như Suno thật (15/10/2026): chọn định dạng rồi bấm nút Download to.
   // Định dạng chọn sẵn là M4A (Suno nhớ lựa chọn lần trước) → app phải tự chọn MP3.
   let dinhDang = 'M4A';
-  function moHop(id) {
+  async function moHop(id) {
+    // Máy chủ bật "hongTai": hộp mở ra mà không có nút tải nào bấm được (như bản 1.2.3 gặp nút lạ) — app phải tải lại.
+    const hong = (await (await fetch('/__suno-hong', { method: 'POST' })).json()).hong;
     // Hết lượt tải: Suno thật (ảnh 15/10/2026) KHÔNG mở hộp chọn định dạng mà mở hộp "Out of Downloads".
     // Ở đây cố ý KHÔNG gắn role=dialog — app phải nhận ra bằng chữ.
     if (cauHinh.hetTai.includes(tk)) {
@@ -119,12 +123,21 @@
     const c = document.createElement('div');
     c.setAttribute('role', 'dialog'); c.id = 'hopTai';
     c.style.cssText = 'position:fixed;left:30%;top:20%;background:#222;padding:20px;z-index:9';
+    // Suno 16/10/2026 (ảnh người dùng): bài chưa mở khoá → nút "Unlock & Download", chân hộp "Plan Free · Downloads 7".
+    // moKhoa === 'nut': bấm Unlock chỉ mở khoá ("Unlocking song...") rồi hộp đổi sang nút "Download “<tên>”" — phải bấm tiếp.
+    const daMo = () => (cauHinh.daMo || []).includes(id);
+    let dangMo = false;
     const ve = () => {
+      if (hong) { c.innerHTML = `<button aria-label="Close" data-dong>✕</button><h2>Download 'Bai ${id}'</h2><p>Loading…</p>`; return; }
+      if (cauHinh.moKhoa === 'nut' && daMo() && dangMo) {
+        c.innerHTML = `<button aria-label="Close" data-dong>✕</button><h2>Download 'Bai ${id}'</h2><button data-tai-ve>Download “Bai ${id}”</button>`;
+        return;
+      }
       c.innerHTML = `<button aria-label="Close" data-dong>✕</button><h2>Download 'Bai ${id}'</h2>` +
         ['M4A', 'MP3', 'WAV', 'MP4 video asset'].map((d) => `<button data-dd="${d}">${d}${d === dinhDang ? ' ✓' : ''}</button>`).join('') +
         `<div><span>Stems &amp; MIDI</span> <button>Manage</button></div>` +
-        `<button data-tai-ve ${het ? 'aria-disabled="true" data-disabled=""' : ''}>Download</button>` +
-        `<p>${het ? "You've reached your download limit for this month. Upgrade to Pro for more downloads." : "You've unlocked this song. You can return and download at any time. Learn more."}</p>`;
+        `<button data-tai-ve ${het ? 'aria-disabled="true" data-disabled=""' : ''}>${daMo() ? 'Download' : 'Unlock &amp; Download'}</button>` +
+        (daMo() ? `<p>You've unlocked this song. You can return and download at any time. Learn more.</p>` : `<div><div>Plan<br>Free</div><div>Downloads<br>7</div></div>`);
     };
     ve();
     c.onclick = (e) => {
@@ -132,6 +145,11 @@
       if (d) { dinhDang = d.dataset.dd; ve(); return; }
       if (e.target.closest('[data-dong]')) { c.remove(); return; }
       const b = e.target.closest('[data-tai-ve]');
+      if (b && !b.hasAttribute('data-disabled') && cauHinh.moKhoa === 'nut' && !daMo()) {
+        b.textContent = 'Unlocking song...';
+        fetch('/__suno-mo-khoa/' + id, { method: 'POST' }).then(() => nap()).then(() => { dangMo = true; ve(); });
+        return;
+      }
       if (b && !b.hasAttribute('data-disabled')) {
         const a = document.createElement('a');
         a.href = '/__suno-mp3/' + id + '?dd=' + encodeURIComponent(dinhDang); a.download = '';

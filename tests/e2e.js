@@ -20,16 +20,22 @@ const daGui = [];
 const flowGhi = [];   // mọi thứ engine Flow giả nhận được (mẻ, kho ảnh, chế độ…)
 let duAnFlow = ['gia-khac'];
 // Suno giả: bài lưu theo tài khoản; mỗi lần Create 4 bài (2 đủ dài, 2 bản nghe thử — bài 3 dài 4:00 làm mồi).
-const suno = { clips: {}, gui: [], tai: [], dinhDang: [], hetTai: [], hetTao: [], lan: 0, treoKiem: 0 };
+const suno = { clips: {}, gui: [], tai: [], dinhDang: [], hetTai: [], hetTao: [], lan: 0, treoKiem: 0, treoDs: 0, hongTai: 0, moKhoa: '', daMo: [] };
 function sunoApi(req, res) {
   const json = (o) => { res.setHeader('content-type', 'application/json'); res.end(JSON.stringify(o)); };
   const body = (fn) => { let b = ''; req.setEncoding('utf8'); req.on('data', (d) => { b += d; }); req.on('end', () => { let o = {}; try { o = JSON.parse(b); } catch (_) {} fn(o); }); };
   const u = new URL(req.url, 'http://x');
   if (u.pathname === '/__suno-ds') {
-    const now = Date.now();
-    return json({ hetTai: suno.hetTai, hetTao: suno.hetTao, clips: (suno.clips[u.searchParams.get('tk')] || []).map((c) =>
-      ({ ...c, trangThai: now - c.tao > 2500 ? 'complete' : now - c.tao > 800 ? 'streaming' : 'submitted' })) });
+    const tra = () => {
+      const now = Date.now();
+      json({ hetTai: suno.hetTai, hetTao: suno.hetTao, moKhoa: suno.moKhoa, daMo: suno.daMo, clips: (suno.clips[u.searchParams.get('tk')] || []).map((c) =>
+        ({ ...c, trangThai: now - c.tao > 2500 ? 'complete' : now - c.tao > 800 ? 'streaming' : 'submitted' })) });
+    };
+    // Lần nạp đầu của trang chậm (treoDs ms): danh sách bài hiện SAU form như Suno thật.
+    return u.searchParams.get('dau') && suno.treoDs ? setTimeout(tra, suno.treoDs) : tra();
   }
+  if (u.pathname === '/__suno-hong') { const hong = suno.hongTai > 0; if (hong) suno.hongTai--; return json({ hong }); }
+  { const mk = u.pathname.match(/^\/__suno-mo-khoa\/([^/]+)$/); if (mk) { suno.daMo.push(mk[1]); return json({ ok: true }); } }
   if (u.pathname === '/__suno-tao') {
     return body((o) => {
       suno.gui.push({ ...o, luc: Date.now() });
@@ -42,14 +48,15 @@ function sunoApi(req, res) {
       json({ ok: true });
     });
   }
-  if (u.pathname === '/__suno-cau-hinh') return body((o) => { if (o.hetTai) suno.hetTai = o.hetTai; if (o.hetTao) suno.hetTao = o.hetTao; if ('treoKiem' in o) suno.treoKiem = +o.treoKiem || 0; json({ ok: true }); });
-  if (u.pathname === '/__suno-gui') return json({ gui: suno.gui, tai: suno.tai, dinhDang: suno.dinhDang });
+  if (u.pathname === '/__suno-cau-hinh') return body((o) => { if (o.hetTai) suno.hetTai = o.hetTai; if (o.hetTao) suno.hetTao = o.hetTao; if ('treoKiem' in o) suno.treoKiem = +o.treoKiem || 0; for (const k of ['treoDs', 'hongTai']) if (k in o) suno[k] = +o[k] || 0; if ('moKhoa' in o) suno.moKhoa = o.moKhoa; json({ ok: true }); });
+  if (u.pathname === '/__suno-gui') return json({ gui: suno.gui, tai: suno.tai, dinhDang: suno.dinhDang, clips: suno.clips });
   const m = u.pathname.match(/^\/__suno-mp3\/([^/]+)$/);
   if (m) {
     const c = Object.values(suno.clips).flat().find((x) => x.id === m[1]);
     const dd = (u.searchParams.get('dd') || 'MP3').toUpperCase();
     const duoi = { MP3: 'mp3', M4A: 'm4a', WAV: 'wav' }[dd] || 'mp4';
     suno.tai.push(m[1]); suno.dinhDang.push(dd);
+    if (!suno.daMo.includes(m[1])) suno.daMo.push(m[1]);   // Unlock & Download = mở khoá luôn
     res.setHeader('content-type', duoi === 'mp3' ? 'audio/mpeg' : 'application/octet-stream');
     res.setHeader('content-disposition', `attachment; filename="${(c ? c.ten : 'bai').replace(/\s+/g, '_')}.${duoi}"`);
     return res.end(`ID3-gia:${m[1]}:${c ? c.giay : 0}`);

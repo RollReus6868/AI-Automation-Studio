@@ -1,4 +1,14 @@
-# AI Automation Studio 1.2.3
+# AI Automation Studio 1.2.4
+
+- **Sửa lỗi Suno gửi nhiều prompt một lúc mà không tải được bài nào** (nhật ký 16/10/2026: *"Không bấm được Download của Suno (hop-khong-co-nut-download … Unlock & Download …)"* rồi *"Suno đang tạo 14 bài"*). Có ba chỗ hỏng:
+  - Hộp *Download* của Suno đã đổi nút to thành **"Unlock & Download"** (kèm chân hộp *Plan Free · Downloads 7*). Bản 1.2.3 chỉ nhận nút tên đúng "Download" nên báo không có nút. Giờ app bấm được **Unlock & Download**; nếu Suno mở khoá xong lại hiện nút *Download "<tên bài>"* thì app bấm tiếp nút đó. Lưu ý: mỗi lần Unlock trừ **1 lượt tải** của tài khoản Suno (tài khoản free trong ảnh còn 7).
+  - Tải hỏng thì bản cũ **chạy lại cả việc** — tức là bấm Create gửi lại prompt, Suno đẻ thêm bài mới. Đó là lý do bạn thấy như gửi nhiều prompt cùng lúc. Giờ tải hỏng thì app **tải lại đúng bài vừa tạo** (tối đa 3 lần, nhật ký ghi *tải lại bài này (lần 2/3), không gửi lại prompt*). Hỏng cả 3 lần mà việc được thử lại ở cùng tài khoản thì app vẫn dùng lại bài đã tạo, không bấm Create nữa. Bấm **Tạo lại** ở việc thì mới tạo bài mới.
+  - Danh sách bài của Suno nạp chậm hơn ô nhập, nên app tưởng các bài cũ là bài mới (*"đang tạo 14 bài"*). Giờ app chờ danh sách bài nạp xong mới bấm Create, và chỉ lấy đúng 2 bài vừa tạo.
+- Mỗi tài khoản Suno vẫn làm **từng prompt một**: gửi prompt → chờ bài tạo xong → ⋯ → *Download* → MP3 → *Unlock & Download* → tải xong mới gửi prompt kế tiếp. Nhiều tài khoản Suno chỉ chạy cùng lúc khi bạn đặt *Chạy cùng lúc* của dự án lớn hơn 1.
+
+Lưu ý: đã kiểm trên trang Suno giả dựng theo ảnh menu, ảnh hộp Download và file HTML bạn gửi, chưa chạy trên suno.com thật. Lần đầu hãy chạy 2–3 prompt và gửi lại Nhật ký (*Xuất .txt*).
+
+## Bản 1.2.3
 
 - **Sửa lỗi Flow tạo video xong mà không tải về được** (nhật ký 16/10/2026: *"Chờ 120s mà Google chưa xuất file"* lặp 3 lần rồi *"5 phút chưa tải về được"*). Đúng như bạn đoán: menu *Tải xuống* của Flow vẫn hiện **1080p** và **4K** nhưng tài khoản thường bị khoá (mờ, kèm nút *Nâng cấp*). App thấy chữ "1080p" là bấm, mục khoá nên bấm không ra gì. Giờ app bỏ qua mục bị khoá và **tự hạ xuống 720p** (Kích thước gốc); nhật ký ghi *Không có 1080p, dùng "720p" thay thế.* Tài khoản được tải 1080p thì vẫn tải 1080p như cũ. Ảnh cũng vậy: 2K / 4K bị khoá thì tải cỡ gốc.
 - **Sửa lỗi "Không lưu được tệp chẩn đoán Flow: Script failed to execute"**: trang Flow chặn một cách ghi HTML mà bản 1.2.2 dùng khi chụp. Giờ tệp chẩn đoán lưu được. Khi tải về quá hạn, tệp này còn kèm menu *Tải xuống* gần nhất.
