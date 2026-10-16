@@ -149,8 +149,8 @@ module.exports = function e2eFlow({ win, app, LENH, dieuPhoi, taiKhoan }) {
       ghi('-- 6. Tài khoản Flow chưa đăng nhập');
       const tk3 = await LENH.themTaiKhoan({ ten: 'Flow 3', nen: 'flow' });
       await session.fromPartition(tk3.partition).cookies.set({ url: process.env.MUSE_URL, name: 'flow_dang_xuat', value: '1' });
-      // Tắt "Flow hỏng → Muse" ở bước này: chỉ kiểm nhận ra chưa đăng nhập (bật thì ảnh sang Muse — mục 9).
-      LENH.datCaiDat({ flow: { sangMuseKhiHong: false } });
+      // Tắt "Muse ⇄ Flow" ở bước này: chỉ kiểm nhận ra chưa đăng nhập (bật thì ảnh sang Muse — mục 9).
+      LENH.datCaiDat({ doiNenKhiLoi: false });
       const d6id = LENH.taoDuAn({ ten: 'Chi Flow 3', taiKhoan: [tk3.id] }).id;
       nk = LENH.trangThai().nhatKy.length;
       LENH.them({ duAn: d6id, loai: 'anh', nen: 'flow', tyLe: '9:16', prompts: ['chưa đăng nhập'], chay: true });
@@ -162,7 +162,7 @@ module.exports = function e2eFlow({ win, app, LENH, dieuPhoi, taiKhoan }) {
       kiem(LENH.trangThai().nhatKy.slice(nk).some((d) => /"Flow 3" chưa đăng nhập Flow/.test(d.chu)), 'nhật ký nói rõ tài khoản Flow nào chưa đăng nhập');
       LENH.dung();
       LENH.xoaViec({ ids: v6.map((j) => j.id) });
-      LENH.datCaiDat({ flow: { sangMuseKhiHong: true } });
+      LENH.datCaiDat({ doiNenKhiLoi: true });
 
       // 7) 1.0.2: chạy hết hàng chờ → tự xoá dự án Flow vừa dùng (đúng dự án đó, dự án khác của người dùng
       //    giữ nguyên); tài khoản quên địa chỉ dự án → lần chạy sau tự mở dự án mới.
@@ -219,7 +219,7 @@ module.exports = function e2eFlow({ win, app, LENH, dieuPhoi, taiKhoan }) {
       inViec(v9);
       dongNhatKy(nk);
       kiem(v9.every((j) => j.trangThai === 'xong' && j.nen === 'muse' && j.taiKhoan === 'tk-1' && fs.existsSync(j.files[0])), 'ảnh hỏng ở Flow được tạo xong ở Muse');
-      kiem(LENH.trangThai().nhatKy.slice(nk).some((d) => /🔀 Flow:.*Muse/.test(d.chu)), 'nhật ký báo chuyển sang Muse');
+      kiem(LENH.trangThai().nhatKy.slice(nk).some((d) => /🔀 Flow → Muse: /.test(d.chu)), 'nhật ký báo chuyển sang Muse');
       await session.fromPartition('persist:flow-flow-1').cookies.remove(process.env.MUSE_URL, 'flow_hong');
 
       // 10) Nhật ký 16/10/2026: Flow tạo xong mà tải về kẹt mãi (engine tự thử tải lại ~16 phút) → app thôi chờ
@@ -239,6 +239,41 @@ module.exports = function e2eFlow({ win, app, LENH, dieuPhoi, taiKhoan }) {
       kiem(LENH.trangThai().nhatKy.slice(nk).some((d) => /chưa tải về được/.test(d.chu)), 'nhật ký nói rõ tải về bị kẹt');
       kiem(Date.now() - bd10 < 90000, `không chờ tải kẹt quá lâu (${Math.round((Date.now() - bd10) / 1000)} giây)`);
       await session.fromPartition('persist:flow-flow-1').cookies.remove(process.env.MUSE_URL, 'flow_khong_tai');
+
+      // 11) 1.2.1 (ảnh chụp + nhật ký 16/10/2026): Muse trả "Mình không thể tạo video từ ảnh này." → CHỈ ảnh đó sang
+      //     Flow tạo video, ảnh khác vẫn ở Muse. Flow mới: engine không thấy ô tải ảnh lên → app tự bấm [+] "Add media"
+      //     → "Upload image", đưa file thật vào hộp chọn file.
+      ghi('-- 11. Muse từ chối tạo video từ ảnh → ảnh đó sang Flow (Flow mới: bấm nút tải ảnh lên)');
+      await session.fromPartition('persist:flow-flow-1').cookies.set({ url: process.env.MUSE_URL, name: 'flow_upload_moi', value: '1' });
+      dieuPhoi.nghiDen = {}; dieuPhoi.loiLienTiep = {};
+      const anh11 = [path.join(tam, 'nguon-tu-choi.png'), path.join(tam, 'nguon-thuong.png')];
+      for (const f of anh11) fs.writeFileSync(f, PNG1);
+      const d11id = LENH.taoDuAn({ ten: 'Tu choi', taiKhoan: ['tk-1', 'flow-1'] }).id;
+      nk = LENH.trangThai().nhatKy.length;
+      const g11dau = (await flowGhi()).length;
+      LENH.them({ duAn: d11id, loai: 'video', nen: 'muse', tyLe: '9:16', prompts: ['TU_CHOI sóng biển', 'mây trôi'],
+        thamChieuTheoDong: anh11.map((f) => [f]), chay: true });
+      const v11 = viec().filter((j) => j.duAn === d11id);
+      await cho(xongHet(v11), 180000, 'video từ chối ở Muse xong ở Flow');
+      inViec(v11);
+      dongNhatKy(nk);
+      const g11 = (await flowGhi()).slice(g11dau);
+      const nk11 = LENH.trangThai().nhatKy.slice(nk).map((d) => d.chu);
+      const [tc, th] = v11;
+      kiem(tc && tc.trangThai === 'xong' && tc.nen === 'flow' && tc.taiKhoan === 'flow-1' && /\.mp4$/.test(tc.files[0] || '') && fs.existsSync(tc.files[0]),
+        'video Muse từ chối được tạo xong ở FLOW, có file .mp4');
+      kiem(th && th.trangThai === 'xong' && th.nen === 'muse' && th.taiKhoan === 'tk-1', 'video còn lại vẫn tạo ở Muse');
+      kiem((await daGui()).filter((g) => /TU_CHOI/.test(g.prompt)).length === 1, 'không gửi lại Muse ảnh đã bị từ chối');
+      kiem(nk11.some((c) => /🔀 Muse → Flow: #\d+ Muse từ chối tạo video: "Mình không thể tạo video từ ảnh này\."/.test(c)), 'nhật ký nói rõ vì sao chuyển sang Flow');
+      const len11 = g11.filter((x) => x.loai === 'tai-len-trang');
+      const ma11 = len11[0] && len11[0].d.files[0] ? len11[0].d.files[0].ten.replace(/\.[^.]+$/, '') : '?';
+      kiem(g11.some((x) => x.loai === 'upload-hong'), 'engine báo không thấy ô tải ảnh lên (như Flow mới)');
+      kiem(len11.length === 1 && len11[0].d.files.length === 1 && len11[0].d.files[0].co === PNG1.length && /^Nguon_tu_choi_[0-9a-f]{6}$/.test(ma11),
+        `app bấm "Add media" → "Upload image", trang Flow nhận đúng 1 ảnh thật (${JSON.stringify(len11.map((x) => x.d.files))})`);
+      kiem(nk11.some((c) => /Đã đưa 1 ảnh lên Flow \(bấm Add media → Upload image\)/.test(c)), 'nhật ký ghi cách đã tải ảnh lên');
+      const st11 = g11.filter((x) => x.loai === 'start');
+      kiem(st11.length === 1 && st11[0].d.prompts[0] === `TU_CHOI sóng biển @${ma11}`, `prompt video gửi Flow kèm @tên ảnh vừa tải lên ("${st11[0] ? st11[0].d.prompts[0] : ''}")`);
+      await session.fromPartition('persist:flow-flow-1').cookies.remove(process.env.MUSE_URL, 'flow_upload_moi');
     } catch (err) {
       ghi('LỖI KỊCH BẢN: ' + err.stack);
       loi.push('ngoại lệ');

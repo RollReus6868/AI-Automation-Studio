@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="vi"><head><meta charset="utf-8"><title>Flow giả — tải ảnh lên</title>
+<style>body{font-family:sans-serif;background:#111;color:#eee}.ProseMirror{min-height:60px;border:1px solid #555;padding:6px;width:600px}
+[role=menu]{border:1px solid #777;padding:4px;display:flex;flex-direction:column;width:200px}</style>
+</head><body>
+<!--
+  Các kiểu ô tải ảnh lên Flow (chọn bằng ?kieu=…) — tests/flow/tai-anh-main.js:
+    menu   (Flow mới, như lỗi 16/10/2026) nút [+] "Add media" → menu → "Upload image" TẠO ô chọn file
+           không gắn vào trang rồi mở hộp chọn file. Engine cũ không bao giờ thấy ô nào.
+    tab    như menu nhưng mục Upload chỉ hiện sau khi bấm tab "Images".
+    input  (Flow cũ) bấm [+] thì một <input type=file> ẩn gắn vào trang.
+    keo    không nút nào — chỉ thả ảnh vào ô nhập prompt.
+    khong  không có đường nào.
+  Ảnh trang nhận được: window.__nhan = [tên file…] (đọc qua FileReader để chắc file có nội dung thật).
+-->
+<div id="khoi"><div class="ProseMirror" contenteditable="true"><p><br></p></div><div id="nutKhoi"></div>
+  <button aria-label="Start generation"><i class="google-symbols">arrow_forward</i></button></div>
+<script>
+const kieu = new URLSearchParams(location.search).get('kieu') || 'menu';
+window.__nhan = []; window.__soMoHop = 0;
+const nhanFiles = async (fl) => {
+  for (const f of fl) {
+    const buf = await f.arrayBuffer();
+    if (buf.byteLength > 0) window.__nhan.push(f.name);
+  }
+};
+const nutKhoi = document.getElementById('nutKhoi');
+const oNhap = document.querySelector('.ProseMirror');
+if (kieu === 'menu' || kieu === 'tab') {
+  nutKhoi.innerHTML = '<button aria-label="Add media" class="them"><i class="google-symbols">add_2</i></button>';
+  nutKhoi.querySelector('.them').addEventListener('pointerdown', () => {
+    if (document.querySelector('[role=menu]')) return;
+    const m = document.createElement('div');
+    m.setAttribute('role', 'menu');
+    const muc = '<button role="menuitem" class="tai"><i class="google-symbols">upload</i>Upload image</button>';
+    m.innerHTML = kieu === 'tab' ? '<div role="tablist"><button role="tab">Videos</button><button role="tab" class="tabAnh">Images</button></div><div class="noi"></div>'
+      : '<button role="menuitem"><i class="google-symbols">search</i>Search assets</button>' + muc;
+    document.body.appendChild(m);
+    const ganTai = () => m.querySelector('.tai').addEventListener('click', () => {
+      // Như web mới: ô chọn file tạo lúc bấm, KHÔNG gắn vào trang, mở hộp chọn file ngay (cần thao tác người dùng).
+      const i = document.createElement('input');
+      i.type = 'file'; i.accept = 'image/*'; i.multiple = true;
+      i.addEventListener('change', () => { nhanFiles(i.files); m.remove(); });
+      window.__soMoHop++;
+      i.click();
+    });
+    if (kieu === 'tab') m.querySelector('.tabAnh').addEventListener('click', () => { m.querySelector('.noi').innerHTML = muc; ganTai(); });
+    else ganTai();
+  });
+} else if (kieu === 'input') {
+  nutKhoi.innerHTML = '<button class="add-menu-trigger"><i class="google-symbols">add</i></button>';
+  nutKhoi.querySelector('button').addEventListener('click', () => {
+    if (document.querySelector('input[type=file]')) return;
+    const i = document.createElement('input');
+    i.type = 'file'; i.accept = 'image/*'; i.multiple = true; i.style.display = 'none';
+    i.addEventListener('change', () => nhanFiles(i.files));
+    document.body.appendChild(i);
+  });
+} else if (kieu === 'keo') {
+  oNhap.addEventListener('dragover', (e) => e.preventDefault());
+  oNhap.addEventListener('drop', (e) => { e.preventDefault(); nhanFiles(e.dataTransfer.files); });
+}
+</script>
+</body></html>

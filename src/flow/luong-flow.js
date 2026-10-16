@@ -25,6 +25,8 @@ const { FLOW_URL, FLOW_HOST_RE, moPhongBi } = require('./tab-flow');
 const { caiDatEngine, chuanHoaFlow } = require('./cai-dat-flow');
 const { buildStartMessage } = require('./main/jobs');
 const nhipTT = require('./main/nhip-thao-tac');
+const taiAnhLenMd = require('./main/tai-anh-len');
+const thamChieuMd = require('./main/anh-tham-chieu');
 
 const cho = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -72,6 +74,7 @@ class LuongFlow {
   constructor(o) {
     Object.assign(this, { id: o.id, taiKhoan: o.taiKhoan, tabs: o.tabs, may: o.may, thuMucTam: o.thuMucTam,
       docAnh: o.docAnh, luuUrl: o.luuUrl || (() => {}), log: o.log || (() => {}) });
+    this.taiAnhLen = o.taiAnhLen || taiAnhLenMd.taiAnhLen;   // thay được trong bài kiểm
     this.nen = 'flow';
     this.tab = null;
     this.dsViec = null;
@@ -180,17 +183,58 @@ class LuongFlow {
           this.log('error', `❌ [${this.id}] Không đọc được ảnh ${canCo.get(m)}: ${err.message}`);
         }
       }
+      let daTai = false, thuMucLen = '';
       if (anh.length) {
         this.log('info', `⬆️ [${this.id}] Tải ${anh.length} ảnh lên kho Flow (gắn vào prompt bằng @tên)…`);
         const r = moPhongBi(await this.tabs.dispatch(t.id, { action: 'UPLOAD_IMAGES_TO_FLOW', data: { images: anh } }));
-        if (!r || !r.ok) this.log('error', `❌ [${this.id}] Tải ảnh lên Flow hỏng: ${(r && (r.error || r.loiVo)) || 'không rõ'}`);
+        daTai = !!(r && r.ok);
+        if (!daTai) {
+          // 1.2.1: Flow mới không còn ô tải lên nằm sẵn (engine chỉ biết cách đó) → bấm nút Tải lên của Flow
+          // như người, đưa file THẬT (tên = mã ảnh) vào hộp chọn file; không được thì kéo-thả vào ô nhập.
+          this.log('warning', `⚠ [${this.id}] Engine không tải được ảnh lên (${(r && (r.error || r.loiVo)) || 'không rõ'}) — thử bấm nút Tải lên của Flow…`);
+          thuMucLen = path.join(this.thuMucTam, `tai-len-${Date.now().toString(36)}`);
+          const dsFile = [];
+          try {
+            fs.mkdirSync(thuMucLen, { recursive: true });
+            for (const m of thieu) {
+              const goc = canCo.get(m);
+              if (!fs.existsSync(goc)) continue;
+              const dich = path.join(thuMucLen, `${m}${path.extname(goc).toLowerCase() || '.png'}`);
+              fs.copyFileSync(goc, dich);
+              dsFile.push(dich);
+            }
+          } catch (err) { this.log('error', `❌ [${this.id}] Không chép được ảnh để tải lên: ${err.message}`); }
+          const k = dsFile.length && t.view && !t.view.webContents.isDestroyed()
+            ? await this.taiAnhLen(t.view.webContents, dsFile) : { ok: false, loi: 'không có ảnh / tab đã đóng' };
+          daTai = k.ok;
+          const CACH = { 'o-tai-len': 'đặt vào ô tải lên', 'hop-chon-file': `bấm ${k.buoc && k.buoc.length ? k.buoc.map((b) => b.split(': ')[1]).filter(Boolean).join(' → ') : 'Tải lên'}`, 'keo-tha': 'kéo-thả vào ô nhập prompt' };
+          if (k.ok) this.log(k.chacChan ? 'success' : 'warning', `⬆️ [${this.id}] Đã đưa ${dsFile.length} ảnh lên Flow (${CACH[k.cach] || k.cach})${k.chacChan ? '' : ' — chưa chắc Flow nhận, kiểm lại kho'}.`);
+          else this.log('error', `❌ [${this.id}] Tải ảnh lên Flow hỏng: ${k.loi || 'không rõ'}`);
+          if (!k.ok || !k.chacChan) {
+            const cd = taiAnhLenMd.moTaChanDoan(k.chanDoan);
+            if (cd) this.log('info', `🔎 [${this.id}] Quanh ô nhập Flow: ${cd}`);
+          }
+          // Tải lên từ ô nhập prompt thì Flow có thể gắn luôn ảnh vào ô nhập → prompt đầu mẻ mang theo MỌI ảnh
+          // vừa tải. Gỡ ra; engine gắn đúng ảnh cho từng prompt bằng @tên.
+          if (k.ok && t.view && !t.view.webContents.isDestroyed()) {
+            const go = await thamChieuMd.goHet(t.view.webContents).catch(() => null);
+            if (go && go.daGo) this.log('info', `🧹 [${this.id}] Gỡ ${go.daGo} ảnh vừa tải lên khỏi ô nhập prompt (mỗi prompt tự gắn ảnh của nó).`);
+          }
+        }
       }
       // Flow cần một lúc để xử lý ảnh vừa tải lên — kiểm lại vài lần.
       for (let lan = 0; lan < 6 && thieu.length; lan++) {
         if (!(await this._ngu(lan ? 8000 : 4000, huyLuc))) return { dung: true };
         const k = await kiem();
         if (k !== null) thieu = k;
+        // Không dò được kho (Flow đổi ô tìm kiếm) mà ảnh đã đưa lên → chạy luôn, engine gắn @tên được thì xong,
+        // không được thì việc báo lỗi và sang tài khoản / bên khác như thường.
+        else if (daTai && lan >= 1) {
+          this.log('warning', `⚠ [${this.id}] Không dò lại được kho ảnh Flow — coi như ảnh đã lên, chạy tiếp.`);
+          thieu = [];
+        }
       }
+      if (thuMucLen) try { fs.rmSync(thuMucLen, { recursive: true, force: true }); } catch (_) {}
     }
     const hong = new Map();
     for (const [j, ma] of maCua) {

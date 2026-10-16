@@ -720,6 +720,7 @@
     $('#cdLuong').value = c.luongMoiTK; $('#cdNghi').value = c.nghiGiuaLanGui; $('#cdThuLai').value = c.tuThuLai; $('#cdChayLaiLoi').value = c.tuChayLaiLoi;
     $('#cdChoAnh').value = c.choAnhGiay; $('#cdChoVideo').value = c.choVideoGiay; $('#cdChoChu').value = c.choChuGiay; $('#cdChoNhac').value = c.choNhacGiay;
     $('#cdPng').checked = !!c.png;
+    $('#cdDoiNen').checked = c.doiNenKhiLoi !== false;
     $('#cdTatMay').checked = !!c.tatMayKhiXong;
     $('#cdVideoCanhAnh').checked = c.videoCanhAnh !== false;
     $('#cdThuMucVideoAnh').value = c.thuMucVideoAnh || '';
@@ -757,7 +758,7 @@
   const O_FLOW = [['fTab', 'tabMoiTK'], ['fMe', 'meToiDa'], ['fSoLuong', 'outputCount'], ['fChoMin', 'delayMin'], ['fChoMax', 'delayMax'],
     ['fThuLai', 'maxRetries'], ['fGian', 'multiTabStagger'], ['fChatAnh', 'chatLuongAnh'], ['fChatVideo', 'chatLuongVideo'], ['fMang', 'networkGuard'],
     ['fNgauNhien', 'randomDelay'], ['fSoThuTu', 'addIndex'], ['fCuon', 'randomScroll'], ['fGoAnh', 'goAnhThamChieu'], ['fDoiTen', 'doiTenTrenFlow'],
-    ['fModelAnh', 'modelAnh'], ['fSangMuse', 'sangMuseKhiHong'], ['fNghiTT', 'nghiThaoTacBat'], ['fNghiTTMin', 'nghiThaoTacMin'], ['fNghiTTMax', 'nghiThaoTacMax']];
+    ['fModelAnh', 'modelAnh'], ['fNghiTT', 'nghiThaoTacBat'], ['fNghiTTMin', 'nghiThaoTacMin'], ['fNghiTTMax', 'nghiThaoTacMax']];
   const O_FLOW_MODEL = [['fModelChinh', 'chinh'], ['fModelPhu', 'phu'], ['fXenKe', 'xenKeMoi'], ['fModelDuPhong', 'duPhong'], ['fThuLaiPhut', 'thuLaiPhut']];
   // Nhận diện tài khoản lỗi (1.2.0, luôn bật) — khớp chuanHoaCaiDat của src/flow/main/an-toan.js.
   const O_FLOW_AN_TOAN = [['fNguong', 'nguong'], ['fNghi', 'nghiPhut']];
@@ -1132,7 +1133,7 @@
       await api.call('datCaiDat', {
         luongMoiTK: $('#cdLuong').value, nghiGiuaLanGui: $('#cdNghi').value, tuThuLai: $('#cdThuLai').value, tuChayLaiLoi: $('#cdChayLaiLoi').value,
         choAnhGiay: $('#cdChoAnh').value, choVideoGiay: $('#cdChoVideo').value, choChuGiay: $('#cdChoChu').value, choNhacGiay: $('#cdChoNhac').value,
-        png: $('#cdPng').checked, tatMayKhiXong: $('#cdTatMay').checked,
+        png: $('#cdPng').checked, doiNenKhiLoi: $('#cdDoiNen').checked, tatMayKhiXong: $('#cdTatMay').checked,
         videoCanhAnh: $('#cdVideoCanhAnh').checked, xoaChatKhiXong: $('#cdXoaChat').checked, xoaDuAnFlowKhiXong: $('#cdXoaDuAnFlow').checked,
         mau: { anh: $('#cdMauAnh').value, video: $('#cdMauVideo').value },
         flow: docCaiDatFlow()

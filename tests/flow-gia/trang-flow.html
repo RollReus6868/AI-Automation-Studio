@@ -7,6 +7,35 @@
   if (/\/project\//.test(location.pathname)) {
     document.body.innerHTML = '<h3>Dự án Flow giả</h3><div class="ProseMirror" contenteditable="true"><p><br></p></div>' +
       '<button aria-label="Tạo">Tạo</button><div id="luoi"></div>';
+    // Flow mới (cookie flow_upload_moi=1): [+] "Add media" (mở bằng pointerdown) → menu → "Upload image" TẠO ô chọn
+    // file không gắn vào trang rồi mở hộp chọn file. Ảnh nhận được vào kho (localStorage, tên = tên file bỏ đuôi).
+    if (/(^|;\s*)flow_upload_moi=1/.test(document.cookie)) {
+      const nut = document.createElement('button');
+      nut.setAttribute('aria-label', 'Add media');
+      nut.innerHTML = '<i class="google-symbols">add_2</i>';
+      document.querySelector('.ProseMirror').after(nut);
+      nut.addEventListener('pointerdown', () => {
+        if (document.querySelector('[role="menu"]')) return;
+        const m = document.createElement('div');
+        m.setAttribute('role', 'menu');
+        m.innerHTML = '<button role="menuitem"><i class="google-symbols">search</i>Search assets</button>' +
+          '<button role="menuitem" class="tai"><i class="google-symbols">upload</i>Upload image</button>';
+        document.body.appendChild(m);
+        m.querySelector('.tai').addEventListener('click', () => {
+          const i = document.createElement('input');
+          i.type = 'file'; i.accept = 'image/*'; i.multiple = true;
+          i.addEventListener('change', async () => {
+            const ds = [];
+            for (const f of i.files) ds.push({ ten: f.name, co: (await f.arrayBuffer()).byteLength });
+            const kho = JSON.parse(localStorage.getItem('khoAnhFlow') || '[]');
+            localStorage.setItem('khoAnhFlow', JSON.stringify([...new Set([...kho, ...ds.filter((x) => x.co > 0).map((x) => x.ten.replace(/\.[^.]+$/, ''))])]));
+            fetch('/__flow-ghi', { method: 'POST', body: JSON.stringify({ loai: 'tai-len-trang', d: { files: ds }, url: location.href }) }).catch(() => {});
+            m.remove();
+          });
+          i.click();
+        });
+      });
+    }
   } else if (/(^|;\s*)flow_dang_xuat=1/.test(document.cookie)) {
     // Chưa đăng nhập: Google đưa sang trang đăng nhập (ngoài /fx/ → app coi là ngoài Flow).
     location.replace(location.href.replace(/\/fx\/.*/, '/signin/v2/identifier'));

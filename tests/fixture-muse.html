@@ -9,6 +9,7 @@
     NOTFOUND → khung ảnh hiện "chat-image-not-found" 2 giây rồi mới có ảnh
     LUOI     → khung ảnh không có <img>, phải bấm "Open generated image" mới thấy
     CHAM     → tạo mất 6 giây (mặc định 2 giây)
+    TU_CHOI  → Muse từ chối: "Mình không thể tạo video từ ảnh này." (ảnh chụp người dùng 16/10/2026)
   Nút dock [data-testid=hatch-dock-more] mở menu bằng POINTERDOWN (như Radix, click() trơn không mở);
   mục cuối menu mở Cài đặt có mức dùng token ([role=progressbar], như Muse 11/10/2026).
   Chưa có cookie muse_login=1 → hiện màn đăng nhập.
@@ -171,6 +172,10 @@ async function veThread(id) {
     return;
   }
   const video = /^Tạo 1 video/.test(t.prompt);
+  if (/TU_CHOI/.test(t.prompt)) {
+    veKhung(user + '<div data-message-item="true" data-message-role="assistant"><div aria-busy="false"><div data-hatch-assistant-message-body="true">Mình không thể tạo video từ ảnh này.</div></div></div>');
+    return;
+  }
   if (/HOI_LAI/.test(t.prompt) || HONG) {
     veKhung(user + '<div data-message-item="true" data-message-role="assistant"><div aria-busy="false"><div data-hatch-assistant-message-body="true">Bạn muốn ảnh theo phong cách nào?</div></div></div>');
     return;
