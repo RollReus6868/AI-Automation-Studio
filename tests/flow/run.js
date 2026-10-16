@@ -1030,7 +1030,9 @@ test('an toàn: giao diện có đủ ô, và trình dò cảnh báo được ti
   }
   // 1.2.0: các ô của chế độ an toàn cũ đã bỏ hẳn (luôn bật, không cửa sổ phút, không giải lao).
   for (const id of ['fAnToan', 'fCuaSo', 'fNghiToiDa', 'fNhanDoi', 'fCuMoi', 'fGiaiLao']) assert.ok(!html.includes(`id="${id}"`), `ô cũ #${id} vẫn còn`);
-  assert.ok(html.includes('id="fSangMuse"') && bangOFlow('O_FLOW').some(([o, k]) => o === 'fSangMuse' && k === 'sangMuseKhiHong'), 'thiếu công tắc Flow hỏng → Muse');
+  // 1.2.1: "Flow hỏng → Muse" thành công tắc chung Muse ⇄ Flow ở Cài đặt → Chạy (#cdDoiNen → caiDat.doiNenKhiLoi).
+  assert.ok(!html.includes('id="fSangMuse"') && !bangOFlow('O_FLOW').some(([o]) => o === 'fSangMuse'), 'công tắc cũ #fSangMuse vẫn còn');
+  assert.ok(html.includes('id="cdDoiNen"') && /doiNenKhiLoi:\s*\$\('#cdDoiNen'\)\.checked/.test(docNguon('src', 'ui', 'app.js')), 'thiếu công tắc Muse ⇄ Flow');
   // Khoá giao diện gửi PHẢI đúng khoá an-toan.js đọc, và có mặc định.
   const khoaDoc = Object.keys(anToan.chuanHoaCaiDat({})).sort();
   assert.deepStrictEqual([...new Set(bang.map(([, k]) => k))].sort(), khoaDoc, 'khoá ô an toàn lệch với an-toan.js');
@@ -1340,6 +1342,54 @@ test('cập nhật: main.js dựng bộ cập nhật, cài khi thoát, không c�
   assert.strictEqual(l.ranh, true);
   l.dsViec = [{ so: 1 }];
   assert.strictEqual(l.ranh, false, 'luồng Flow đang giữ mẻ (kể cả lúc nghỉ) phải tính là đang chạy');
+});
+
+// ── 1.2.1: tải ảnh lên Flow khi engine không thấy ô tải lên ─────────────────
+testAsync('1.2.1 nhật ký 16/10/2026 "Không tìm thấy ô tải ảnh lên của Flow" → bấm nút Tải lên của Flow, đưa file THẬT (tên = mã ảnh); hỏng thì việc báo lỗi + chẩn đoán', async () => {
+  const { LuongFlow } = require('../../src/flow/luong-flow');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'gan-anh-'));
+  const goc = path.join(dir, '001.png');
+  fs.writeFileSync(goc, Buffer.from('anh-that'));
+  const chay = async ({ engineOk, taiOk, khoSauTai = true }) => {
+    let kho = new Set(), goiTai = [];
+    const nhatKy = [];
+    const tabs = { dispatch: async (_id, m) => {
+      if (m.action === 'CHECK_ASSET_NAMES') return { ok: true, missing: m.data.names.filter((n) => !kho.has(n)) };
+      if (m.action === 'UPLOAD_IMAGES_TO_FLOW') {
+        if (!engineOk) return { ok: false, error: 'Không tìm thấy ô tải ảnh lên của Flow. Hãy mở menu [+] → tab Hình ảnh một lần rồi thử lại.' };
+        for (const a of m.data.images) kho.add(a.name.replace(/\.[^.]+$/, ''));
+        return { ok: true };
+      }
+      return { ok: true };
+    } };
+    const l = new LuongFlow({ id: 'L1', taiKhoan: { id: 'tk', ten: 'TK' }, tabs, may: {}, thuMucTam: dir,
+      docAnh: (p) => ({ b64: fs.readFileSync(p).toString('base64'), mime: 'image/png' }), log: (m, c) => nhatKy.push(`[${m}] ${c}`),
+      taiAnhLen: async (wc, files) => {
+        goiTai.push(files.map((f) => [path.basename(f), fs.readFileSync(f, 'utf8')]));
+        if (!taiOk) return { ok: false, buoc: [], loi: 'không thấy ô tải lên, nút Tải lên hay ô nhập prompt', chanDoan: { oNhap: true, soInput: 0, nut: ['[add_2] "Add media"'] } };
+        if (khoSauTai) for (const f of files) kho.add(path.basename(f).replace(/\.[^.]+$/, ''));
+        return { ok: true, cach: 'hop-chon-file', chacChan: true, buoc: ['moMenu: Add media', 'bamTaiLen: Upload image'] };
+      } });
+    l._ngu = async () => true;
+    l.tab = { id: 't1', view: { webContents: { isDestroyed: () => false, executeJavaScript: async () => { throw new Error('giả'); } } } };
+    const j = { so: 1, loai: 'video', thamChieu: [goc] };
+    const r = await l._ganAnh([j], { anhCua: (v) => v.thamChieu }, 0);
+    return { r, j, goiTai, nhatKy };
+  };
+  try {
+    let k = await chay({ engineOk: false, taiOk: true });
+    const ma = k.r.maCua.get(k.j)[0];
+    assert.strictEqual(k.r.hong.size, 0, k.nhatKy.join('\n'));
+    assert.deepStrictEqual(k.goiTai, [[[`${ma}.png`, 'anh-that']]], 'file đưa lên mang tên mã ảnh, đúng nội dung ảnh nguồn');
+    assert.ok(k.nhatKy.some((x) => /Engine không tải được ảnh lên \(Không tìm thấy ô tải ảnh lên/.test(x)), k.nhatKy.join('\n'));
+    assert.ok(k.nhatKy.some((x) => /Đã đưa 1 ảnh lên Flow \(bấm Add media → Upload image\)/.test(x)), k.nhatKy.join('\n'));
+    assert.deepStrictEqual(fs.readdirSync(dir).filter((f) => f.startsWith('tai-len-')), [], 'dọn thư mục tạm chứa bản chép');
+    k = await chay({ engineOk: true, taiOk: true });
+    assert.ok(k.r.hong.size === 0 && k.goiTai.length === 0, 'engine tải được thì không bấm gì thêm');
+    k = await chay({ engineOk: false, taiOk: false });
+    assert.ok(/Không đưa được ảnh lên kho Flow/.test(k.r.hong.get(k.j)), 'tải hỏng → việc báo lỗi (điều phối chuyển tài khoản / sang Muse)');
+    assert.ok(k.nhatKy.some((x) => /Tải ảnh lên Flow hỏng: không thấy ô tải lên/.test(x)) && k.nhatKy.some((x) => /Quanh ô nhập Flow: ô nhập có, 0 ô chọn file, nút: \[add_2\] "Add media"/.test(x)), k.nhatKy.join('\n'));
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 
 // ── macOS ──────────────────────────────────────────────────────────────────

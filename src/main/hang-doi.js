@@ -249,6 +249,19 @@ function laChanKhuVuc(chu) {
     /(bị chặn|chặn|không khả dụng|không hỗ trợ|chưa hỗ trợ|blocked|not available|unavailable|not supported|restricted)/.test(t);
 }
 
+/**
+ * 1.2.1 — Muse TỪ CHỐI tạo từ ảnh / prompt này ("Mình không thể tạo video từ ảnh này."): lỗi của chính
+ * việc đó (tài khoản Muse khác cũng từ chối) → chuyển riêng việc này sang Flow. Câu ngắn, có chữ "không
+ * thể / can't…" + động từ tạo + video/ảnh. Chặn khu vực / 403 là lỗi tài khoản → laChanKhuVuc, không phải đây.
+ */
+function laTuChoi(chu) {
+  const t = String(chu || '').toLowerCase().replace(/\s+/g, ' ').trim();
+  if (!t || t.length > 400 || laChanKhuVuc(t)) return false;
+  return (/(không thể|chưa thể|can['’]?t|cannot|can not|unable to|not able to)\s+(?:\S+\s+){0,4}?(tạo|làm|dựng|create|generate|make|produce|animate|turn)/.test(t) ||
+      /không (tạo|làm|dựng) (được|nổi)/.test(t)) &&
+    /(video|ảnh|hình|image|photo|picture|clip)/.test(t);
+}
+
 /** Thứ tự tự nhiên: anh2 < anh10. */
 function soSanhTuNhien(a, b) {
   return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' });
@@ -276,7 +289,7 @@ function keHoachTai(viec, tonTai) {
 
 const HD = {
   TY_LE, MAU_MAC_DINH, MAU_TEN_MAC_DINH, MAU_TEN_ANH_MAC_DINH, PROMPT_VIDEO_MAC_DINH, slugTen, tachPrompt, timNhanVat, taoTinNhan, tenFile, mimeTuDuoi, chonKhoang,
-  viecKeTiep, taiKhoanChoViec, taiKhoanChoViecDs, thoiGianDuKien, tienDoUoc, daXong, laTraLoiChu, laChanKhuVuc, soSanhTuNhien, keHoachTai
+  viecKeTiep, taiKhoanChoViec, taiKhoanChoViecDs, thoiGianDuKien, tienDoUoc, daXong, laTraLoiChu, laChanKhuVuc, laTuChoi, soSanhTuNhien, keHoachTai
 };
 // Dùng chung cho tiến trình chính (require) và giao diện (<script> → window.HD).
 if (typeof module !== 'undefined' && module.exports) module.exports = HD;

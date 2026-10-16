@@ -55,6 +55,9 @@ const CAI_DAT_MAC_DINH = {
   tuChayLaiLoi: 2,        // hết hàng chờ mà còn việc lỗi → tự đưa về chạy lại, tối đa mấy lượt
   tatMayKhiXong: false,   // chạy hết hàng chờ thì tắt máy (Windows, macOS) — như Flow Automation Studio
   png: true,              // đổi ảnh webp của Muse sang png
+  // 1.2.1: bên này (Muse / Flow) hỏng thì việc tự chuyển sang bên kia: hết tài khoản dùng được, hỏng ở mọi
+  // tài khoản, hay Muse từ chối tạo video từ một ảnh. Mỗi việc chỉ đổi bên một lần (không đá qua đá lại).
+  doiNenKhiLoi: true,
   tachPrompt: 'dong',     // 'dong' | 'doan'
   mau: { ...hd.MAU_MAC_DINH },
   flow: chuanHoaFlow({})  // cài đặt Google Flow (src/flow/cai-dat-flow.js)
@@ -79,6 +82,7 @@ class DieuPhoi {
     this.mauPrompt = Array.isArray(s.mauPrompt) ? s.mauPrompt : [];
     this.caiDat = { ...CAI_DAT_MAC_DINH, ...(s.caiDat || {}) };
     this.caiDat.mau = { ...hd.MAU_MAC_DINH, ...(this.caiDat.mau || {}) };
+    const sangMuseCu = (this.caiDat.flow || {}).sangMuseKhiHong;   // 1.2.0 — chuanHoaFlow bỏ khoá này, đọc trước (mốc 4)
     this.caiDat.flow = chuanHoaFlow(this.caiDat.flow);
     // 1.0.0 có một thư mục chung "thuMucRa" → dùng làm thư mục cho cả ảnh lẫn video.
     if (this.caiDat.thuMucRa) {
@@ -102,6 +106,11 @@ class DieuPhoi {
     if (this.caiDat.moc < 3) {
       if (this.caiDat.flow.maxRetries === 2) this.caiDat.flow.maxRetries = 1;
       this.caiDat.moc = 3;
+    }
+    // 1.2.1: "Flow hỏng hết thì ảnh sang Muse" (flow.sangMuseKhiHong) thành công tắc chung Muse ⇄ Flow.
+    if (this.caiDat.moc < 4) {
+      if (sangMuseCu === false) this.caiDat.doiNenKhiLoi = false;
+      this.caiDat.moc = 4;
     }
     // Việc đang chạy lúc app tắt → về hàng chờ, GIỮ thread để lấy lại kết quả.
     for (const j of this.viec) if (j.trangThai === 'chay') { j.trangThai = 'cho'; j.buoc = ''; }
@@ -345,6 +354,7 @@ class DieuPhoi {
     m.tenAnh = String(m.tenAnh || '').trim() || hd.MAU_TEN_ANH_MAC_DINH;
     m.tenVideo = String(m.tenVideo || '').trim() || hd.MAU_TEN_MAC_DINH;
     m.taiAnh = m.taiAnh !== false; m.taiVideo = m.taiVideo !== false; m.tatMayKhiXong = !!m.tatMayKhiXong;
+    m.doiNenKhiLoi = m.doiNenKhiLoi !== false;
     m.videoCanhAnh = m.videoCanhAnh !== false; m.xoaChatKhiXong = !!m.xoaChatKhiXong; m.xoaDuAnFlowKhiXong = !!m.xoaDuAnFlowKhiXong;
     m.thuMucVideoAnh = String(m.thuMucVideoAnh || '').trim();
     m.thuMucNhac = String(m.thuMucNhac || '').trim();
@@ -438,8 +448,12 @@ class DieuPhoi {
     const nhamToi = new Map();
     for (const j of this.viec) {
       if (j.trangThai !== 'cho') continue;
-      // Flow tạo ảnh mà mọi tài khoản Flow của dự án đều hỏng (nghỉ / chưa đăng nhập) → chuyển sang Muse.
-      if (j.nen === 'flow' && j.loai === 'anh' && !this._flowConDung(j.duAn)) this._sangMuse(j.duAn, 'mọi tài khoản Flow của dự án đều đang lỗi / nghỉ');
+      // Mọi tài khoản Muse / Flow của dự án đều không chạy được việc này (nghỉ / chưa đăng nhập / bị chặn
+      // loại việc) → chuyển sang bên kia, khỏi tạm dừng cả hàng chờ.
+      if (!this._conDung(j.duAn, j.nen, j.loai) && this._coTheDoiNen(j)) {
+        const ds = this.viec.filter((v) => v.trangThai === 'cho' && v.duAn === j.duAn && v.nen === j.nen && v.loai === j.loai && this._coTheDoiNen(v));
+        this._doiNen(ds, `mọi tài khoản ${TEN_NEN[j.nen]} của dự án đều đang lỗi / nghỉ`);
+      }
       let ds = this._tkCho(j);
       // Các tài khoản việc này chưa thử đều đang nghỉ / chưa đăng nhập → chỉ còn tài khoản đã lỗi:
       // coi như hết vòng, quay lại từ đầu (tài khoản chính). Hết số vòng → Lỗi luôn.
@@ -448,8 +462,8 @@ class DieuPhoi {
         j.vongTk = (j.vongTk || 0) + 1;
         j.tkLoi = [];
         if (j.vongTk > this.caiDat.tuThuLai) {
-          // Flow tạo ảnh hỏng ở mọi tài khoản Flow qua đủ vòng → thôi Flow, tạo tiếp ảnh của dự án ở Muse.
-          if (j.nen === 'flow' && j.loai === 'anh' && this._sangMuse(j.duAn, `#${j.so} hỏng ở mọi tài khoản Flow`, j)) {
+          // Hỏng ở mọi tài khoản qua đủ vòng → thử bên kia (Muse ⇄ Flow) trước khi đánh Lỗi.
+          if (this._coTheDoiNen(j) && this._doiNen([j], `#${j.so} hỏng ở mọi tài khoản ${TEN_NEN[j.nen]}`)) {
             ds = this._tkCho(j);
           } else {
             // Lần chạy dở ở tài khoản dự phòng đã xoá chữ lỗi và đổi tài khoản → trả lại lỗi gốc + tài khoản đã lỗi.
@@ -581,40 +595,50 @@ class DieuPhoi {
   }
 
   /** Dự án của việc còn tài khoản KHÁC dùng được trên cùng nền tảng (để chuyển sang dự phòng) — hoặc
-   *  việc là ảnh Flow và dự án chuyển được sang Muse khi Flow hỏng hết. */
+   *  việc chuyển được sang bên kia (Muse ⇄ Flow). */
   coDuPhong(tkId) {
     return this.viec.some((j) => j.taiKhoan === tkId && j.trangThai === 'chay' &&
-      (this._dsTk(j.duAn, j.nen).some((id) => id !== tkId && !this._nghi(id)) ||
-       (j.nen === 'flow' && j.loai === 'anh' && this._coTheSangMuse(j.duAn))));
+      (this._dsTk(j.duAn, j.nen).some((id) => id !== tkId && !this._nghi(id)) || this._coTheDoiNen(j)));
   }
 
-  /** Dự án còn tài khoản Flow nào chạy được (đăng nhập rồi, không đang nghỉ). */
-  _flowConDung(duAnId) {
-    return this._dsTk(duAnId, 'flow').some((id) => !this._nghi(id));
+  _nenKhac(nen) { return nen === 'muse' ? 'flow' : nen === 'flow' ? 'muse' : null; }
+  /** Dự án còn tài khoản `nen` nào chạy được loại việc này (đăng nhập rồi, không nghỉ, không bị chặn loại). */
+  _conDung(duAnId, nen, loai) {
+    return this._dsTk(duAnId, nen).some((id) => !this._nghi(id) && !this._nghiLoai(id, loai));
   }
-  _coTheSangMuse(duAnId) {
-    return !!this.caiDat.flow.sangMuseKhiHong && this._dsTk(duAnId, 'muse').length > 0;
+  /** Việc chuyển được sang bên kia: bật công tắc, chưa từng ở bên đó, bên đó có tài khoản chạy được ngay. */
+  _coTheDoiNen(j) {
+    const k = this._nenKhac(j.nen);
+    return !!(k && this.caiDat.doiNenKhiLoi && !(j.daQuaNen || []).includes(k) &&
+      this._tkDoiNen(j.duAn, k).some((id) => !this._nghi(id) && !this._nghiLoai(id, j.loai)));
+  }
+  /** Tài khoản bên kia nhận được việc chuyển sang: dự án tự chọn, hoặc đã đăng nhập chắc chắn — tài khoản
+   *  mặc định chưa ai đăng nhập (vd "Flow 1" của người chỉ dùng Muse) không được tính. */
+  _tkDoiNen(duAnId, nen) {
+    const d = this.duAn.find((x) => x.id === duAnId);
+    const chon = new Set((d && d.taiKhoan) || []);
+    return this._dsTk(duAnId, nen).filter((id) => { const a = this.o.taiKhoan.tim(id); return chon.has(id) || (a && a.trangThai === 'da-dang-nhap'); });
   }
 
   /**
-   * Flow hỏng hết tài khoản khi đang tạo ảnh → thôi Flow cho dự án này: mọi việc ẢNH Flow còn chờ của dự
-   * án chuyển sang Muse, gửi mới từ đầu. Có `j` = chỉ riêng việc đó (hỏng ở mọi tài khoản Flow qua đủ
-   * vòng — có thể chỉ prompt đó hỏng, tài khoản vẫn tốt). Tắt ở Cài đặt → Google Flow.
-   * @returns số việc đã chuyển (0 = không chuyển được: tắt tuỳ chọn / dự án không có tài khoản Muse)
+   * Chuyển việc sang bên kia (Muse ⇄ Flow), gửi mới từ đầu: ảnh nguồn / tham chiếu giữ nguyên, Flow tự tải
+   * ảnh lên kho của nó. Mỗi việc chỉ đổi bên một lần (`daQuaNen`).
+   * @returns số việc đã chuyển
    */
-  _sangMuse(duAnId, lyDo, j) {
-    if (!this._coTheSangMuse(duAnId)) return 0;
-    const ds = j ? [j] : this.viec.filter((v) => v.duAn === duAnId && v.nen === 'flow' && v.loai === 'anh' && v.trangThai === 'cho');
-    if (!ds.length) return 0;
-    for (const v of ds) {
-      Object.assign(v, { nen: 'muse', trangThai: 'cho', buoc: '', thread: '', taiKhoan: '', tkLoi: [], vongTk: 0, thu: 0, loi: '', tuFlow: true });
+  _doiNen(ds, lyDo) {
+    const chuyen = ds.filter((v) => this._coTheDoiNen(v));
+    if (!chuyen.length) return 0;
+    const tu = chuyen[0].nen, den = this._nenKhac(tu);
+    for (const v of chuyen) {
+      v.daQuaNen = [...new Set([...(v.daQuaNen || []), v.nen, den])];
+      Object.assign(v, { nen: den, trangThai: 'cho', buoc: '', thread: '', taiKhoan: '', tkLoi: [], vongTk: 0, thu: 0, loi: '' });
+      if (den === 'muse') v.tuFlow = true;
       delete v.flowAnh;
     }
-    const d = this.duAn.find((x) => x.id === duAnId);
-    this.log('warning', j ? `🔀 Flow: ${lyDo} — chuyển ảnh #${j.so} sang Muse.`
-      : `🔀 Flow: ${lyDo} — dừng Flow cho dự án "${d ? d.ten : duAnId}", chuyển ${ds.length} ảnh còn lại sang Muse (#${ds.map((v) => v.so).join(', #')}).`);
+    const loai = chuyen[0].loai === 'video' ? 'video' : 'ảnh';
+    this.log('warning', `🔀 ${TEN_NEN[tu]} → ${TEN_NEN[den]}: ${lyDo} — chuyển ${chuyen.length > 1 ? `${chuyen.length} ${loai}` : loai} #${chuyen.map((v) => v.so).join(', #')} sang ${TEN_NEN[den]}.`);
     this.luu();
-    return ds.length;
+    return chuyen.length;
   }
 
   _ketThuc(j, r, tk) {
@@ -678,6 +702,11 @@ class DieuPhoi {
         this.lyDoNghi[tkId] = r.loi;
         this.log('warning', `⚠ "${this._tenTk(tkId)}": ${r.loi} — tài khoản này thôi nhận việc ${TEN_LOAI[j.loai] || j.loai} ${Math.round(NGHI_CHAN_LOAI_MS / 60000)} phút, việc chuyển sang tài khoản khác.`);
       }
+    } else if (r.tuChoi && this._coTheDoiNen(j)) {
+      // Muse nói không tạo được video / ảnh từ CHÍNH ảnh này (lỗi của ảnh, không phải của tài khoản —
+      // tài khoản Muse khác cũng từ chối) → chỉ riêng việc này sang Flow ngay, việc khác vẫn chạy ở Muse.
+      j.loiTruoc = r.loi;
+      this._doiNen([j], `#${j.so} ${r.loi}`);
     } else if (r.matKetNoi) {
       // Muse của TÀI KHOẢN này hỏng chứ không phải việc hỏng: không tính lần thử, tài khoản tạm nghỉ,
       // việc sang tài khoản dự phòng (không còn tài khoản nào → _vong tạm dừng hàng chờ, khỏi phí lượt).
@@ -713,7 +742,7 @@ class DieuPhoi {
       this.loiLienTiep[tkId] = (this.loiLienTiep[tkId] || 0) + 1;
       // Tài khoản lỗi liên tiếp → cả dự án sang tài khoản dự phòng một thời gian (chỉ khi có dự phòng).
       // Ảnh Flow chuyển được sang Muse thì Muse cũng tính là dự phòng.
-      const coDuPhong = ds.some((id) => id !== tkId) || (j.nen === 'flow' && j.loai === 'anh' && this._coTheSangMuse(j.duAn));
+      const coDuPhong = ds.some((id) => id !== tkId) || this._coTheDoiNen(j);
       if (this.loiLienTiep[tkId] >= LOI_LIEN_TIEP_NGHI && coDuPhong) this._choNghi(tkId, `lỗi ${this.loiLienTiep[tkId]} việc liên tiếp`);
       j.thu = (j.thu || 0) + 1;
       // Mọi tài khoản của dự án đều đã lỗi việc này → hết một vòng, vòng sau bắt đầu lại từ tài khoản chính.
@@ -736,8 +765,8 @@ class DieuPhoi {
           this.log('warning', `↻ #${j.so} ${r.loi} — thử lại ở "${this._tenTk(sang)}" (${nhan})`);
         }
         Object.assign(j, { trangThai: 'cho', buoc: '', loi: r.loi });
-      } else if (j.nen === 'flow' && j.loai === 'anh' && this._sangMuse(j.duAn, `#${j.so} ${r.loi} ở mọi tài khoản Flow`, j)) {
-        // Đã chuyển sang Muse (cùng các ảnh Flow còn chờ của dự án).
+      } else if (this._coTheDoiNen(j) && this._doiNen([j], `#${j.so} ${r.loi} ở mọi tài khoản ${TEN_NEN[j.nen]}`)) {
+        // Đã chuyển sang bên kia.
       } else {
         Object.assign(j, { trangThai: 'loi', buoc: '', loi: r.loi, xongLuc: Date.now() });
         this.log('error', `❌ #${j.so} ${r.loi}${ds.length > 1 ? ` (đã thử ${soVong} vòng qua ${ds.length} tài khoản)` : ''}`);

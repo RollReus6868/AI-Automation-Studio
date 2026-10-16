@@ -158,6 +158,11 @@ class Luong {
         return { ok: false, chanLoai: true, loi: `Muse báo tài khoản bị chặn tạo ${job.loai === 'video' ? 'video' : 'ảnh'}: "${kq.chu.slice(0, 200)}"` };
       }
       const giay = coChuLuc ? (Date.now() - coChuLuc) / 1000 : 0;
+      // Muse từ chối tạo từ ảnh / prompt này → báo ngay (chờ vài giây cho chắc không có khung nào nạp):
+      // điều phối chuyển riêng việc này sang Flow.
+      if (kq.chu && !kq.dangGo && !kq.soKhungAnh && !kq.soKhungVideo && giay >= 5 && hd.laTuChoi(kq.chu)) {
+        return { ok: false, tuChoi: true, loi: `Muse từ chối tạo ${job.loai === 'video' ? 'video' : 'ảnh'}: "${kq.chu.slice(0, 200)}"` };
+      }
       if (hd.laTraLoiChu(kq, giay, ctx.choChuGiay)) {
         return { ok: false, loi: `Muse trả lời chữ, không có ${job.loai === 'video' ? 'video' : 'ảnh'}: "${kq.chu.slice(0, 200)}"` };
       }

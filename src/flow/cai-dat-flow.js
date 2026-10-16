@@ -38,8 +38,6 @@ const FLOW_MAC_DINH = {
   // Flow báo "hoạt động bất thường" / hết lượt → đổi tài khoản ngay; `nguong` prompt KHÁC NHAU hỏng
   // liền nhau (chưa prompt nào xong xen giữa) → đổi tài khoản; tài khoản lỗi nghỉ `nghiPhut` phút.
   anToan: { nguong: 2, nghiPhut: 15 },
-  // Tạo ảnh Flow mà mọi tài khoản Flow của dự án đều hỏng → chuyển ảnh còn lại sang Muse.
-  sangMuseKhiHong: true,
   // Chất lượng tải về
   chatLuongAnh: 'img_2k',
   chatLuongVideo: '1080p',
@@ -85,7 +83,8 @@ function chuanHoaFlow(raw) {
   m.tabMoiTK = Math.round(so(m.tabMoiTK, 1, 4, 1));
   m.meToiDa = Math.round(so(m.meToiDa, 1, 50, 10));
   m.networkGuard = m.networkGuard === 'off' ? 'off' : 'auto';
-  for (const k of ['randomDelay', 'voiceSync', 'addIndex', 'randomScroll', 'goAnhThamChieu', 'nghiThaoTacBat', 'doiTenTrenFlow', 'sangMuseKhiHong']) m[k] = !!m[k];
+  for (const k of ['randomDelay', 'voiceSync', 'addIndex', 'randomScroll', 'goAnhThamChieu', 'nghiThaoTacBat', 'doiTenTrenFlow']) m[k] = !!m[k];
+  delete m.sangMuseKhiHong;   // 1.2.1: thành công tắc chung caiDat.doiNenKhiLoi (dieu-phoi.js, mốc 4)
   if (!['img_4k', 'img_2k', 'img_1k'].includes(m.chatLuongAnh)) m.chatLuongAnh = 'img_2k';
   if (!['4k', '1080p', '720p'].includes(m.chatLuongVideo)) m.chatLuongVideo = '1080p';
   return m;

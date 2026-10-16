@@ -12,6 +12,9 @@
 //    cookie flow_hong=1      → MỌI dòng ERROR (tài khoản này hỏng → chuyển dự phòng)
 //    cookie flow_khong_tai=1 → tạo xong (COMPLETED) nhưng KHÔNG BAO GIỜ tải về (như "Chờ 120s mà Google chưa
 //                              xuất file" lặp mãi ở nhật ký 16/10/2026) — đứng đó tới khi bị dừng
+//    cookie flow_upload_moi=1 → như Flow mới (nhật ký 16/10/2026): engine KHÔNG tải ảnh lên được ("Không tìm thấy
+//                              ô tải ảnh lên…"); trang dự án có nút [+] "Add media" → "Upload image" mở hộp chọn
+//                              file (ô chọn file không gắn vào trang) — app phải tự bấm và đưa file vào
 //  Kho ảnh Flow của tài khoản = localStorage của trang (mỗi tài khoản một phiên).
 // ============================================================================
 const gui = (m) => chrome.runtime.sendMessage(m);
@@ -92,6 +95,11 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     }
     case 'UPLOAD_IMAGES_TO_FLOW': {
       const imgs = d.images || [];
+      if (/(^|;\s*)flow_upload_moi=1/.test(document.cookie)) {
+        ghi('upload-hong', { names: imgs.map((i) => i.name) });
+        setTimeout(() => sendResponse({ ok: false, error: 'Không tìm thấy ô tải ảnh lên của Flow. Hãy mở menu [+] → tab Hình ảnh một lần rồi thử lại.' }), 300);
+        return true;
+      }
       ghi('upload', { names: imgs.map((i) => i.name), dataUrl: imgs.map((i) => String(i.dataUrl || '').slice(0, 22)) });
       themKho(imgs.map((i) => String(i.name).replace(/\.[^.]+$/, '')));
       setTimeout(() => sendResponse({ ok: true, uploaded: imgs.length }), 300);
