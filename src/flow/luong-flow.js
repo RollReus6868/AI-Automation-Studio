@@ -270,6 +270,7 @@ class LuongFlow {
       const files = new Map(chay.map((j) => [j, []]));
       const hang = new Map();
       const xongTaoLuc = new Map();    // việc → lúc Flow báo tạo xong (COMPLETED) — để biết tải về bị kẹt
+      let taiGanNhat = 0;              // lúc file gần nhất của mẻ về tới — engine tải lần lượt từng file
       const thuMucTai = path.join(this.thuMucTam, `me-${Date.now().toString(36)}`);
       fs.mkdirSync(thuMucTai, { recursive: true });
       let lanCuoi = Date.now();
@@ -344,6 +345,7 @@ class LuongFlow {
           if (!j) { goc = goc.replace(/_\d+$/, ''); j = theoTen.get(goc); }
           if (!j) { this.log('warning', `⚠ [${this.id}] Tải về file lạ (không thuộc việc nào của mẻ): ${path.basename(duongDan)}`); return; }
           files.get(j).push(duongDan);
+          taiGanNhat = Date.now();
           thuXong(j);
           hetViec();
         };
@@ -357,10 +359,13 @@ class LuongFlow {
             return ket('xong');
           }
           // Tạo xong mà tải về kẹt quá lâu → việc đó hỏng (sang tài khoản khác), tính là một lỗi của tài khoản.
+          // Đếm từ lúc việc tạo xong HOẶC lúc file gần nhất của mẻ về (cái nào muộn hơn): engine tải lần lượt,
+          // mỗi file có thể chờ Google xuất tới 120 s — mẻ 10 ảnh tải đều đều thì không phải kẹt.
+          const choTai = this.choTaiMs >= 60000 ? `${Math.round(this.choTaiMs / 60000)} phút` : `${Math.round(this.choTaiMs / 1000)} giây`;
           for (const [j, luc] of xongTaoLuc) {
-            if (!conLai.has(j) || files.get(j).length || Date.now() - luc < this.choTaiMs) continue;
-            this.log('error', `❌ [${this.id}] #${j.so}: Flow tạo xong nhưng ${Math.round(this.choTaiMs / 60000)} phút chưa tải về được — bỏ, chạy lại ở tài khoản khác.`);
-            xong(j, { ok: false, loi: `Flow tạo xong nhưng quá ${Math.round(this.choTaiMs / 60000)} phút chưa tải về được` });
+            if (!conLai.has(j) || files.get(j).length || Date.now() - Math.max(luc, taiGanNhat) < this.choTaiMs) continue;
+            this.log('error', `❌ [${this.id}] #${j.so}: Flow tạo xong nhưng ${choTai} chưa tải về được — bỏ, chạy lại ở tài khoản khác.`);
+            xong(j, { ok: false, loi: `Flow tạo xong nhưng quá ${choTai} chưa tải về được` });
             if (this.may.ghiLoiTai) this.may.ghiLoiTai(t, [...theoSo].find(([, v]) => v === j)[0]).catch(() => {});
             if (!conLai.size) {
               nhipTT.huy(t);
