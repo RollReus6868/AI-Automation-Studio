@@ -1462,6 +1462,25 @@ testAsync('1.2.2 tải / dò ảnh trên Flow hỏng → lưu HTML bảng kho ra
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 
+// ── 1.2.3: menu Tải xuống — 1080p / 4K bị khoá ("Nâng cấp") ────────────────
+test('1.2.3 nhật ký 16/10 "Chờ 120s mà Google chưa xuất file" ×3: tab Flow tiêm trình ẩn mục chất lượng bị khoá; tải hỏng thì giữ menu cho tệp chẩn đoán', () => {
+  const t = docGoc('src', 'flow', 'tab-flow.js');
+  const iEngine = t.indexOf("['engine dò DOM'"), iTai = t.indexOf("['trình ẩn chất lượng bị khoá', n.taiVe]"), iChot = t.indexOf("['chốt hoàn tất'");
+  assert.ok(iEngine > 0 && iTai > iEngine && iChot > iTai, 'thiếu / sai chỗ giai đoạn "trình ẩn chất lượng bị khoá"');
+  const { docNguon: nguon } = require('../../src/flow/tab-flow');
+  assert.ok(/window\.__flowTaiVe = \{ anKhoa: anKhoa, menuCuoi: '' \}/.test(nguon().taiVe));
+  // Engine chỉ hạ chất lượng khi KHÔNG thấy mục 1080p, và bỏ qua mục không hiện — hai điều trình ẩn dựa vào.
+  const e = nguon().engine;
+  assert.ok(e.includes("'1080p': ['720p', '270p', '4k']") && e.includes("return st.visibility !== 'hidden'"), 'engine đổi cách chọn chất lượng — xem lại flow-tai-ve.js');
+  const l = docGoc('src', 'flow', 'luong-flow.js');
+  assert.ok(/this\._chupChanDoan\(`#\$\{j\.so\} tạo xong nhưng quá \$\{choTai\} chưa tải về được`, false\)/.test(l), 'tải về quá hạn chưa lưu tệp chẩn đoán (không mở bảng [+])');
+  // Trang Google bật Trusted Types: tệp tiêm không được gán innerHTML (nhật ký: "Script failed to execute").
+  for (const f of ['flow-kho-anh.js', 'flow-tai-ve.js', 'flow-tai-anh.js', 'flow-mode.js', 'flow-model.js', 'flow-bam-tao.js', 'flow-anh-tham-chieu.js', 'flow-canh-bao.js']) {
+    const src = docGoc('src', 'flow', 'inject', f).replace(/\/\/.*$/gm, '');
+    assert.ok(!/\.innerHTML\s*=|insertAdjacentHTML|document\.write/.test(src), `${f} gán HTML thô — trang Flow (Trusted Types) sẽ ném lỗi`);
+  }
+});
+
 // ── macOS ──────────────────────────────────────────────────────────────────
 
 test('macOS: cấu hình đóng gói đủ để Mac chip Apple mở được', () => {

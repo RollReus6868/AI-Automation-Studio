@@ -105,7 +105,8 @@
     var bo = c.querySelectorAll('script, style, link, noscript, iframe');
     for (var i = 0; i < bo.length; i++) bo[i].remove();
     var svg = c.querySelectorAll('svg');
-    for (var j = 0; j < svg.length; j++) svg[j].innerHTML = '';
+    // KHÔNG dùng innerHTML: trang Google bật Trusted Types, gán innerHTML là ném lỗi (nhật ký 16/10: "Script failed to execute").
+    for (var j = 0; j < svg.length; j++) while (svg[j].firstChild) svg[j].removeChild(svg[j].firstChild);
     var tat = c.querySelectorAll('*');
     for (var k = 0; k < tat.length; k++) {
       var e = tat[k];
@@ -123,6 +124,7 @@
     var khung = document.querySelector('flow-prompt-box') ||
       (document.querySelector('[role="textbox"][contenteditable="true"], .ProseMirror') || {}).parentElement;
     if (khung) phan.push(lamSach(khung));
+    if (window.__flowTaiVe && window.__flowTaiVe.menuCuoi) phan.push('<!-- menu Tải xuống gần nhất -->\n' + window.__flowTaiVe.menuCuoi);
     var html = phan.join('\n\n<!-- ──────────── -->\n\n');
     // Không để lọt địa chỉ email / tên tài khoản Google (nếu menu tài khoản đang mở) vào tệp gửi đi.
     html = html.replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, '[email]')
