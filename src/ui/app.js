@@ -82,20 +82,26 @@
     return ds.length ? ds : S.taiKhoan.filter((a) => nenTk(a) === nen).map((a) => a.id);
   };
   const tenTk = (id) => (S.taiKhoan.find((a) => a.id === id) || { ten: id }).ten;
-  /** Ô chọn tài khoản trong hộp thoại: mỗi nơi chạy một tài khoản CHÍNH + các tài khoản DỰ PHÒNG. */
+  /**
+   * Ô chọn tài khoản trong hộp thoại: mỗi nơi chạy một tài khoản CHÍNH + các tài khoản DỰ PHÒNG.
+   * Gọn (16/10/2026, ảnh người dùng: hộp dài quá màn hình): "Chính" và "Cùng lúc" nằm một hàng, dự phòng là
+   * các ô chọn xếp nhiều cột; hộp thoại tự cuộn khi vẫn dài.
+   */
   function htmlChonTk(d) {
-    return DS_NEN.map((nen) => {
-      const tk = S.taiKhoan.filter((a) => nenTk(a) === nen);
-      if (!tk.length) return `<div class="chon-tk"><b>${TEN_NEN[nen]}</b><span>Chưa có tài khoản ${TEN_NEN[nen]} — thêm ở mục Tài khoản.</span></div>`;
-      const ds = tkCuaDuAn(d, nen), chinh = ds[0], song = soSong(d, nen);
-      return `<div class="chon-tk nhom-nen"><b>${TEN_NEN[nen]}</b>
-        <label>Tài khoản chính<select name="tkChinh_${nen}" data-nen-chinh="${nen}">${tk.map((a) =>
-          `<option value="${esc(a.id)}" ${a.id === chinh ? 'selected' : ''}>${esc(a.ten)}${a.trangThai === 'can-dang-nhap' ? ' (chưa đăng nhập)' : ''}</option>`).join('')}</select></label>
-        <label>Chạy cùng lúc<select name="song_${nen}">${Array.from({ length: Math.max(tk.length, song) }, (_, i) => i + 1).map((n) =>
-          `<option value="${n}" ${n === song ? 'selected' : ''}>${n === 1 ? '1 tài khoản (chỉ tài khoản chính)' : `${n} tài khoản (chính + ${n - 1} tài khoản đầu danh sách dự phòng)`}</option>`).join('')}</select></label>
-        <span>Dự phòng — chạy cùng lúc theo số trên, tài khoản nào lỗi thì tài khoản kế tiếp vào thay (theo thứ tự):</span>
-        ${tk.map((a) => `<label class="hang-tk" data-du="${esc(a.id)}" data-nen="${nen}" ${a.id === chinh ? 'hidden' : ''}><input type="checkbox" name="du_${esc(a.id)}" ${ds.slice(1).includes(a.id) ? 'checked' : ''}>${esc(a.ten)}</label>`).join('')}</div>`;
-    }).join('');
+    return `<p class="chon-tk-giai">Dự phòng: tài khoản nào lỗi thì tài khoản kế tiếp (theo thứ tự) vào thay. <i>Cùng lúc</i> &gt; 1: chính + các dự phòng đầu danh sách chạy song song.</p>` +
+      DS_NEN.map((nen) => {
+        const tk = S.taiKhoan.filter((a) => nenTk(a) === nen);
+        if (!tk.length) return `<div class="chon-tk nhom-nen"><b>${TEN_NEN[nen]}</b><span>Chưa có tài khoản ${TEN_NEN[nen]} — thêm ở mục Tài khoản.</span></div>`;
+        const ds = tkCuaDuAn(d, nen), chinh = ds[0], song = soSong(d, nen);
+        return `<div class="chon-tk nhom-nen"><b>${TEN_NEN[nen]}</b>
+        <div class="chon-tk-hang">
+          <label>Tài khoản chính<select name="tkChinh_${nen}" data-nen-chinh="${nen}">${tk.map((a) =>
+            `<option value="${esc(a.id)}" ${a.id === chinh ? 'selected' : ''}>${esc(a.ten)}${a.trangThai === 'can-dang-nhap' ? ' (chưa đăng nhập)' : ''}</option>`).join('')}</select></label>
+          <label>Chạy cùng lúc<select name="song_${nen}">${Array.from({ length: Math.max(tk.length, song) }, (_, i) => i + 1).map((n) =>
+            `<option value="${n}" ${n === song ? 'selected' : ''}>${n === 1 ? '1 (chỉ tài khoản chính)' : `${n} tài khoản`}</option>`).join('')}</select></label>
+        </div>
+        ${tk.length > 1 ? `<span>Dự phòng:</span><div class="chon-tk-du">${tk.map((a) => `<label class="hang-tk" data-du="${esc(a.id)}" data-nen="${nen}" ${a.id === chinh ? 'hidden' : ''}><input type="checkbox" name="du_${esc(a.id)}" ${ds.slice(1).includes(a.id) ? 'checked' : ''}><span>${esc(a.ten)}</span></label>`).join('')}</div>` : ''}</div>`;
+      }).join('');
   }
   /** Dự án chạy mấy tài khoản của nơi này cùng lúc (giống _soSong của điều phối). */
   const soSong = (d, nen) => (d && d.chaySong && d.chaySong[nen]) || 1;
