@@ -30,7 +30,11 @@
   var ICON_THEM = /^(add|add_2|add_circle|add_box|add_photo_alternate|attach_file|attachment|image|photo|add_a_photo)$/;
   var CHU_THEM = /^(add|thêm|attach|đính kèm|upload|tải lên|insert|chèn)\b|add (media|image|photo|ingredient|asset)|thêm (ảnh|hình|nội dung|thành phần)/i;
   var ICON_TAI = /^(upload|file_upload|upload_file|cloud_upload|drive_folder_upload|add_photo_alternate|computer|folder_open)$/;
-  var CHU_TAI = /(upload|tải lên|tải ảnh|tải tệp|from (your )?(computer|device)|từ máy|từ thiết bị|chọn tệp|chọn ảnh|choose file|browse)/i;
+  // Nút TẢI LÊN là một hành động: nhãn bắt đầu bằng động từ ("Tải nội dung nghe nhìn lên" — Flow 16/10/2026,
+  // "Upload image", "Chọn tệp"…). Mục LỌC "Tệp tải lên" / "Uploads" ở cột trái bảng kho chỉ lọc danh sách —
+  // bấm nhầm nó thì không hộp chọn file nào mở (lỗi 1.2.1: app bấm nó rồi rơi xuống kéo-thả).
+  var CHU_TAI = /^(tải|upload|chọn (tệp|ảnh|file)|choose file|browse|from (your )?(computer|device)|từ máy|từ thiết bị|add (media|image|file)s? from)/i;
+  var KHONG_TAI = /^(tệp|file|uploads$|uploaded|đã tải|tải xuống|download)/i;
   var CHU_TAB_ANH = /^(hình ảnh|ảnh|images?|photos?)$/i;
 
   function hien(el) {
@@ -103,7 +107,11 @@
     for (var i = 0; i < ds.length; i++) if (kiem(ds[i], nhan(ds[i]))) return ds[i];
     return null;
   }
-  var laTaiLen = function (el, n) { return ICON_TAI.test(n.ic) || CHU_TAI.test(n.a) || CHU_TAI.test(n.c); };
+  var laTaiLen = function (el, n) {
+    var s = (n.c || n.a || '').toLowerCase();
+    if (s) return !KHONG_TAI.test(s) && (CHU_TAI.test(s) || /tải\b.{0,30}\blên/.test(s));
+    return ICON_TAI.test(n.ic);          // nút chỉ có biểu tượng
+  };
   var laThem = function (el, n) {
     if (el.closest('[role="menu"], [role="listbox"], [role="dialog"]')) return false;
     if (/generat|tạo|send|gửi/i.test(n.a)) return false;
@@ -112,7 +120,7 @@
 
   function bamTaiLen() {
     // Mục tải lên của menu đang mở (ưu tiên trong menu / popover), không lấy nút [+] ngoài ô nhập.
-    var menu = tatCa('[role="menu"], [role="listbox"], [role="dialog"], .cdk-overlay-container, .add-menu-popover-container, [data-radix-popper-content-wrapper]').filter(hien);
+    var menu = tatCa('[role="menu"], [role="listbox"], [role="dialog"], .cdk-overlay-pane, .cdk-overlay-container, .add-menu-popover-container, [data-radix-popper-content-wrapper]').filter(hien);
     for (var i = 0; i < menu.length; i++) {
       var n = timNut(laTaiLen, menu[i]);
       if (n) { bam(n); return { ok: true, nut: moTa(n) }; }
@@ -132,6 +140,8 @@
     var k = khoiNhap();
     var b = (k && timNut(laThem, k)) || timNut(laThem);
     if (!b) return { ok: false };
+    // Bảng đang mở rồi (engine vừa mở, hoặc lần trước) → bấm nữa là ĐÓNG nó.
+    if (b.getAttribute('aria-expanded') === 'true') return { ok: true, nut: moTa(b) + ' (đang mở)' };
     bam(b);
     return { ok: true, nut: moTa(b) };
   }

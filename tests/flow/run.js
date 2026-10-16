@@ -1392,6 +1392,76 @@ testAsync('1.2.1 nhật ký 16/10/2026 "Không tìm thấy ô tải ảnh lên c
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 
+// ── 1.2.2: giao diện Flow mới (HTML trang dự án + ảnh chụp người dùng 16/10/2026) ──
+test('1.2.2 tự chọn mục Video → "Thành phần" khi gắn ảnh @tên, "Khung hình" khi dùng khung đầu/cuối; ảnh / video chữ không đụng', () => {
+  const { tuyCheDo } = require('../../src/flow/may-flow');
+  assert.deepStrictEqual(tuyCheDo({ runMode: 'video', charSync: true }), { phu: 'thanh-phan' });
+  assert.deepStrictEqual(tuyCheDo({ runMode: 'video', keyframeSync: true }), { phu: 'khung-hinh' });
+  assert.strictEqual(tuyCheDo({ runMode: 'video' }), null);
+  assert.strictEqual(tuyCheDo({ runMode: 'image', charSync: true }), null, 'mục Hình ảnh không có cặp Khung hình | Thành phần');
+  assert.strictEqual(tuyCheDo(null), null);
+  const m = docGoc('src', 'flow', 'may-flow.js');
+  assert.ok(/datCheDoKienTri\(tab, settings\.runMode, 4, 8000, conChay, tuyCheDo\(settings\)\)/.test(thanHam(m, 'async function chuanBiMe')),
+    'chuẩn bị mẻ chưa chuyển mục con Video cho trình đổi chế độ');
+  assert.ok(/window\.__flowSetMode = async function \(mode, tuy\)/.test(docGoc('src', 'flow', 'inject', 'flow-mode.js')));
+});
+
+test('1.2.2 tab Flow tiêm trình nắn kho ảnh SAU engine (engine dò mục kho bằng bộ chọn cứng, bảng mới không có)', () => {
+  const t = docGoc('src', 'flow', 'tab-flow.js');
+  const iEngine = t.indexOf("['engine dò DOM'"), iKho = t.indexOf("['trình nắn kho ảnh', n.khoAnh]"), iChot = t.indexOf("['chốt hoàn tất'");
+  assert.ok(iEngine > 0 && iKho > iEngine && iChot > iKho, 'thiếu / sai chỗ giai đoạn "trình nắn kho ảnh"');
+  const { docNguon: nguon } = require('../../src/flow/tab-flow');
+  const n = nguon();
+  assert.ok(/window\.__flowKhoAnh = \{ danhDau: danhDau, chup: chup \}/.test(n.khoAnh));
+  assert.strictEqual(nguon({ khoAnh: 'X' }).khoAnh, 'X');
+  // Không đụng engine: dấu engine tìm vẫn y nguyên trong engine gốc.
+  assert.ok(n.engine.includes("button.asset-item, div.asset-item-container, div[data-item-index]"), 'bộ chọn mục kho của engine đã đổi — xem lại flow-kho-anh.js');
+  // Chọn nút tải lên: động từ "Tải … lên" đứng đầu, KHÔNG phải mục lọc "Tệp tải lên" của bảng kho.
+  const ta = docGoc('src', 'flow', 'inject', 'flow-tai-anh.js');
+  const CHU_TAI = eval(ta.match(/var CHU_TAI = (\/.*\/i);/)[1]), KHONG_TAI = eval(ta.match(/var KHONG_TAI = (\/.*\/i);/)[1]);
+  const la = (s) => !KHONG_TAI.test(s) && (CHU_TAI.test(s) || /tải\b.{0,30}\blên/.test(s));
+  assert.ok(la('tải nội dung nghe nhìn lên') && la('upload') && la('tải lên'));
+  assert.ok(!la('tệp tải lên') && !la('tải xuống') && !la('download') && !la('uploads') && !la('uploaded'), 'mục lọc / nút tải xuống bị nhận nhầm là nút tải lên');
+});
+
+testAsync('1.2.2 tải / dò ảnh trên Flow hỏng → lưu HTML bảng kho ra tệp chẩn đoán (mỗi luồng tối đa 1 lần / 30 phút) và ghi đường dẫn vào nhật ký', async () => {
+  const { LuongFlow } = require('../../src/flow/luong-flow');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'chan-doan-'));
+  const goc = path.join(dir, '001.png');
+  fs.writeFileSync(goc, Buffer.from('anh'));
+  const nhatKy = [], goi = [];
+  const wc = { isDestroyed: () => false, executeJavaScript: async (c) => {
+    goi.push(c);
+    if (/__flowKhoAnh/.test(c)) return { html: '<div class="kho">371.jpg</div>', luc: 'L', url: '/project/x' };
+    if (/add-menu-trigger/.test(c)) return true;
+    return undefined;
+  } };
+  const tabs = { dispatch: async (_id, m) => (m.action === 'CHECK_ASSET_NAMES' ? { ok: true, missing: m.data.names } : { ok: false, error: 'Không tìm thấy ô tải ảnh lên' }) };
+  const tao = (thuMucChanDoan) => {
+    const l = new LuongFlow({ id: 'L1', taiKhoan: { id: 'tk', ten: 'TK' }, tabs, may: {}, thuMucTam: dir, thuMucChanDoan,
+      docAnh: () => ({ b64: '', mime: 'image/png' }), log: (m, c) => nhatKy.push(`[${m}] ${c}`),
+      taiAnhLen: async () => ({ ok: false, buoc: [], loi: 'không thấy nút' }) });
+    l._ngu = async () => true;
+    l.tab = { id: 't1', view: { webContents: wc } };
+    return l;
+  };
+  try {
+    const cd = path.join(dir, 'chan-doan-flow');
+    const l = tao(cd);
+    const j = { so: 1, loai: 'video', thamChieu: [goc] };
+    const r = await l._ganAnh([j], { anhCua: (v) => v.thamChieu }, 0);
+    assert.ok(r.hong.has(j));
+    const tep = fs.readdirSync(cd);
+    assert.strictEqual(tep.length, 1, 'tải hỏng rồi kho vẫn thiếu → chỉ một tệp (chặn chụp lặp)');
+    const nd = fs.readFileSync(path.join(cd, tep[0]), 'utf8');
+    assert.ok(/^<!-- AI Automation Studio · chẩn đoán Flow · L · \/project\/x\n     Lý do: tải ảnh lên hỏng: không thấy nút -->/.test(nd) && nd.includes('371.jpg'), nd);
+    assert.ok(nhatKy.some((x) => x.includes(`Đã lưu HTML bảng ảnh của Flow để sửa tiếp: ${path.join(cd, tep[0])}`)), nhatKy.join('\n'));
+    assert.ok(goi.some((c) => /Escape/.test(c)), 'mở bảng [+] để chụp thì phải đóng lại');
+    // Không cấu hình thư mục → không ghi gì.
+    assert.strictEqual(await tao('')._chupChanDoan('x'), null);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
 // ── macOS ──────────────────────────────────────────────────────────────────
 
 test('macOS: cấu hình đóng gói đủ để Mac chip Apple mở được', () => {

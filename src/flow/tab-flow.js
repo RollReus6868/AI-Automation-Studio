@@ -40,7 +40,8 @@ function docNguon(thay = {}) {
     canhBao: thay.canhBao || doc('flow-canh-bao.js'),
     model: thay.model || doc('flow-model.js'),
     bamTao: thay.bamTao || doc('flow-bam-tao.js'),
-    thamChieu: thay.thamChieu || doc('flow-anh-tham-chieu.js')
+    thamChieu: thay.thamChieu || doc('flow-anh-tham-chieu.js'),
+    khoAnh: thay.khoAnh || doc('flow-kho-anh.js')
   };
 }
 
@@ -159,6 +160,8 @@ try {
       ['trình bấm nút Tạo', n.bamTao],
       ['trình dò cảnh báo', n.canhBao],
       ['trình dò ảnh tham chiếu', n.thamChieu],
+      // Bảng kho [+] của Flow mới: đánh dấu mục kho cho engine dò ảnh / gắn ảnh @tên (1.2.2).
+      ['trình nắn kho ảnh', n.khoAnh],
       ['chốt hoàn tất', 'window.__flowEngineLoaded = true;']
     ];
     try {
