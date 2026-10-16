@@ -490,8 +490,8 @@ const LENH = {
   taoLai: ({ ids }) => dieuPhoi.taoLai(ids),
   xoaViec: ({ ids }) => dieuPhoi.xoaViec(ids),
   suaViec: ({ id, thay }) => dieuPhoi.suaViec(id, thay),
-  taoDuAn: ({ ten, taiKhoan: ds }) => dieuPhoi.taoDuAn(ten, ds),
-  datTaiKhoanDuAn: ({ id, taiKhoan: ds }) => dieuPhoi.datTaiKhoanDuAn(id, ds),
+  taoDuAn: ({ ten, taiKhoan: ds, chaySong }) => dieuPhoi.taoDuAn(ten, ds, chaySong),
+  datTaiKhoanDuAn: ({ id, taiKhoan: ds, chaySong }) => dieuPhoi.datTaiKhoanDuAn(id, ds, chaySong),
   doiTenDuAn: ({ id, ten }) => dieuPhoi.doiTenDuAn(id, ten),
   xoaDuAn: ({ id }) => dieuPhoi.xoaDuAn(id),
   luuNhanVat: (nv) => {
@@ -781,7 +781,8 @@ app.whenReady().then(() => {
     layCaiDat: () => dieuPhoi.caiDat.flow,
     conViec: () => dieuPhoi.viec.some((j) => j.trangThai === 'cho' || j.trangThai === 'chay'),
     thongBao: () => {},
-    // Flow nhắc tài khoản này: dự án còn tài khoản dự phòng → cho nghỉ, việc sang dự phòng ngay (như Muse).
+    // Tài khoản Flow lỗi: dự án còn tài khoản Flow khác (hoặc ảnh chuyển được sang Muse) → cho nghỉ, dừng tab của nó,
+    // việc sang tài khoản khác ngay (như Muse).
     nghiTaiKhoan: (tkId, ms, lyDo) => {
       if (!dieuPhoi.coDuPhong(tkId)) return false;
       dieuPhoi._choNghi(tkId, lyDo, ms);

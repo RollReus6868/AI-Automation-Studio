@@ -87,14 +87,19 @@
     return DS_NEN.map((nen) => {
       const tk = S.taiKhoan.filter((a) => nenTk(a) === nen);
       if (!tk.length) return `<div class="chon-tk"><b>${TEN_NEN[nen]}</b><span>Chưa có tài khoản ${TEN_NEN[nen]} — thêm ở mục Tài khoản.</span></div>`;
-      const ds = tkCuaDuAn(d, nen), chinh = ds[0];
+      const ds = tkCuaDuAn(d, nen), chinh = ds[0], song = soSong(d, nen);
       return `<div class="chon-tk nhom-nen"><b>${TEN_NEN[nen]}</b>
         <label>Tài khoản chính<select name="tkChinh_${nen}" data-nen-chinh="${nen}">${tk.map((a) =>
           `<option value="${esc(a.id)}" ${a.id === chinh ? 'selected' : ''}>${esc(a.ten)}${a.trangThai === 'can-dang-nhap' ? ' (chưa đăng nhập)' : ''}</option>`).join('')}</select></label>
-        <span>Dự phòng — việc lỗi ở tài khoản chính thì chuyển ngay sang (theo thứ tự):</span>
+        <label>Chạy cùng lúc<select name="song_${nen}">${Array.from({ length: Math.max(tk.length, song) }, (_, i) => i + 1).map((n) =>
+          `<option value="${n}" ${n === song ? 'selected' : ''}>${n === 1 ? '1 tài khoản (chỉ tài khoản chính)' : `${n} tài khoản (chính + ${n - 1} tài khoản đầu danh sách dự phòng)`}</option>`).join('')}</select></label>
+        <span>Dự phòng — chạy cùng lúc theo số trên, tài khoản nào lỗi thì tài khoản kế tiếp vào thay (theo thứ tự):</span>
         ${tk.map((a) => `<label class="hang-tk" data-du="${esc(a.id)}" data-nen="${nen}" ${a.id === chinh ? 'hidden' : ''}><input type="checkbox" name="du_${esc(a.id)}" ${ds.slice(1).includes(a.id) ? 'checked' : ''}>${esc(a.ten)}</label>`).join('')}</div>`;
     }).join('');
   }
+  /** Dự án chạy mấy tài khoản của nơi này cùng lúc (giống _soSong của điều phối). */
+  const soSong = (d, nen) => (d && d.chaySong && d.chaySong[nen]) || 1;
+  const laySong = (v) => Object.fromEntries(DS_NEN.map((nen) => [nen, parseInt(v['song_' + nen], 10) || 1]));
   const layTk = (v) => DS_NEN.flatMap((nen) => {
     const chinh = v['tkChinh_' + nen];
     if (!chinh) return [];
@@ -188,8 +193,9 @@
     // Chip tài khoản theo nơi chạy đang chọn ở cột Tạo.
     const nen = nenTrang();
     const tkd = d ? tkCuaDuAn(d, nen) : [];
-    $('#chuTkDuAn').textContent = tkd.length ? `${tenTk(tkd[0])}${tkd.length > 1 ? ` +${tkd.length - 1} dự phòng` : ''}` : `Chưa có tài khoản ${TEN_NEN[nen]}`;
-    $('#nutTkDuAn').title = tkd.length ? `${TEN_NEN[nen]} — chính: ${tenTk(tkd[0])}${tkd.length > 1 ? ` · dự phòng: ${tkd.slice(1).map(tenTk).join(', ')}` : ''} — bấm để đổi` : '';
+    const song = Math.min(soSong(d, nen), tkd.length || 1);
+    $('#chuTkDuAn').textContent = tkd.length ? `${tkd.slice(0, song).map(tenTk).join(' + ')}${tkd.length > song ? ` +${tkd.length - song} dự phòng` : ''}` : `Chưa có tài khoản ${TEN_NEN[nen]}`;
+    $('#nutTkDuAn').title = tkd.length ? `${TEN_NEN[nen]} — ${song > 1 ? `chạy cùng lúc: ${tkd.slice(0, song).map(tenTk).join(', ')}` : `chính: ${tenTk(tkd[0])}`}${tkd.length > song ? ` · dự phòng: ${tkd.slice(song).map(tenTk).join(', ')}` : ''} — bấm để đổi` : '';
     const dangChay = S.viec.filter((j) => j.trangThai === 'chay').length;
     const chip = $('#chipChay');
     chip.classList.toggle('chay', S.dangChay);
@@ -744,10 +750,10 @@
   const O_FLOW = [['fTab', 'tabMoiTK'], ['fMe', 'meToiDa'], ['fSoLuong', 'outputCount'], ['fChoMin', 'delayMin'], ['fChoMax', 'delayMax'],
     ['fThuLai', 'maxRetries'], ['fGian', 'multiTabStagger'], ['fChatAnh', 'chatLuongAnh'], ['fChatVideo', 'chatLuongVideo'], ['fMang', 'networkGuard'],
     ['fNgauNhien', 'randomDelay'], ['fSoThuTu', 'addIndex'], ['fCuon', 'randomScroll'], ['fGoAnh', 'goAnhThamChieu'], ['fDoiTen', 'doiTenTrenFlow'],
-    ['fModelAnh', 'modelAnh'], ['fNghiTT', 'nghiThaoTacBat'], ['fNghiTTMin', 'nghiThaoTacMin'], ['fNghiTTMax', 'nghiThaoTacMax']];
+    ['fModelAnh', 'modelAnh'], ['fSangMuse', 'sangMuseKhiHong'], ['fNghiTT', 'nghiThaoTacBat'], ['fNghiTTMin', 'nghiThaoTacMin'], ['fNghiTTMax', 'nghiThaoTacMax']];
   const O_FLOW_MODEL = [['fModelChinh', 'chinh'], ['fModelPhu', 'phu'], ['fXenKe', 'xenKeMoi'], ['fModelDuPhong', 'duPhong'], ['fThuLaiPhut', 'thuLaiPhut']];
-  const O_FLOW_AN_TOAN = [['fAnToan', 'bat'], ['fNguong', 'nguong'], ['fCuaSo', 'cuaSoPhut'], ['fNghi', 'nghiPhut'], ['fNghiToiDa', 'nghiToiDaPhut'],
-    ['fCuMoi', 'cuMoi'], ['fGiaiLao', 'giaiLaoPhut'], ['fNhanDoi', 'nhanDoi']];
+  // Nhận diện tài khoản lỗi (1.2.0, luôn bật) — khớp chuanHoaCaiDat của src/flow/main/an-toan.js.
+  const O_FLOW_AN_TOAN = [['fNguong', 'nguong'], ['fNghi', 'nghiPhut']];
   function docCaiDatFlow() {
     const doc = (id) => { const el = $('#' + id); return el.type === 'checkbox' ? el.checked : el.value; };
     const f = { chonModel: {}, anToan: {} };
@@ -820,7 +826,7 @@
     const v = await hoi({ tieuDe: 'Dự án mới', html: '<label>Tên dự án (cũng là tên thư mục kết quả)<input name="ten" placeholder="vd: Truyện người que"></label>' +
       htmlChonTk(duAnHienTai()), ok: 'Tạo' });
     if (!v || !v.ten.trim()) return;
-    const d = await api.call('taoDuAn', { ten: v.ten, taiKhoan: layTk(v) });
+    const d = await api.call('taoDuAn', { ten: v.ten, taiKhoan: layTk(v), chaySong: laySong(v) });
     if (d && d.id) { U.duAn = d.id; U.chiTiet = null; U.chon.clear(); luuUi(); }
   }
 
@@ -828,7 +834,7 @@
     const d = duAnHienTai();
     if (!d) return;
     const v = await hoi({ tieuDe: `Tài khoản chạy "${d.ten}"`, html: htmlChonTk(d), ok: 'Lưu' });
-    if (v) { await api.call('datTaiKhoanDuAn', { id: d.id, taiKhoan: layTk(v) }); toast('Đã lưu tài khoản của dự án'); }
+    if (v) { await api.call('datTaiKhoanDuAn', { id: d.id, taiKhoan: layTk(v), chaySong: laySong(v) }); toast('Đã lưu tài khoản của dự án'); }
   }
 
   // ── Gắn sự kiện ──────────────────────────────────────────────────────────

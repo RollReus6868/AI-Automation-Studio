@@ -63,34 +63,42 @@ function taoMayFlow(o) {
     return caiDatAnToan;
   }
 
-  /** Có prompt vừa hỏng → đọc chữ Flow ghi trên thẻ lỗi (mỗi câu ghi MỘT lần mỗi tab). */
-  async function ghiLyDoTheLoi(tab, rows) {
-    if (!tab || !tab.ready) return;
-    if (!tab._loiDaDocLyDo) tab._loiDaDocLyDo = new Set();
+  /** Có prompt vừa hỏng → đọc chữ Flow ghi trên thẻ lỗi (mỗi câu ghi MỘT lần mỗi tab).
+   *  @returns true nếu một câu trên thẻ nói tài khoản bị chặn / hết lượt */
+  async function ghiLyDoTheLoi(tab, coLoiMoi) {
+    if (!tab || !tab.ready || !coLoiMoi) return false;
     if (!tab._lyDoDaGhi) tab._lyDoDaGhi = new Set();
-    if (!anToan.loiMoi(rows, tab._loiDaDocLyDo).length) return;
     let r = null;
     try {
       r = await tab.view.webContents.executeJavaScript('window.__flowDocLyDoTheLoi ? window.__flowDocLyDoTheLoi() : null', true);
-    } catch (_) { return; }
-    if (!r || !r.ok || !Array.isArray(r.lyDo)) return;
+    } catch (_) { return false; }
+    if (!r || !r.ok || !Array.isArray(r.lyDo)) return false;
+    let chan = false;
     for (const cau of r.lyDo) {
+      if (anToan.laCanhBaoChan(cau) || anToan.laHetLuot(cau)) chan = true;
       if (tab._lyDoDaGhi.has(cau)) continue;
       tab._lyDoDaGhi.add(cau);
       log('error', `🧾 [${tab.id}] Flow ghi trên thẻ lỗi: "${cau}"`);
     }
+    return chan;
   }
 
-  /** Đếm prompt vừa hỏng; đủ dấu hiệu thì cho cả tài khoản nghỉ. */
+  /**
+   * NHẬN DIỆN TÀI KHOẢN LỖI (1.2.0, luôn bật): prompt nào xong thì xoá dấu lỗi của tài khoản; prompt
+   * hỏng thì ghi lại — đủ `nguong` prompt khác nhau hỏng liền nhau, hoặc Flow nói "hoạt động bất
+   * thường" / hết lượt, thì đổi tài khoản ngay (dự án còn dự phòng) hoặc cho tài khoản nghỉ.
+   */
   async function theoDoiAnToan(tab, rows) {
-    if (!tab || !caiDatAnToan.bat) return;
+    if (!tab) return;
     const so = soAnToanCua(tab.accountId);
     if (!tab._daDemLoi) tab._daDemLoi = new Set();
+    if (!tab._daDemXong) tab._daDemXong = new Set();
+    if (anToan.xongMoi(rows, tab._daDemXong).length) anToan.xoaDauLoi(so);
     const moi = anToan.loiMoi(rows, tab._daDemLoi);
     if (moi.length) {
-      const bayGio = Date.now();
-      for (let i = 0; i < moi.length; i++) so.moc.push(bayGio);
+      for (const m of moi) so.promptLoi.add(`${tab.id}#${tab._meKhoa || 0}#${m.chiSo}`);
       if (moi.some((m) => m.chacChan)) so.coCauChan = true;
+      if (await ghiLyDoTheLoi(tab, true)) so.coCauChan = true;
       if (!so.coCauChan) {
         const doc = await doCanhBaoTrenTrang(tab);
         if (doc && doc.co) {
@@ -99,19 +107,16 @@ function taoMayFlow(o) {
         }
       }
     }
+    if (so.dangXuLy) return;          // bảng đến dồn dập — một lần đổi / nghỉ là đủ
     const qd = anToan.canNghi(so, Date.now(), caiDatAnToan);
-    if (qd.nghi) {
+    if (!qd.nghi) return;
+    so.dangXuLy = true;
+    try {
       // Đang chạy Lower Priority và có model dự phòng: đổi model chạy tiếp, không nghỉ.
       if (await thuChuyenDuPhong(tab.accountId, qd)) return;
       await batDauNghi(tab.accountId, anToan.thoiGianNghi(so.soLanBiChan, caiDatAnToan), qd);
-      return;
-    }
-    // Giải lao định kỳ — phòng bệnh, theo tổng prompt đã xong của tài khoản.
-    const xong = tabCungTaiKhoan(tab.accountId).reduce((t, x) => t + ((x.stats && x.stats.done) || 0), 0);
-    const gl = anToan.canGiaiLao(so, xong, caiDatAnToan);
-    if (gl.nghi) {
-      so.mocGiaiLao = gl.daXong;
-      await batDauNghi(tab.accountId, caiDatAnToan.giaiLaoPhut * 60000, { lyDo: gl.lyDo, giaiLao: true });
+    } finally {
+      so.dangXuLy = false;
     }
   }
 
@@ -126,24 +131,20 @@ function taoMayFlow(o) {
     if (so.dangNghi) return;
     const ds = tabCungTaiKhoan(accountId).filter((t) => t.busy);
     if (!ds.length) return;
-    if (!qd.giaiLao) so.soLanBiChan += 1;
+    so.soLanBiChan += 1;
     const ten = ds[0].accountName || accountId || 'tài khoản';
 
-    // Dự án còn tài khoản dự phòng → bộ điều phối cho tài khoản này nghỉ, việc sang dự phòng NGAY.
-    if (!qd.giaiLao && o.nghiTaiKhoan && o.nghiTaiKhoan(accountId, ms, `Flow nhắc ${qd.lyDo}`)) {
-      so.moc.length = 0;
-      so.coCauChan = false;
-      log('error', `🛑 [${ten}] ${qd.lyDo} — tài khoản này nghỉ ${anToan.doDai(ms)}, việc chuyển sang tài khoản dự phòng.`);
+    // Dự án còn tài khoản dự phòng (hoặc ảnh chuyển được sang Muse) → bộ điều phối cho tài khoản này
+    // nghỉ, dừng các tab của nó, việc sang tài khoản khác NGAY.
+    if (o.nghiTaiKhoan && o.nghiTaiKhoan(accountId, ms, `Flow lỗi: ${qd.lyDo}`)) {
+      anToan.xoaDauLoi(so);
+      log('error', `🛑 [${ten}] Tài khoản lỗi (${qd.lyDo}) — nghỉ ${anToan.doDai(ms)}, việc chuyển ngay sang tài khoản khác.`);
       return;
     }
 
     so.dangNghi = true;
     so.nghiDen = Date.now() + ms;
-    log(qd.giaiLao ? 'info' : 'error', (qd.giaiLao ? '☕ ' : '🛑 ') +
-      `[${ten}] ${qd.giaiLao ? 'Nghỉ giải lao' : 'TẠM DỪNG để hạ nhiệt'}: ${qd.lyDo}. Sẽ tự chạy lại sau ${anToan.doDai(ms)}.`);
-    if (!qd.giaiLao && !qd.chacChan) {
-      log('warning', '   (Chưa đọc được đúng câu "hoạt động bất thường" trên trang — có thể chỉ là vài prompt bị chặn vì nội dung. Nghỉ cho chắc vẫn hơn cố chạy.)');
-    }
+    log('error', `🛑 [${ten}] Tài khoản lỗi (${qd.lyDo}) và dự án không còn tài khoản Flow nào khác — TẠM DỪNG tài khoản này, tự chạy lại sau ${anToan.doDai(ms)}.`);
     for (const t of ds) {
       t.nghiAnToan = true;
       nhipTT.huy(t);   // cắt ngang khoảng nghỉ giữa thao tác đang chờ
@@ -158,7 +159,7 @@ function taoMayFlow(o) {
     const so = soAnToanCua(accountId);
     henChayLai.delete(khoa(accountId));
     if (!so.dangNghi) return;
-    so.dangNghi = false; so.nghiDen = 0; so.coCauChan = false; so.moc.length = 0;
+    so.dangNghi = false; so.nghiDen = 0; anToan.xoaDauLoi(so);
     const ds = tabCungTaiKhoan(accountId).filter((t) => t.nghiAnToan);
     log('success', `▶ [${(ds[0] && ds[0].accountName) || accountId}] Hết giờ nghỉ — chạy tiếp.`);
     for (const t of ds) {
@@ -319,7 +320,7 @@ function taoMayFlow(o) {
       const ten = ds[0].accountName || accountId || 'tài khoản';
       const duPhong = ds[0].keHoachModel.duPhong;
       log('error', `🚫 [${ten}] Lower Priority bị Flow chặn (${qd.lyDo}). Ngừng gửi Lower Priority ${anToan.doDai(ms)}, chuyển sang ${duPhong} (tốn credit) và chạy tiếp.`);
-      so.moc.length = 0; so.coCauChan = false;
+      anToan.xoaDauLoi(so);
       for (const t of ds) { t.nghiAnToan = true; nhipTT.huy(t); try { await tabs.dispatch(t.id, { action: 'PAUSE_AUTOMATION' }); } catch (_) {} }
       await cho(6000);
       const hong = [];
@@ -386,7 +387,10 @@ function taoMayFlow(o) {
    * @returns bộ cài đặt cuối cùng gửi cho engine
    */
   async function chuanBiMe(tab, settings, conChay) {
+    // Số thứ tự prompt bắt đầu lại từ 1 mỗi mẻ → sổ đếm theo mẻ.
     tab._daDemLoi = new Set();
+    tab._daDemXong = new Set();
+    tab._meKhoa = Date.now();
     datCaiDatAnToan(settings.anToan);
     const doi = await datCheDoKienTri(tab, settings.runMode, 4, 8000, conChay);
     if (!doi.ok) return { ok: false, lyDo: doi.lyDo };
@@ -433,7 +437,6 @@ function taoMayFlow(o) {
         const hangs = Array.isArray(d.rows) ? d.rows : [];
         if (tab && typeof d.isRunning === 'boolean') tab.busy = d.isRunning;
         if (tab) theoDoiAnToan(tab, hangs).catch(() => {});
-        if (tab) ghiLyDoTheLoi(tab, hangs).catch(() => {});
         if (tab && tab.onBang) { try { tab.onBang(hangs, d); } catch (err) { log('error', `[${tabId}] ${err.message}`); } }
         return { success: true };
       }

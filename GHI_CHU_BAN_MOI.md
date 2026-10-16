@@ -1,4 +1,17 @@
-# AI Automation Studio 1.1.3
+# AI Automation Studio 1.2.0
+
+- **Mỗi dự án chạy được nhiều tài khoản cùng lúc** (Muse, Google Flow, Suno). Bấm nút tài khoản cạnh tên dự án → ô **Chạy cùng lúc** → chọn 2, 3… tài khoản. Tài khoản chính + các tài khoản đầu danh sách dự phòng chạy **song song**, việc chia đều cho nhau (mẻ Flow cũng chia đôi, chia ba). Tài khoản nào lỗi thì nghỉ, tài khoản dự phòng kế tiếp vào thay. Để 1 = như cũ (chỉ tài khoản chính chạy, lỗi mới đổi).
+- **Flow hỏng hết tài khoản khi tạo ảnh → tự chuyển sang Muse.** Mọi tài khoản Flow của dự án đều lỗi → dừng Flow cho dự án đó, các ảnh còn lại tự tạo tiếp ở tài khoản Muse của dự án; nhật ký ghi dòng *🔀 Flow: … chuyển … sang Muse*. Tắt được ở Cài đặt → Google Flow → *Flow hỏng hết tài khoản thì tạo ảnh tiếp ở Muse*.
+- **Nhận ra tài khoản Flow lỗi nhanh hơn** (thay cho "Chế độ an toàn", giờ luôn bật):
+  - Flow báo "hoạt động bất thường" / "quá nhiều yêu cầu" / hết tín dụng (đọc cả chữ trên thẻ lỗi) → đổi tài khoản **ngay từ lỗi đầu tiên**.
+  - Không thấy câu đó: **2 prompt khác nhau hỏng liền nhau** → đổi tài khoản (trước đây phải đủ 3 lỗi trong 5 phút, và khi tắt chế độ an toàn thì phải đợi 2 việc hỏng hết lượt thử lại). Một prompt bị thử lại nhiều lần vẫn tính là một, nên prompt vi phạm chính sách không làm "oan" tài khoản.
+  - Tài khoản lỗi nghỉ 15 phút (bị lại thì gấp đôi, tối đa 60 phút), việc của nó chuyển ngay sang tài khoản khác.
+  - *Thử lại cùng tài khoản* mặc định còn 1 lần (trước 2) — lỗi là sang tài khoản khác thay vì gõ mãi một tài khoản. Nếu bạn đã tự đặt số khác, app giữ nguyên số của bạn.
+- **Bỏ khỏi Cài đặt → Google Flow** (không còn hợp kiểu chạy mới): công tắc *Bật chế độ an toàn* (giờ luôn bật), *trong (phút)*, *Nghỉ tối đa*, *Bị chặn lại thì nghỉ gấp đôi* (giờ tự động), *Giải lao sau mỗi … prompt* và *Giải lao (phút)* (nghỉ giải lao giữ việc đứng chờ trong khi tài khoản khác chạy được).
+
+Lưu ý: phần mới được kiểm trên trang Muse / Flow giả. Lần đầu hãy chạy vài prompt với 2 tài khoản cùng lúc và xem Nhật ký.
+
+## Bản 1.1.3
 
 - **Sửa lỗi đăng nhập Suno bằng Google** ("Couldn't sign you in — This browser or app may not be secure"): khung đăng nhập Suno giờ dùng cùng kiểu trình duyệt với khung đăng nhập Google Flow (vốn đăng nhập Google được trong app). Nếu Google vẫn từ chối, gửi lại ảnh chụp cho người phát triển.
 - **Sửa lỗi khung đăng nhập "treo" đè lên các mục khác**: bấm *Xong, đóng lại*, chuyển sang mục khác hoặc xoá tài khoản thì khung đăng nhập đóng **ngay**; bước kiểm tài khoản chạy ngầm sau đó (trước đây khung nằm đè lên màn hình tới khi kiểm xong, có khi ~25 giây).

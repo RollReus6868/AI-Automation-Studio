@@ -19,7 +19,7 @@ const FLOW_MAC_DINH = {
   delayMin: 20,
   delayMax: 30,
   randomDelay: true,
-  maxRetries: 2,            // Flow để 5; lỗi quá chừng này lần thì việc chuyển sang tài khoản dự phòng (như Muse)
+  maxRetries: 1,            // Flow để 5; thử lại CÙNG tài khoản chừng này lần rồi việc sang tài khoản khác (1.2.0: 2 → 1)
   networkGuard: 'auto',
   multiTabStagger: 0,
   voiceSelect: '',
@@ -34,8 +34,12 @@ const FLOW_MAC_DINH = {
   // Model
   modelAnh: 'Nano Banana 2 Lite',
   chonModel: { chinh: '', phu: '', xenKeMoi: 0, duPhong: '', thuLaiPhut: 30 },
-  // Chế độ an toàn (src/flow/main/an-toan.js)
-  anToan: { bat: true, nguong: 3, cuaSoPhut: 5, nghiPhut: 10, nghiToiDaPhut: 60, nhanDoi: true, cuMoi: 0, giaiLaoPhut: 5 },
+  // Nhận diện tài khoản lỗi (src/flow/main/an-toan.js) — 1.2.0 luôn bật, thay "chế độ an toàn":
+  // Flow báo "hoạt động bất thường" / hết lượt → đổi tài khoản ngay; `nguong` prompt KHÁC NHAU hỏng
+  // liền nhau (chưa prompt nào xong xen giữa) → đổi tài khoản; tài khoản lỗi nghỉ `nghiPhut` phút.
+  anToan: { nguong: 2, nghiPhut: 15 },
+  // Tạo ảnh Flow mà mọi tài khoản Flow của dự án đều hỏng → chuyển ảnh còn lại sang Muse.
+  sangMuseKhiHong: true,
   // Chất lượng tải về
   chatLuongAnh: 'img_2k',
   chatLuongVideo: '1080p',
@@ -65,7 +69,11 @@ function chuanHoaFlow(raw) {
   const r = raw && typeof raw === 'object' ? raw : {};
   const m = { ...FLOW_MAC_DINH, ...r };
   m.chonModel = { ...FLOW_MAC_DINH.chonModel, ...(r.chonModel || {}) };
-  m.anToan = { ...FLOW_MAC_DINH.anToan, ...(r.anToan || {}) };
+  // Chỉ giữ khoá còn dùng (bật / cửa sổ phút / nghỉ tối đa / nhân đôi / giải lao của bản cũ bỏ đi).
+  // Bộ cũ (có cuaSoPhut) mang nghĩa khác ("3 lỗi trong 5 phút") → lấy mặc định mới.
+  const at = r.anToan && !('cuaSoPhut' in r.anToan) ? r.anToan : {};
+  m.anToan = { nguong: Math.round(so(at.nguong, 1, 10, FLOW_MAC_DINH.anToan.nguong)),
+    nghiPhut: Math.round(so(at.nghiPhut, 1, 240, FLOW_MAC_DINH.anToan.nghiPhut)) };
   m.selectors = r.selectors && typeof r.selectors === 'object' ? { ...r.selectors } : {};
   m.outputCount = Math.round(so(m.outputCount, 1, 4, 1));
   m.delayMin = Math.round(so(m.delayMin, 1, 600, 20));
@@ -77,7 +85,7 @@ function chuanHoaFlow(raw) {
   m.tabMoiTK = Math.round(so(m.tabMoiTK, 1, 4, 1));
   m.meToiDa = Math.round(so(m.meToiDa, 1, 50, 10));
   m.networkGuard = m.networkGuard === 'off' ? 'off' : 'auto';
-  for (const k of ['randomDelay', 'voiceSync', 'addIndex', 'randomScroll', 'goAnhThamChieu', 'nghiThaoTacBat', 'doiTenTrenFlow']) m[k] = !!m[k];
+  for (const k of ['randomDelay', 'voiceSync', 'addIndex', 'randomScroll', 'goAnhThamChieu', 'nghiThaoTacBat', 'doiTenTrenFlow', 'sangMuseKhiHong']) m[k] = !!m[k];
   if (!['img_4k', 'img_2k', 'img_1k'].includes(m.chatLuongAnh)) m.chatLuongAnh = 'img_2k';
   if (!['4k', '1080p', '720p'].includes(m.chatLuongVideo)) m.chatLuongVideo = '1080p';
   return m;

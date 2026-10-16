@@ -148,6 +148,8 @@ module.exports = function e2eFlow({ win, app, LENH, dieuPhoi, taiKhoan }) {
       ghi('-- 6. Tài khoản Flow chưa đăng nhập');
       const tk3 = await LENH.themTaiKhoan({ ten: 'Flow 3', nen: 'flow' });
       await session.fromPartition(tk3.partition).cookies.set({ url: process.env.MUSE_URL, name: 'flow_dang_xuat', value: '1' });
+      // Tắt "Flow hỏng → Muse" ở bước này: chỉ kiểm nhận ra chưa đăng nhập (bật thì ảnh sang Muse — mục 9).
+      LENH.datCaiDat({ flow: { sangMuseKhiHong: false } });
       const d6id = LENH.taoDuAn({ ten: 'Chi Flow 3', taiKhoan: [tk3.id] }).id;
       nk = LENH.trangThai().nhatKy.length;
       LENH.them({ duAn: d6id, loai: 'anh', nen: 'flow', tyLe: '9:16', prompts: ['chưa đăng nhập'], chay: true });
@@ -159,6 +161,7 @@ module.exports = function e2eFlow({ win, app, LENH, dieuPhoi, taiKhoan }) {
       kiem(LENH.trangThai().nhatKy.slice(nk).some((d) => /"Flow 3" chưa đăng nhập Flow/.test(d.chu)), 'nhật ký nói rõ tài khoản Flow nào chưa đăng nhập');
       LENH.dung();
       LENH.xoaViec({ ids: v6.map((j) => j.id) });
+      LENH.datCaiDat({ flow: { sangMuseKhiHong: true } });
 
       // 7) 1.0.2: chạy hết hàng chờ → tự xoá dự án Flow vừa dùng (đúng dự án đó, dự án khác của người dùng
       //    giữ nguyên); tài khoản quên địa chỉ dự án → lần chạy sau tự mở dự án mới.
@@ -187,6 +190,36 @@ module.exports = function e2eFlow({ win, app, LENH, dieuPhoi, taiKhoan }) {
       const url7b = taiKhoan.store.get('taiKhoan').taiKhoan.find((a) => a.id === 'flow-1').flowUrl;
       kiem(v7b.every((j) => j.trangThai === 'xong') && /\/project\//.test(url7b) && !url7b.includes(ma7), `lần sau tự mở dự án mới (${url7b})`);
       dongNhatKy(Math.max(0, LENH.trangThai().nhatKy.length - 8));
+
+      // 8) 1.2.0: dự án chạy 2 tài khoản Flow CÙNG LÚC — mẻ chia đôi, hai tài khoản chạy song song.
+      ghi('-- 8. Hai tài khoản Flow chạy cùng lúc');
+      const d8id = LENH.taoDuAn({ ten: 'Song song', taiKhoan: ['flow-1', tk2.id], chaySong: { flow: 2 } }).id;
+      const g8dau = (await flowGhi()).length;
+      LENH.them({ duAn: d8id, loai: 'anh', nen: 'flow', tyLe: '9:16', prompts: ['CHAM song 1', 'CHAM song 2', 'CHAM song 3', 'CHAM song 4'], chay: true });
+      const v8 = viec().filter((j) => j.duAn === d8id);
+      let cungLuc = false;
+      await cho(() => { if (new Set(v8.filter((j) => j.trangThai === 'chay').map((j) => j.taiKhoan)).size === 2) cungLuc = true; return xongHet(v8)(); }, 120000, 'hai tài khoản Flow xong');
+      inViec(v8);
+      const st8 = (await flowGhi()).slice(g8dau).filter((x) => x.loai === 'start');
+      kiem(v8.every((j) => j.trangThai === 'xong'), 'cả 4 ảnh xong');
+      kiem(v8.filter((j) => j.taiKhoan === 'flow-1').length === 2 && v8.filter((j) => j.taiKhoan === tk2.id).length === 2,
+        `mỗi tài khoản 2 ảnh (${v8.map((j) => j.taiKhoan).join(', ')})`);
+      kiem(cungLuc, 'hai tài khoản chạy CÙNG LÚC (không chờ nhau)');
+      kiem(st8.length === 2 && st8.every((x) => x.d.videosToCreate.length === 2), `2 mẻ, mỗi mẻ 2 prompt (${st8.map((x) => x.d.videosToCreate.length).join('+')})`);
+
+      // 9) 1.2.0: mọi tài khoản Flow của dự án hỏng khi tạo ảnh → ảnh tự tạo tiếp ở Muse.
+      ghi('-- 9. Flow hỏng hết → ảnh sang Muse');
+      await session.fromPartition('persist:flow-flow-1').cookies.set({ url: process.env.MUSE_URL, name: 'flow_hong', value: '1' });
+      const d9id = LENH.taoDuAn({ ten: 'Flow sang Muse', taiKhoan: ['flow-1', 'tk-1'] }).id;
+      nk = LENH.trangThai().nhatKy.length;
+      LENH.them({ duAn: d9id, loai: 'anh', nen: 'flow', tyLe: '9:16', prompts: ['sang muse 1', 'sang muse 2'], chay: true });
+      const v9 = viec().filter((j) => j.duAn === d9id);
+      await cho(xongHet(v9), 180000, 'ảnh xong ở Muse');
+      inViec(v9);
+      dongNhatKy(nk);
+      kiem(v9.every((j) => j.trangThai === 'xong' && j.nen === 'muse' && j.taiKhoan === 'tk-1' && fs.existsSync(j.files[0])), 'ảnh hỏng ở Flow được tạo xong ở Muse');
+      kiem(LENH.trangThai().nhatKy.slice(nk).some((d) => /🔀 Flow:.*Muse/.test(d.chu)), 'nhật ký báo chuyển sang Muse');
+      await session.fromPartition('persist:flow-flow-1').cookies.remove(process.env.MUSE_URL, 'flow_hong');
     } catch (err) {
       ghi('LỖI KỊCH BẢN: ' + err.stack);
       loi.push('ngoại lệ');

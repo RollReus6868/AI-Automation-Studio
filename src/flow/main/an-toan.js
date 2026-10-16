@@ -51,6 +51,25 @@ const CUM_TU_CHAN = [
   'thu lai sau'
 ];
 
+// Tài khoản hết lượt / hết tín dụng — chỉ so với chữ TRÊN THẺ LỖI và chữ lỗi của engine, không quét cả
+// trang (trang Flow lúc nào cũng có chữ "credits" ở chỗ chọn model).
+const CUM_TU_HET_LUOT = [
+  'not enough credits',
+  'out of credits',
+  'insufficient credits',
+  'no credits left',
+  'khong du tin dung',
+  'het tin dung',
+  'daily limit',
+  'gioi han hang ngay'
+];
+
+/** Câu trên thẻ lỗi nói tài khoản hết lượt / hết tín dụng. */
+function laHetLuot(text) {
+  const t = boDau(text);
+  return !!t && CUM_TU_HET_LUOT.some((c) => t.includes(c));
+}
+
 // Câu báo lỗi chung chung của engine — KHÔNG đủ để kết luận bị chặn, nhưng
 // nhiều cái liên tiếp thì đáng nghi.
 const LOI_CHUNG = 'khong thanh cong';
@@ -80,21 +99,29 @@ function laLoiChungChung(text) {
 }
 
 // ── Cài đặt ────────────────────────────────────────────────────────────────
+//
+//  1.2.0 — "NHẬN DIỆN TÀI KHOẢN LỖI" thay cho chế độ an toàn. Mỗi dự án giờ có
+//  tài khoản dự phòng (và chạy được nhiều tài khoản cùng lúc), nên khi một tài
+//  khoản hỏng việc đúng nhất là ĐỔI NGAY sang tài khoản khác, không ngồi đếm
+//  lỗi trong cửa sổ 5 phút hay nghỉ giải lao. Luôn bật; còn hai con số:
+//    • nguong   — bao nhiêu prompt KHÁC NHAU hỏng liền nhau (không có prompt
+//                 nào xong xen giữa) thì coi là tài khoản hỏng. Đếm prompt khác
+//                 nhau chứ không đếm lần thử: một prompt vi phạm chính sách bị
+//                 thử lại mấy lần cũng chỉ là MỘT prompt, không làm oan tài khoản.
+//    • nghiPhut — tài khoản hỏng nghỉ bao lâu (bị lại thì tự nghỉ gấp đôi, tối
+//                 đa 4 lần con số này).
+//  Đọc được câu "hoạt động bất thường" / "quá nhiều yêu cầu"… thì đổi ngay từ
+//  lỗi ĐẦU TIÊN.
 
 const MAC_DINH = {
-  bat: true,            // bật chế độ an toàn
-  nguong: 3,            // bao nhiêu prompt lỗi thì nghi bị chặn
-  cuaSoPhut: 5,         // ...trong vòng bấy nhiêu phút
-  nghiPhut: 10,         // nghỉ bao lâu ở lần bị chặn đầu tiên
-  nhanDoi: true,        // bị lại thì nghỉ gấp đôi
-  nghiToiDaPhut: 60,    // trần, để không nghỉ tới sáng
-  cuMoi: 0,             // nghỉ giải lao sau mỗi N prompt xong (0 = tắt)
-  giaiLaoPhut: 5        // ...nghỉ bấy nhiêu phút
+  nguong: 2,            // 2 prompt khác nhau hỏng liền nhau → tài khoản hỏng
+  nghiPhut: 15          // tài khoản hỏng nghỉ bấy nhiêu phút
 };
+const HE_SO_NGHI_TOI_DA = 4;
 
 /**
- * Nhặt cài đặt an toàn từ giao diện về dạng số sạch sẽ.
- * Giao diện gửi lên toàn chuỗi, và người dùng gõ được cả chữ vào ô số.
+ * Nhặt cài đặt từ giao diện về dạng số sạch sẽ (giao diện gửi lên toàn chuỗi).
+ * Khoá của bản cũ (bat, cuaSoPhut, nhanDoi, nghiToiDaPhut, cuMoi, giaiLaoPhut) bỏ qua.
  */
 function chuanHoaCaiDat(raw) {
   const r = raw || {};
@@ -104,14 +131,8 @@ function chuanHoaCaiDat(raw) {
     return Math.min(max, Math.max(min, n));
   };
   return {
-    bat:           r.bat === undefined ? MAC_DINH.bat : !!r.bat,
-    nguong:        so(r.nguong,        MAC_DINH.nguong,        1, 50),
-    cuaSoPhut:     so(r.cuaSoPhut,     MAC_DINH.cuaSoPhut,     1, 120),
-    nghiPhut:      so(r.nghiPhut,      MAC_DINH.nghiPhut,      1, 240),
-    nhanDoi:       r.nhanDoi === undefined ? MAC_DINH.nhanDoi : !!r.nhanDoi,
-    nghiToiDaPhut: so(r.nghiToiDaPhut, MAC_DINH.nghiToiDaPhut, 1, 600),
-    cuMoi:         so(r.cuMoi,         MAC_DINH.cuMoi,         0, 500),
-    giaiLaoPhut:   so(r.giaiLaoPhut,   MAC_DINH.giaiLaoPhut,   1, 120)
+    nguong:   so(r.nguong,   MAC_DINH.nguong,   1, 10),
+    nghiPhut: so(r.nghiPhut, MAC_DINH.nghiPhut, 1, 240)
   };
 }
 
@@ -120,24 +141,28 @@ function chuanHoaCaiDat(raw) {
 /** Sổ theo dõi rỗng cho MỘT tài khoản. */
 function soMoi() {
   return {
-    moc: [],            // thời điểm (ms) của từng prompt lỗi gần đây
-    coCauChan: false,   // đã đọc được đúng câu "hoạt động bất thường" chưa
-    soLanBiChan: 0,     // đã phải nghỉ mấy lần trong phiên này
+    promptLoi: new Set(), // prompt (khoá theo mẻ) đã hỏng từ lần XONG gần nhất của tài khoản
+    coCauChan: false,     // đã đọc được đúng câu "hoạt động bất thường" chưa
+    soLanBiChan: 0,       // đã phải nghỉ mấy lần trong phiên này
     dangNghi: false,
-    nghiDen: 0,
-    mocGiaiLao: 0       // số prompt đã xong ở lần giải lao gần nhất
+    nghiDen: 0
   };
+}
+
+/** Xoá dấu vết lỗi (sau khi đã đổi / nghỉ tài khoản, hoặc có prompt xong). */
+function xoaDauLoi(so) {
+  so.promptLoi.clear();
+  so.coCauChan = false;
 }
 
 /**
  * Tìm những prompt VỪA chuyển sang lỗi, chưa được đếm lần nào.
  *
  * Phải lọc trùng: engine gửi lại NGUYÊN bảng mỗi vài giây, nên một prompt lỗi
- * sẽ xuất hiện trong hàng chục lượt gửi liên tiếp. Đếm thẳng thì chỉ một lỗi
- * duy nhất cũng vượt ngưỡng trong nháy mắt.
+ * sẽ xuất hiện trong hàng chục lượt gửi liên tiếp.
  *
  * @param {Array}  rows    mảng hàng engine gửi lên
- * @param {Set}    daDem   chỉ số các prompt đã đếm rồi (bị sửa tại chỗ)
+ * @param {Set}    daDem   khoá các lần lỗi đã đếm rồi (bị sửa tại chỗ)
  * @returns {{chiSo:number, loi:string, chacChan:boolean}[]}
  */
 function loiMoi(rows, daDem) {
@@ -145,95 +170,57 @@ function loiMoi(rows, daDem) {
   const ra = [];
   for (const r of ds) {
     if (!r || r.status !== 'ERROR') continue;
-    // Khoá theo cả số lần thử: engine thử lại thì retries tăng, và lần hỏng
-    // thứ hai của cùng một prompt là một lần gõ cửa mới thật sự.
+    // Khoá theo cả số lần thử: engine thử lại thì retries tăng — lần hỏng thứ hai của cùng prompt
+    // cũng được báo (để đọc câu lỗi mới), còn đếm "prompt khác nhau" là việc của canNghi.
     const khoa = `${r.index}#${r.retries || 0}`;
     if (daDem.has(khoa)) continue;
     daDem.add(khoa);
     ra.push({
       chiSo: r.index,
       loi: r.error || '',
-      chacChan: laCanhBaoChan(r.error)
+      chacChan: laCanhBaoChan(r.error) || laHetLuot(r.error)
     });
   }
   return ra;
 }
 
-/**
- * Đếm số lỗi còn nằm trong cửa sổ thời gian, và bỏ những mốc đã quá cũ.
- * Sửa `moc` tại chỗ để sổ không phình mãi trong phiên chạy dài.
- */
-function locTheoCuaSo(moc, bayGio, cuaSoPhut) {
-  const gioiHan = bayGio - cuaSoPhut * 60000;
-  let i = 0;
-  while (i < moc.length && moc[i] < gioiHan) i++;
-  if (i > 0) moc.splice(0, i);
-  return moc.length;
+/** Những prompt VỪA xong (COMPLETED), chưa đếm lần nào. */
+function xongMoi(rows, daDem) {
+  const ra = [];
+  for (const r of Array.isArray(rows) ? rows : []) {
+    if (!r || r.status !== 'COMPLETED' || daDem.has(r.index)) continue;
+    daDem.add(r.index);
+    ra.push(r.index);
+  }
+  return ra;
 }
 
 /**
- * Có nên cho tài khoản này nghỉ không?
- *
- * Hai đường dẫn tới "có":
- *   • Đọc được đúng câu "hoạt động bất thường" trên trang → chắc chắn, nghỉ
- *     ngay từ lỗi đầu tiên, khỏi đợi đủ ngưỡng.
- *   • Chưa đọc được câu đó, nhưng số lỗi trong cửa sổ đã chạm ngưỡng → nghi.
+ * Tài khoản này đã hỏng chưa (đổi sang tài khoản khác / cho nghỉ)?
+ *   • Đọc được câu "hoạt động bất thường" → chắc chắn, ngay từ lỗi đầu tiên.
+ *   • `nguong` prompt khác nhau hỏng liền nhau → hỏng.
  */
 function canNghi(so, bayGio, caiDat) {
-  if (!caiDat.bat) return { nghi: false };
-  if (so.dangNghi)  return { nghi: false };
-
-  const trongCuaSo = locTheoCuaSo(so.moc, bayGio, caiDat.cuaSoPhut);
-
-  if (so.coCauChan && trongCuaSo >= 1) {
-    return {
-      nghi: true,
-      chacChan: true,
-      soLoi: trongCuaSo,
-      lyDo: 'Trang Flow đang hiện thông báo hoạt động bất thường'
-    };
+  if (so.dangNghi) return { nghi: false };
+  const soLoi = so.promptLoi.size;
+  if (so.coCauChan && soLoi >= 1) {
+    return { nghi: true, chacChan: true, soLoi, lyDo: 'Trang Flow đang hiện thông báo hoạt động bất thường / hết lượt' };
   }
-  if (trongCuaSo >= caiDat.nguong) {
-    return {
-      nghi: true,
-      chacChan: false,
-      soLoi: trongCuaSo,
-      lyDo: `${trongCuaSo} prompt hỏng trong ${caiDat.cuaSoPhut} phút`
-    };
+  if (soLoi >= caiDat.nguong) {
+    return { nghi: true, chacChan: false, soLoi, lyDo: `${soLoi} prompt khác nhau hỏng liền nhau` };
   }
-  return { nghi: false, soLoi: trongCuaSo };
+  return { nghi: false, soLoi };
 }
 
 /**
- * Nghỉ bao lâu (mili-giây). Tăng gấp đôi mỗi lần bị chặn lại, vì bị chặn
- * lần nữa ngay sau khi chạy lại nghĩa là lần nghỉ trước chưa đủ.
- *
+ * Nghỉ bao lâu (mili-giây): nghiPhut, bị lại thì gấp đôi, tối đa 4 lần nghiPhut.
  * @param {number} soLanBiChan số lần ĐÃ nghỉ trước đó (0 = lần đầu)
  */
 function thoiGianNghi(soLanBiChan, caiDat) {
   const c = caiDat || MAC_DINH;
   const lan = Math.max(0, Number(soLanBiChan) || 0);
-  const heSo = c.nhanDoi ? Math.pow(2, Math.min(lan, 10)) : 1;
-  const phut = Math.min(c.nghiToiDaPhut, c.nghiPhut * heSo);
+  const phut = Math.min(c.nghiPhut * HE_SO_NGHI_TOI_DA, c.nghiPhut * Math.pow(2, Math.min(lan, 10)));
   return Math.round(phut * 60000);
-}
-
-/**
- * Đã tới lúc giải lao định kỳ chưa? Khác với nghỉ-do-bị-chặn: cái này là
- * phòng bệnh, nghỉ trước khi Google kịp khó chịu.
- *
- * @param {number} daXong tổng số prompt đã xong của tài khoản
- */
-function canGiaiLao(so, daXong, caiDat) {
-  if (!caiDat.bat || !caiDat.cuMoi) return { nghi: false };
-  if (so.dangNghi) return { nghi: false };
-  const xong = Math.max(0, Number(daXong) || 0);
-  if (xong - so.mocGiaiLao < caiDat.cuMoi) return { nghi: false };
-  return {
-    nghi: true,
-    daXong: xong,
-    lyDo: `đã xong ${xong} prompt — nghỉ giải lao ${caiDat.giaiLaoPhut} phút`
-  };
 }
 
 // ── Bộ nhịp gợi ý ──────────────────────────────────────────────────────────
@@ -280,14 +267,16 @@ module.exports = {
   MAC_DINH,
   boDau,
   laCanhBaoChan,
+  CUM_TU_HET_LUOT,
+  laHetLuot,
   laLoiChungChung,
   chuanHoaCaiDat,
   soMoi,
+  xoaDauLoi,
   loiMoi,
-  locTheoCuaSo,
+  xongMoi,
   canNghi,
   thoiGianNghi,
-  canGiaiLao,
   nhipAnToan,
   doDai
 };
