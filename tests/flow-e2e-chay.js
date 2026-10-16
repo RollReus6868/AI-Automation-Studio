@@ -100,7 +100,7 @@ module.exports = function e2eFlow({ win, app, LENH, dieuPhoi, taiKhoan }) {
 
       // 3) Flow ảnh → Flow video CÙNG tài khoản: dùng lại tên ảnh trên Flow, KHÔNG tải lên lại.
       ghi('-- 3. Flow ảnh → Flow video (cùng tài khoản)');
-      const soTruoc3 = viec().length, g3dau = (await flowGhi()).length;
+      const soTruoc3 = viec().length, g3dau = (await flowGhi()).length, nk3 = LENH.trangThai().nhatKy.length;
       LENH.them({ duAn: 'mac-dinh', loai: 'anh', nen: 'flow', tyLe: '16:9', prompts: ['ngọn núi'],
         chuoiVideo: { prompt: 'mây bay', nen: 'flow' }, chay: true });
       const anh3 = viec()[soTruoc3];
@@ -113,6 +113,7 @@ module.exports = function e2eFlow({ win, app, LENH, dieuPhoi, taiKhoan }) {
       kiem(!g3.some((x) => x.loai === 'upload'), 'không tải ảnh lên lại (ảnh đã có trên Flow của tài khoản này)');
       kiem(st3.length === 2 && st3[1].d.prompts[0] === `mây bay @${anh3.flowTen && anh3.flowTen.ten}`,
         `prompt video dùng đúng tên ảnh trên Flow (${st3[1] && st3[1].d.prompts[0]})`);
+      if (anh3.nen !== 'flow' || st3.length !== 2) dongNhatKy(nk3);   // CI đỏ mục này → có nhật ký để truy
 
       // 4) Tài khoản Flow hỏng → việc chuyển NGAY sang tài khoản Flow dự phòng.
       ghi('-- 4. Flow 1 lỗi → chuyển sang Flow 2');

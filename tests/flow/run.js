@@ -1210,6 +1210,12 @@ test('model: nối dây trong máy Flow (may-flow.js) đủ các chỗ', () => {
     'chuyển dự phòng chưa đánh dấu nghiAnToan trước khi tạm dừng');
 });
 
+test('tải về kẹt: đếm từ file GẦN NHẤT của mẻ, mẻ đang tải lần lượt không bị cắt (CI Windows 1.2.0)', () => {
+  const l = docNguon('src', 'flow', 'luong-flow.js');
+  assert.ok(/files\.get\(j\)\.push\(duongDan\);\s*taiGanNhat = Date\.now\(\);/.test(l), 'file về phải ghi mốc taiGanNhat');
+  assert.ok(/Date\.now\(\) - Math\.max\(luc, taiGanNhat\) < this\.choTaiMs/.test(l), 'hạn tải phải tính từ mốc muộn hơn (tạo xong / file gần nhất)');
+});
+
 test('kiểm trước mẻ: chỗ giao mẻ duy nhất và đường đọc kho sau F5 đều đi qua bộ lọc selector', () => {
   // Bản gộp: mọi mẻ giao qua LuongFlow.chayMe (một chỗ buildStartMessage duy nhất trong app).
   const nguon = [['main.js', docGoc('main.js')]];
