@@ -1305,12 +1305,19 @@ testAsync('1.2.5 Suno hết credit ("Create again in 9:44:35") → KHÔNG bấm 
   assert.ok(r.ok && tp.tao === 0 && tp.taiMp3.join() === 'c1', JSON.stringify(r));
   // Điều phối: tài khoản nghỉ theo nghiMs của luồng (không phải 6 giờ cố định).
   const NGHI = 3 * 3600e3;
+  // Luồng giả như luongGiaSuno (bận trong lúc chạy) — CI Windows từng đọc mốc trước khi việc kịp chạy (NaN giờ).
   const { dp, tk } = dungDieuPhoi({ taoLuong: (a, stt) => (a.nen === 'suno' ? { id: `${a.id}-${stt}`, nen: 'suno', ranh: true, viec: null, dung() {},
-    async chay() { await new Promise((x) => setTimeout(x, 5)); return { ok: false, hetLuot: true, nghiMs: NGHI, loi: 'Suno hết credit tạo bài: "Create again in 2:59:00"' }; } } : luongGiaHaiNen([])(a, stt)) });
+    async chay(j) {
+      this.ranh = false; this.viec = j;
+      await new Promise((x) => setTimeout(x, 15));
+      this.ranh = true; this.viec = null;
+      return { ok: false, hetLuot: true, nghiMs: NGHI, loi: 'Suno hết credit tạo bài: "Create again in 2:59:00"' };
+    } } : luongGiaHaiNen([])(a, stt)) });
   dp.datCaiDat({ nghiGiuaLanGui: 0, tuThuLai: 0, tuChayLaiLoi: 0 });
   dp.them({ loai: 'nhac', prompts: ['a'] });
   dp.chayTatCa();
   await chayHet(dp);
+  for (let i = 0; i < 200 && !(tk.tim('suno-1').hetLuotDen > 0); i++) { dp._vong(); await new Promise((x) => setTimeout(x, 15)); }
   const a1 = tk.tim('suno-1');
   assert.ok(Math.abs(a1.hetLuotDen - (Date.now() + NGHI)) < 60e3, `nghỉ ~3 giờ (còn ${((a1.hetLuotDen - Date.now()) / 3600e3).toFixed(2)} giờ)`);
   assert.ok(/Create again in/.test(a1.lyDoHetLuot));
