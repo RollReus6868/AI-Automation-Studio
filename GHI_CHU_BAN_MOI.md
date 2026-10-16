@@ -1,4 +1,14 @@
-# AI Automation Studio 1.2.1
+# AI Automation Studio 1.2.2
+
+- **Sửa lỗi Flow vẫn không tải ảnh lên được** (nhật ký 16/10/2026: *"Không đưa được ảnh lên kho Flow (371_68b883)"* ở mọi tài khoản). Dựa trên file HTML trang dự án và ảnh chụp bạn gửi, có ba chỗ hỏng:
+  - Trong bảng [+] mới, bản 1.2.1 bấm nhầm mục lọc **"Tệp tải lên"** (danh sách bên trái) thay vì nút **"Tải nội dung nghe nhìn lên"** ở dưới cùng → không có hộp chọn file nào mở ra, app phải kéo-thả và Flow không nhận. Giờ app chỉ bấm nút có chữ bắt đầu bằng *Tải … lên* / *Upload*, bỏ qua các mục lọc.
+  - Ảnh đã lên kho mà engine vẫn báo thiếu: bảng kho mới không còn đúng các dấu mà engine Flow (giống tool Flow cũ) dùng để tìm ảnh theo tên → app thêm một lớp "nắn" bảng kho để engine thấy đúng ảnh *371_68b883.png*, rồi gắn được ảnh vào prompt bằng nút **Thêm vào câu lệnh**.
+  - Nếu Flow lại đổi giao diện mà vẫn hỏng, app lưu HTML của bảng ảnh (đã bỏ hình, không có mật khẩu) vào **Tài liệu/AI Automation Studio/chan-doan-flow** và ghi đường dẫn vào nhật ký — gửi tệp đó để sửa tiếp nhanh.
+- **Tự chuyển mục Hình ảnh / Video trên Flow.** Việc tạo ảnh → app tự mở bảng cài đặt (nút *🍌 Nano Banana… x1*) và chọn **Hình ảnh**; việc tạo video → chọn **Video**; video từ ảnh (ảnh gắn @tên) → chọn thêm **Thành phần** (ảnh khung đầu/cuối → **Khung hình**). Nhật ký ghi *🎛 Đã tự đổi Flow sang mục Video* / *Đã chọn "Thành phần" trong mục Video*.
+
+Lưu ý: đã kiểm trên trang Flow giả dựng lại từ HTML và ảnh chụp bạn gửi (chạy đúng engine Flow thật của app), chưa chạy trên Flow thật. Lần đầu hãy chạy 2–3 video từ ảnh và 2–3 ảnh ở Flow, gửi lại Nhật ký (*Xuất .txt*); nếu vẫn lỗi, gửi kèm tệp trong thư mục *chan-doan-flow*.
+
+## Bản 1.2.1
 
 - **Muse từ chối tạo video từ ảnh → riêng ảnh đó tự sang Google Flow.** Muse trả lời kiểu *"Mình không thể tạo video từ ảnh này."* → app nhận ra ngay (không chờ hết giờ), chuyển **chỉ việc đó** sang tài khoản Flow của bạn để tạo video từ đúng ảnh đó; các ảnh khác vẫn tạo ở Muse như thường. Tài khoản Muse không bị tính lỗi. Nhật ký ghi *🔀 Muse → Flow: #… Muse từ chối tạo video: "…"*.
 - **Muse ⇄ Flow: bên nào lỗi thì tự đổi sang bên kia.** Mọi tài khoản Muse của dự án đều lỗi / nghỉ → việc Muse còn lại sang Flow; mọi tài khoản Flow đều lỗi → việc Flow (ảnh **và** video) sang Muse; một việc hỏng ở mọi tài khoản một bên → thử ở bên kia trước khi báo Lỗi. Mỗi việc chỉ đổi bên **một lần** (hỏng cả hai bên thì báo Lỗi, không đẩy qua lại mãi). Bên kia cần có tài khoản đã đăng nhập (hoặc được chọn trong dự án) — "Flow 1" có sẵn mà bạn chưa đăng nhập thì không nhận việc. Công tắc chung ở **Cài đặt → Chạy → Muse ⇄ Flow** (thay công tắc *Flow hỏng hết → Muse* cũ ở mục Google Flow; nếu bạn đã tắt công tắc cũ thì công tắc mới cũng tắt).

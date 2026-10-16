@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="vi" dir="ltr"><head><meta charset="utf-8"><title>Google Flow mới (giả) — trang dự án</title>
+<style>
+  body{font-family:sans-serif;background:#000;color:#eee;margin:0}
+  flow-prompt-box{position:fixed;left:400px;bottom:20px;width:480px;display:block}
+  flow-base-prompt-box .base-prompt-box{border:1px solid #444;border-radius:16px;padding:10px;background:#111}
+  [role=textbox]{min-height:40px;outline:none}
+  .hang{display:flex;gap:6px;align-items:center;margin-top:6px}
+  .chip{display:inline-flex;gap:4px;align-items:center;border:1px solid #666;border-radius:8px;padding:2px}
+  .chip img{width:28px;height:28px}
+  button{background:#222;color:#eee;border:1px solid #555;border-radius:8px;padding:4px 8px}
+  mat-icon{font-size:12px;margin-right:2px}
+  .cdk-overlay-container{position:fixed;inset:0;pointer-events:none;z-index:1000}
+  .cdk-overlay-backdrop{position:absolute;inset:0;pointer-events:auto}
+  .cdk-overlay-pane{position:absolute;pointer-events:auto;background:#1b1b1b;border:1px solid #444;border-radius:16px;padding:8px}
+  .kho{left:360px;top:80px;width:620px;height:460px;display:flex;flex-direction:column}
+  .kho .than{display:flex;flex:1;gap:8px;min-height:0}
+  .kho nav{display:flex;flex-direction:column;gap:2px;width:120px}
+  .kho nav .tai-len{margin-top:auto;max-width:110px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+  .kho .ds{width:200px;overflow:auto}
+  .kho .muc{display:flex;gap:6px;padding:4px;border-radius:8px;cursor:pointer}
+  .kho .muc.chon{background:#444}
+  .kho .muc img{width:36px;height:36px}
+  .kho .xem{flex:1;display:flex;flex-direction:column;justify-content:flex-end}
+  .cai-dat{left:600px;bottom:110px;width:260px}
+  .cai-dat .hang button[aria-pressed=true]{background:#eee;color:#000}
+</style>
+</head><body>
+<!--
+  GOOGLE FLOW GIAO DIỆN MỚI (10/2026) — dựng lại để kiểm trình tiêm của app, tests/flow/flow-moi-main.js.
+  Khung ô nhập chép từ HTML trang dự án người dùng gửi ngày 16/10/2026 (đã bỏ hết thông tin tài khoản):
+    flow-prompt-box > flow-base-prompt-box > flow-rich-text-editor > div[role=textbox][contenteditable]
+    flow-add-menu > button[aria-label="Thêm thành phần vào ô nhập câu lệnh"] (mat-icon "add", aria-haspopup, aria-expanded)
+    nút "Tác nhân", nút cài đặt aria-label="Điều kiện kích hoạt cài đặt" (chữ "🍌 Nano Banana 2.1 crop_16_9 x1"),
+    flow-generate-icon-button > button[aria-label="Bắt đầu tạo"] (mat-icon arrow_forward), <flow-media-upload> rỗng,
+    KHÔNG có <input type=file> nào trong trang.
+  Hai bảng bật lên dựng theo ảnh chụp cùng ngày (bảng thật chưa có HTML — đóng lúc lưu trang):
+    • [+] → bảng kho: ô "Tìm kiếm thành phần" (không có thuộc tính type), cột trái Tất cả / Hình ảnh / Video /
+      Giọng nói / Nhân vật / Hình đại diện / Tệp tải lên (MỤC LỌC, không phải nút tải), dưới cùng nút
+      "Tải nội dung nghe nhìn lên" (chữ bị cắt "Tải nội dung …") → tạo ô chọn file KHÔNG gắn vào trang rồi mở
+      hộp chọn file. Mỗi mục kho: ảnh nhỏ + tên tệp + "Hình ảnh"; bấm mục → xem trước + nút "Thêm vào câu lệnh"
+      → ảnh gắn vào ô nhập (chip có nút close), bảng đóng.
+    • nút cài đặt → bảng: Hình ảnh | Video; Video có Khung hình | Thành phần; tỷ lệ; model; x1–x4.
+      Nút là <button aria-pressed> chứa <mat-icon> dính liền chữ (textContent "imageHình ảnh").
+  Ghi lại cho bài kiểm: __kho (tên mục kho), __nhan (tệp trang nhận được, có nội dung), __soMoHop, __gan (tên ảnh
+  đang gắn trong ô nhập), __cheDo ('image'|'video'), __phu ('khung-hinh'|'thanh-phan'), __dan (chữ đã dán).
+-->
+<flow-project-page>
+  <!-- Chép NGUYÊN khối flow-prompt-box từ trang thật (bỏ svg, thuộc tính _ngcontent / ripple / describedby); thêm id cho bài kiểm và #chips. -->
+  <flow-prompt-box class="prompt-box-container"><!----><flow-prompt-box-instruction-card-wrapper><div class="wrapper-container"><!----><div class="prompt-box-content"><!----><flow-base-prompt-box><div cdkoverlayorigin="" class="base-prompt-box"><flow-border-glow class="loop"></flow-border-glow><div class="prompt-top-row"><!----><flow-rich-text-editor class="prompt-input"><span aria-hidden="true" class="prosemirror-placeholder">Bạn muốn tạo những gì?</span><!----><div class="prosemirror-editor"><div role="textbox" aria-multiline="true" aria-label="Bạn muốn tạo những gì?" contenteditable="true" translate="no" class="ProseMirror"><p><br class="ProseMirror-trailingBreak"></p></div></div></flow-rich-text-editor><!----><!----><!----><div class="top-right-actions"><div id="chips"></div></div></div><!----><!----><div class="bottom-controls"><flow-add-menu><div cdkoverlayorigin="" class="add-menu-container"><button maticonbutton="" type="button" aria-haspopup="true" class="mdc-icon-button mat-mdc-icon-button mat-mdc-button-base mat-mdc-tooltip-trigger add-menu-trigger mat-unthemed" id="nutThem" aria-label="Thêm thành phần vào ô nhập câu lệnh" aria-expanded="false"><span class="mat-mdc-button-persistent-ripple mdc-icon-button__ripple"></span><mat-icon role="img" class="mat-icon notranslate add-menu-icon google-symbols mat-icon-no-color" aria-hidden="true" data-mat-icon-type="font">add</mat-icon><!----><span class="mat-focus-indicator"></span><span class="mat-mdc-button-touch-target"></span></button><!----><!----></div><!----><!----><!----></flow-add-menu><!----><flow-agent-mode-toggle-chip bottomcontrolextra=""><button class="agent-mode-chip" aria-pressed="false"><!----><span class="agent-mode-chip-label">Tác nhân</span></button></flow-agent-mode-toggle-chip><!----><div class="submit-controls"><button matbutton="" flow-button="" aria-label="Điều kiện kích hoạt cài đặt" cdkoverlayorigin="" id="nutCaiDat" class="mdc-button mat-mdc-button-base settings-trigger-button mdc-button--unelevated mat-mdc-unelevated-button mat-unthemed flow-button-primary flow-button-small flow-button-no-touch-target"><span class="mat-mdc-button-persistent-ripple mdc-button__ripple"></span><span class="mdc-button__label"><span settingstriggercontent="" class="settings-summary" id="chuCaiDat"></span></span><!----><span class="mat-focus-indicator"></span><span class="mat-mdc-button-touch-target"></span><span class="mat-ripple mat-mdc-button-ripple"></span></button><!----><!----><!----><flow-generate-icon-button class="mat-mdc-tooltip-trigger"><button flow-icon-button="" maticonbutton="" type="submit" aria-label="Bắt đầu tạo" cdkoverlayorigin="" class="mdc-icon-button mat-mdc-icon-button mat-mdc-button-base generate-icon-button mat-mdc-button-disabled mat-unthemed flow-icon-button-secondary flow-button-small flow-icon-button-no-touch-target" disabled="true"><span class="mat-mdc-button-persistent-ripple mdc-icon-button__ripple"></span><!----><mat-icon role="img" class="mat-icon notranslate flow-icon-m mat-icon-rtl-mirror google-symbols mat-icon-no-color" aria-hidden="true" data-mat-icon-type="font">arrow_forward</mat-icon><!----><!----><span class="mat-focus-indicator"></span><span class="mat-mdc-button-touch-target"></span></button><!----></flow-generate-icon-button><!----><!----><!----></div></div></div></flow-base-prompt-box><!----></div></div></flow-prompt-box-instruction-card-wrapper><!----></flow-prompt-box>
+  <flow-media-upload></flow-media-upload>
+</flow-project-page>
+<div class="cdk-overlay-container"></div>
+<script>
+(function () {
+  const q = new URLSearchParams(location.search);
+  const ANH = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFElEQVR4nGP8z8DwnwEJMDGgAQAy2wIDqvFBJQAAAABJRU5ErkJggg==';
+  window.__kho = (q.get('kho') || '').split(',').filter(Boolean);
+  window.__nhan = []; window.__soMoHop = 0; window.__gan = []; window.__dan = [];
+  window.__cheDo = q.get('cheDo') || 'image';
+  window.__phu = 'khung-hinh';
+  const oc = document.querySelector('.cdk-overlay-container');
+  const nutThem = document.getElementById('nutThem');
+  const chuCaiDat = document.getElementById('chuCaiDat');
+  const ve = () => {
+    chuCaiDat.innerHTML = window.__cheDo === 'video'
+      ? 'Video · 720p · 8 giây <mat-icon role="img" aria-hidden="true">crop_16_9</mat-icon> x1'
+      : ' 🍌 Nano Banana 2.1 <mat-icon role="img" aria-hidden="true">crop_16_9</mat-icon> x1 ';
+  };
+  ve();
+  const dong = () => { oc.innerHTML = ''; nutThem.setAttribute('aria-expanded', 'false'); };
+  const moPane = (lop, html) => {
+    dong();
+    oc.innerHTML = '<div class="cdk-overlay-backdrop"></div><div class="cdk-overlay-pane ' + lop + '">' + html + '</div>';
+    oc.querySelector('.cdk-overlay-backdrop').addEventListener('click', dong);
+    return oc.querySelector('.cdk-overlay-pane');
+  };
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') dong(); });
+
+  // ── Bảng kho ([+]) — Angular: mở bằng click ─────────────────────────
+  const MUC_LOC = [['dashboard', 'Tất cả'], ['image', 'Hình ảnh'], ['videocam', 'Video'], ['record_voice_over', 'Giọng nói'],
+    ['accessibility_new', 'Nhân vật'], ['face', 'Hình đại diện'], ['drive_folder_upload', 'Tệp tải lên']];
+  let chon = null;
+  function veDs(pane) {
+    const loc = (pane.querySelector('input').value || '').toLowerCase();
+    const ds = pane.querySelector('.ds');
+    ds.innerHTML = window.__kho.filter((t) => t.toLowerCase().includes(loc)).map((t) =>
+      `<flow-asset-list-item><div class="muc${t === chon ? ' chon' : ''}" data-ten="${t}"><img src="${ANH}" alt=""><div><div class="ten">${t}</div><div class="loai">Hình ảnh</div></div></div></flow-asset-list-item>`).join('');
+    for (const m of ds.querySelectorAll('.muc')) m.addEventListener('click', () => { chon = m.dataset.ten; veDs(pane); veXem(pane); });
+  }
+  function veXem(pane) {
+    const x = pane.querySelector('.xem');
+    x.innerHTML = chon ? `<img src="${ANH}" style="width:100%"><button class="them-cau">Thêm vào câu lệnh</button>` : '';
+    const b = x.querySelector('.them-cau');
+    if (b) b.addEventListener('click', () => { ganVao(chon); dong(); });
+  }
+  function ganVao(ten) {
+    window.__gan.push(ten);
+    const c = document.createElement('span');
+    c.className = 'chip';
+    c.innerHTML = `<img src="${ANH}" alt="${ten}"><button aria-label="Xoá"><mat-icon>close</mat-icon></button>`;
+    c.querySelector('button').addEventListener('click', () => { c.remove(); window.__gan.splice(window.__gan.indexOf(ten), 1); });
+    document.getElementById('chips').appendChild(c);
+  }
+  nutThem.addEventListener('click', () => {
+    if (nutThem.getAttribute('aria-expanded') === 'true') { dong(); return; }
+    chon = null;
+    const pane = moPane('kho', `<flow-asset-picker>
+      <div class="hang"><button>Tháng 10 16 - …</button><mat-icon>search</mat-icon><input placeholder="Tìm kiếm thành phần" aria-label="Tìm kiếm thành phần"><button>Gần đây</button></div>
+      <div class="than"><nav>${MUC_LOC.map(([i, c]) => `<button class="loc"><mat-icon>${i}</mat-icon>${c}</button>`).join('')}
+        <button class="tai-len" aria-describedby="tip-tai"><mat-icon>upload</mat-icon><span>Tải nội dung nghe nhìn lên</span></button></nav>
+        <div class="ds"></div><div class="xem"></div></div></flow-asset-picker>`);
+    nutThem.setAttribute('aria-expanded', 'true');
+    pane.querySelector('input').addEventListener('input', () => veDs(pane));
+    pane.querySelector('.tai-len').addEventListener('click', () => {
+      // Như web mới: ô chọn file tạo lúc bấm, KHÔNG gắn vào trang, mở hộp chọn file ngay.
+      const i = document.createElement('input');
+      i.type = 'file'; i.accept = 'image/*,video/*,audio/*'; i.multiple = true;
+      i.addEventListener('change', async () => {
+        for (const f of i.files) {
+          if ((await f.arrayBuffer()).byteLength > 0) { window.__nhan.push(f.name); window.__kho.unshift(f.name); }
+        }
+        if (document.querySelector('.cdk-overlay-pane.kho')) veDs(document.querySelector('.cdk-overlay-pane.kho'));
+      });
+      window.__soMoHop++;
+      i.click();
+    });
+    veDs(pane);
+  });
+
+  // ── Bảng cài đặt ────────────────────────────────────────────────────
+  document.getElementById('nutCaiDat').addEventListener('click', () => {
+    if (oc.querySelector('.cai-dat')) { dong(); return; }
+    const pane = moPane('cai-dat', '<div class="noi"></div>');
+    const veBang = () => {
+      const v = window.__cheDo === 'video';
+      const n = (ma, chu, bat, lop) => `<button class="${lop}" aria-pressed="${bat}"><mat-icon>${ma}</mat-icon>${chu}</button>`;
+      pane.querySelector('.noi').innerHTML =
+        `<div class="hang">${n('image', 'Hình ảnh', !v, 'm-anh')}${n('videocam', 'Video', v, 'm-video')}</div>` +
+        (v ? `<div class="hang">${n('crop_free', 'Khung hình', window.__phu === 'khung-hinh', 'p-khung')}${n('category', 'Thành phần', window.__phu === 'thanh-phan', 'p-tp')}</div>` : '') +
+        `<div class="hang">${n('crop_16_9', '16:9', true, 'tl')}${n('crop_portrait', '9:16', false, 'tl')}</div>` +
+        `<div class="hang"><button>${v ? 'Veo 3.1 - Lite' : '🍌 Nano Banana 2 Lite'}<mat-icon>arrow_drop_down</mat-icon></button></div>` +
+        `<div class="hang">${['x1', 'x2', 'x3', 'x4'].map((x, k) => `<button aria-pressed="${k === 0}">${x}</button>`).join('')}</div>`;
+      pane.querySelector('.m-anh').addEventListener('click', () => { window.__cheDo = 'image'; ve(); veBang(); });
+      pane.querySelector('.m-video').addEventListener('click', () => { window.__cheDo = 'video'; ve(); veBang(); });
+      if (v) {
+        pane.querySelector('.p-khung').addEventListener('click', () => { window.__phu = 'khung-hinh'; veBang(); });
+        pane.querySelector('.p-tp').addEventListener('click', () => { window.__phu = 'thanh-phan'; veBang(); });
+      }
+    };
+    veBang();
+  });
+})();
+</script>
+</body></html>

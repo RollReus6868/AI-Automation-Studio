@@ -33,6 +33,19 @@ const { kiemTruocKhiChay } = require('./main/kiem-truoc');
 const cho = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /**
+ * Mục con của Video cần chọn trên Flow mới (16/10/2026 có "Khung hình | Thành phần"):
+ * ảnh gắn @tên (charSync) là THÀNH PHẦN, ảnh khung đầu/cuối (keyframeSync) là KHUNG HÌNH;
+ * video chỉ từ chữ, hay chế độ Hình ảnh → không đụng.
+ */
+function tuyCheDo(settings) {
+  const s = settings || {};
+  if (s.runMode !== 'video') return null;
+  if (s.charSync) return { phu: 'thanh-phan' };
+  if (s.keyframeSync) return { phu: 'khung-hinh' };
+  return null;
+}
+
+/**
  * @param o.tabs          QuanLyTabFlow
  * @param o.taiVe         DownloadManager (src/flow/main/downloads.js)
  * @param o.log(muc, chu)
@@ -367,12 +380,22 @@ function taoMayFlow(o) {
   // ══════════════════════════════════════════════════════════════════════
   //  CHẾ ĐỘ Image / Video — đổi bằng src/flow/inject/flow-mode.js
   // ══════════════════════════════════════════════════════════════════════
-  async function datCheDo(tab, mode, imLang = false) {
+  const TEN_CHE_DO = { image: 'Hình ảnh', video: 'Video' };
+  const TEN_PHU = { 'thanh-phan': 'Thành phần', 'khung-hinh': 'Khung hình' };
+  async function datCheDo(tab, mode, imLang = false, tuy = null) {
     if (!tab || !tab.ready) return { ok: false, lyDo: 'Tab chưa sẵn sàng' };
     try {
-      const r = await tab.view.webContents.executeJavaScript(`window.__flowSetMode && window.__flowSetMode(${JSON.stringify(mode)})`, true);
+      const thamSo = JSON.stringify(mode) + (tuy ? ', ' + JSON.stringify(tuy) : '');
+      const r = await tab.view.webContents.executeJavaScript(`window.__flowSetMode && window.__flowSetMode(${thamSo})`, true);
       if (!r) return { ok: false, lyDo: 'Trình đổi chế độ chưa được tiêm' };
-      if (r.ok && r.daDoi) log('success', `🎛 [${tab.id}] Đã tự đổi Flow sang chế độ ${mode}`);
+      if (r.ok && r.daDoi) log('success', `🎛 [${tab.id}] Đã tự đổi Flow sang mục ${TEN_CHE_DO[mode] || mode}`);
+      // Mục con của Video (1.2.2): ảnh gắn @tên là "Thành phần", ảnh khung đầu/cuối là "Khung hình".
+      if (r.ok && r.phu && r.daDoiPhu) log('success', `🎛 [${tab.id}] Đã chọn "${TEN_PHU[r.phu] || r.phu}" trong mục Video`);
+      // Bản Flow chưa có cặp nút này thì báo MỘT lần mỗi tab, engine vẫn chạy tiếp như cũ.
+      if (r.ok && r.phu && r.lyDoPhu && !(tab._daBaoPhu || (tab._daBaoPhu = new Set())).has(r.phu)) {
+        tab._daBaoPhu.add(r.phu);
+        log('warning', `⚠️ [${tab.id}] Không chọn được "${TEN_PHU[r.phu] || r.phu}" trong mục Video: ${r.lyDoPhu} — vẫn chạy tiếp.`);
+      }
       else if (!r.ok && !imLang) {
         log('warning', `⚠️ [${tab.id}] Không tự đổi được sang chế độ ${mode}: ${r.lyDo}.`);
         if (r.chiTiet) log('info', `   ↳ chẩn đoán: ${JSON.stringify(r.chiTiet)}`);
@@ -383,9 +406,9 @@ function taoMayFlow(o) {
     }
   }
   /** Đổi chế độ, KIÊN TRÌ: Google chậm dựng bảng thì lần sau được. */
-  async function datCheDoKienTri(tab, mode, soLan = 4, cachNhau = 8000, conChay = () => true) {
+  async function datCheDoKienTri(tab, mode, soLan = 4, cachNhau = 8000, conChay = () => true, tuy = null) {
     for (let lan = 1; lan <= soLan; lan++) {
-      const r = await datCheDo(tab, mode, lan < soLan);
+      const r = await datCheDo(tab, mode, lan < soLan, tuy);
       if (r && r.ok) return r;
       if (lan < soLan) {
         log('warning', `⏳ [${tab.id}] Chưa đổi được sang chế độ ${mode} (lần ${lan}/${soLan}) — thử lại sau ${Math.round(cachNhau / 1000)} giây.`);
@@ -407,7 +430,7 @@ function taoMayFlow(o) {
     tab._daDemXong = new Set();
     tab._meKhoa = Date.now();
     datCaiDatAnToan(settings.anToan);
-    const doi = await datCheDoKienTri(tab, settings.runMode, 4, 8000, conChay);
+    const doi = await datCheDoKienTri(tab, settings.runMode, 4, 8000, conChay, tuyCheDo(settings));
     if (!doi.ok) return { ok: false, lyDo: doi.lyDo };
     if (settings.runMode === 'image') await datModelAnh(tab, settings);
     const caiDat = await kiemTruocKhiChay(tab.view.webContents, await chuanBiModel(tab, settings),
@@ -672,4 +695,4 @@ function taoMayFlow(o) {
   };
 }
 
-module.exports = { taoMayFlow };
+module.exports = { taoMayFlow, tuyCheDo };

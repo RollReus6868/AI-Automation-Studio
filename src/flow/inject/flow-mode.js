@@ -58,6 +58,17 @@
   };
 
   const chu = (el) => (el && el.textContent ? el.textContent : '').trim().toLowerCase();
+  // Nhãn nút KHÔNG kèm chữ biểu tượng: Flow 16/10/2026 viết <mat-icon>image</mat-icon>Hình ảnh liền nhau, nên
+  // textContent là "imagehình ảnh" / "videocamvideo" — so nguyên chuỗi thì không bao giờ khớp "video".
+  const nhanNut = (el) => {
+    if (!el) return '';
+    let t = el.textContent || '';
+    for (const ic of el.querySelectorAll('mat-icon, i.google-symbols, .material-icons, .material-symbols-outlined, .google-symbols')) {
+      const s = ic.textContent || '';
+      if (s) t = t.replace(s, ' ');
+    }
+    return t.replace(/\s+/g, ' ').trim().toLowerCase();
+  };
 
   // Nhãn hai chế độ. Flow chạy tiếng Anh kể cả khi trang đang là tiếng Việt,
   // nhưng vẫn để sẵn cả hai cho chắc.
@@ -200,10 +211,20 @@
     if (bat && nhinThay(bat)) return bat;
 
     // Lối cuối: bất cứ khối nào đang hiện mà chứa ĐỦ CẢ HAI nhãn Image và
-    // Video ở dạng nút ngắn — đó chắc chắn là bảng chọn chế độ.
+    // Video ở dạng nút ngắn — đó chắc chắn là bảng chọn chế độ. Bỏ chính nút mở
+    // bảng: Flow 16/10/2026 ghi "Video · 720p · 8 giây x1" trên nó, bỏ biểu tượng
+    // thì đủ ngắn để bị nhận nhầm là nút "Video" (lỗi bắt được ở bài flow-moi).
+    const trig = timTrigger();
     const nuts = [...document.querySelectorAll(
       'button, [role="tab"], [role="radio"], [role="menuitemradio"], mat-button-toggle'
-    )].filter((el) => nhinThay(el) && chu(el).length <= 24);
+    )].filter((el) => nhinThay(el) && nhanNut(el).length <= 24 &&
+      !(trig && (el === trig || el.contains(trig) || trig.contains(el))) && !el.closest('[role="article"]'));
+    // Bảng bật lên của Angular CDK (Flow 16/10/2026) chứa cả hai nút → lấy cả bảng (còn cặp Khung hình | Thành phần).
+    for (const pane of document.querySelectorAll('.cdk-overlay-pane')) {
+      if (!nhinThay(pane)) continue;
+      const trong = nuts.filter((el) => pane.contains(el));
+      if (trong.some((el) => khopNhan(el, 'video')) && trong.some((el) => khopNhan(el, 'image'))) return pane;
+    }
 
     const coVideo = nuts.find((el) => khopNhan(el, 'video'));
     const coImage = nuts.find((el) => khopNhan(el, 'image'));
@@ -219,7 +240,7 @@
   }
 
   function khopNhan(el, mode) {
-    const t = chu(el);
+    const t = nhanNut(el);
     if (!t || t.length > 24) return false;
     return (NHAN[mode] || []).some((n) => t === n || t.startsWith(n + ' ') || t.endsWith(' ' + n));
   }
@@ -266,6 +287,7 @@
   const dangBat = (el) => !!el && (
     el.getAttribute('aria-selected') === 'true' ||
     el.getAttribute('aria-checked') === 'true' ||
+    el.getAttribute('aria-pressed') === 'true' ||
     el.getAttribute('data-state') === 'active' ||
     el.getAttribute('data-state') === 'checked' ||
     el.classList.contains('mat-button-toggle-checked')
@@ -322,6 +344,37 @@
     return null;
   }
 
+  // ══════════════════════════════════════════════ 3b. KHUNG HÌNH / THÀNH PHẦN (video)
+  // Flow 16/10/2026: mục Video có thêm cặp "Khung hình" (ảnh đầu / cuối) | "Thành phần" (ảnh gắn vào prompt
+  // làm thành phần — đúng thứ Character Sync của engine gắn bằng @tên).
+  const NHAN_PHU = {
+    'thanh-phan': ['thành phần', 'ingredients', 'ingredient'],
+    'khung-hinh': ['khung hình', 'frames', 'frame']
+  };
+  function timNutPhu(goc, phu) {
+    const ds = [...(goc || document).querySelectorAll('button, [role="tab"], [role="radio"], mat-button-toggle')]
+      .filter((el) => nhinThay(el) && (NHAN_PHU[phu] || []).includes(nhanNut(el)));
+    return ds.length ? ds[ds.length - 1] : null;
+  }
+  async function datPhu(phu) {
+    if (!NHAN_PHU[phu]) return { ok: true, daDoi: false };
+    let bang = await moBang();
+    if (!bang) return { ok: false, daDoi: false, lyDo: 'Không mở được bảng cài đặt' };
+    const vung = () => (timBang() || bang).closest('.cdk-overlay-pane, [role="dialog"], flow-prompt-box-settings, [data-radix-popper-content-wrapper]') || document;
+    let nut = timNutPhu(vung(), phu);
+    if (!nut) { dongBang(); return { ok: false, daDoi: false, lyDo: `không thấy nút "${NHAN_PHU[phu][0]}"` }; }
+    if (dangBat(nut)) { dongBang(); return { ok: true, daDoi: false }; }
+    for (const kieu of ['chuot', 'click', 'phim']) {
+      await bamMotLan(nut, kieu);
+      await wait(600);
+      bang = timBang() || await moBang();
+      nut = timNutPhu(vung(), phu) || nut;
+      if (dangBat(nut)) { dongBang(); await wait(250); return { ok: true, daDoi: true }; }
+    }
+    dongBang();
+    return { ok: false, daDoi: false, lyDo: `đã bấm "${NHAN_PHU[phu][0]}" mà Flow không đổi` };
+  }
+
   // ══════════════════════════════════════════════════════ 4. ĐỌC CHẾ ĐỘ THẬT
 
   /**
@@ -368,13 +421,21 @@
    * @param {'video'|'image'} mode
    * @returns {Promise<{ok:boolean, daDoi:boolean, lyDo?:string, chiTiet?:object}>}
    */
-  window.__flowSetMode = async function (mode) {
+  window.__flowSetMode = async function (mode, tuy) {
     const muon = mode === 'image' ? 'image' : 'video';
+    const phu = muon === 'video' && tuy && tuy.phu;
+    // Chế độ đã đúng → chọn tiếp Khung hình / Thành phần (nếu được yêu cầu). Không thấy nút đó thì vẫn ok:
+    // tài khoản / bản Flow chưa có cặp nút này.
+    const xong = async (kq) => {
+      if (!phu || !kq.ok) return kq;
+      const p = await datPhu(phu);
+      return { ...kq, daDoi: kq.daDoi || p.daDoi, phu, daDoiPhu: !!p.daDoi, lyDoPhu: p.ok ? undefined : p.lyDo };
+    };
 
     try {
       // ── Đang đúng chế độ rồi thì thôi ────────────────────────────────
       const dangO = docCheDo();
-      if (dangO === muon) return { ok: true, daDoi: false, lyDo: `Flow đã ở chế độ ${muon}` };
+      if (dangO === muon) return xong({ ok: true, daDoi: false, lyDo: `Flow đã ở chế độ ${muon}` });
 
       if (dangO === null && !timTrigger()) {
         return {
@@ -407,7 +468,7 @@
 
       if (dangBat(tim.boc)) {
         dongBang();
-        return { ok: true, daDoi: false, lyDo: `Đã ở chế độ ${muon} sẵn` };
+        return xong({ ok: true, daDoi: false, lyDo: `Đã ở chế độ ${muon} sẵn` });
       }
 
       // Bấm tới 3 lần, mỗi lần một KIỂU khác, chờ rồi đọc lại — giống
@@ -422,7 +483,7 @@
           if (docCheDo() === muon) {
             dongBang();
             await wait(250);
-            return { ok: true, daDoi: true };
+            return xong({ ok: true, daDoi: true });
           }
           await wait(300);
         }

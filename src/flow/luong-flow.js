@@ -70,10 +70,11 @@ class LuongFlow {
    * @param o.docAnh(duongDan) → {dataUrl, name, type}
    * @param o.luuUrl(taiKhoanId, url)   nhớ trang dự án Flow của tài khoản
    * @param o.log(muc, chu)
+   * @param o.thuMucChanDoan   nơi lưu tệp chẩn đoán HTML khi tải / dò ảnh trên Flow hỏng (1.2.2)
    */
   constructor(o) {
     Object.assign(this, { id: o.id, taiKhoan: o.taiKhoan, tabs: o.tabs, may: o.may, thuMucTam: o.thuMucTam,
-      docAnh: o.docAnh, luuUrl: o.luuUrl || (() => {}), log: o.log || (() => {}) });
+      docAnh: o.docAnh, luuUrl: o.luuUrl || (() => {}), log: o.log || (() => {}), thuMucChanDoan: o.thuMucChanDoan || '' });
     this.taiAnhLen = o.taiAnhLen || taiAnhLenMd.taiAnhLen;   // thay được trong bài kiểm
     this.nen = 'flow';
     this.tab = null;
@@ -214,6 +215,7 @@ class LuongFlow {
             const cd = taiAnhLenMd.moTaChanDoan(k.chanDoan);
             if (cd) this.log('info', `🔎 [${this.id}] Quanh ô nhập Flow: ${cd}`);
           }
+          if (!k.ok) await this._chupChanDoan(`tải ảnh lên hỏng: ${k.loi || 'không rõ'}`);
           // Tải lên từ ô nhập prompt thì Flow có thể gắn luôn ảnh vào ô nhập → prompt đầu mẻ mang theo MỌI ảnh
           // vừa tải. Gỡ ra; engine gắn đúng ảnh cho từng prompt bằng @tên.
           if (k.ok && t.view && !t.view.webContents.isDestroyed()) {
@@ -235,6 +237,7 @@ class LuongFlow {
         }
       }
       if (thuMucLen) try { fs.rmSync(thuMucLen, { recursive: true, force: true }); } catch (_) {}
+      if (thieu.length) await this._chupChanDoan(`kho Flow vẫn thiếu ảnh ${thieu.join(', ')} sau khi tải lên`);
     }
     const hong = new Map();
     for (const [j, ma] of maCua) {
@@ -242,6 +245,40 @@ class LuongFlow {
       if (mat.length) hong.set(j, `Không đưa được ảnh lên kho Flow (${mat.join(', ')})`);
     }
     return { maCua, hong };
+  }
+
+  /**
+   * Lưu HTML bảng kho [+] + ô nhập của trang Flow (đã bỏ ảnh, script, style — không có dữ liệu tài khoản ngoài
+   * những gì hiện trong bảng) ra một tệp, để người dùng gửi khi Flow đổi giao diện mà app chưa theo kịp.
+   * Mỗi luồng chụp tối đa một lần mỗi 30 phút.
+   */
+  async _chupChanDoan(lyDo) {
+    const t = this.tab;
+    if (!this.thuMucChanDoan || !t || !t.view || t.view.webContents.isDestroyed()) return null;
+    if (this._lucChup && Date.now() - this._lucChup < 30 * 60000) return null;
+    this._lucChup = Date.now();
+    try {
+      const wc = t.view.webContents;
+      // Mở bảng [+] (nếu đang đóng) để chụp được các mục kho, chụp xong đóng lại.
+      const daMo = await wc.executeJavaScript(`(function () {
+        var b = document.querySelector('button.add-menu-trigger, flow-add-menu button') ||
+          Array.prototype.find.call(document.querySelectorAll('button[aria-label]'), function (x) { return /thêm thành phần|add (media|asset|ingredient)/i.test(x.getAttribute('aria-label')); });
+        if (!b || b.getAttribute('aria-expanded') === 'true') return false;
+        b.click(); return true;
+      })()`, true).catch(() => false);
+      if (daMo) await cho(1500);
+      const r = await wc.executeJavaScript('window.__flowKhoAnh ? window.__flowKhoAnh.chup() : null', true);
+      if (daMo) await wc.executeJavaScript('document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); undefined;', true).catch(() => {});
+      if (!r || !r.html) return null;
+      fs.mkdirSync(this.thuMucChanDoan, { recursive: true });
+      const tep = path.join(this.thuMucChanDoan, `flow-${new Date().toISOString().replace(/[:.]/g, '-')}.html`);
+      fs.writeFileSync(tep, `<!-- AI Automation Studio · chẩn đoán Flow · ${r.luc} · ${r.url}\n     Lý do: ${String(lyDo).replace(/--/g, '—')} -->\n${r.html}\n`);
+      this.log('info', `🔎 [${this.id}] Đã lưu HTML bảng ảnh của Flow để sửa tiếp: ${tep} — nếu vẫn lỗi, gửi tệp này kèm nhật ký.`);
+      return tep;
+    } catch (err) {
+      this.log('warning', `⚠ [${this.id}] Không lưu được tệp chẩn đoán Flow: ${err.message}`);
+      return null;
+    }
   }
 
   async _ngu(ms, huyLuc) {

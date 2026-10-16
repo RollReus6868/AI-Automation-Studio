@@ -204,6 +204,9 @@ function taoLuong(tk, stt) {
   if (tk.nen === 'flow') {
     return new LuongFlow({ id, taiKhoan: tk, tabs: tabsFlow, may: mayFlow, log,
       thuMucTam: path.join(app.getPath('userData'), 'flow-tai-tam', slugThuMuc(`${tk.id}-${stt}`)),
+      // Bài kiểm (MUSE_DATA_DIR) ghi vào thư mục dữ liệu tạm, không rơi vào Tài liệu của máy.
+      thuMucChanDoan: process.env.MUSE_DATA_DIR ? path.join(app.getPath('userData'), 'chan-doan-flow')
+        : path.join(app.getPath('documents'), 'AI Automation Studio', 'chan-doan-flow'),
       docAnh, luuUrl: (tkId, url) => {
         taiKhoan.sua(tkId, { flowUrl: url });
         if (taiKhoan.tim(tkId).flowUrl === url) log('info', `📁 Nhớ trang dự án Flow của "${tk.ten}": ${url}`);
