@@ -210,9 +210,43 @@ function laTraLoiChu(kq, giayTuKhiCoChu, choToiDa) {
  * @returns id hoặc null (không còn tài khoản nào chạy được)
  */
 function taiKhoanChoViec(j, dsTk, nghi) {
+  return taiKhoanChoViecDs(j, dsTk, nghi, 1)[0] || null;
+}
+
+/**
+ * 1.2.0 — dự án chạy nhiều tài khoản CÙNG LÚC: các tài khoản việc này được phép chạy ngay bây giờ.
+ * Nhóm chạy cùng lúc = `soSong` tài khoản dùng được (không nghỉ) đầu danh sách; tài khoản trong nhóm
+ * nghỉ / hỏng thì tài khoản dự phòng kế tiếp tự vào nhóm. Việc đi tới tài khoản nào trong nhóm còn
+ * rảnh trước (chưa lỗi việc này).
+ *  1. Chat dở của một tài khoản còn dùng được → chỉ tài khoản đó.
+ *  2. Các tài khoản trong nhóm chưa lỗi việc này.
+ *  3. Cả nhóm đã lỗi việc này → tài khoản dự phòng đầu tiên chưa lỗi.
+ *  4. Lỗi ở mọi tài khoản → [tài khoản đầu tiên dùng được] (điều phối tính là hết một vòng).
+ * soSong = 1 cho đúng kết quả của taiKhoanChoViec cũ (chính → dự phòng theo thứ tự).
+ * @returns [id…] (rỗng = không còn tài khoản nào chạy được)
+ */
+function taiKhoanChoViecDs(j, dsTk, nghi, soSong = 1) {
   const duoc = dsTk.filter((id) => !(nghi && nghi(id)));
-  if (j.thread && j.taiKhoan && duoc.includes(j.taiKhoan)) return j.taiKhoan;
-  return duoc.find((id) => !(j.tkLoi || []).includes(id)) || duoc[0] || null;
+  if (j.thread && j.taiKhoan && duoc.includes(j.taiKhoan)) return [j.taiKhoan];
+  const loi = j.tkLoi || [];
+  const nhom = duoc.slice(0, Math.max(1, parseInt(soSong, 10) || 1)).filter((id) => !loi.includes(id));
+  if (nhom.length) return nhom;
+  const chuaLoi = duoc.find((id) => !loi.includes(id));
+  if (chuaLoi) return [chuaLoi];
+  return duoc.length ? [duoc[0]] : [];
+}
+
+/**
+ * Muse trả chữ báo TÀI KHOẢN bị chặn tạo loại này (nhật ký 16/10/2026: "Block vẫn còn (lỗi 403, tạo video
+ * không khả dụng tại khu vực này)…", "Video vẫn bị chặn khu vực (lỗi 403)…"). Lỗi của tài khoản chứ không
+ * phải của prompt: nhận ra NGAY (khỏi chờ choChuGiay) và cho tài khoản nghỉ loại việc đó.
+ */
+function laChanKhuVuc(chu) {
+  const t = String(chu || '').toLowerCase();
+  if (!t) return false;
+  if (/(lỗi|error|code|mã)\s*:?\s*403\b|\b403\s*(forbidden|error)/.test(t)) return true;
+  return /(khu vực|vùng|quốc gia|region|country|your area|location)/.test(t) &&
+    /(bị chặn|chặn|không khả dụng|không hỗ trợ|chưa hỗ trợ|blocked|not available|unavailable|not supported|restricted)/.test(t);
 }
 
 /** Thứ tự tự nhiên: anh2 < anh10. */
@@ -242,7 +276,7 @@ function keHoachTai(viec, tonTai) {
 
 const HD = {
   TY_LE, MAU_MAC_DINH, MAU_TEN_MAC_DINH, MAU_TEN_ANH_MAC_DINH, PROMPT_VIDEO_MAC_DINH, slugTen, tachPrompt, timNhanVat, taoTinNhan, tenFile, mimeTuDuoi, chonKhoang,
-  viecKeTiep, taiKhoanChoViec, thoiGianDuKien, tienDoUoc, daXong, laTraLoiChu, soSanhTuNhien, keHoachTai
+  viecKeTiep, taiKhoanChoViec, taiKhoanChoViecDs, thoiGianDuKien, tienDoUoc, daXong, laTraLoiChu, laChanKhuVuc, soSanhTuNhien, keHoachTai
 };
 // Dùng chung cho tiến trình chính (require) và giao diện (<script> → window.HD).
 if (typeof module !== 'undefined' && module.exports) module.exports = HD;

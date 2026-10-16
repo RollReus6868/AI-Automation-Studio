@@ -924,88 +924,62 @@ test('an toàn: đếm lỗi KHÔNG đếm trùng khi engine gửi lại cả b�
   assert.strictEqual(anToan.loiMoi(rows, daDem).length, 1);
 });
 
-test('an toàn: chưa đủ ngưỡng thì chưa nghỉ', () => {
-  const c = anToan.chuanHoaCaiDat({ nguong: 3, cuaSoPhut: 5 });
+test('tài khoản lỗi: đếm prompt KHÁC NHAU hỏng liền nhau — một prompt thử lại nhiều lần không làm oan tài khoản', () => {
+  const c = anToan.chuanHoaCaiDat({ nguong: 2 });
   const so = anToan.soMoi();
-  const t = 1000000;
-  so.moc.push(t - 1000, t - 2000);
-  assert.strictEqual(anToan.canNghi(so, t, c).nghi, false);
-  so.moc.push(t - 500);
-  assert.strictEqual(anToan.canNghi(so, t, c).nghi, true);
+  so.promptLoi.add('tab#1#3');
+  so.promptLoi.add('tab#1#3');                        // cùng prompt hỏng lần thử thứ hai
+  assert.strictEqual(anToan.canNghi(so, Date.now(), c).nghi, false);
+  so.promptLoi.add('tab#1#4');                        // prompt khác hỏng tiếp → tài khoản hỏng
+  const qd = anToan.canNghi(so, Date.now(), c);
+  assert.strictEqual(qd.nghi, true);
+  assert.strictEqual(qd.soLoi, 2);
 });
 
-test('an toàn: lỗi quá cũ rơi ra khỏi cửa sổ, không cộng dồn cả buổi', () => {
-  const c = anToan.chuanHoaCaiDat({ nguong: 3, cuaSoPhut: 5 });
+test('tài khoản lỗi: có prompt XONG xen giữa thì đếm lại từ đầu', () => {
+  const daDem = new Set();
+  assert.deepStrictEqual(anToan.xongMoi([{ index: 1, status: 'COMPLETED' }, { index: 2, status: 'ERROR' }], daDem), [1]);
+  assert.deepStrictEqual(anToan.xongMoi([{ index: 1, status: 'COMPLETED' }], daDem), [], 'bảng gửi lại thì không đếm trùng');
   const so = anToan.soMoi();
-  const t = 1000000000;
-  so.moc.push(t - 20 * 60000, t - 19 * 60000, t - 18 * 60000);  // 3 lỗi, 20 phút trước
-  assert.strictEqual(anToan.canNghi(so, t, c).nghi, false, 'lỗi cũ vẫn làm dừng');
-  assert.strictEqual(so.moc.length, 0, 'mốc quá cũ chưa bị dọn, sổ sẽ phình mãi');
+  so.promptLoi.add('a'); so.coCauChan = true;
+  anToan.xoaDauLoi(so);
+  assert.strictEqual(so.promptLoi.size, 0);
+  assert.strictEqual(so.coCauChan, false);
 });
 
-test('an toàn: đọc được đúng câu cảnh báo thì nghỉ ngay từ lỗi đầu', () => {
+test('tài khoản lỗi: Flow nói "hoạt động bất thường" / hết tín dụng thì đổi ngay từ lỗi đầu', () => {
   const c = anToan.chuanHoaCaiDat({ nguong: 10 });
   const so = anToan.soMoi();
   so.coCauChan = true;
-  so.moc.push(Date.now());
+  assert.strictEqual(anToan.canNghi(so, Date.now(), c).nghi, false, 'chưa có prompt nào hỏng thì chưa đổi');
+  so.promptLoi.add('x');
   const qd = anToan.canNghi(so, Date.now(), c);
   assert.strictEqual(qd.nghi, true);
   assert.strictEqual(qd.chacChan, true);
+  assert.ok(anToan.laHetLuot('You do not have enough credits. Not enough credits to generate'));
+  assert.ok(anToan.laHetLuot('Bạn không đủ tín dụng'));
+  assert.ok(!anToan.laHetLuot('Không thành công (Policy/Error)'));
+  // Chữ lỗi của engine nói hết tín dụng → lỗi đó "chắc chắn" là lỗi tài khoản.
+  assert.strictEqual(anToan.loiMoi([{ index: 1, status: 'ERROR', error: 'Out of credits' }], new Set())[0].chacChan, true);
 });
 
-test('an toàn: đang nghỉ rồi thì không xếp thêm lần nghỉ nữa', () => {
+test('tài khoản lỗi: đang nghỉ rồi thì không xếp thêm lần nghỉ nữa', () => {
   const c = anToan.chuanHoaCaiDat({ nguong: 1 });
   const so = anToan.soMoi();
   so.dangNghi = true;
-  so.moc.push(Date.now());
+  so.promptLoi.add('x');
   assert.strictEqual(anToan.canNghi(so, Date.now(), c).nghi, false);
 });
 
-test('an toàn: tắt chế độ an toàn thì không bao giờ tự nghỉ', () => {
-  const c = anToan.chuanHoaCaiDat({ bat: false, nguong: 1 });
-  const so = anToan.soMoi();
-  so.coCauChan = true;
-  so.moc.push(Date.now(), Date.now(), Date.now());
-  assert.strictEqual(anToan.canNghi(so, Date.now(), c).nghi, false);
+test('tài khoản lỗi: nghỉ gấp đôi khi bị lại, tối đa 4 lần số phút đặt', () => {
+  const c = anToan.chuanHoaCaiDat({ nghiPhut: 15 });
+  assert.deepStrictEqual([0, 1, 2, 3, 99].map((n) => anToan.thoiGianNghi(n, c) / 60000), [15, 30, 60, 60, 60]);
 });
 
-test('an toàn: nghỉ tăng gấp đôi mỗi lần bị chặn lại, và có trần', () => {
-  const c = anToan.chuanHoaCaiDat({ nghiPhut: 10, nhanDoi: true, nghiToiDaPhut: 60 });
-  assert.strictEqual(anToan.thoiGianNghi(0, c), 10 * 60000);
-  assert.strictEqual(anToan.thoiGianNghi(1, c), 20 * 60000);
-  assert.strictEqual(anToan.thoiGianNghi(2, c), 40 * 60000);
-  assert.strictEqual(anToan.thoiGianNghi(3, c), 60 * 60000, 'phải chặn ở trần 60 phút');
-  assert.strictEqual(anToan.thoiGianNghi(99, c), 60 * 60000, 'lần thứ 99 vẫn phải là 60');
-});
-
-test('an toàn: tắt nhân đôi thì lần nào cũng nghỉ bấy nhiêu', () => {
-  const c = anToan.chuanHoaCaiDat({ nghiPhut: 7, nhanDoi: false });
-  assert.strictEqual(anToan.thoiGianNghi(0, c), 7 * 60000);
-  assert.strictEqual(anToan.thoiGianNghi(5, c), 7 * 60000);
-});
-
-test('an toàn: giải lao định kỳ đếm theo tổng prompt đã xong', () => {
-  const c = anToan.chuanHoaCaiDat({ cuMoi: 20, giaiLaoPhut: 5 });
-  const so = anToan.soMoi();
-  assert.strictEqual(anToan.canGiaiLao(so, 19, c).nghi, false);
-  assert.strictEqual(anToan.canGiaiLao(so, 20, c).nghi, true);
-  so.mocGiaiLao = 20;                       // đã nghỉ ở mốc 20
-  assert.strictEqual(anToan.canGiaiLao(so, 25, c).nghi, false);
-  assert.strictEqual(anToan.canGiaiLao(so, 40, c).nghi, true);
-});
-
-test('an toàn: cuMoi = 0 là tắt hẳn giải lao', () => {
-  const c = anToan.chuanHoaCaiDat({ cuMoi: 0 });
-  assert.strictEqual(anToan.canGiaiLao(anToan.soMoi(), 999, c).nghi, false);
-});
-
-test('an toàn: người dùng gõ bậy vào ô số thì lấy mặc định, không NaN', () => {
-  const c = anToan.chuanHoaCaiDat({ nguong: 'ba', cuaSoPhut: '', nghiPhut: null });
-  assert.strictEqual(c.nguong, anToan.MAC_DINH.nguong);
-  assert.strictEqual(c.cuaSoPhut, anToan.MAC_DINH.cuaSoPhut);
-  assert.strictEqual(c.nghiPhut, anToan.MAC_DINH.nghiPhut);
-  // Và số vô lý bị kẹp về khoảng cho phép.
-  assert.strictEqual(anToan.chuanHoaCaiDat({ nguong: 9999 }).nguong, 50);
+test('tài khoản lỗi: gõ bậy vào ô số thì lấy mặc định; khoá cũ của chế độ an toàn bị bỏ', () => {
+  const c = anToan.chuanHoaCaiDat({ nguong: 'ba', nghiPhut: null, bat: false, cuaSoPhut: 5, cuMoi: 20 });
+  assert.deepStrictEqual(c, { nguong: anToan.MAC_DINH.nguong, nghiPhut: anToan.MAC_DINH.nghiPhut });
+  assert.strictEqual(anToan.chuanHoaCaiDat({ nguong: 9999 }).nguong, 10);
   assert.strictEqual(anToan.chuanHoaCaiDat({ nguong: -5 }).nguong, 1);
 });
 
@@ -1050,15 +1024,17 @@ const { FLOW_MAC_DINH, chuanHoaFlow, caiDatEngine } = require('../../src/flow/ca
 test('an toàn: giao diện có đủ ô, và trình dò cảnh báo được tiêm vào tab', () => {
   const html = docNguon('src', 'ui', 'index.html');
   const bang = bangOFlow('O_FLOW_AN_TOAN');
-  for (const id of ['fAnToan', 'fNguong', 'fCuaSo', 'fNghi', 'fNghiToiDa', 'fNhanDoi', 'fCuMoi', 'fGiaiLao']) {
+  for (const id of ['fNguong', 'fNghi']) {
     assert.ok(html.includes(`id="${id}"`), `giao diện thiếu ô #${id}`);
     assert.ok(bang.some(([o]) => o === id), `ô #${id} chưa nối vào O_FLOW_AN_TOAN — không lưu, không gửi đi`);
   }
+  // 1.2.0: các ô của chế độ an toàn cũ đã bỏ hẳn (luôn bật, không cửa sổ phút, không giải lao).
+  for (const id of ['fAnToan', 'fCuaSo', 'fNghiToiDa', 'fNhanDoi', 'fCuMoi', 'fGiaiLao']) assert.ok(!html.includes(`id="${id}"`), `ô cũ #${id} vẫn còn`);
+  assert.ok(html.includes('id="fSangMuse"') && bangOFlow('O_FLOW').some(([o, k]) => o === 'fSangMuse' && k === 'sangMuseKhiHong'), 'thiếu công tắc Flow hỏng → Muse');
   // Khoá giao diện gửi PHẢI đúng khoá an-toan.js đọc, và có mặc định.
   const khoaDoc = Object.keys(anToan.chuanHoaCaiDat({})).sort();
   assert.deepStrictEqual([...new Set(bang.map(([, k]) => k))].sort(), khoaDoc, 'khoá ô an toàn lệch với an-toan.js');
   assert.deepStrictEqual(Object.keys(FLOW_MAC_DINH.anToan).sort(), khoaDoc, 'mặc định an toàn lệch với an-toan.js');
-  assert.strictEqual(chuanHoaFlow({}).anToan.bat, true, 'chế độ an toàn phải BẬT sẵn');
   // Đi tới tận engine/máy Flow: caiDatEngine mang anToan, chuanBiMe nạp nó trước khi giao mẻ.
   assert.strictEqual(caiDatEngine({ anToan: { nguong: 7 } }, { loai: 'anh', ten: [] }).anToan.nguong, 7);
   assert.ok(/datCaiDatAnToan\(settings\.anToan\)/.test(thanHam(docNguon('main.js'), 'async function chuanBiMe')),
@@ -1702,9 +1678,13 @@ test('thẻ lỗi: đọc chữ Flow ghi trên thẻ và ghi vào nhật ký', (
   assert.ok(/window\.__flowDocLyDoTheLoi = function/.test(cb), 'flow-canh-bao.js chưa phơi __flowDocLyDoTheLoi');
   assert.ok(/flow-error-tile/.test(cb), 'chưa dò thẻ flow-error-tile');
   assert.ok(/async function ghiLyDoTheLoi/.test(m), 'main.js thiếu ghiLyDoTheLoi');
-  // Gọi từ UPDATE_TABLE_DATA và KHÔNG phụ thuộc chế độ an toàn.
+  // 1.2.0: UPDATE_TABLE_DATA → theoDoiAnToan (luôn chạy) → có prompt vừa hỏng thì đọc chữ trên thẻ
+  // (vừa ghi nhật ký, vừa để nhận ra "hoạt động bất thường" / hết tín dụng ghi trên thẻ).
   const khoi = m.slice(m.indexOf("case 'UPDATE_TABLE_DATA'"), m.indexOf("case 'UPDATE_PROGRESS'"));
-  assert.ok(/ghiLyDoTheLoi\(tab, hangs\)/.test(khoi), 'UPDATE_TABLE_DATA chưa gọi ghiLyDoTheLoi');
+  assert.ok(/theoDoiAnToan\(tab, hangs\)/.test(khoi), 'UPDATE_TABLE_DATA chưa gọi theoDoiAnToan');
+  const td = thanHam(m, 'async function theoDoiAnToan');
+  assert.ok(/ghiLyDoTheLoi\(tab/.test(td), 'theoDoiAnToan chưa đọc chữ trên thẻ lỗi');
+  assert.ok(!/caiDatAnToan\.bat/.test(td), 'nhận diện tài khoản lỗi luôn bật');
   const g = thanHam(m, 'async function ghiLyDoTheLoi');
   assert.ok(g, 'không cắt được thân ghiLyDoTheLoi');
   assert.ok(!/caiDatAnToan\.bat/.test(g), 'đọc lý do thẻ lỗi không được phụ thuộc chế độ an toàn');
@@ -1929,6 +1909,42 @@ test('model ảnh: mặc định Nano Banana 2 Lite, áp sau khi đổi sang ch�
   assert.ok(/if \(!doi\.ok\) return/.test(cb.slice(iCheDo, iAnh)), 'đổi chế độ hỏng thì không được chọn model ảnh / giao mẻ');
   const dma = thanHam(m, 'async function datModelAnh');
   assert.ok(/tab\.modelHienTai = null/.test(dma), 'chọn model ảnh xong phải xoá modelHienTai (của kế hoạch video)');
+});
+
+// ── 1.2.0: nhận diện tài khoản lỗi chạy thật trong máy Flow (tab giả) ──────
+testAsync('tài khoản lỗi (máy Flow): 2 prompt khác nhau hỏng → đổi tài khoản ngay; thử lại cùng prompt / có prompt xong xen giữa thì chưa', async () => {
+  const { taoMayFlow } = require('../../src/flow/may-flow');
+  const doi = [], nhatKy = [];
+  let theLoi = [];
+  const tab = { id: 'T1', accountId: 'flow-1', accountName: 'Flow 1', busy: true, ready: true,
+    view: { webContents: { id: 7, isDestroyed: () => false,
+      executeJavaScript: async (js) => (/__flowDocLyDoTheLoi/.test(js) ? { ok: true, lyDo: theLoi } : /__flowDoCanhBao/.test(js) ? { co: false } : null) } } };
+  const tabs = { tabs: [tab], findByWcId: (id) => (id === 7 ? tab : null), find: () => tab, dispatch: async () => ({ ok: true }) };
+  const may = taoMayFlow({ tabs, taiVe: {}, log: (m, c) => nhatKy.push(c), thongBao: () => {},
+    nghiTaiKhoan: (id, ms, lyDo) => { doi.push([id, ms, lyDo]); return true; } });
+  may.datCaiDatAnToan({ nguong: 2, nghiPhut: 15 });
+  const bang = async (rows, isRunning = true) => { await may.handleEngineMessage({ action: 'UPDATE_TABLE_DATA', data: { rows, isRunning } }, { id: 7 }); await new Promise((r) => setTimeout(r, 5)); };
+  await bang([{ index: 1, status: 'ERROR', retries: 0, error: 'Không thành công (Policy/Error)' }]);
+  await bang([{ index: 1, status: 'ERROR', retries: 1, error: 'Không thành công (Policy/Error)' }]);
+  assert.strictEqual(doi.length, 0, 'MỘT prompt thử lại hỏng lần nữa chưa phải tài khoản hỏng');
+  await bang([{ index: 1, status: 'ERROR', retries: 1 }, { index: 2, status: 'COMPLETED' }]);
+  await bang([{ index: 1, status: 'ERROR', retries: 1 }, { index: 2, status: 'COMPLETED' }, { index: 3, status: 'ERROR', retries: 0 }]);
+  assert.strictEqual(doi.length, 0, 'có prompt xong xen giữa → đếm lại từ đầu');
+  await bang([{ index: 3, status: 'ERROR', retries: 0 }, { index: 4, status: 'ERROR', retries: 0 }]);
+  assert.strictEqual(doi.length, 1, '2 prompt khác nhau hỏng liền nhau → đổi tài khoản');
+  assert.deepStrictEqual(doi[0].slice(0, 2), ['flow-1', 15 * 60000]);
+  // Chữ trên thẻ lỗi nói hết tín dụng → đổi ngay từ lỗi đầu tiên.
+  theLoi = ['Not enough credits to generate'];
+  await bang([{ index: 5, status: 'ERROR', retries: 0 }]);
+  assert.strictEqual(doi.length, 2, 'hết tín dụng ghi trên thẻ → đổi tài khoản ngay');
+  assert.strictEqual(doi[1][1], 30 * 60000, 'bị lại → nghỉ gấp đôi');
+  assert.ok(nhatKy.some((x) => /Not enough credits/.test(x)), 'chữ trên thẻ vẫn ghi vào nhật ký');
+  // Lỗi đến khi tab đã thôi chạy (việc đã về điều phối) → bỏ dấu lỗi, mẻ SAU không bị đổi oan.
+  theLoi = [];
+  await bang([{ index: 6, status: 'ERROR', retries: 0 }, { index: 7, status: 'ERROR', retries: 0 }], false);
+  assert.strictEqual(doi.length, 2, 'không tab nào chạy thì không đổi tài khoản');
+  await bang([{ index: 1, status: 'ERROR', retries: 0 }]);
+  assert.strictEqual(doi.length, 2, 'mẻ mới hỏng 1 prompt — dấu lỗi cũ không được cộng dồn vào');
 });
 
 // ── Kết luận ───────────────────────────────────────────────────────────────

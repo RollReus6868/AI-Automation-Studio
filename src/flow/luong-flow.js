@@ -78,6 +78,9 @@ class LuongFlow {
     this.huy = 0;
     this.choSanSangMs = Number(process.env.FLOW_CHO_SAN_SANG_MS) || 120000;
     this.dungYenMs = Number(process.env.FLOW_DUNG_YEN_MS) || 10 * 60000;
+    // Flow báo tạo xong mà quá chừng này chưa tải về được → thôi chờ, việc sang tài khoản khác (engine tự
+    // "Audit" thử tải lại tới ~16 phút — nhật ký 16/10/2026).
+    this.choTaiMs = Number(process.env.FLOW_CHO_TAI_MS) || 5 * 60000;
   }
 
   get ranh() { return !this.dsViec; }
@@ -266,6 +269,7 @@ class LuongFlow {
       const theoSo = new Map(chay.map((j, i) => [i + 1, j]));
       const files = new Map(chay.map((j) => [j, []]));
       const hang = new Map();
+      const xongTaoLuc = new Map();    // việc → lúc Flow báo tạo xong (COMPLETED) — để biết tải về bị kẹt
       const thuMucTai = path.join(this.thuMucTam, `me-${Date.now().toString(36)}`);
       fs.mkdirSync(thuMucTai, { recursive: true });
       let lanCuoi = Date.now();
@@ -320,6 +324,7 @@ class LuongFlow {
             if (!j) continue;
             const truoc = hang.get(j);
             hang.set(j, r);
+            if (r.status === 'COMPLETED' && !xongTaoLuc.has(j)) xongTaoLuc.set(j, Date.now());
             if (conLai.has(j) && (!truoc || truoc.status !== r.status || truoc.progress !== r.progress)) {
               const thay = { buoc: (TRANG_THAI_BUOC[r.status] || r.status) + (r.status === 'CREATING' && r.progress ? ` ${r.progress}%` : '') +
                 (r.retries ? ` · thử lại ${r.retries}/${c.maxRetries}` : '') };
@@ -350,6 +355,18 @@ class LuongFlow {
             nhipTT.huy(t);
             this.tabs.dispatch(t.id, { action: 'STOP_AUTOMATION' }).catch(() => {});
             return ket('xong');
+          }
+          // Tạo xong mà tải về kẹt quá lâu → việc đó hỏng (sang tài khoản khác), tính là một lỗi của tài khoản.
+          for (const [j, luc] of xongTaoLuc) {
+            if (!conLai.has(j) || files.get(j).length || Date.now() - luc < this.choTaiMs) continue;
+            this.log('error', `❌ [${this.id}] #${j.so}: Flow tạo xong nhưng ${Math.round(this.choTaiMs / 60000)} phút chưa tải về được — bỏ, chạy lại ở tài khoản khác.`);
+            xong(j, { ok: false, loi: `Flow tạo xong nhưng quá ${Math.round(this.choTaiMs / 60000)} phút chưa tải về được` });
+            if (this.may.ghiLoiTai) this.may.ghiLoiTai(t, [...theoSo].find(([, v]) => v === j)[0]).catch(() => {});
+            if (!conLai.size) {
+              nhipTT.huy(t);
+              this.tabs.dispatch(t.id, { action: 'STOP_AUTOMATION' }).catch(() => {});
+              return ket('xong');
+            }
           }
           if (t.nghiAnToan) { lanCuoi = Date.now(); return; }   // đang nghỉ an toàn — không phải đứng im
           if (Date.now() - lanCuoi > this.dungYenMs) {

@@ -15,7 +15,7 @@
   const U = Object.assign({
     trang: 'anh', duAn: '', loc: 'tat', tim: '', moiNhat: true, cheDo: 'tudo', tyLe: { anh: '9:16', video: '9:16' },
     nhap: { anh: '', video: '', nhac: '' }, tvLoc: 'tat', tvDuAn: '', chuoi: { bat: false, prompt: '', tyLe: '', nen: '' }, promptThuMuc: '',
-    nen: { anh: 'muse', video: 'muse' }, locNen: ''
+    nen: { anh: 'muse', video: 'muse' }, locNen: '', nenTk: 'muse'
   }, docLuu());
   if (!U.nen || typeof U.nen !== 'object') U.nen = { anh: 'muse', video: 'muse' };
   if (!U.nhap || typeof U.nhap !== 'object') U.nhap = { anh: '', video: '', nhac: '' };
@@ -28,7 +28,7 @@
   function luuUi() {
     try {
       localStorage.setItem(KHOA, JSON.stringify({ trang: U.trang, duAn: U.duAn, loc: U.loc, moiNhat: U.moiNhat, cheDo: U.cheDo,
-        tyLe: U.tyLe, nhap: U.nhap, tvLoc: U.tvLoc, tvDuAn: U.tvDuAn, chuoi: U.chuoi, promptThuMuc: U.promptThuMuc, nen: U.nen, locNen: U.locNen, mauTai: U.mauTai }));
+        tyLe: U.tyLe, nhap: U.nhap, tvLoc: U.tvLoc, tvDuAn: U.tvDuAn, chuoi: U.chuoi, promptThuMuc: U.promptThuMuc, nen: U.nen, locNen: U.locNen, nenTk: U.nenTk, mauTai: U.mauTai }));
     } catch (_) {}
   }
 
@@ -87,14 +87,19 @@
     return DS_NEN.map((nen) => {
       const tk = S.taiKhoan.filter((a) => nenTk(a) === nen);
       if (!tk.length) return `<div class="chon-tk"><b>${TEN_NEN[nen]}</b><span>Chưa có tài khoản ${TEN_NEN[nen]} — thêm ở mục Tài khoản.</span></div>`;
-      const ds = tkCuaDuAn(d, nen), chinh = ds[0];
+      const ds = tkCuaDuAn(d, nen), chinh = ds[0], song = soSong(d, nen);
       return `<div class="chon-tk nhom-nen"><b>${TEN_NEN[nen]}</b>
         <label>Tài khoản chính<select name="tkChinh_${nen}" data-nen-chinh="${nen}">${tk.map((a) =>
           `<option value="${esc(a.id)}" ${a.id === chinh ? 'selected' : ''}>${esc(a.ten)}${a.trangThai === 'can-dang-nhap' ? ' (chưa đăng nhập)' : ''}</option>`).join('')}</select></label>
-        <span>Dự phòng — việc lỗi ở tài khoản chính thì chuyển ngay sang (theo thứ tự):</span>
+        <label>Chạy cùng lúc<select name="song_${nen}">${Array.from({ length: Math.max(tk.length, song) }, (_, i) => i + 1).map((n) =>
+          `<option value="${n}" ${n === song ? 'selected' : ''}>${n === 1 ? '1 tài khoản (chỉ tài khoản chính)' : `${n} tài khoản (chính + ${n - 1} tài khoản đầu danh sách dự phòng)`}</option>`).join('')}</select></label>
+        <span>Dự phòng — chạy cùng lúc theo số trên, tài khoản nào lỗi thì tài khoản kế tiếp vào thay (theo thứ tự):</span>
         ${tk.map((a) => `<label class="hang-tk" data-du="${esc(a.id)}" data-nen="${nen}" ${a.id === chinh ? 'hidden' : ''}><input type="checkbox" name="du_${esc(a.id)}" ${ds.slice(1).includes(a.id) ? 'checked' : ''}>${esc(a.ten)}</label>`).join('')}</div>`;
     }).join('');
   }
+  /** Dự án chạy mấy tài khoản của nơi này cùng lúc (giống _soSong của điều phối). */
+  const soSong = (d, nen) => (d && d.chaySong && d.chaySong[nen]) || 1;
+  const laySong = (v) => Object.fromEntries(DS_NEN.map((nen) => [nen, parseInt(v['song_' + nen], 10) || 1]));
   const layTk = (v) => DS_NEN.flatMap((nen) => {
     const chinh = v['tkChinh_' + nen];
     if (!chinh) return [];
@@ -188,8 +193,9 @@
     // Chip tài khoản theo nơi chạy đang chọn ở cột Tạo.
     const nen = nenTrang();
     const tkd = d ? tkCuaDuAn(d, nen) : [];
-    $('#chuTkDuAn').textContent = tkd.length ? `${tenTk(tkd[0])}${tkd.length > 1 ? ` +${tkd.length - 1} dự phòng` : ''}` : `Chưa có tài khoản ${TEN_NEN[nen]}`;
-    $('#nutTkDuAn').title = tkd.length ? `${TEN_NEN[nen]} — chính: ${tenTk(tkd[0])}${tkd.length > 1 ? ` · dự phòng: ${tkd.slice(1).map(tenTk).join(', ')}` : ''} — bấm để đổi` : '';
+    const song = Math.min(soSong(d, nen), tkd.length || 1);
+    $('#chuTkDuAn').textContent = tkd.length ? `${tkd.slice(0, song).map(tenTk).join(' + ')}${tkd.length > song ? ` +${tkd.length - song} dự phòng` : ''}` : `Chưa có tài khoản ${TEN_NEN[nen]}`;
+    $('#nutTkDuAn').title = tkd.length ? `${TEN_NEN[nen]} — ${song > 1 ? `chạy cùng lúc: ${tkd.slice(0, song).map(tenTk).join(', ')}` : `chính: ${tenTk(tkd[0])}`}${tkd.length > song ? ` · dự phòng: ${tkd.slice(song).map(tenTk).join(', ')}` : ''} — bấm để đổi` : '';
     const dangChay = S.viec.filter((j) => j.trangThai === 'chay').length;
     const chip = $('#chipChay');
     chip.classList.toggle('chay', S.dangChay);
@@ -623,8 +629,15 @@
   function veTaiKhoan() {
     $('#soLuongTK').textContent = S.caiDat.luongMoiTK;
     $('#soTabFlow').textContent = S.caiDat.flow.tabMoiTK;
-    const ds = [...S.taiKhoan].sort((a, b) => DS_NEN.indexOf(nenTk(a)) - DS_NEN.indexOf(nenTk(b)));
-    datHtml($('#dsTaiKhoan'), ds.map((a) => {
+    // Mỗi nơi chạy một thẻ riêng (Muse / Google Flow / Suno) cho khỏi lẫn tài khoản với nhau.
+    if (!DS_NEN.includes(U.nenTk)) U.nenTk = 'muse';
+    for (const b of $$('#nenTk button')) b.classList.toggle('on', b.dataset.v === U.nenTk);
+    for (const n of DS_NEN) {
+      $(`#nenTk [data-dem="${n}"]`).textContent = S.taiKhoan.filter((a) => nenTk(a) === n).length;
+      for (const el of $$(`.chi-${n}`)) el.hidden = n !== U.nenTk;
+    }
+    const ds = S.taiKhoan.filter((a) => nenTk(a) === U.nenTk);
+    datHtml($('#dsTaiKhoan'), ds.length ? ds.map((a) => {
       const [cls, nhan] = NHAN_TK[a.trangThai] || NHAN_TK['chua-kiem'];
       const dang = S.dangNhap && S.dangNhap.id === a.id;
       const nen = nenTk(a), flow = nen === 'flow';
@@ -644,7 +657,7 @@
             <button class="nut-vien nho do" data-tk="xoa" data-id="${esc(a.id)}" title="Xoá">${ic('trash-2')}</button>
           </div></div>
       </div>`;
-    }).join(''));
+    }).join('') : `<div class="trong">Chưa có tài khoản ${TEN_NEN[U.nenTk]} — bấm <b>Thêm ${U.nenTk === 'flow' ? 'Flow' : TEN_NEN[U.nenTk]}</b> ở trên.</div>`);
     const tk = S.dangNhap && S.taiKhoan.find((a) => a.id === S.dangNhap.id);
     $('#tieuDeDangNhap').textContent = tk ? `Đăng nhập ${TEN_NEN[nenTk(tk)]}: ${tk.ten}${nenTk(tk) === 'flow' ? ' — mở một dự án rồi bấm Xong' : ''}` : 'Đăng nhập';
     $('#nutXongDangNhap').hidden = !tk;
@@ -744,10 +757,10 @@
   const O_FLOW = [['fTab', 'tabMoiTK'], ['fMe', 'meToiDa'], ['fSoLuong', 'outputCount'], ['fChoMin', 'delayMin'], ['fChoMax', 'delayMax'],
     ['fThuLai', 'maxRetries'], ['fGian', 'multiTabStagger'], ['fChatAnh', 'chatLuongAnh'], ['fChatVideo', 'chatLuongVideo'], ['fMang', 'networkGuard'],
     ['fNgauNhien', 'randomDelay'], ['fSoThuTu', 'addIndex'], ['fCuon', 'randomScroll'], ['fGoAnh', 'goAnhThamChieu'], ['fDoiTen', 'doiTenTrenFlow'],
-    ['fModelAnh', 'modelAnh'], ['fNghiTT', 'nghiThaoTacBat'], ['fNghiTTMin', 'nghiThaoTacMin'], ['fNghiTTMax', 'nghiThaoTacMax']];
+    ['fModelAnh', 'modelAnh'], ['fSangMuse', 'sangMuseKhiHong'], ['fNghiTT', 'nghiThaoTacBat'], ['fNghiTTMin', 'nghiThaoTacMin'], ['fNghiTTMax', 'nghiThaoTacMax']];
   const O_FLOW_MODEL = [['fModelChinh', 'chinh'], ['fModelPhu', 'phu'], ['fXenKe', 'xenKeMoi'], ['fModelDuPhong', 'duPhong'], ['fThuLaiPhut', 'thuLaiPhut']];
-  const O_FLOW_AN_TOAN = [['fAnToan', 'bat'], ['fNguong', 'nguong'], ['fCuaSo', 'cuaSoPhut'], ['fNghi', 'nghiPhut'], ['fNghiToiDa', 'nghiToiDaPhut'],
-    ['fCuMoi', 'cuMoi'], ['fGiaiLao', 'giaiLaoPhut'], ['fNhanDoi', 'nhanDoi']];
+  // Nhận diện tài khoản lỗi (1.2.0, luôn bật) — khớp chuanHoaCaiDat của src/flow/main/an-toan.js.
+  const O_FLOW_AN_TOAN = [['fNguong', 'nguong'], ['fNghi', 'nghiPhut']];
   function docCaiDatFlow() {
     const doc = (id) => { const el = $('#' + id); return el.type === 'checkbox' ? el.checked : el.value; };
     const f = { chonModel: {}, anToan: {} };
@@ -820,7 +833,7 @@
     const v = await hoi({ tieuDe: 'Dự án mới', html: '<label>Tên dự án (cũng là tên thư mục kết quả)<input name="ten" placeholder="vd: Truyện người que"></label>' +
       htmlChonTk(duAnHienTai()), ok: 'Tạo' });
     if (!v || !v.ten.trim()) return;
-    const d = await api.call('taoDuAn', { ten: v.ten, taiKhoan: layTk(v) });
+    const d = await api.call('taoDuAn', { ten: v.ten, taiKhoan: layTk(v), chaySong: laySong(v) });
     if (d && d.id) { U.duAn = d.id; U.chiTiet = null; U.chon.clear(); luuUi(); }
   }
 
@@ -828,7 +841,7 @@
     const d = duAnHienTai();
     if (!d) return;
     const v = await hoi({ tieuDe: `Tài khoản chạy "${d.ten}"`, html: htmlChonTk(d), ok: 'Lưu' });
-    if (v) { await api.call('datTaiKhoanDuAn', { id: d.id, taiKhoan: layTk(v) }); toast('Đã lưu tài khoản của dự án'); }
+    if (v) { await api.call('datTaiKhoanDuAn', { id: d.id, taiKhoan: layTk(v), chaySong: laySong(v) }); toast('Đã lưu tài khoản của dự án'); }
   }
 
   // ── Gắn sự kiện ──────────────────────────────────────────────────────────
@@ -1081,10 +1094,12 @@
       const v = await hoi({ tieuDe: `Thêm tài khoản ${TEN_NEN[nen]}`, html: `<label>Tên gợi nhớ<input name="ten" placeholder="vd: ${TEN_NEN[nen].split(' ').pop()} 2"></label>`, ok: 'Thêm' });
       if (!v) return;
       const a = await api.call('themTaiKhoan', { ten: v.ten, nen });
+      if (a && a.id) { U.nenTk = nen; luuUi(); veTaiKhoan(); }
       if (a && a.id && await xacNhan('Đăng nhập luôn?', nen === 'flow'
         ? `Mở Google Flow để đăng nhập "${esc(a.ten)}"? Đăng nhập xong, mở (hoặc tạo) một dự án Flow rồi bấm <b>Xong</b>.`
         : `Mở ${nen === 'suno' ? 'suno.com' : 'muse.ai'} để đăng nhập "${esc(a.ten)}"?`, 'Đăng nhập')) lenhTaiKhoan('dangNhap', a.id);
     };
+    $('#nenTk').onclick = (e) => { const b = e.target.closest('[data-v]'); if (b) { U.nenTk = b.dataset.v; luuUi(); veTaiKhoan(); } };
     $('#nutThemTK').onclick = () => themTk('muse');
     $('#nutThemTKFlow').onclick = () => themTk('flow');
     $('#nutThemTKSuno').onclick = () => themTk('suno');

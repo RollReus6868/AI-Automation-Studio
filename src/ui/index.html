@@ -246,13 +246,18 @@
         <div class="panel-dau">
           <h2><i data-icon="contact"></i>Tài khoản</h2>
           <div class="hang-nut-dau">
-            <button class="nut-vien nho" id="nutCapNhatToken" title="Đọc lại mức dùng token của mọi tài khoản Muse"><i data-icon="refresh-cw"></i>Cập nhật token</button>
-            <button class="nut-gradient nho" id="nutThemTK"><i data-icon="plus"></i>Thêm Muse</button>
-            <button class="nut-gradient nho" id="nutThemTKFlow"><i data-icon="plus"></i>Thêm Flow</button>
-            <button class="nut-gradient nho" id="nutThemTKSuno"><i data-icon="plus"></i>Thêm Suno</button>
+            <button class="nut-vien nho chi-muse" id="nutCapNhatToken" title="Đọc lại mức dùng token của mọi tài khoản Muse"><i data-icon="refresh-cw"></i>Cập nhật token</button>
+            <button class="nut-gradient nho chi-muse" id="nutThemTK"><i data-icon="plus"></i>Thêm Muse</button>
+            <button class="nut-gradient nho chi-flow" id="nutThemTKFlow"><i data-icon="plus"></i>Thêm Flow</button>
+            <button class="nut-gradient nho chi-suno" id="nutThemTKSuno"><i data-icon="plus"></i>Thêm Suno</button>
           </div>
         </div>
-        <p class="mo">Mỗi tài khoản đăng nhập riêng một lần trong khung bên phải, app nhớ phiên (app không bao giờ hỏi hay lưu mật khẩu). Mỗi dự án chọn một tài khoản <b>chính</b> và các tài khoản <b>dự phòng</b> cho từng nơi chạy — bấm nút tài khoản cạnh tên dự án. Muse: <b id="soLuongTK">3</b> luồng mỗi tài khoản; Flow: <b id="soTabFlow">1</b> tab mỗi tài khoản; Suno: 1 luồng mỗi tài khoản. Việc lỗi ở tài khoản chính thì chuyển ngay sang dự phòng; tài khoản Suno hết lượt tạo / tải thì bài được tạo lại ở tài khoản Suno dự phòng.</p>
+        <p class="mo">Mỗi tài khoản đăng nhập riêng một lần trong khung bên phải, app nhớ phiên (app không bao giờ hỏi hay lưu mật khẩu). Mỗi dự án chọn một tài khoản <b>chính</b> và các tài khoản <b>dự phòng</b> cho từng nơi chạy, và mấy tài khoản <b>chạy cùng lúc</b> — bấm nút tài khoản cạnh tên dự án. Muse: <b id="soLuongTK">3</b> luồng mỗi tài khoản; Flow: <b id="soTabFlow">1</b> tab mỗi tài khoản; Suno: 1 luồng mỗi tài khoản. Việc lỗi ở tài khoản chính thì chuyển ngay sang dự phòng; tài khoản Suno hết lượt tạo / tải thì bài được tạo lại ở tài khoản Suno dự phòng.</p>
+        <div class="phan-doan" id="nenTk">
+          <button data-v="muse" class="on">Muse <span class="dem-nen" data-dem="muse"></span></button>
+          <button data-v="flow">Flow <span class="dem-nen" data-dem="flow"></span></button>
+          <button data-v="suno">Suno <span class="dem-nen" data-dem="suno"></span></button>
+        </div>
         <div class="cuon" id="dsTaiKhoan"></div>
       </section>
       <section class="panel cot-trinh-duyet">
@@ -281,7 +286,7 @@
           <li><b>Video từ ảnh có sẵn:</b> trang Tạo video → <i>Tạo video từ thư mục ảnh</i> → chọn thư mục; gõ prompt vào ô <i>Prompt dùng chung</i> rồi Tạo &amp; chạy — mỗi ảnh một video. Đặt tên video <code>{tenAnh}</code> để video trùng tên ảnh.</li>
           <li><b>Ảnh và video chạy song song:</b> khi bật <i>Ảnh xong → tự tạo video</i>, ảnh nào xong là video của nó được chạy ngay ở luồng rảnh kế tiếp, không chờ hết mẻ ảnh.</li>
           <li><b>Việc lỗi:</b> hết hàng chờ mà còn việc lỗi, tool tự chạy lại chúng (mặc định tối đa 2 lượt — đổi ở Cài đặt).</li>
-          <li><b>Nhiều luồng hơn:</b> tăng <i>Số luồng mỗi tài khoản</i> (Cài đặt nâng cao), không cần tạo thêm dự án. Tài khoản khác của dự án là dự phòng: chỉ chạy khi tài khoản chính lỗi.</li>
+          <li><b>Nhiều luồng hơn:</b> tăng <i>Số luồng mỗi tài khoản</i> (Cài đặt nâng cao), hoặc cho dự án <b>chạy nhiều tài khoản cùng lúc</b>: bấm nút tài khoản cạnh tên dự án → <i>Chạy cùng lúc</i> = 2, 3… tài khoản. Các tài khoản đầu danh sách (chính + dự phòng theo thứ tự) chạy song song, việc chia đều; tài khoản nào lỗi thì nghỉ và tài khoản dự phòng kế tiếp vào thay.</li>
           <li><b>Tài khoản chính + dự phòng:</b> bấm nút tài khoản cạnh tên dự án (hoặc khi tạo dự án mới) để chọn. Việc nào lỗi hoặc quá lâu (ảnh quá 3 phút, video quá 5 phút — chỉnh ở Cài đặt) thì chạy lại NGAY ở tài khoản dự phòng kế tiếp; tài khoản chính lỗi 2 việc liền (hoặc Muse "Connecting...") thì nghỉ 15 phút, cả dự án sang dự phòng. Bấm <i>Chạy tất cả</i> lại là cho mọi tài khoản cơ hội mới.</li>
           <li><b>Kết quả</b>: thư mục lưu, công tắc tải về và mẫu tên file nằm trong <i>Cài đặt nâng cao</i> của từng trang Tạo ảnh / Tạo video (mặc định <code>Mac_dinh/Mac_dinh_001.png</code>).</li>
           <li><b>Nhiều file .txt:</b> bấm <i>Nhập nhiều file .txt</i>, chọn cả loạt — mỗi file thành một dự án mang tên file, dùng chung tuỳ chọn đang chọn ở cột Tạo, rồi tự chạy.</li>
@@ -292,7 +297,7 @@
           <li><b>Đặt lại hàng đợi:</b> nút <i>Đặt lại</i> trên hàng đợi đưa mọi việc của dự án đang xem (trang ảnh hoặc video) về <i>Chờ</i> như lúc mới thêm; bấm chạy là tạo lại từ đầu, kết quả mới ghi đè file cũ cùng tên.</li>
           <li><b>Google Flow:</b> Tài khoản → <i>Thêm Flow</i> → <i>Đăng nhập</i> → đăng nhập Google, mở (hoặc tạo) một dự án Flow → <i>Xong</i>. Ở trang Tạo ảnh / Tạo video chọn <i>Chạy trên: Google Flow</i> rồi Tạo &amp; chạy như Muse. Flow nhận việc theo mẻ (mặc định 10 prompt), engine Flow tự dán, bấm Tạo, thử lại, tải về; từng việc vẫn hiện riêng trên hàng đợi.</li>
           <li><b>Flow ⇄ Muse tự động:</b> bật <i>Ảnh xong → tự tạo video</i> và chọn <i>Video chạy ở</i>: ảnh Flow → video Muse, ảnh Muse → video Flow, hoặc cùng một nơi. Ảnh lưu vào thư mục chung (mặc định <code>Tài liệu/AI Automation Studio</code>), video tự lấy ảnh từ đó. Video Flow gắn ảnh bằng <code>@tên</code> (Character Sync) — ảnh chưa có trên Flow thì app tự tải lên.</li>
-          <li><b>Flow nhắc "hoạt động bất thường":</b> chế độ an toàn cho tài khoản đó nghỉ; dự án có tài khoản Flow dự phòng thì việc chuyển ngay sang dự phòng, không thì tự chạy lại khi hết giờ nghỉ.</li>
+          <li><b>Tài khoản Flow lỗi:</b> Flow báo "hoạt động bất thường" / hết tín dụng, hoặc 2 prompt khác nhau hỏng liền nhau → tài khoản đó nghỉ, việc chuyển ngay sang tài khoản Flow khác của dự án. Đang tạo ảnh mà mọi tài khoản Flow đều lỗi → ảnh còn lại tự tạo tiếp ở Muse (tắt được ở Cài đặt → Google Flow).</li>
           <li><b>Tạo nhạc (Suno):</b> Tài khoản → <i>Thêm Suno</i> → <i>Đăng nhập</i> → đăng nhập suno.com → <i>Xong</i>. Trang <i>Tạo nhạc</i>: mỗi dòng một prompt mô tả phong cách (vd <code>lofi chill piano, mưa nhẹ, 80 bpm</code>). App mở Create ở chế độ Advanced, điền prompt vào ô <i>Styles</i>, để trống lời (nhạc không lời), bấm Create. Suno free ra 4 bài: app chỉ xét 2 bài đầu và tải bản MP3 của bài <b>dài hơn</b>, đặt tên theo mẫu (mặc định <code>{stt}</code> → <code>001.mp3</code>) vào thư mục chọn ở Cài đặt nâng cao của trang Tạo nhạc. Chạy song song với ảnh / video.</li>
           <li><b>Suno hết lượt:</b> tài khoản Suno báo hết credit / hết lượt tải thì bài đó được tạo lại và tải ở tài khoản Suno dự phòng; tài khoản hết lượt nghỉ 6 giờ (bấm <i>Kiểm tra</i> ở tài khoản đó để cho chạy lại sớm). Suno hỏi captcha thì cửa sổ Suno hiện lên để bạn tự giải — app không giải hộ. Đăng nhập Suno bằng Google mà Google báo <i>Couldn't sign you in</i>: bấm <i>Try again</i>; vẫn không được thì gửi ảnh chụp cho người phát triển.</li>
           <li><b>Lỗi lạ:</b> Cài đặt → bật <i>Hiện các luồng chạy ngầm</i> để nhìn thấy trang Muse / Flow của từng luồng; nhật ký đầy đủ ở thư mục dữ liệu (<code>nhat-ky.txt</code>).</li>
@@ -331,14 +336,14 @@
         </div>
         <div class="the-cai" id="cdFlow">
           <h3><i data-icon="sparkles"></i>Google Flow</h3>
-          <small class="mo">Giữ đúng các cài đặt của Flow Automation Studio. Tải về và đặt tên file do app tự lo (theo mẫu tên chung ở Cài đặt nâng cao của trang Tạo).</small>
+          <small class="mo">Tải về và đặt tên file do app tự lo (theo mẫu tên chung ở Cài đặt nâng cao của trang Tạo). Chạy nhiều tài khoản Flow cùng lúc: chọn ở nút tài khoản cạnh tên dự án.</small>
           <div class="luoi-3">
             <label>Số tab mỗi tài khoản Flow<input type="number" id="fTab" min="1" max="4"></label>
             <label>Mỗi mẻ giao Flow tối đa (prompt)<input type="number" id="fMe" min="1" max="50"></label>
             <label>Số kết quả mỗi prompt<select id="fSoLuong"><option>1</option><option>2</option><option>3</option><option>4</option></select></label>
             <label>Chờ giữa 2 prompt — từ (giây)<input type="number" id="fChoMin" min="1" max="600"></label>
             <label>đến (giây)<input type="number" id="fChoMax" min="1" max="600"></label>
-            <label>Thử lại khi lỗi (lần, rồi chuyển dự phòng)<input type="number" id="fThuLai" min="0" max="10"></label>
+            <label>Thử lại cùng tài khoản (lần), rồi sang tài khoản khác<input type="number" id="fThuLai" min="0" max="10"></label>
             <label>Giãn nhịp bấm Tạo giữa các tab (giây)<input type="number" id="fGian" min="0" max="600"></label>
             <label>Chất lượng ảnh tải về<select id="fChatAnh"><option value="img_1k">1K</option><option value="img_2k">2K</option><option value="img_4k">4K</option></select></label>
             <label>Chất lượng video tải về<select id="fChatVideo"><option value="720p">720p</option><option value="1080p">1080p</option><option value="4k">4K</option></select></label>
@@ -349,6 +354,11 @@
           <div class="dong-cong-tac"><div><b>Cuộn trang ngẫu nhiên giữa các lần tạo</b></div><label class="cong-tac"><input type="checkbox" id="fCuon"><span></span></label></div>
           <div class="dong-cong-tac"><div><b>Gỡ ảnh tham chiếu bị dính</b><small>Ô nhập còn ảnh của prompt trước thì gỡ trước khi dán (mẻ không gắn ảnh).</small></div><label class="cong-tac"><input type="checkbox" id="fGoAnh"><span></span></label></div>
           <div class="dong-cong-tac"><div><b>Đổi tên kết quả trên Flow theo mã việc</b><small>Cần cho "ảnh Flow → video Flow" cùng tài khoản khỏi tải ảnh lên lại.</small></div><label class="cong-tac"><input type="checkbox" id="fDoiTen"><span></span></label></div>
+          <div class="dong-cong-tac"><div><b>Nghỉ giữa các thao tác</b><small>Nghỉ ngẫu nhiên trước khi nhập, bấm Tạo, đổi tên, tải về.</small></div><label class="cong-tac"><input type="checkbox" id="fNghiTT"><span></span></label></div>
+          <div class="luoi-3">
+            <label>Nghỉ thao tác từ (giây)<input type="number" id="fNghiTTMin" min="0" max="60" step="0.5"></label>
+            <label>đến (giây)<input type="number" id="fNghiTTMax" min="0" max="60" step="0.5"></label>
+          </div>
           <h4>Model</h4>
           <div class="luoi-3">
             <label>Model ảnh<select id="fModelAnh"></select></label>
@@ -359,22 +369,13 @@
             <label>Tránh Lower Priority (phút, tăng dần)<input type="number" id="fThuLaiPhut" min="5" max="240"></label>
           </div>
           <small class="mo">Danh sách theo các model Flow đang có (28/09/2026). App chọn model trên Flow trước mỗi mẻ; Flow không còn model nào thì nhật ký báo và giữ nguyên model trên trang.</small>
-          <h4>Chế độ an toàn</h4>
-          <div class="dong-cong-tac"><div><b>Bật chế độ an toàn (nên bật)</b><small>Flow bắt đầu báo lỗi dồn dập / "hoạt động bất thường" thì cho tài khoản nghỉ. Dự án có tài khoản Flow dự phòng thì việc chuyển ngay sang dự phòng.</small></div><label class="cong-tac"><input type="checkbox" id="fAnToan"><span></span></label></div>
+          <h4>Tài khoản lỗi</h4>
+          <div class="dong-cong-tac"><div><b>Flow hỏng hết tài khoản thì tạo ảnh tiếp ở Muse</b><small>Đang tạo ảnh Flow mà mọi tài khoản Flow của dự án đều lỗi → dừng Flow cho dự án đó, các ảnh còn lại tự chuyển sang tài khoản Muse của dự án.</small></div><label class="cong-tac"><input type="checkbox" id="fSangMuse"><span></span></label></div>
           <div class="luoi-3">
-            <label>Số prompt lỗi<input type="number" id="fNguong" min="1" max="50"></label>
-            <label>trong (phút)<input type="number" id="fCuaSo" min="1" max="120"></label>
-            <label>thì nghỉ (phút)<input type="number" id="fNghi" min="1" max="240"></label>
-            <label>Nghỉ tối đa (phút)<input type="number" id="fNghiToiDa" min="1" max="600"></label>
-            <label>Giải lao sau mỗi (prompt, 0 = tắt)<input type="number" id="fCuMoi" min="0" max="500"></label>
-            <label>Giải lao (phút)<input type="number" id="fGiaiLao" min="1" max="120"></label>
+            <label>Mấy prompt khác nhau hỏng liền nhau thì đổi tài khoản<input type="number" id="fNguong" min="1" max="10"></label>
+            <label>Tài khoản lỗi nghỉ (phút)<input type="number" id="fNghi" min="1" max="240"></label>
           </div>
-          <div class="dong-cong-tac"><div><b>Bị chặn lại thì nghỉ gấp đôi</b><small>10 → 20 → 40 phút…</small></div><label class="cong-tac"><input type="checkbox" id="fNhanDoi"><span></span></label></div>
-          <div class="dong-cong-tac"><div><b>Nghỉ giữa các thao tác</b><small>Nghỉ ngẫu nhiên trước khi nhập, bấm Tạo, đổi tên, tải về.</small></div><label class="cong-tac"><input type="checkbox" id="fNghiTT"><span></span></label></div>
-          <div class="luoi-3">
-            <label>Nghỉ thao tác từ (giây)<input type="number" id="fNghiTTMin" min="0" max="60" step="0.5"></label>
-            <label>đến (giây)<input type="number" id="fNghiTTMax" min="0" max="60" step="0.5"></label>
-          </div>
+          <small class="mo">Luôn bật. Flow báo "hoạt động bất thường" / "quá nhiều yêu cầu" / hết tín dụng → đổi tài khoản ngay từ lỗi đầu tiên. Không đọc được câu đó thì đếm prompt hỏng liền nhau (một prompt thử lại nhiều lần vẫn tính là một, có prompt xong thì đếm lại từ đầu). Tài khoản lỗi nghỉ theo số phút trên (bị lại thì nghỉ gấp đôi, tối đa 4 lần), việc của nó sang ngay tài khoản khác của dự án; dự án không còn tài khoản Flow nào khác thì tài khoản đó tạm dừng rồi tự chạy lại.</small>
         </div>
         <div class="the-cai">
           <h3><i data-icon="file-text"></i>Mẫu câu lệnh gửi Muse</h3>

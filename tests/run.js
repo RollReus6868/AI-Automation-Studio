@@ -462,7 +462,7 @@ test('video nối từ ảnh KHÔNG tải về (ảnh ở bộ nhớ tạm) → 
 });
 test('nâng cấp 1.0.2: mẫu tên ảnh mặc định cũ → {stt}, thử lại 1 → 2 vòng; giá trị tự đặt thì giữ', () => {
   const c = dungDieuPhoi({ duLieu: { caiDat: { tenAnh: '{duAn}/{duAn}_{so}', tuThuLai: 1, moc: 1 } } }).dp.caiDat;
-  assert.deepStrictEqual([c.tenAnh, c.tuThuLai, c.moc], ['{stt}', 2, 2]);
+  assert.deepStrictEqual([c.tenAnh, c.tuThuLai, c.moc], ['{stt}', 2, 3]);
   const t = dungDieuPhoi({ duLieu: { caiDat: { tenAnh: 'anh_{so}', tuThuLai: 4, moc: 1 } } }).dp.caiDat;
   assert.deepStrictEqual([t.tenAnh, t.tuThuLai], ['anh_{so}', 4]);
   assert.strictEqual(dungDieuPhoi({ duLieu: { caiDat: { tenAnh: '{duAn}/{duAn}_{so}', moc: 2 } } }).dp.caiDat.tenAnh, '{duAn}/{duAn}_{so}', 'đã nâng cấp thì không đổi nữa');
@@ -709,7 +709,12 @@ test('cài đặt Flow: kẹp giá trị, giữ khoá con khi lưu thiếu, Flow
   assert.strictEqual(c.meToiDa, 1);
   assert.strictEqual(c.tabMoiTK, 4);
   assert.strictEqual(c.anToan.nguong, 5);
-  assert.strictEqual(c.anToan.bat, true, 'thiếu khoá con thì lấy mặc định');
+  assert.strictEqual(c.anToan.nghiPhut, 15, 'thiếu khoá con thì lấy mặc định');
+  assert.deepStrictEqual(Object.keys(c.anToan).sort(), ['nghiPhut', 'nguong'], 'chỉ còn 2 khoá nhận diện tài khoản lỗi');
+  // Bộ cũ (chế độ an toàn: "3 lỗi trong 5 phút") mang nghĩa khác → lấy mặc định mới.
+  assert.deepStrictEqual(CF.chuanHoaFlow({ anToan: { bat: false, nguong: 3, cuaSoPhut: 5, nghiPhut: 10, cuMoi: 20 } }).anToan, { nguong: 2, nghiPhut: 15 });
+  assert.strictEqual(CF.chuanHoaFlow({}).sangMuseKhiHong, true, 'Flow hỏng hết → sang Muse: bật sẵn');
+  assert.strictEqual(CF.chuanHoaFlow({}).maxRetries, 1);
   assert.strictEqual(c.chatLuongAnh, 'img_2k');
   assert.deepStrictEqual(['16:9', '9:16', '4:3', '1:1', '3:4'].map(CF.tyLeFlow), ['16:9', '9:16', '16:9', '9:16', '9:16']);
 });
@@ -836,6 +841,128 @@ testAsync('Flow: tài khoản Flow lỗi → việc chuyển sang tài khoản F
   assert.ok(dp.viec.every((j) => j.trangThai === 'xong' && j.taiKhoan === f2.id && j.tkLoi.includes('flow-1')), dp.viec.map((j) => j.trangThai + j.taiKhoan).join());
   assert.ok(!daChay.some((x) => Array.isArray(x)), 'không tài khoản Muse nào chạy việc Flow');
   assert.ok(nhatKy.some((x) => /chuyển sang "Flow 2"/.test(x)));
+});
+test('1.2.0 chạy nhiều tài khoản cùng lúc: nhóm = N tài khoản dùng được đầu danh sách; lỗi / nghỉ thì dự phòng vào thay', () => {
+  const ds = ['A', 'B', 'C', 'D'];
+  assert.deepStrictEqual(HD.taiKhoanChoViecDs({}, ds, null, 2), ['A', 'B']);
+  assert.deepStrictEqual(HD.taiKhoanChoViecDs({ tkLoi: ['A'] }, ds, null, 2), ['B'], 'việc lỗi ở A → tài khoản khác trong nhóm');
+  assert.deepStrictEqual(HD.taiKhoanChoViecDs({ tkLoi: ['A', 'B'] }, ds, null, 2), ['C'], 'cả nhóm lỗi việc này → dự phòng kế tiếp');
+  assert.deepStrictEqual(HD.taiKhoanChoViecDs({}, ds, (id) => id === 'A', 2), ['B', 'C'], 'A nghỉ → C vào nhóm');
+  assert.deepStrictEqual(HD.taiKhoanChoViecDs({ tkLoi: ds }, ds, null, 2), ['A'], 'lỗi ở mọi tài khoản → về chính (hết vòng)');
+  assert.deepStrictEqual(HD.taiKhoanChoViecDs({ thread: 't', taiKhoan: 'B' }, ds, null, 3), ['B'], 'chat dở → đúng tài khoản');
+  assert.deepStrictEqual(HD.taiKhoanChoViecDs({}, ds, null, 9), ds);
+  assert.deepStrictEqual(HD.taiKhoanChoViecDs({}, ['A'], () => true, 2), []);
+  // 1 tài khoản cùng lúc = đúng như bản cũ (chính → dự phòng).
+  for (const j of [{}, { tkLoi: ['A'] }, { tkLoi: ['A', 'B'] }, { tkLoi: ds }]) assert.deepStrictEqual(HD.taiKhoanChoViecDs(j, ds, null, 1), [HD.taiKhoanChoViec(j, ds)]);
+});
+testAsync('1.2.0 Muse: dự án chạy 2 tài khoản cùng lúc — hai tài khoản chạy song song, dự phòng thứ 3 chỉ vào khi một tài khoản hỏng', async () => {
+  const daChay = [], hong = new Set();
+  let dang = 0, max = 0;
+  const taoLuong = (a, stt) => ({ id: `${a.id}-${stt}`, ranh: true, viec: null, dung() {},
+    async chay(j) {
+      this.ranh = false; this.viec = j; daChay.push([a.id, j.so]); dang++; max = Math.max(max, dang);
+      await new Promise((r) => setTimeout(r, 20)); dang--; this.ranh = true; this.viec = null;
+      return hong.has(a.id) ? { ok: false, loi: 'Muse lỗi' } : { ok: true, files: [{ mime: 'image/png', b64: 'AA==' }] };
+    } });
+  const { dp, tk, nhatKy } = dungDieuPhoi({ taoLuong });
+  tk.them('Hai'); tk.them('Ba');
+  dp.datCaiDat({ luongMoiTK: 1, nghiGiuaLanGui: 0, tuThuLai: 0, tuChayLaiLoi: 0 });
+  const d = dp.taoDuAn('P', ['tk-1', 'hai', 'ba'], { muse: 2 });
+  assert.deepStrictEqual(d.chaySong, { muse: 2, flow: 1, suno: 1 });
+  dp.them({ duAn: d.id, prompts: ['1', '2', '3', '4', '5', '6'] });
+  dp.chayTatCa();
+  await chayHet(dp);
+  assert.ok(dp.viec.every((j) => j.trangThai === 'xong'));
+  assert.strictEqual(max, 2, 'hai tài khoản chạy CÙNG LÚC');
+  assert.deepStrictEqual([...new Set(daChay.map((x) => x[0]))].sort(), ['hai', 'tk-1'], 'dự phòng "Ba" không chạy khi không ai lỗi');
+  // Tài khoản chính hỏng → lỗi liên tiếp thì nghỉ, "Ba" vào nhóm cùng "Hai".
+  hong.add('tk-1'); daChay.length = 0;
+  dp.them({ duAn: d.id, prompts: ['7', '8', '9', '10', '11', '12'] });
+  dp.chayTatCa();
+  await chayHet(dp);
+  assert.ok(dp.viec.every((j) => j.trangThai === 'xong'), dp.viec.map((j) => j.trangThai).join());
+  assert.ok(dp._nghi('tk-1'), 'tài khoản hỏng tạm nghỉ');
+  assert.ok(daChay.some((x) => x[0] === 'ba'), 'dự phòng vào thay tài khoản hỏng');
+  assert.ok(nhatKy.some((x) => /tạm nghỉ tài khoản này/.test(x)));
+  dp.datTaiKhoanDuAn(d.id, ['tk-1'], { muse: 99, flow: '2', suno: 0 });
+  assert.deepStrictEqual(dp.duAn.find((x) => x.id === d.id).chaySong, { muse: 10, flow: 2, suno: 1 }, 'kẹp 1–10');
+});
+testAsync('1.2.0 Flow: 2 tài khoản cùng lúc chia đều mẻ, chạy song song', async () => {
+  const daChay = [];
+  const { dp, tk } = dungDieuPhoi({ taoLuong: luongGiaHaiNen(daChay) });
+  const f2 = tk.them('Flow 2', 'flow');
+  tk.them('Flow 3', 'flow');
+  dp.datCaiDat({ nghiGiuaLanGui: 0, flow: { meToiDa: 10 } });
+  const d = dp.taoDuAn('P', ['flow-1', f2.id], { flow: 2 });
+  dp.them({ duAn: d.id, nen: 'flow', loai: 'anh', prompts: ['1', '2', '3', '4', '5', '6'] });
+  dp.chayTatCa();
+  await chayHet(dp);
+  assert.ok(dp.viec.every((j) => j.trangThai === 'xong'));
+  const me = daChay.filter((x) => x.so);
+  assert.deepStrictEqual(me.map((x) => [x.tk, x.so.length]).sort(), [['flow-1', 3], [f2.id, 3]], JSON.stringify(me));
+});
+testAsync('1.2.0 Flow hỏng mọi tài khoản khi tạo ảnh → dừng Flow, ảnh còn lại tự chạy ở Muse', async () => {
+  const daChay = [];
+  const { dp, nhatKy } = dungDieuPhoi({ taoLuong: luongGiaHaiNen(daChay, new Set(['flow-1'])) });
+  dp.datCaiDat({ nghiGiuaLanGui: 0, tuThuLai: 1, tuChayLaiLoi: 0, flow: { meToiDa: 1 } });
+  dp.them({ nen: 'flow', loai: 'anh', prompts: ['1', '2', '3'] });
+  dp.them({ nen: 'flow', loai: 'video', prompts: ['v'] });
+  dp.chayTatCa();
+  await chayHet(dp);
+  const anh = dp.viec.filter((j) => j.loai === 'anh');
+  assert.ok(anh.every((j) => j.trangThai === 'xong' && j.nen === 'muse' && j.taiKhoan === 'tk-1' && j.tuFlow), anh.map((j) => j.trangThai + j.nen + j.taiKhoan).join());
+  assert.ok(dp._nghi('flow-1'), 'tài khoản Flow hỏng tạm nghỉ (Muse tính là dự phòng)');
+  assert.ok(nhatKy.some((x) => /dừng Flow cho dự án/.test(x)), nhatKy.join('\n'));
+  assert.strictEqual(dp.viec.find((j) => j.loai === 'video').nen, 'flow', 'chỉ ảnh sang Muse, video Flow giữ nguyên');
+});
+testAsync('1.2.0 tắt "Flow hỏng → Muse": ảnh Flow không sang Muse', async () => {
+  const daChay = [];
+  const { dp } = dungDieuPhoi({ taoLuong: luongGiaHaiNen(daChay, new Set(['flow-1'])) });
+  dp.datCaiDat({ nghiGiuaLanGui: 0, tuThuLai: 0, tuChayLaiLoi: 0, flow: { meToiDa: 1, sangMuseKhiHong: false } });
+  dp.them({ nen: 'flow', loai: 'anh', prompts: ['1', '2'] });
+  dp.chayTatCa();
+  await chayHet(dp);
+  assert.ok(dp.viec.every((j) => j.nen === 'flow' && j.trangThai === 'loi'), dp.viec.map((j) => j.trangThai + j.nen).join());
+  assert.ok(!daChay.some((x) => Array.isArray(x)), 'không tài khoản Muse nào chạy');
+});
+test('nhật ký 16/10/2026: Muse báo chặn 403 / chặn khu vực → nhận ra là lỗi TÀI KHOẢN', () => {
+  assert.ok(HD.laChanKhuVuc('Block vẫn còn (lỗi 403, tạo video không khả dụng tại khu vực này). Ảnh + prompt đã lưu vào hàng chờ, sẽ chạy lại khi block được gỡ.'));
+  assert.ok(HD.laChanKhuVuc('Đã lưu request vào hàng đợi (44 video chờ). Video vẫn bị chặn khu vực (lỗi 403), sẽ tạo ngay khi giới hạn được gỡ.'));
+  assert.ok(HD.laChanKhuVuc('Video generation is not available in your region yet.'));
+  for (const c of ['Bạn muốn ảnh theo phong cách nào?', 'Mình không thể tạo ảnh này vì vi phạm chính sách nội dung.', 'Khu vực biển xanh, bãi cát trắng như bạn mô tả', 'Ảnh 403 x 600 pixel', '']) {
+    assert.ok(!HD.laChanKhuVuc(c), c);
+  }
+});
+testAsync('Muse chặn video (403) ở một tài khoản → tài khoản đó thôi nhận VIDEO ngay, video sang tài khoản khác, ảnh vẫn chạy ở nó', async () => {
+  const daChay = [];
+  const taoLuong = (a, stt) => ({ id: `${a.id}-${stt}`, ranh: true, viec: null, dung() {},
+    async chay(j) {
+      this.ranh = false; this.viec = j; daChay.push([a.id, j.loai, j.so]);
+      await new Promise((r) => setTimeout(r, 10)); this.ranh = true; this.viec = null;
+      if (a.id === 'tk-1' && j.loai === 'video') return { ok: false, chanLoai: true, loi: 'Muse báo tài khoản bị chặn tạo video: "lỗi 403"' };
+      return { ok: true, files: [{ mime: j.loai === 'video' ? 'video/mp4' : 'image/png', b64: 'AA==' }] };
+    } });
+  const { dp, tk, nhatKy } = dungDieuPhoi({ taoLuong });
+  tk.them('Hai');
+  dp.datCaiDat({ luongMoiTK: 1, nghiGiuaLanGui: 0, tuThuLai: 0, tuChayLaiLoi: 0 });
+  dp.them({ loai: 'video', prompts: ['v1', 'v2', 'v3'] });
+  dp.chayTatCa();
+  await chayHet(dp);
+  assert.ok(dp.viec.every((j) => j.trangThai === 'xong' && j.taiKhoan === 'hai' && !j.thu), dp.viec.map((j) => j.trangThai + j.taiKhoan + j.thu).join());
+  assert.strictEqual(daChay.filter((x) => x[0] === 'tk-1' && x[1] === 'video').length, 1, 'chỉ phí đúng MỘT lần ở tài khoản bị chặn');
+  assert.ok(nhatKy.some((x) => /thôi nhận việc video/.test(x)));
+  assert.ok(!dp._nghi('tk-1'), 'không nghỉ cả tài khoản');
+  dp.them({ loai: 'anh', prompts: ['a1'] });
+  dp.chayTatCa();
+  await chayHet(dp);
+  assert.strictEqual(dp.viec.find((j) => j.loai === 'anh').taiKhoan, 'tk-1', 'ảnh vẫn chạy ở tài khoản chính');
+});
+test('1.2.0 mục Tài khoản: thẻ riêng Muse / Google Flow / Suno, mỗi thẻ chỉ hiện tài khoản và nút Thêm của nơi đó', () => {
+  const h = docNguon('src/ui/index.html'), a = docNguon('src/ui/app.js');
+  for (const n of ['muse', 'flow', 'suno']) assert.ok(new RegExp(`id="nenTk"[\\s\\S]*data-v="${n}"`).test(h), `thiếu thẻ ${n}`);
+  assert.ok(/class="nut-gradient nho chi-flow" id="nutThemTKFlow"/.test(h) && /class="nut-gradient nho chi-suno" id="nutThemTKSuno"/.test(h));
+  assert.ok(/S\.taiKhoan\.filter\(\(a\) => nenTk\(a\) === U\.nenTk\)/.test(a), 'danh sách chưa lọc theo thẻ đang chọn');
+  assert.ok(/nenTk: U\.nenTk/.test(a), 'thẻ đang chọn chưa được nhớ');
 });
 testAsync('Flow: lỗi mất kết nối / tạm nghỉ an toàn (daNghi) → việc về hàng chờ, không tính lần thử, không nghỉ chồng', async () => {
   const { dp } = dungDieuPhoi();

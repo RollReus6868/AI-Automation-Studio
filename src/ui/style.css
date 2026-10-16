@@ -396,3 +396,7 @@ body.trang-nhac .khong-nhac { display: none !important; }
 .o-tv .nhac-tv { width: 100%; height: 100%; display: grid; place-items: center; color: var(--chu-mo); }
 .o-tv .nhac-tv i { width: 34px; height: 34px; }
 .het-luot { color: #ffc98a; }
+/* 1.2.0: mục Tài khoản tách thẻ Muse / Google Flow / Suno */
+#nenTk { grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 4px 0 10px; }
+#nenTk .dem-nen { display: inline-block; min-width: 18px; padding: 0 5px; margin-left: 4px; border-radius: 9px; background: rgba(255, 255, 255, .12); font-size: 11px; }
+#dsTaiKhoan > .trong { padding: 24px; text-align: center; color: var(--chu-phu); }
