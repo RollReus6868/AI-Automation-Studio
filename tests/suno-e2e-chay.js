@@ -163,6 +163,43 @@ module.exports = function e2eSuno({ win, app, LENH, dieuPhoi, taiKhoan }) {
       kiem(nk5.some((x) => /Đã bấm "Unlock & Download"/.test(x)) && nk5.some((x) => /Bấm "Download “Bai /.test(x)), 'bấm "Unlock & Download" rồi nút "Download “<tên bài>”"');
       kiem(nk5.some((x) => /Suno đang tạo 4 bài/.test(x)) && !nk5.some((x) => /đang tạo ([5-9]|\d\d) bài/.test(x)), 'danh sách nạp muộn: không coi bài cũ là bài mới');
       kiem(g5b.dinhDang.slice(-1)[0] === 'MP3', `tải định dạng MP3 (${g5b.dinhDang.slice(-1)[0]})`);
+
+      // 6) Video người dùng 16/10/2026 tối (Suno thật): mở hộp → "Unlock & Download" còn MỜ, ô Downloads chưa có số
+      // (1.2.4 bấm ngay → "nut-download-bi-tat" mãi); bấm → "Preparing..." (mờ) ~40 s → Suno tự tải file, tự đóng hộp.
+      ghi('-- 6. Nút Unlock & Download mờ lúc mới mở hộp, rồi "Preparing..." lâu mới có file');
+      await cauHinh({ moKhoa: 'chuanBi', tatMs: 2500, chuanBiMs: 12000, hongTai: 0, treoDs: 0 });
+      const g6 = await sunoGui();
+      nk = LENH.trangThai().nhatKy.length;
+      LENH.them({ duAn: 'mac-dinh', loai: 'nhac', nen: 'suno', prompts: ['sáo trúc buổi sớm'], chay: true });
+      const v6 = viec().filter((j) => j.loai === 'nhac' && j.prompt === 'sáo trúc buổi sớm');
+      await cho(xongHet(v6), 150000, 'bài nhạc mục 6 xong');
+      inViec(v6);
+      dongNhatKy(nk);
+      const g6b = await sunoGui();
+      const nk6 = LENH.trangThai().nhatKy.slice(nk).map((d) => d.chu);
+      kiem(v6[0] && v6[0].trangThai === 'xong' && fs.existsSync(v6[0].files[0] || ''), 'tải được bài dù nút mờ lúc đầu và "Preparing..." 12 s');
+      kiem(g6b.gui.length - g6.gui.length === 1 && g6b.tai.length - g6.tai.length === 1, `một lần Create, một lần tải (${g6b.gui.length - g6.gui.length}, ${g6b.tai.length - g6.tai.length})`);
+      kiem(!nk6.some((x) => /nut-download-bi-tat|tải lại bài này/.test(x)), 'không báo nút mờ, không phải tải lại');
+      kiem(nk6.some((x) => /Suno đang chuẩn bị file \(Preparing…\)/.test(x)), 'nhật ký: Suno đang chuẩn bị file (Preparing…)');
+
+      // 7) Hết credit trong ngày: nút Create ghi "Create again in 9:44:35" (video 16/10/2026). Nhật ký 1.2.4:
+      // "Bấm Create nhưng Suno không tạo bài nào" ×3. Giờ: không bấm, tài khoản nghỉ tới giờ Suno ghi.
+      ghi('-- 7. Hết credit: "Create again in 9:44:35"');
+      await cauHinh({ choTaoLai: ['suno-1'] });
+      await ngu(1500);
+      const g7 = await sunoGui();
+      nk = LENH.trangThai().nhatKy.length;
+      LENH.them({ duAn: 'mac-dinh', loai: 'nhac', nen: 'suno', prompts: ['trống trận'], chay: true });
+      const v7 = viec().filter((j) => j.loai === 'nhac' && j.prompt === 'trống trận');
+      await cho(() => !dieuPhoi.dangChay, 90000, 'hàng chờ tạm dừng (hết tài khoản còn credit)');
+      inViec(v7);
+      dongNhatKy(nk);
+      const g7b = await sunoGui();
+      const a7 = luu('suno-1');
+      kiem(g7b.gui.length === g7.gui.length, `không bấm Create (${g7b.gui.length - g7.gui.length} lần)`);
+      kiem(v7[0] && v7[0].trangThai === 'cho' && /Create again in 9:44:35/.test(v7[0].loi || ''), `việc về Chờ, ghi lý do (${v7[0] && v7[0].loi})`);
+      const conGio = (a7.hetLuotDen - Date.now()) / 3600e3;
+      kiem(conGio > 9.6 && conGio < 9.9, `"Suno 1" nghỉ tới lúc Suno cho tạo lại (~9,75 giờ, còn ${conGio.toFixed(2)} giờ)`);
     } catch (err) {
       ghi('LỖI KỊCH BẢN: ' + err.stack);
       loi.push('ngoại lệ');
