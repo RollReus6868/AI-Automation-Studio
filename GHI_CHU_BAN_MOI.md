@@ -1,4 +1,8 @@
-# AI Automation Studio 1.2.5
+# AI Automation Studio 1.2.6
+
+- **Hộp "Tài khoản chạy dự án" gọn hơn và cuộn được.** Trước đây hộp dài quá màn hình khi có nhiều tài khoản, phần Suno và nút *Lưu* bị che mà không cuộn xuống được. Giờ *Tài khoản chính* và *Chạy cùng lúc* nằm cùng một hàng, các tài khoản dự phòng xếp thành nhiều cột, và hộp tự cuộn khi vẫn dài; nút *Huỷ* / *Lưu* luôn hiện ở dưới cùng. Các hộp thoại khác của app cũng cuộn được như vậy.
+
+## Bản 1.2.5
 
 - **Sửa lỗi Suno vẫn không tải được** (nhật ký 16/10/2026 tối: *"Không bấm được Download của Suno (nut-download-bi-tat …)"* ở mọi bài). Theo video bạn quay:
   - Hộp *Download* vừa mở thì nút **Unlock & Download** còn **mờ** vài giây (Suno đang nạp số lượt tải, ô *Downloads* chưa có số). Bản 1.2.4 bấm ngay lúc nút còn mờ nên báo lỗi. Giờ app **chờ nút sáng** (tối đa 30 giây) rồi mới bấm.

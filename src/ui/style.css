@@ -346,12 +346,14 @@ select option { background: var(--panel-dac); }
 
 /* ── Hộp thoại / xem lớn / toast ── */
 .phu { position: fixed; inset: 0; z-index: 80; background: rgba(5, 3, 15, .6); backdrop-filter: blur(4px); display: grid; place-items: center; }
-.hop { width: min(520px, 92vw); background: var(--panel-dac); border: 1px solid var(--vien-dam); border-radius: 18px; padding: 20px; box-shadow: 0 30px 80px rgba(0, 0, 0, .55); }
-.hop h3 { margin: 0 0 12px; font-size: 16px; }
+.hop { width: min(520px, 92vw); max-height: calc(100vh - 32px); display: flex; flex-direction: column; background: var(--panel-dac); border: 1px solid var(--vien-dam); border-radius: 18px; padding: 20px; box-shadow: 0 30px 80px rgba(0, 0, 0, .55); }
+/* Nội dung dài (vd chọn tài khoản nhiều nơi chạy) tự cuộn, tiêu đề và nút Lưu / Huỷ luôn thấy. */
+#hopNoiDung { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; margin: 0 -6px; padding: 0 6px; }
+.hop h3 { margin: 0 0 12px; font-size: 16px; flex: none; }
 .hop label { display: block; font-size: 12.5px; color: var(--chu-phu); margin-bottom: 10px; }
 .hop label input, .hop label textarea { margin-top: 5px; color: var(--chu); }
 .hop p { color: var(--chu-phu); line-height: 1.5; margin: 0 0 8px; }
-.hop-nut { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+.hop-nut { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; flex: none; }
 .xem-lon { padding: 30px; }
 .xem-lon #xemLonNoiDung { max-width: 92vw; max-height: 88vh; display: grid; place-items: center; }
 .xem-lon img, .xem-lon video { max-width: 92vw; max-height: 88vh; border-radius: 12px; }
@@ -382,6 +384,14 @@ select.canh-bao { border-color: #e0a100; }
 .the-cai h4 { margin: 16px 0 8px; font-size: 13px; color: var(--chu-phu); text-transform: uppercase; letter-spacing: .4px; }
 .chon-tk.nhom-nen { padding: 10px 12px; margin-bottom: 10px; border: 1px solid var(--vien); border-radius: var(--bo); background: var(--the); }
 .chon-tk.nhom-nen > b { display: block; margin-bottom: 6px; color: var(--chu); font-size: 13px; }
+.chon-tk-giai { font-size: 12px; margin-bottom: 10px !important; }
+.chon-tk-hang { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+.chon-tk-hang label { margin-bottom: 8px; min-width: 0; }
+.chon-tk-hang select { width: 100%; min-width: 0; margin-top: 5px; }
+.chon-tk-du { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 4px 10px; }
+.chon-tk-du label.hang-tk { margin: 0; min-width: 0; }
+.chon-tk-du label.hang-tk[hidden] { display: none; }
+.chon-tk-du label.hang-tk span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .the-tk .tt .tag { display: inline-block; margin: 0 6px 0 0; }
 .du-an-flow { word-break: break-all; }
 

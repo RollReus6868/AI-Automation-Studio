@@ -1334,6 +1334,14 @@ test('1.2.4 Suno: nhận nút "Unlock & Download" và nút "Download “<tên b�
   assert.ok(/sunoBai: null/.test(dp.slice(dp.indexOf('taoLai(ids) {'), dp.indexOf('taoLai(ids) {') + 600)), 'Tạo lại phải bỏ sunoBai');
 });
 
+test('1.2.5 Hộp thoại dài (chọn tài khoản nhiều nơi chạy) tự cuộn, nút Lưu / Huỷ luôn thấy; chọn tài khoản gọn hai cột', () => {
+  const c = docNguon('src/ui/style.css'), h = docNguon('src/ui/index.html'), a = docNguon('src/ui/app.js');
+  assert.ok(/\.hop \{[^}]*max-height: calc\(100vh - 32px\)[^}]*display: flex; flex-direction: column/.test(c), 'hộp không cao quá cửa sổ');
+  assert.ok(/#hopNoiDung \{[^}]*min-height: 0; overflow-y: auto/.test(c), 'nội dung hộp tự cuộn');
+  assert.ok(/\.hop-nut \{[^}]*flex: none/.test(c) && /<div id="hopNoiDung" class="cuon">/.test(h));
+  assert.ok(/class="chon-tk-hang"/.test(a) && /class="chon-tk-du"/.test(a) && /\.chon-tk-hang \{ display: grid; grid-template-columns: minmax\(0, 1fr\) minmax\(0, 1fr\)/.test(c));
+});
+
 test('Suno: giao diện có mục Tạo nhạc, nút Thêm Suno, ô chờ tối đa; trang nhạc ẩn phần chỉ dành cho ảnh / video', () => {
   const h = docNguon('src/ui/index.html'), a = docNguon('src/ui/app.js'), c = docNguon('src/ui/style.css');
   assert.ok(/data-trang="nhac"[\s\S]{0,80}data-icon="music"/.test(h));
