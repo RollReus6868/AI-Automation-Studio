@@ -603,6 +603,9 @@ class DieuPhoi {
           ...j.nhanVat.map((id) => this.nhanVat.find((n) => n.id === id)).filter(Boolean).flatMap((n) => n.anh || []),
           ...(j.thamChieu || [])
         ].filter((p) => this.o.tonTai(p)),
+        // Kết quả đã có của các việc khác cùng loại — để luồng Flow nhận ra file engine tải nhầm (video cũ cùng prompt).
+        fileCu: (j) => this.viec.filter((v) => v !== j && v.loai === j.loai).flatMap((v) => v.files || [])
+          .filter((p) => this.o.tonTai(p)),
         capNhat: (j, thay) => { if (this.viec.includes(j) && j.trangThai === 'chay') { Object.assign(j, thay); this.luu(); } },
         xong: (j, r) => this._ketThuc(j, r, tk)
       });

@@ -281,6 +281,47 @@ class LuongFlow {
     }
   }
 
+  /**
+   * Bỏ file THỪA engine tải về cho một việc (nhật ký 17/10/2026, video 280 trở đi: 280_2.mp4, 280_3.mp4…).
+   * Engine tìm thẻ của prompt bằng ô Tìm kiếm của Flow theo ~80 ký tự ĐẦU prompt. Video nối từ ảnh dùng
+   * chung MỘT prompt (chỉ khác @ảnh ở cuối) → ô tìm trả mọi video cũ cùng prompt trong dự án Flow của tài
+   * khoản, engine tải hết và đặt tên _1, _2… nên chúng đều rơi vào việc đang chạy.
+   * Chỉ làm khi engine tải về NHIỀU hơn số bản mỗi prompt:
+   *  1. bỏ file trùng nội dung với file đã có của việc khác (`khac`: kết quả cũ trên đĩa + việc khác trong mẻ);
+   *  2. còn nhiều hơn số bản mỗi prompt → giữ các file về ĐẦU (Flow xếp thẻ mới nhất lên trên, engine tải
+   *     theo thứ tự đó — đúng ở cả 20 việc trong nhật ký), bỏ phần sau.
+   * File bỏ thì xoá khỏi thư mục tạm. Trả danh sách file giữ lại.
+   */
+  _locFileThua(j, ds, khac, soBan) {
+    // Đúng số bản mỗi prompt → không có gì thừa (đừng so nội dung: trang Flow giả của bài kiểm trả ảnh giống hệt nhau).
+    if (!ds || ds.length <= Math.max(1, soBan || 1)) return ds || [];
+    const kichCo = (p) => { try { return fs.statSync(p).size; } catch (_) { return -1; } };
+    const bam = new Map();
+    const maBam = (p) => {
+      if (!bam.has(p)) { try { bam.set(p, crypto.createHash('md5').update(fs.readFileSync(p)).digest('hex')); } catch (_) { bam.set(p, ''); } }
+      return bam.get(p);
+    };
+    const theoCo = new Map();
+    for (const p of khac || []) {
+      const n = kichCo(p);
+      if (n > 0) theoCo.set(n, [...(theoCo.get(n) || []), p]);
+    }
+    const trung = [], giu = [];
+    for (const p of ds) {
+      const n = kichCo(p);
+      const cung = n > 0 ? theoCo.get(n) || [] : [];
+      if (cung.length && maBam(p) && cung.some((q) => maBam(q) === maBam(p))) trung.push(p);
+      else giu.push(p);
+    }
+    const thua = giu.splice(Math.max(1, soBan || 1));
+    for (const p of [...trung, ...thua]) try { fs.rmSync(p, { force: true }); } catch (_) {}
+    if (trung.length || thua.length) {
+      this.log('warning', `⚠ [${this.id}] #${j.so}: Flow tải về ${ds.length} file cho một prompt (ô Tìm kiếm của Flow bắt cả kết quả cũ cùng prompt) — ` +
+        `bỏ ${trung.length + thua.length} file thừa${trung.length ? ` (${trung.length} file trùng hệt kết quả đã có)` : ''}, giữ ${giu.length}.`);
+    }
+    return giu;
+  }
+
   async _ngu(ms, huyLuc) {
     const het = Date.now() + ms;
     while (Date.now() < het) {
@@ -356,12 +397,19 @@ class LuongFlow {
       fs.mkdirSync(thuMucTai, { recursive: true });
       let lanCuoi = Date.now();
 
+      // Kết quả "xong" của một việc: bỏ file thừa trước (video cũ cùng prompt — xem _locFileThua).
+      const ketQuaOk = (j, flowTen) => {
+        const khac = [...(ctx.fileCu ? ctx.fileCu(j) : []), ...chay.filter((v) => v !== j).flatMap((v) => files.get(v))];
+        const giu = this._locFileThua(j, files.get(j), khac, c.outputCount);
+        if (!giu.length) return { ok: false, loi: 'Flow chỉ tải về video/ảnh cũ trùng prompt trong dự án, không thấy kết quả mới' };
+        return { ok: true, files: giu.map((p) => ({ duongDan: p })), flowTen };
+      };
       const thuXong = (j) => {
         const h = hang.get(j);
         const f = files.get(j);
         if (!h || !conLai.has(j)) return;
         if (h.status === 'COMPLETED' && h.downloaded && f.length >= Math.max(1, Math.min(h.totalVideos || 1, c.outputCount))) {
-          xong(j, { ok: true, files: f.map((p) => ({ duongDan: p })), flowTen: c.doiTenTrenFlow ? theoTenNguoc(j) : '' });
+          xong(j, ketQuaOk(j, c.doiTenTrenFlow ? theoTenNguoc(j) : ''));
         } else if (h.status === 'ERROR' && (h.retries || 0) >= c.maxRetries) {
           xong(j, { ok: false, loi: `Flow: ${h.error || 'tạo hỏng'}` });
         }
@@ -380,12 +428,12 @@ class LuongFlow {
           if (vi === 'dung' || this.huy !== huyLuc) {
             const lyDo = this.lyDoDung;
             xongHet((j) => (files.get(j).length
-              ? { ok: true, files: files.get(j).map((p) => ({ duongDan: p })), flowTen: '' }
+              ? ketQuaOk(j, '')
               : lyDo ? { ok: false, matKetNoi: true, daNghi: true, loi: lyDo } : { ok: false, dung: true }));
           } else {
             xongHet((j) => {
               const h = hang.get(j) || {};
-              if (files.get(j).length) return { ok: true, files: files.get(j).map((p) => ({ duongDan: p })), flowTen: c.doiTenTrenFlow ? theoTenNguoc(j) : '' };
+              if (files.get(j).length) return ketQuaOk(j, c.doiTenTrenFlow ? theoTenNguoc(j) : '');
               if (vi === 'dungYen') return { ok: false, loi: `Flow đứng im quá ${Math.round(this.dungYenMs / 60000)} phút` };
               if (h.status === 'COMPLETED') return { ok: false, loi: 'Flow tạo xong nhưng không tải về được' };
               return { ok: false, loi: `Flow: ${h.error || 'mẻ dừng khi việc này chưa xong'}` };
