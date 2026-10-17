@@ -28,6 +28,7 @@ const modelKH = require('./main/model');
 const nhipTT = require('./main/nhip-thao-tac');
 const thamChieu = require('./main/anh-tham-chieu');
 const { pastePrompt, bamChuotThat } = require('./main/paste');
+const danBu = require('./main/dan-bu');
 const { kiemTruocKhiChay } = require('./main/kiem-truoc');
 
 const cho = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -214,6 +215,75 @@ function taoMayFlow(o) {
   const lpDangChan = (accountId) => { const x = lpChan.get(khoa(accountId)); return !!(x && x.den > Date.now()); };
   const nhipTao = new Map();
   const ghiNghiCua = (tab) => (msg) => log('info', String(msg).replace('💤', `💤 [${tab.id}]`));
+
+  // ══════════════════════════════════════════════════════════════════════
+  //  DÁN BÙ + CHỜ KHUNG Ô NHẬP SAU KHI GẮN ẢNH (1.3.2) — đọc đầu src/flow/main/dan-bu.js
+  // ══════════════════════════════════════════════════════════════════════
+  /** Đọc từng dòng nhật ký engine: prompt nào bắt đầu dán, đã gắn ảnh chưa, engine kẹt ở đâu. */
+  function theoDoiDan(tab, chu) {
+    const n = danBu.soCuaDongBatDauDan(chu);
+    if (n) { tab._dan = { n, daDan: false, ganAnh: false }; return; }
+    if (tab._dan && /🧑 Đã đính kèm ảnh/.test(chu)) tab._dan.ganAnh = true;
+    if (/❌ Create button not found/.test(chu)) kiemHetTinDung(tab).catch(() => {});
+    if (tab.onLoiKhungNhap && /❌ (Create button not found|Không tìm thấy ô tìm kiếm \(Search Box\))/.test(chu)) {
+      try { tab.onLoiKhungNhap(chu.replace(/^\[\d+\]\s*/, '')); } catch (_) {}
+    }
+  }
+
+  // Tài khoản không đủ tín dụng: Flow thay nút Tạo bằng nút cảnh báo (flow-bam-tao.js → canhBaoTinDung). Thử lại
+  // không bao giờ ăn → nghỉ lâu, việc sang tài khoản khác ngay. Bấm Chạy lại thì mọi tài khoản được thử lại từ đầu.
+  const NGHI_HET_TIN_DUNG_MS = 3 * 3600000;
+  async function kiemHetTinDung(tab) {
+    if (!tab || !tab.ready || !tab.view || tab.view.webContents.isDestroyed()) return null;
+    const thamSo = JSON.stringify({ selector: selectorNguoiDung().createBtn || '' });
+    const r = await tab.view.webContents.executeJavaScript(
+      `window.__flowCanhBaoTinDung ? window.__flowCanhBaoTinDung(${thamSo}) : null`, true).catch(() => null);
+    if (r && r.co) await baoHetTinDung(tab, r.chu);
+    return r;
+  }
+  async function baoHetTinDung(tab, chu) {
+    const so = soAnToanCua(tab.accountId);
+    if (so.dangNghi || so.dangXuLy) return;
+    if (tab._hetTinDung === (tab._meKhoa || 0)) return;   // mỗi mẻ báo một lần
+    tab._hetTinDung = tab._meKhoa || 0;
+    log('error', `💳 [${tab.id}] Flow thay nút Tạo bằng nút "${chu}" — tài khoản "${tab.accountName || tab.accountId}" không đủ credit ` +
+      `cho model ${tab.modelHienTai || 'đang chọn'}. Không thử lại nữa.`);
+    so.coCauChan = true;
+    so.promptLoi.add(`${tab.id}#${tab._meKhoa || 0}#tin-dung`);
+    so.dangXuLy = true;
+    try {
+      await batDauNghi(tab.accountId, NGHI_HET_TIN_DUNG_MS,
+        { nghi: true, chacChan: true, soLoi: 1, lyDo: 'Flow báo không đủ tín dụng (hết credit)' });
+    } finally {
+      so.dangXuLy = false;
+    }
+  }
+  /** Chờ ô nhập gõ được + nút Tạo hiện; bảng / lớp nền còn mở thì đóng. */
+  async function choKhungNhap(tab, ms = 15000) {
+    const wc = tab.view.webContents;
+    const thamSo = JSON.stringify({ selector: selectorNguoiDung().createBtn || '' });
+    const batDau = Date.now();
+    let k = null, daDong = '';
+    while (Date.now() - batDau < ms && !wc.isDestroyed()) {
+      k = await wc.executeJavaScript(`window.__flowKhungNhap ? window.__flowKhungNhap(${thamSo}) : null`, true).catch(() => null);
+      if (!k) return { ok: true, khongDo: true, daDong };
+      if (k.lop && k.lop.length) {
+        const r = await wc.executeJavaScript('window.__flowDongLopPhu ? window.__flowDongLopPhu(2) : null', true).catch(() => null);
+        if (r && r.daDong && !daDong) daDong = r.daDong;
+        if (r && r.conMo && r.conMo.length) await cho(500);
+        continue;
+      }
+      if (k.oNhap && k.nut) return { ok: true, k, daDong, cho: Date.now() - batDau };
+      if (k.hetTinDung) { await baoHetTinDung(tab, k.hetTinDung); return { ok: false, k, daDong, hetTinDung: k.hetTinDung, cho: Date.now() - batDau }; }
+      await cho(400);
+    }
+    return { ok: false, k, daDong, cho: Date.now() - batDau };
+  }
+  function baoKhungNhap(tab, k) {
+    if (k.daDong) log('info', `🧹 [${tab.id}] Gắn ảnh xong, Flow còn để lớp ${k.daDong} mở — đã đóng.`);
+    if (!k.ok && !k.hetTinDung) log('warning', `⚠️ [${tab.id}] Sau khi gắn ảnh, ô nhập Flow chưa sẵn sàng sau ${Math.round(k.cho / 1000)} giây` +
+      (k.k ? ` (ô nhập ${k.k.oNhap ? 'gõ được' : 'CHƯA gõ được'}, nút Tạo ${k.k.nut ? 'có' : 'CHƯA thấy'})` : '') + ' — vẫn làm tiếp.');
+  }
 
   function ganNhipThaoTac(tab, settings) {
     const k = nhipTT.ganChoTab(tab, settings);
@@ -462,6 +532,7 @@ function taoMayFlow(o) {
       case 'LOG': {
         const chu = String(message.message || '');
         if (tab && tab.ghiNhatKy) tab.ghiNhatKy(message.type || 'info', chu);
+        if (tab) theoDoiDan(tab, chu);
         // Engine không chọn được mục chất lượng nào trong menu Tải xuống → luồng lưu tệp chẩn đoán (kèm menu).
         if (tab && tab.onLoiChatLuong && /Không chọn được chất lượng tải xuống/.test(chu)) { try { tab.onLoiChatLuong(chu); } catch (_) {} }
         // Nhật ký engine rất dày: chỉ đẩy lên nhật ký app dòng cảnh báo / lỗi / thành công.
@@ -494,6 +565,9 @@ function taoMayFlow(o) {
         if (!tab) return { ok: false, error: 'Không xác định được tab gửi yêu cầu' };
         const text = (message.data && message.data.text) || '';
         const ghiNghi = ghiNghiCua(tab);
+        if (tab._dan) tab._dan.daDan = true;
+        // Vừa gắn ảnh @tên: Flow dựng lại khung ô nhập, có khi để sót lớp nền của bảng kho → chờ khung yên rồi mới dán.
+        if (tab._dan && tab._dan.ganAnh) baoKhungNhap(tab, await choKhungNhap(tab));
         await donAnhThamChieuTruocKhiDan(tab).catch(() => {});
         await nhipTT.nghi(tab, 'truocNhap', ghiNghi);
         const result = await pastePrompt(tab.view.webContents, text, (lvl, msg) => { if (lvl !== 'info') log(lvl, `[${tabId}] ${msg}`); });
@@ -509,11 +583,30 @@ function taoMayFlow(o) {
         setTimeout(() => theoDoiAnhThamChieu(tab, 'bấm Tạo').catch(() => {}), 8000);
         const sel = selectorNguoiDung().createBtn || '';
         const wc = tab.view.webContents;
+        // Engine bỏ qua bước dán (không có INJECT_PASTE cho prompt này) → dán bù rồi mới bấm.
+        //  KHÔNG nghỉ theo nhịp thao tác ở đây (lưới đã chụp — xem dòng trên): chỉ chờ khung ô nhập yên, dán, 1 giây.
+        if (tab._dan && !tab._dan.daDan) {
+          const d = tab._dan;
+          d.daDan = true;
+          const chu = danBu.chuDanCua(tab.promptsMe, d.n, tab.caiDatEngine);
+          if (chu == null) {
+            log('error', `❌ [${tab.id}] Engine chưa dán prompt [${d.n}] vào ô nhập Flow mà app không dựng lại được chữ — lần bấm Tạo này có thể không ăn.`);
+          } else {
+            log('warning', `🩹 [${tab.id}] Engine bỏ qua bước dán prompt [${d.n}]${d.ganAnh ? ' (ngay sau khi gắn ảnh, ô nhập Flow chưa gõ được)' : ''} — app tự dán rồi mới bấm Tạo.`);
+            baoKhungNhap(tab, await choKhungNhap(tab));
+            const kq = await pastePrompt(wc, chu, (lvl, msg) => { if (lvl !== 'info') log(lvl, `[${tab.id}] ${msg}`); });
+            if (!kq || !kq.ok) {
+              log('error', `❌ [${tab.id}] Dán bù prompt [${d.n}] hỏng: ${(kq && kq.error) || 'không rõ'}`);
+              return { ok: false, error: `Không dán được prompt vào ô nhập Flow: ${(kq && kq.error) || 'không rõ'}` };
+            }
+            await cho(1000);
+          }
+        }
         try {
           const cb = await wc.executeJavaScript(`window.__flowBamTaoChuanBi ? window.__flowBamTaoChuanBi(${JSON.stringify({ selector: sel })}) : null`, true);
           if (cb && cb.wasDisabled) { log('error', `❌ [${tab.id}] ${cb.error}`); return cb; }
           if (cb && cb.ok) {
-            if (cb.daGo && cb.trung) log('info', `🧹 [${tab.id}] Nút Tạo bị lớp ${cb.daGo} che — đã đóng lớp đó rồi bấm.`);
+            if (cb.daGo && cb.trung) log('info', `🧹 [${tab.id}] Trang Flow còn lớp ${cb.daGo} mở (che nút Tạo) — đã đóng rồi mới bấm.`);
             else if (!cb.trung) log('warning', `⚠️ [${tab.id}] Tâm nút Tạo đang bị lớp khác che${cb.che ? ` (${cb.che})` : ''} — vẫn thử bấm chuột thật.`);
             const b = await bamChuotThat(wc, cb.x, cb.y);
             if (b.ok) {

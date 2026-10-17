@@ -26,6 +26,7 @@ const { LuongFlow } = require('./src/flow/luong-flow');
 const { DownloadManager } = require('./src/flow/main/downloads');
 const { locVeoSettings } = require('./src/flow/main/kiem-truoc');
 const { xoaDuAnFlow } = require('./src/flow/main/xoa-du-an');
+const { xoaChatChuotThat, nenThuChuotThat } = require('./src/main/xoa-chat-muse');
 
 // Thư mục dữ liệu riêng (phiên đăng nhập, cài đặt, hàng đợi) — PHẢI trước whenReady.
 app.setPath('userData', process.env.MUSE_DATA_DIR ||
@@ -214,6 +215,12 @@ function taoLuong(tk, stt, duAnId) {
       thuMucChanDoan: process.env.MUSE_DATA_DIR ? path.join(app.getPath('userData'), 'chan-doan-flow')
         : path.join(app.getPath('documents'), 'AI Automation Studio', 'chan-doan-flow'),
       docAnh, luuUrl: (tkId, url) => {
+        if (!url) {
+          // Dự án Flow đã lưu không còn (Flow báo 404): quên địa chỉ + ảnh đã tải lên dự án đó (phải tải lại).
+          if (duAnId) dieuPhoi.boFlowTen(tkId, duAnId); else taiKhoan.sua(tkId, { flowUrl: '' });
+          baoTrangThai();
+          return;
+        }
         if (duAnId) {
           if (dieuPhoi.datFlowUrl(duAnId, tkId, url)) log('info', `📁 Dự án "${tenDa}" chạy trên dự án Flow riêng của "${tk.ten}": ${url}`);
         } else {
@@ -401,7 +408,7 @@ function luuChanDoanMuse(tk, r) {
     const p = path.join(thuMuc, `xoa-chat-${t.getFullYear()}${so(t.getMonth() + 1)}${so(t.getDate())}-${so(t.getHours())}${so(t.getMinutes())}${so(t.getSeconds())}.html`);
     const esc = (x) => String(x || '').replace(/</g, '&lt;');
     fs.writeFileSync(p, `<!-- Chẩn đoán xoá chat Muse · ${esc(tk.ten)} · ${t.toISOString()}\n url: ${esc(cd.url)}\n lỗi: ${esc(cd.loi || r.loi)}\n` +
-      ` số hàng chat: ${cd.soHang} · có nút ⋯: ${cd.soHangCoNut} -->\n<h3>Danh sách chat</h3>\n${cd.danhSach || ''}\n<h3>Menu / hộp thoại đang mở</h3>\n${cd.menu || ''}\n`, 'utf8');
+      ` số hàng chat: ${cd.soHang} · có nút ⋯: ${cd.soHangCoNut}${cd.thongBao ? `\n thông báo Muse: ${esc(cd.thongBao)}` : ''} -->\n<h3>Danh sách chat</h3>\n${cd.danhSach || ''}\n<h3>Menu / hộp thoại đang mở</h3>\n${cd.menu || ''}\n`, 'utf8');
     return p;
   } catch (_) { return ''; }
 }
@@ -415,23 +422,54 @@ async function xoaChat(id, threads) {
   const w = taoCuaSoAn(tk, 'Muse · xoá đoạn chat');
   const wc = w.webContents;
   const mo = async (url) => { wc.loadURL(url).catch(() => {}); const tt = await docTrangThai(wc, 25000); return !!(tt && tt.coONhap); };
-  let da = 0, hong = 0, chanDoan = '', lyDo = '';
+  let da = 0, hong = 0, chanDoan = '', lyDo = '', chuotThat = false;
   const ghiHong = (r) => {
     if (r && r.loi && !lyDo) lyDo = r.loi;
     if (!chanDoan && r && r.chanDoan) chanDoan = luuChanDoanMuse(tk, r);
   };
+  // 1.3.2: bấm bằng JavaScript không xoá được (Muse bỏ qua cú bấm isTrusted = false) → thử lại bằng chuột thật;
+  // được thì các chat sau của lượt này đi thẳng đường chuột thật.
+  const thuChuotThat = async (r, dangMo) => {
+    if (!nenThuChuotThat(r)) return r;
+    const t = await xoaChatChuotThat(wc, { dangMo });
+    if (t.ok) {
+      if (!chuotThat) log('info', `🖱 "${tk.ten}": Muse không nhận cú bấm tự động khi xoá chat (${r.loi}) — chuyển sang bấm chuột thật.`);
+      chuotThat = true;
+      return t;
+    }
+    // Chẩn đoán lấy lại SAU lần chuột thật (giữ HTML menu / hộp xác nhận của cả hai lần thử).
+    return { ...r, chanDoan: null, loi: `${r.loi} · chuột thật: ${t.loi || 'không xoá được'}` };
+  };
+  const chanDoanSau = async (r) => {
+    const cd = await wc.executeJavaScript('window.__muse.chanDoanXoa()', true).catch(() => null);
+    return cd ? { ...r, chanDoan: { ...cd, loi: r.loi } } : r;
+  };
   try {
     if (threads) {
       for (const url of threads) {
-        const r = (await mo(url)) ? await wc.executeJavaScript('window.__muse.xoaChatDangMo()', true).catch(() => null) : null;
-        if (r && r.ok) da++; else { hong++; ghiHong(r); }
+        if (!(await mo(url))) { hong++; ghiHong(null); continue; }
+        let r = chuotThat ? await xoaChatChuotThat(wc, { dangMo: true }) : await wc.executeJavaScript('window.__muse.xoaChatDangMo()', true).catch(() => null);
+        if (!chuotThat) r = await thuChuotThat(r, true);
+        if (r && r.ok) da++; else { hong++; ghiHong(r && !r.chanDoan ? await chanDoanSau(r) : r); }
       }
     } else {
       if (!(await mo(GOC_MUSE))) return { ok: false, loi: 'Không mở được Muse (chưa đăng nhập?)' };
       for (;;) {
-        const r = await wc.executeJavaScript('window.__muse.xoaNhieuChat({ toiDa: 10 })', true).catch(() => null);
+        if (chuotThat) {
+          const r = await xoaChatChuotThat(wc, {});
+          if (r.het) break;
+          if (!r.ok) { hong++; ghiHong(await chanDoanSau(r)); break; }
+          if (++da % 10 === 0) log('info', `🗑 "${tk.ten}": đã xoá ${da} đoạn chat…`);
+          continue;
+        }
+        let r = await wc.executeJavaScript('window.__muse.xoaNhieuChat({ toiDa: 10 })', true).catch(() => null);
         if (r) da += r.da;
-        if (!r || !r.ok) { hong++; ghiHong(r); break; }
+        if (r && !r.ok) {
+          const t = await thuChuotThat(r, false);
+          if (t.ok) { da++; continue; }
+          r = t;
+        }
+        if (!r || !r.ok) { hong++; ghiHong(r && r.chanDoan ? r : r && await chanDoanSau(r)); break; }
         if (!r.da) break;
         log('info', `🗑 "${tk.ten}": đã xoá ${da} đoạn chat…`);
       }

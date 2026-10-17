@@ -24,8 +24,10 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 /**
  * @param wc     webContents của tab Flow
  * @param files  [đường dẫn tuyệt đối] — tên file = tên muốn có trong kho Flow
- * @param tuy    { choMs: chờ hộp chọn file sau mỗi cú bấm (mặc định 1500) }
- * @returns {Promise<{ok, cach?, chacChan?, buoc:[], loi?, chanDoan?}>}
+ * @param tuy    { choMs: chờ hộp chọn file sau mỗi cú bấm (mặc định 1500),
+ *                 dongY: được bấm "Tôi đồng ý" ở hộp "Quyền sử dụng hình ảnh này" (Cài đặt → Google Flow),
+ *                 xemMs: chờ bao lâu để xem Flow có mở hộp thoại sau khi nhận file (mặc định 2500) }
+ * @returns {Promise<{ok, cach?, chacChan?, buoc:[], loi?, chanDoan?, canDongY?, dongY?, sauTai?}>}
  *   cach: 'o-tai-len' | 'hop-chon-file' | 'keo-tha'; chacChan=false với kéo-thả (không biết trang có nhận)
  */
 async function taiAnhLen(wc, files, tuy = {}) {
@@ -65,16 +67,54 @@ async function taiAnhLen(wc, files, tuy = {}) {
       await goi('DOM.setFileInputFiles', { files, backendNodeId: hop.backendNodeId });
       return true;
     };
-    const ketQua = (cach, chacChan = true) => ({ ok: true, cach, chacChan, buoc });
+    // File đã vào: chờ một lúc xem Flow có hiện hộp thoại / thông báo gì không (1.3.2) — ghi vào kết quả cho nhật ký.
+    const xemSauTai = async () => {
+      const het = Date.now() + (tuy.xemMs == null ? 2500 : tuy.xemMs);
+      let tb = [];
+      do {
+        await wait(500);
+        const r = await chay('window.__flowTaiAnh.sauTai()').then((x) => x.value).catch(() => null);
+        if (r && r.hop) return { hop: r.hop, thongBao: r.thongBao || [] };
+        if (r && r.thongBao && r.thongBao.length) tb = r.thongBao;
+      } while (Date.now() < het);
+      return tb.length ? { hop: null, thongBao: tb } : null;
+    };
+    // Hộp "Quyền sử dụng hình ảnh này": ảnh chỉ vào kho khi bấm "Tôi đồng ý". Chỉ bấm khi người dùng cho phép
+    // (tuy.dongY — Cài đặt → Google Flow); không thì báo ngay, khỏi chờ kho 60 giây vô ích.
+    const xemDongY = async () => {
+      const het = Date.now() + (tuy.xemMs == null ? 2500 : tuy.xemMs);
+      let h = null;
+      do {
+        await wait(400);
+        h = await chay('window.__flowTaiAnh.hopDongY()').then((x) => x.value).catch(() => null);
+      } while (!(h && h.co) && Date.now() < het);
+      if (!(h && h.co)) return null;
+      if (!tuy.dongY) return { canDongY: true, tieuDe: h.tieuDe };
+      const b = await chay('window.__flowTaiAnh.bamDongY()').then((x) => x.value).catch((e) => ({ ok: false, lyDo: e.message }));
+      for (let i = 0; i < 12 && b && b.ok; i++) {
+        await wait(400);
+        const con = await chay('window.__flowTaiAnh.hopDongY()').then((x) => x.value).catch(() => null);
+        if (!(con && con.co)) return { daDongY: true, tieuDe: h.tieuDe };
+      }
+      return { canDongY: true, tieuDe: h.tieuDe, loiBam: (b && b.lyDo) || 'bấm rồi mà hộp vẫn mở' };
+    };
+    const ketQua = async (cach, chacChan = true) => {
+      const dy = await xemDongY();
+      if (dy && dy.canDongY) {
+        return { ok: false, cach, buoc, canDongY: true, dongY: dy,
+          loi: `Flow hỏi "${dy.tieuDe || 'Quyền sử dụng hình ảnh này'}" — ảnh chỉ vào kho khi bấm "Tôi đồng ý"` + (dy.loiBam ? ` (app bấm hỏng: ${dy.loiBam})` : '') };
+      }
+      return { ok: true, cach, chacChan, buoc, dongY: dy, sauTai: dy ? null : await xemSauTai() };
+    };
 
-    if (await vaoInput()) return ketQua('o-tai-len');
+    if (await vaoInput()) return await ketQua('o-tai-len');
     // Mục "Tải lên" đã hiện (engine vừa mở menu [+]) → bấm luôn; chưa thì mở menu, tab Hình ảnh, rồi bấm.
     for (const b of ['bamTaiLen', 'moMenu', 'bamTaiLen', 'moTabAnh', 'bamTaiLen']) {
       const r = await chay(`window.__flowTaiAnh.${b}()`).then((x) => x.value).catch((e) => ({ ok: false, loi: e.message }));
       if (!r || !r.ok) continue;
       buoc.push(`${b}: ${r.nut || ''}`);
-      if (await vaoHop(b === 'bamTaiLen' ? choMs * 2 : choMs)) return ketQua('hop-chon-file');
-      if (await vaoInput()) return ketQua('o-tai-len');
+      if (await vaoHop(b === 'bamTaiLen' ? choMs * 2 : choMs)) return await ketQua('hop-chon-file');
+      if (await vaoInput()) return await ketQua('o-tai-len');
     }
 
     // Kéo-thả file thật vào ô nhập prompt.
@@ -89,7 +129,7 @@ async function taiAnhLen(wc, files, tuy = {}) {
       }
       buoc.push(`kéo-thả vào ô nhập (${v.x}, ${v.y})`);
       const cd = (await chay('window.__flowTaiAnh.chanDoan()').catch(() => null)) || {};
-      return { ...ketQua('keo-tha', false), chanDoan: cd.value };
+      return { ...(await ketQua('keo-tha', false)), chanDoan: cd.value };
     }
     const cd = (await chay('window.__flowTaiAnh.chanDoan()').catch(() => null)) || {};
     return { ok: false, buoc, loi: 'không thấy ô tải lên, nút Tải lên hay ô nhập prompt', chanDoan: cd.value };
@@ -102,10 +142,19 @@ async function taiAnhLen(wc, files, tuy = {}) {
   }
 }
 
+/** Một dòng nhật ký cho thứ Flow hiện ngay sau khi nhận file (hộp thoại / thông báo) — rỗng nếu không có gì. */
+function moTaSauTai(st) {
+  if (!st) return '';
+  const p = [];
+  if (st.hop) p.push(`hộp thoại "${st.hop.chu}"${st.hop.nut && st.hop.nut.length ? ` (nút: ${st.hop.nut.join(' · ')})` : ''}`);
+  if (st.thongBao && st.thongBao.length) p.push(`thông báo "${st.thongBao.join('" · "')}"`);
+  return p.join('; ');
+}
+
 /** Một dòng nhật ký cho kết quả chẩn đoán (nút quanh ô nhập) — để lần sau biết Flow đổi gì. */
 function moTaChanDoan(cd) {
   if (!cd) return '';
   return `ô nhập ${cd.oNhap ? 'có' : 'KHÔNG thấy'}, ${cd.soInput} ô chọn file, nút: ${(cd.nut || []).join(' · ') || '(không có)'}`;
 }
 
-module.exports = { taiAnhLen, moTaChanDoan };
+module.exports = { taiAnhLen, moTaChanDoan, moTaSauTai };

@@ -832,7 +832,7 @@
   // Ô Cài đặt → Google Flow ↔ khoá trong caiDat.flow (src/flow/cai-dat-flow.js).
   const O_FLOW = [['fTab', 'tabMoiTK'], ['fMe', 'meToiDa'], ['fSoLuong', 'outputCount'], ['fChoMin', 'delayMin'], ['fChoMax', 'delayMax'],
     ['fThuLai', 'maxRetries'], ['fGian', 'multiTabStagger'], ['fChatAnh', 'chatLuongAnh'], ['fChatVideo', 'chatLuongVideo'], ['fMang', 'networkGuard'],
-    ['fNgauNhien', 'randomDelay'], ['fSoThuTu', 'addIndex'], ['fCuon', 'randomScroll'], ['fGoAnh', 'goAnhThamChieu'], ['fDoiTen', 'doiTenTrenFlow'],
+    ['fNgauNhien', 'randomDelay'], ['fSoThuTu', 'addIndex'], ['fCuon', 'randomScroll'], ['fGoAnh', 'goAnhThamChieu'], ['fDoiTen', 'doiTenTrenFlow'], ['fDongY', 'dongYQuyenAnh'],
     ['fModelAnh', 'modelAnh'], ['fNghiTT', 'nghiThaoTacBat'], ['fNghiTTMin', 'nghiThaoTacMin'], ['fNghiTTMax', 'nghiThaoTacMax']];
   const O_FLOW_MODEL = [['fModelChinh', 'chinh'], ['fModelPhu', 'phu'], ['fXenKe', 'xenKeMoi'], ['fModelDuPhong', 'duPhong'], ['fThuLaiPhut', 'thuLaiPhut']];
   // Nhận diện tài khoản lỗi (1.2.0, luôn bật) — khớp chuanHoaCaiDat của src/flow/main/an-toan.js.

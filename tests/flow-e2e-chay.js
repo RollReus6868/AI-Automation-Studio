@@ -200,6 +200,24 @@ module.exports = function e2eFlow({ win, app, LENH, dieuPhoi, taiKhoan }) {
       const url7b = flowUrlLuu(d7id, 'flow-1');
       kiem(v7b.every((j) => j.trangThai === 'xong') && /\/project\//.test(url7b) && !url7b.includes(ma7), `lần sau tự mở dự án mới (${url7b})`);
       dongNhatKy(Math.max(0, LENH.trangThai().nhatKy.length - 8));
+      // 1.3.2 (nhật ký 18/10/2026 01:34): dự án Flow đã nhớ bị xoá BÊN FLOW → Flow mở trang 404?reason=project.
+      // App phải quên địa chỉ đó + ảnh trong dự án đó, tạo dự án Flow mới, không kẹt 120 giây.
+      ghi('-- 7b. Dự án Flow đã nhớ bị xoá bên Flow (trang 404)');
+      const daXoa7 = `${process.env.FLOW_TEST_URL}/project/da-xoa-tren-flow`;
+      dieuPhoi.datFlowUrl(d7id, 'flow-1', daXoa7);
+      kiem(flowUrlLuu(d7id, 'flow-1') === daXoa7 && v7b.some((j) => j.flowTen && j.flowTen.tk === 'flow-1'), 'chuẩn bị: dự án app nhớ dự án Flow đã bị xoá');
+      nk = LENH.trangThai().nhatKy.length;
+      const t7c = Date.now();
+      LENH.them({ duAn: d7id, loai: 'anh', nen: 'flow', tyLe: '9:16', prompts: ['dự án Flow đã bị xoá'], chay: true });
+      const v7c = viec().filter((j) => j.duAn === d7id && !v7.includes(j) && !v7b.includes(j));
+      await cho(xongHet(v7c), 120000, 'chạy khi dự án Flow đã bị xoá');
+      const url7c = flowUrlLuu(d7id, 'flow-1');
+      inViec(v7c);
+      kiem(v7c.every((j) => j.trangThai === 'xong') && /\/project\//.test(url7c) && !/da-xoa|\/404/.test(url7c) && Date.now() - t7c < 60000,
+        `trang 404 → tự tạo dự án Flow mới, việc xong (${url7c}, ${Math.round((Date.now() - t7c) / 1000)} giây)`);
+      kiem(LENH.trangThai().nhatKy.slice(nk).some((d) => /Dự án Flow đã lưu không còn nữa \(Flow báo 404/.test(d.chu)), 'nhật ký nói rõ dự án Flow đã lưu không còn');
+      kiem(v7b.every((j) => !j.flowTen), 'quên tên ảnh nằm trong dự án Flow đã bị xoá (video Flow sẽ tải ảnh lên lại)');
+      dongNhatKy(nk);
 
       // 8) 1.2.0: dự án chạy 2 tài khoản Flow CÙNG LÚC — mẻ chia đôi, hai tài khoản chạy song song.
       ghi('-- 8. Hai tài khoản Flow chạy cùng lúc');

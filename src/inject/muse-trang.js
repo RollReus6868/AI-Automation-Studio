@@ -420,13 +420,60 @@
     $$('[role="menu"] [role="menuitem"], [role="menu"] button').find((e) => XOA.test(chuCua(e)));
   const nutXacNhan = () => $('[role="dialog"] [data-pel-click="chat_thread_delete_confirm"], [role="alertdialog"] [data-pel-click="chat_thread_delete_confirm"]') ||
     $$('[role="alertdialog"] button, [role="dialog"] button').filter((b) => XOA.test(chuCua(b)) || XOA.test(nhan(b))).pop();
-  let loiCuoi = '', menuLoi = '';
+  let loiCuoi = '', menuLoi = '', hopLoi = '';
+
+  // 1.3.2 (tệp chẩn đoán người dùng 18/10/2026): hàng chat phụ THẬT không có href / data-id; danh sách nạp
+  // dần nên xoá một hàng thì hàng kế được nạp bù → đếm số hàng không đổi. Nhận ra hàng bằng id nút ⋯
+  // (radix-_r_qi_ — React giữ nguyên id khi vẽ lại danh sách) + tên chat.
+  const idNutCua = (h) => { const b = nutChat(h); return (b && b.id) || ''; };
+  const tenHang = (h) => chuCua(h && ($('span[title]', h) || h)).split('\n')[0].slice(0, 80);
+  /** Hàng vẫn còn trên màn hình? (hàng đang chạy hiệu ứng biến mất: rời bố cục / mờ hẳn = coi như đã xoá) */
+  const conHien = (e) => {
+    if (!e || !e.isConnected || !e.getClientRects().length) return false;
+    for (let x = e, i = 0; x && x !== document.body && i < 4; x = x.parentElement, i++) {
+      const cs = getComputedStyle(x);
+      if (cs.display === 'none' || cs.visibility === 'hidden' || Number(cs.opacity) < 0.05 || x.getAttribute('aria-hidden') === 'true') return false;
+    }
+    return e.getBoundingClientRect().height >= 2;
+  };
+  const hangCuaNut = (b) => b.closest('[data-testid="hatch-thread-row"]') || hangGoc().find((x) => x.contains(b)) || b;
+  /** Đã xoá hàng `h` chưa — so với ảnh chụp danh sách trước khi xoá (`chup`). */
+  function daXoa(h, chup) {
+    if (hangGoc().length < chup.soHang) return true;
+    if (chup.ma && !hangGoc().some((x) => maThread(x) === chup.ma)) return true;
+    if (chup.idNut) {
+      const b = document.getElementById(chup.idNut);
+      // Nút ⋯ thật bị ẩn (display:none) tới khi rê chuột → xét HÀNG chứa nút, đừng xét chính nút.
+      if (!b || !conHien(hangCuaNut(b))) {
+        // Mất id nút: chỉ tin khi phần lớn các hàng khác còn nguyên id (không phải Muse vẽ lại cả danh sách).
+        const con = chup.idKhac.filter((id) => document.getElementById(id)).length;
+        if (!chup.idKhac.length || con * 2 >= chup.idKhac.length) return true;
+      }
+      return false;
+    }
+    return !conHien(h);
+  }
+  /** Chữ của thông báo nổi (toast) đang hiện — Muse báo lỗi xoá ở đây. */
+  const thongBaoMuse = () => $$('[role="status"],[role="alert"],[data-sonner-toast],[data-testid*="toast" i]')
+    .map(chuCua).filter(Boolean).join(' | ').replace(/\s+/g, ' ').slice(0, 200);
+  /** Bấm có toạ độ giữa phần tử (thư viện "press" bỏ qua pointerup ở toạ độ 0,0 = ngoài nút). */
+  function bamGiua(e) {
+    const r = e.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2;
+    const o = { bubbles: true, cancelable: true, button: 0, buttons: 1, pointerType: 'mouse', isPrimary: true, clientX: x, clientY: y, view: window };
+    e.dispatchEvent(new PointerEvent('pointerdown', o)); e.dispatchEvent(new MouseEvent('mousedown', o));
+    e.dispatchEvent(new PointerEvent('pointerup', { ...o, buttons: 0 })); e.dispatchEvent(new MouseEvent('mouseup', { ...o, buttons: 0 }));
+    e.dispatchEvent(new MouseEvent('click', { ...o, buttons: 0, detail: 1 }));
+  }
+  const hopCua = (b) => b && b.closest('[role="dialog"],[role="alertdialog"]');
+  const nutBat = (b) => b && !b.disabled && b.getAttribute('aria-disabled') !== 'true';
 
   async function xoaHang(h) {
-    const truoc = hangGoc().length, ma = maThread(h);
+    const chup = { soHang: hangGoc().length, ma: maThread(h), idNut: idNutCua(h), ten: tenHang(h),
+      idKhac: hangChat().filter((x) => x !== h).map(idNutCua).filter(Boolean) };
     let nut = nutChat(h);
     if (!nut) { reChuot(h); nut = await cho(() => nutChat(h), 2000); }
     if (!nut) { loiCuoi = 'khong-thay-nut-3-cham'; return false; }
+    if (!chup.idNut) chup.idNut = nut.id || '';
     // Menu Radix mở bằng pointerdown. KHÔNG bắn click trước: click nổi lên hàng → Muse chuyển sang chat đó.
     nut.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, button: 0, pointerType: 'mouse', isPrimary: true }));
     let muc = await cho(mucXoa, 1500);
@@ -436,16 +483,75 @@
       menuLoi = menuMo() ? menuMo().outerHTML.slice(0, 100000) : '';   // giữ HTML menu trước khi đóng — cho tệp chẩn đoán
       dongMenu(); return false;
     }
+    menuLoi = menuMo() ? menuMo().outerHTML.slice(0, 30000) : '';
     bam(muc);
     const ok = await cho(nutXacNhan, 5000);
-    if (ok) ok.click();
-    else if (!(await cho(() => hangGoc().length < truoc, 1500))) { loiCuoi = 'khong-thay-nut-xac-nhan'; dongMenu(); return false; }
-    // Xoá xong = danh sách ngắn đi, hoặc không còn hàng của chat đó (KHÔNG dựa vào hàng rời DOM: Muse vẽ lại
-    // danh sách là hàng cũ rời ngay).
-    const xong = await cho(() => hangGoc().length < truoc || (ma && !hangGoc().some((x) => maThread(x) === ma)), 15000);
-    if (!xong) loiCuoi = 'xoa-xong-nhung-danh-sach-khong-doi';
+    if (!ok) {
+      if (await cho(() => daXoa(h, chup), 1500)) return true;   // Muse xoá luôn, không hỏi lại
+      loiCuoi = 'khong-thay-nut-xac-nhan'; dongMenu(); return false;
+    }
+    hopLoi = (hopCua(ok) || ok).outerHTML.slice(0, 30000);
+    // Hộp vừa mở còn chạy hiệu ứng / nút xác nhận còn khoá → đợi nút bấm được rồi mới bấm.
+    await cho(() => nutBat(ok), 3000);
+    await ngu(300);
+    ok.click();
+    // Muse không nhận cú bấm (hộp vẫn mở) → bấm lại kiểu đủ sự kiện chuột, có toạ độ giữa nút.
+    if (!(await cho(() => !ok.isConnected || !conHien(ok) || daXoa(h, chup), 2500)) && ok.isConnected) bamGiua(ok);
+    const xong = await cho(() => daXoa(h, chup), 15000);
+    if (!xong) {
+      const tb = thongBaoMuse();
+      loiCuoi = 'xoa-xong-nhung-danh-sach-khong-doi' + (tb ? ` · Muse báo: ${tb}` : '') +
+        (hopCua(ok) && ok.isConnected ? ' · hộp xác nhận vẫn mở' : '');
+      if (ok.isConnected) dongMenu();
+    }
     return !!xong;
   }
+
+  /**
+   * Toạ độ để tiến trình chính bấm CHUỘT THẬT (debugger) khi cú bấm bằng JavaScript không ăn (isTrusted = false).
+   * buoc 'nut': nút ⋯ của hàng cần xoá (chat đang mở nếu dangMo, không thì hàng đầu có nút ⋯), cuộn hàng vào giữa
+   * khung; 'muc': mục Delete của menu đang mở; 'xacNhan': nút xác nhận trong hộp. Không thấy → null.
+   */
+  async function diemXoa(p) {
+    const giua = (e) => { const r = e.getBoundingClientRect(); return r.width && r.height ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : null; };
+    if (p.buoc === 'nut') {
+      const ma = (location.pathname.match(/\/thread\/([^/?#]+)/) || [])[1] || '';
+      let h = p.dangMo ? hangGoc().find((x) => x.getAttribute('aria-current') === 'page' || $('[aria-current="page"]', x) || (ma && maThread(x) === ma))
+        : (await cacHang())[0];
+      if (!h && !p.dangMo) {
+        // Danh sách nạp dần: kéo tới "nạp thêm"; vẫn không còn hàng nào có nút ⋯ → hết chat để xoá.
+        const s = $('[data-testid="active-side-chat-load-more-sentinel"]');
+        if (s) s.scrollIntoView();
+        h = await cho(() => hangChat()[0], 4000);
+        if (!h) return { het: true };
+      }
+      if (!h) return null;
+      h.scrollIntoView({ block: 'center' });
+      reChuot(h);
+      const b = await cho(() => nutChat(h), 2000);
+      if (!b) return null;
+      await ngu(200);
+      if (!b.id) b.id = 'muse-xoa-' + Date.now();
+      chupThat = { soHang: hangGoc().length, ma: maThread(h), idNut: b.id, ten: tenHang(h),
+        idKhac: hangChat().filter((x) => x !== h).map(idNutCua).filter(Boolean), hang: h };
+      // Toạ độ HÀNG: tiến trình chính rê chuột thật vào hàng trước — nút ⋯ chỉ hiện khi rê chuột (CSS :hover).
+      return { ...giua(h), ten: chupThat.ten };
+    }
+    if (p.buoc === 'nutHien') {
+      const b = chupThat && document.getElementById(chupThat.idNut);
+      return b && giua(b);
+    }
+    if (p.buoc === 'muc') { const m = mucXoa(); return m && giua(m); }
+    if (p.buoc === 'xacNhan') {
+      const b = nutXacNhan();
+      if (!b || !nutBat(b)) return null;
+      hopLoi = (hopCua(b) || b).outerHTML.slice(0, 30000);
+      return giua(b);
+    }
+    if (p.buoc === 'daXoa') return chupThat ? daXoa(chupThat.hang, chupThat) : false;
+    return null;
+  }
+  let chupThat = null;
 
   /** HTML gọn của khung danh sách chat + menu / hộp thoại đang mở — để chẩn đoán khi xoá không được. */
   function chanDoanXoa() {
@@ -456,23 +562,25 @@
     return {
       url: location.href, loi: loiCuoi, soHang: hangGoc().length, soHangCoNut: hangChat().length,
       danhSach: lay(khung || $('[data-testid="hatch-side-chats-panel-content"]') || $('nav') || $('aside')),
-      menu: [menuLoi, ...$$('[role="menu"],[role="dialog"],[role="alertdialog"]').map(lay)].filter(Boolean).join('\n')
+      menu: [menuLoi, hopLoi && '<!-- hộp xác nhận lúc bấm -->\n' + hopLoi, ...$$('[role="menu"],[role="dialog"],[role="alertdialog"]').map(lay)].filter(Boolean).join('\n'),
+      thongBao: thongBaoMuse()
     };
   }
 
   /** Xoá chat đang mở (mở /thread/<id> trước). */
   async function xoaChatDangMo() {
-    loiCuoi = ''; menuLoi = '';
+    loiCuoi = ''; menuLoi = ''; hopLoi = '';
     const ma = (location.pathname.match(/\/thread\/([^/?#]+)/) || [])[1] || '';
     const tim = () => hangGoc().find((x) => x.getAttribute('aria-current') === 'page' || $('[aria-current="page"]', x) || (ma && maThread(x) === ma));
-    const h = await cho(tim, 20000);
+    // Danh sách nạp dần: chat đang mở có thể nằm dưới phần đã nạp → kéo tới "nạp thêm" trong lúc tìm.
+    const h = await cho(() => tim() || void ($('[data-testid="active-side-chat-load-more-sentinel"]') || { scrollIntoView() {} }).scrollIntoView(), 20000);
     if (!h) return { ok: false, loi: 'khong-thay-chat', chanDoan: chanDoanXoa() };
     return (await xoaHang(h)) ? { ok: true } : { ok: false, loi: loiCuoi || 'xoa-khong-duoc', chanDoan: chanDoanXoa() };
   }
 
   /** Xoá lần lượt mọi chat phụ trong danh sách, tối đa `toiDa` cái mỗi lần gọi. */
   async function xoaNhieuChat(p) {
-    loiCuoi = ''; menuLoi = '';
+    loiCuoi = ''; menuLoi = ''; hopLoi = '';
     const toiDa = (p && p.toiDa) || 10;
     await cho(() => hangGoc().length || $('[data-testid="hatch-side-chats-panel-content"]'), 20000);
     await ngu(1500);
@@ -500,6 +608,6 @@
     return { ok: true, da, conLai: hangChat().length };
   }
 
-  window.__muse = { phienBan: 1, trangThai, gui, ketQua, layFile, hanMuc, xoaChatDangMo, xoaNhieuChat };
+  window.__muse = { phienBan: 1, trangThai, gui, ketQua, layFile, hanMuc, xoaChatDangMo, xoaNhieuChat, diemXoa, chanDoanXoa: () => chanDoanXoa() };
 })();
 undefined;

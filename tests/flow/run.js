@@ -1007,6 +1007,8 @@ test('an toàn: đổi mili-giây sang chữ người đọc được', () => {
   assert.strictEqual(anToan.doDai(30000), '30 giây');
   assert.strictEqual(anToan.doDai(600000), '10 phút');
   assert.strictEqual(anToan.doDai(330000), '5 phút 30 giây');
+  assert.strictEqual(anToan.doDai(3 * 3600000), '3 giờ');
+  assert.strictEqual(anToan.doDai(3600000), '60 phút');
 });
 
 // Bản gộp: các ô nằm ở Cài đặt → Google Flow (src/ui), app.js nối ô ↔ khoá bằng
@@ -1459,7 +1461,7 @@ test('1.2.2 tab Flow tiêm trình nắn kho ảnh SAU engine (engine dò mục k
   assert.ok(iEngine > 0 && iKho > iEngine && iChot > iKho, 'thiếu / sai chỗ giai đoạn "trình nắn kho ảnh"');
   const { docNguon: nguon } = require('../../src/flow/tab-flow');
   const n = nguon();
-  assert.ok(/window\.__flowKhoAnh = \{ danhDau: danhDau, chup: chup \}/.test(n.khoAnh));
+  assert.ok(/window\.__flowKhoAnh = \{ danhDau: danhDau, chup: chup[,\s}]/.test(n.khoAnh));
   assert.strictEqual(nguon({ khoAnh: 'X' }).khoAnh, 'X');
   // Không đụng engine: dấu engine tìm vẫn y nguyên trong engine gốc.
   assert.ok(n.engine.includes("button.asset-item, div.asset-item-container, div[data-item-index]"), 'bộ chọn mục kho của engine đã đổi — xem lại flow-kho-anh.js');
@@ -2158,7 +2160,7 @@ testAsync('lỗi chọn chất lượng tải xuống (máy Flow): gọi tab.onL
   assert.strictEqual(goi.length, 1, 'phải báo luồng lưu tệp chẩn đoán');
   const lf = require('fs').readFileSync(require('path').join(__dirname, '..', '..', 'src', 'flow', 'luong-flow.js'), 'utf8');
   assert.ok(/t\.onLoiChatLuong = \(\) => \{ this\._chupChanDoan\(/.test(lf), 'luong-flow phải gắn onLoiChatLuong → _chupChanDoan');
-  assert.ok(/t\.onBang = t\.onDung = t\.onTai = t\.onLoiChatLuong = null/.test(lf), 'kết thúc mẻ phải gỡ onLoiChatLuong');
+  assert.ok(/t\.onBang = t\.onDung = t\.onTai = t\.onLoiChatLuong = (t\.onLoiKhungNhap = )?null/.test(lf), 'kết thúc mẻ phải gỡ onLoiChatLuong');
 });
 
 // 1.3.1 (nhật ký 17/10/2026 18:00, 7 tài khoản Flow kẹt ở trang chủ): nút "+ Dự án mới" của Flow thật nổi giữa đáy
@@ -2175,6 +2177,94 @@ test('trang chủ Flow: tìm nút "+ Dự án mới" không dựa vào offsetPar
   }
   // Dự án app chưa có dự án Flow riêng mà Flow tự mở lại dự án cũ → về trang chủ để tạo dự án mới.
   assert.ok(/canMoi && !daBamMoi && \/\\\/project\\\/\/\.test\(url\)/.test(lf) && /wc\.loadURL\(FLOW_URL\)/.test(lf), 'thiếu bước về trang chủ khi đang ở dự án Flow cũ');
+});
+
+// Nhật ký 17/10/2026 21:48: "🧑 Đã đính kèm ảnh" rồi engine KHÔNG dán prompt (ô nhập chưa gõ được) → bấm Tạo với ô trống
+// → "Flow không nhận". Máy Flow dán bù đúng chữ engine định dán. Bài điện (Electron) đầy đủ: tests/flow/gan-anh-video-main.js.
+test('dán bù (1.3.2): chữ dựng lại khớp hệt pastePrompt() của engine', () => {
+  const { chuDanCua, soCuaDongBatDauDan } = require('../../src/flow/main/dan-bu');
+  const e = docNguon('src', 'inject', 'flow-engine.js');
+  const ham = (dau) => { const t = thanHam(e, dau); assert.ok(t, `engine không còn ${dau}`); return t + '\n}\n'; };
+  const eng = new Function('state', ham('function applyCharSyncTags') + ham('function getPromptIndexNumber') +
+    'return { applyCharSyncTags, getPromptIndexNumber };');
+  // Đúng các nhánh pastePrompt() đang có — engine đổi cách dựng chữ thì bài này đỏ, phải sửa dan-bu.js theo.
+  const p = thanHam(e, 'async function pastePrompt');
+  assert.ok(/else if \(state\.settings\.charSync\) \{\s*const parsed = applyCharSyncTags\(originalPrompt, state\.settings\.charSyncStripTag\);/.test(p), 'nhánh charSync của engine đã đổi');
+  assert.ok(/if \(state\.settings\.addIndex\) \{\s*const displayIndex = getPromptIndexNumber\(video\.promptIndex\);\s*textToPaste = `\$\{displayIndex\}\. \$\{textToPaste\}`;/.test(p), 'nhánh addIndex của engine đã đổi');
+  assert.ok(/addLog\('info', `\[\$\{video\.promptIndex\}\] 🔍 Starting paste\.\.\.`\)/.test(p), 'dòng nhật ký "Starting paste" của engine đã đổi');
+  const prompts = ['Sóng vỗ @001_ab12, gió thổi @002_cd34 .', 'Cảnh 2 không ảnh', 'Ảnh  @Nhân_Vật_1  ở giữa'];
+  for (const s of [
+    { charSync: true, charSyncStripTag: true, addIndex: true },
+    { charSync: true, charSyncStripTag: false, addIndex: false },
+    { charSync: false, addIndex: true, renameStartIndex: '5' },
+    { charSync: true, charSyncStripTag: true, addIndex: true, renameMode: 'custom_list', renameStartIndex: 9 }
+  ]) {
+    const E = eng({ settings: s });
+    prompts.forEach((goc, i) => {
+      let mong = s.charSync ? E.applyCharSyncTags(goc, s.charSyncStripTag).text : goc;
+      if (s.addIndex) mong = `${E.getPromptIndexNumber(i + 1)}. ${mong}`;
+      assert.strictEqual(chuDanCua(prompts, i + 1, s), mong, JSON.stringify(s));
+    });
+  }
+  assert.strictEqual(chuDanCua(prompts, 4, {}), null);
+  assert.strictEqual(chuDanCua(prompts, 1, { keyframeSync: true }), null);
+  assert.strictEqual(soCuaDongBatDauDan('[12] 🔍 Starting paste...'), 12);
+  assert.strictEqual(soCuaDongBatDauDan('[1] 🧑 Đã đính kèm ảnh: x'), 0);
+});
+
+test('dán bù (1.3.2): máy Flow nối đúng chỗ — LOG theo dõi, INJECT_PASTE ghi đã dán, bấm Tạo dán bù TRƯỚC khi chuẩn bị bấm', () => {
+  const m = boGhiChu(docNguon('main.js'));                // → src/flow/may-flow.js
+  const h = thanHam(m, 'async function handleEngineMessage');
+  const log = khoiGiua(h, "case 'LOG':", "case 'UPDATE_STATS'");
+  assert.ok(/theoDoiDan\(tab, chu\)/.test(log), 'LOG chưa gọi theoDoiDan');
+  const dan = khoiGiua(h, "case 'INJECT_PASTE':", "case 'INJECT_CLICK_CREATE'");
+  assert.ok(dan.indexOf('tab._dan.daDan = true') > 0 && dan.indexOf('tab._dan.daDan = true') < dan.indexOf('pastePrompt('), 'INJECT_PASTE chưa ghi đã dán');
+  assert.ok(/tab\._dan\.ganAnh\) baoKhungNhap\(tab, await choKhungNhap\(tab\)\)/.test(dan), 'INJECT_PASTE chưa chờ khung ô nhập sau khi gắn ảnh');
+  const bam = khoiGiua(h, "case 'INJECT_CLICK_CREATE':", "case 'INJECT_RENAME_INPUT'");
+  const i = bam.indexOf('danBu.chuDanCua(tab.promptsMe, d.n, tab.caiDatEngine)'), j = bam.indexOf('__flowBamTaoChuanBi');
+  assert.ok(i > 0 && j > i, 'dán bù phải chạy trước khi chuẩn bị bấm Tạo');
+  assert.ok(!/nhipTT\.nghi/.test(bam), 'không được nghỉ theo nhịp thao tác trong INJECT_CLICK_CREATE (lưới đã chụp)');
+  const lf = docNguon('src', 'flow', 'luong-flow.js');
+  assert.ok(/t\.promptsMe = prompts;/.test(lf) && /t\.caiDatEngine = cb\.caiDat;/.test(lf), 'luồng Flow chưa gắn prompt mẻ lên tab');
+});
+
+test('hộp "Quyền sử dụng hình ảnh này" (1.3.2): bật sẵn tự đồng ý, có công tắc, luồng truyền xuống trình tải lên', () => {
+  const { chuanHoaFlow } = require('../../src/flow/cai-dat-flow');
+  assert.strictEqual(chuanHoaFlow({}).dongYQuyenAnh, true, 'người dùng chọn "App tự bấm" → mặc định bật');
+  assert.strictEqual(chuanHoaFlow({ dongYQuyenAnh: false }).dongYQuyenAnh, false, 'tắt rồi thì giữ tắt');
+  assert.ok(/\['fDongY', 'dongYQuyenAnh'\]/.test(docGoc('src', 'ui', 'app.js')) && /id="fDongY"/.test(docGoc('src', 'ui', 'index.html')), 'thiếu công tắc trong Cài đặt → Google Flow');
+  const lf = docNguon('src', 'flow', 'luong-flow.js');
+  assert.ok(/this\.taiAnhLen\(t\.view\.webContents, files, \{ dongY: !!chuanHoaFlow\(ctx\.caiDat\)\.dongYQuyenAnh \}\)/.test(lf), 'luồng chưa truyền dongY');
+  assert.ok(/lan < 6 && thieu\.length && !canDongY/.test(lf), 'chưa đồng ý thì không được chờ kho 60 giây vô ích');
+  const ta = docNguon('src', 'flow', 'inject', 'flow-tai-anh.js');
+  assert.ok(/flow-upload-consent-dialog/.test(ta) && /tôi đồng ý/.test(ta), 'trình tìm hộp đồng ý thiếu thẻ / chữ thật của Flow');
+});
+
+test('nhật ký 17/10/2026 23:30 (1.3.2): tải lại ảnh sau khi bấm "Tôi đồng ý"; nút Tạo thành nút hết tín dụng → nghỉ tài khoản', () => {
+  const lf = docNguon('src', 'flow', 'luong-flow.js');
+  const i = lf.indexOf('k.dongY && k.dongY.daDongY'), j = lf.indexOf('const k2 = await taiLen(lai)'), kk = lf.indexOf('daTai = k.ok;');
+  assert.ok(i > 0 && j > i && kk > j, 'bấm "Tôi đồng ý" xong phải kiểm kho và tải lại ảnh còn thiếu TRƯỚC khi chốt daTai');
+  assert.ok(/con === null \|\| con\.includes\(path\.basename\(f, path\.extname\(f\)\)\)/.test(lf), 'chỉ tải lại ảnh còn thiếu (không dò được kho thì tải lại hết)');
+  const bt = docNguon('src', 'flow', 'inject', 'flow-bam-tao.js');
+  assert.ok(/flow-credit-warning-button/.test(bt) && /window\.__flowCanhBaoTinDung = /.test(bt) && /hetTinDung: el \? '' : canhBaoTinDung\(\)/.test(bt),
+    'thiếu nhận diện <flow-credit-warning-button> ở chỗ nút Tạo');
+  const mf = docNguon('src', 'flow', 'may-flow.js');
+  assert.ok(/❌ Create button not found\/\.test\(chu\)\) kiemHetTinDung\(tab\)/.test(mf), 'dòng "Create button not found" của engine phải xem nút hết tín dụng');
+  assert.ok(/if \(k\.hetTinDung\) \{ await baoHetTinDung\(tab, k\.hetTinDung\)/.test(mf), 'chờ khung ô nhập thấy hết tín dụng thì báo ngay, không chờ 15 giây');
+  assert.ok(/batDauNghi\(tab\.accountId, NGHI_HET_TIN_DUNG_MS/.test(mf) && /NGHI_HET_TIN_DUNG_MS = 3 \* 3600000/.test(mf), 'hết tín dụng → tài khoản nghỉ 3 giờ');
+});
+
+test('1.3.2 trang 404?reason=project (dự án Flow đã nhớ bị xoá): nhận ra, quên địa chỉ cũ, tạo dự án mới', () => {
+  const s = fs.readFileSync(path.join(__dirname, '../../src/flow/luong-flow.js'), 'utf8');
+  const la = eval(s.match(/const LA_404_DU_AN = (.*);\r?\n/)[1]);
+  for (const u of ['https://flow.google.com/404?reason=project', 'https://flow.google.com/404', 'https://labs.google/fx/vi/tools/flow/404?reason=project'])
+    assert.ok(la(u), u);
+  for (const u of ['https://flow.google.com/', 'https://flow.google.com/project/404abc', 'https://flow.google.com/project/37c0b52d-240f-438b-b59b-9866f9fe1cba'])
+    assert.ok(!la(u), u);
+  const d = s.slice(s.indexOf('async _damBaoTab('), s.indexOf('async _ganAnh('));
+  assert.ok(/LA_404_DU_AN\(url\)/.test(d) && /this\.luuUrl\(this\.taiKhoan\.id, ''\)/.test(d) && /canMoi = true/.test(d) && /loadURL\(FLOW_URL\)/.test(d));
+  const m = fs.readFileSync(path.join(__dirname, '../../main.js'), 'utf8');
+  assert.ok(/if \(!url\) \{[\s\S]{0,200}dieuPhoi\.boFlowTen\(tkId, duAnId\)/.test(m), 'quên cả ảnh trong dự án Flow đã bị xoá');
 });
 
 // ── Kết luận ───────────────────────────────────────────────────────────────

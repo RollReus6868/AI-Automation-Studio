@@ -258,6 +258,7 @@ function doDai(ms) {
   const p = Math.floor(giay / 60);
   const g = giay % 60;
   if (!p) return `${g} giây`;
+  if (!g && p >= 120 && p % 60 === 0) return `${p / 60} giờ`;
   if (!g) return `${p} phút`;
   return `${p} phút ${g} giây`;
 }

@@ -279,9 +279,11 @@ class DieuPhoi {
     return true;
   }
   /** Dự án chạy mấy tài khoản của nền tảng này CÙNG LÚC (1 = chỉ tài khoản chính, các tài khoản khác là dự phòng). */
-  _soSong(duAnId, nen) {
+  _soSong(duAnId, nen, goc = false) {
     const d = this.duAn.find((x) => x.id === duAnId);
-    return (d && d.chaySong && d.chaySong[nen]) || 1;
+    const n = (d && d.chaySong && d.chaySong[nen]) || 1;
+    // Bên kia thiếu tài khoản → bên này chạy thêm chừng ấy tài khoản cho việc mượn sang (_canBang).
+    return goc ? n : n + ((this._muonTk && this._muonTk.get(`${duAnId}|${nen}`)) || 0);
   }
   /** Tài khoản việc này được chạy ngay bây giờ (nhóm chạy cùng lúc của dự án, trừ tài khoản đã lỗi việc này). */
   _tkCho(j) {
@@ -737,15 +739,11 @@ class DieuPhoi {
     }
     // Mỗi việc chờ (của dự án đang chạy, hoặc được bấm Chạy riêng) nhắm tới các tài khoản được chạy nó NGAY
     // BÂY GIỜ: nhóm chạy cùng lúc của dự án, tài khoản nào trong nhóm lỗi việc này thì dự phòng kế tiếp.
+    // Bên nào thiếu tài khoản chạy được (so với số tài khoản Chạy của dự án) → mượn tài khoản bên kia cho đủ.
+    this._canBang();
     const nhamToi = new Map();
     for (const j of this.viec) {
       if (j.trangThai !== 'cho' || !this._duocChay(j)) continue;
-      // Mọi tài khoản Muse / Flow của dự án đều không chạy được việc này (nghỉ / chưa đăng nhập / bị chặn
-      // loại việc) → chuyển sang bên kia, khỏi tạm dừng cả hàng chờ.
-      if (!this._conDung(j.duAn, j.nen, j.loai) && this._coTheDoiNen(j)) {
-        const ds = this.viec.filter((v) => v.trangThai === 'cho' && this._duocChay(v) && v.duAn === j.duAn && v.nen === j.nen && v.loai === j.loai && this._coTheDoiNen(v));
-        this._doiNen(ds, `mọi tài khoản ${TEN_NEN[j.nen]} của dự án đều đang lỗi / nghỉ`);
-      }
       let ds = this._tkCho(j);
       // Các tài khoản việc này chưa thử đều đang nghỉ / chưa đăng nhập → chỉ còn tài khoản đã lỗi:
       // coi như hết vòng, quay lại từ đầu (tài khoản chính). Hết số vòng → Lỗi luôn.
@@ -941,6 +939,77 @@ class DieuPhoi {
   }
 
   _nenKhac(nen) { return nen === 'muse' ? 'flow' : nen === 'flow' ? 'muse' : null; }
+
+  /**
+   * GIỮ ĐỦ SỐ TÀI KHOẢN CHẠY CÙNG LÚC (nhật ký 18/10/2026 00:42). Dự án chạy 5 tài khoản Flow cùng lúc (+3 dự phòng);
+   * 7 tài khoản lần lượt hết credit / bị "hoạt động bất thường", còn đúng 1 tài khoản Flow chạy suốt 7 phút mà Muse
+   * ngồi không — bản cũ chỉ chuyển sang Muse khi MỌI tài khoản Flow đều nghỉ, và lúc đó chuyển CẢ hàng chờ (321 video)
+   * sang Muse luôn, Flow nghỉ xong cũng không lấy lại được.
+   * Giờ mỗi lượt _vong, với mỗi (dự án, bên, loại việc) đang có việc chờ:
+   *   cần  = số tài khoản Chạy của bên đó (chaySong, không quá số tài khoản của dự án);
+   *   được = số tài khoản bên đó (Chạy + Dự phòng) còn chạy được loại việc này ngay bây giờ;
+   *   thiếu = cần − được (dự phòng vào thay trước, hết dự phòng mới thiếu).
+   * Thiếu k tài khoản → bên kia chạy thêm k tài khoản (_muonTk → _soSong) và nhận việc vừa đủ cho k tài khoản đó
+   * (k × số luồng mỗi tài khoản Muse, hoặc k × số tab × mỗi mẻ của Flow), không hơn. Bên này có lại tài khoản
+   * (hết giờ nghỉ) → việc mượn CHƯA chạy quay về. Việc mượn mang `muon = {tu, quaCu}`; hỏng ở mọi tài khoản bên
+   * kia thì còn về được bên cũ một lần (_coTheDoiNen), không đẩy qua lại mãi.
+   */
+  _canBang() {
+    this._muonTk = new Map();
+    const nhom = new Map();
+    for (const j of this.viec) {
+      if (j.trangThai !== 'cho' || !this._duocChay(j) || !this._nenKhac(j.nen)) continue;
+      const tu = j.muon ? j.muon.tu : j.nen;
+      const k = `${j.duAn}|${tu}|${j.loai}`;
+      if (!nhom.has(k)) nhom.set(k, { duAn: j.duAn, tu, loai: j.loai });
+    }
+    for (const { duAn, tu, loai } of nhom.values()) {
+      const den = this._nenKhac(tu);
+      const c = this.cd(duAn);
+      const can = Math.max(1, Math.min(this._soSong(duAn, tu, true), this._dsTkGoc(duAn, tu).length));
+      const duoc = this._dsTk(duAn, tu).filter((id) => !this._nghi(id) && !this._nghiLoai(id, loai)).length;
+      const thieu = c.doiNenKhiLoi ? Math.max(0, can - duoc) : 0;
+      const moiTk = den === 'muse' ? c.luongMoiTK : c.flow.tabMoiTK * c.flow.meToiDa;
+      const han = thieu * moiTk;
+      const daMuon = this.viec.filter((v) => v.duAn === duAn && v.loai === loai && v.muon && v.muon.tu === tu && v.nen === den &&
+        (v.trangThai === 'cho' || v.trangThai === 'chay'));
+      if (daMuon.length < han) {
+        const ung = this.viec.filter((v) => v.trangThai === 'cho' && this._duocChay(v) && v.duAn === duAn && v.nen === tu && v.loai === loai &&
+            !v.muon && !v.thread && this._coTheDoiNen(v))
+          .sort((a, b) => (a.uuTienLuc ? 0 : 1) - (b.uuTienLuc ? 0 : 1) || a.taoLuc - b.taoLuc || a.id - b.id)
+          .slice(0, han - daMuon.length);
+        if (ung.length) {
+          for (const v of ung) {
+            v.muon = { tu, quaCu: [...(v.daQuaNen || [])] };
+            v.daQuaNen = [...new Set([...(v.daQuaNen || []), den])];
+            Object.assign(v, { nen: den, buoc: '', taiKhoan: '', tkLoi: [], vongTk: 0, thu: 0 });
+            if (den === 'muse') v.tuFlow = true;
+          }
+          const ten = loai === 'video' ? 'video' : 'ảnh';
+          this.log('warning', `🔀 ${TEN_NEN[tu]} → ${TEN_NEN[den]}: dự án "${this._tenDuAn(duAn)}" chạy ${can} tài khoản ${TEN_NEN[tu]} cùng lúc ` +
+            `nhưng chỉ còn ${duoc} tài khoản chạy được ${ten} — ${TEN_NEN[den]} chạy thêm ${thieu} tài khoản, nhận ${ung.length} ${ten} ` +
+            `#${ung.map((v) => v.so).join(', #')}. ${TEN_NEN[tu]} có lại tài khoản thì ${ten} chưa chạy quay về ${TEN_NEN[tu]}.`);
+          this.luu();
+        }
+      } else if (daMuon.length > han) {
+        // Bên cũ có lại tài khoản: trả việc mượn chưa chạy (mới mượn sau trả trước).
+        const dangChay = daMuon.filter((v) => v.trangThai === 'chay').length;
+        const tra = daMuon.filter((v) => v.trangThai === 'cho' && !v.thread).reverse().slice(0, daMuon.length - Math.max(han, dangChay));
+        if (tra.length) {
+          for (const v of tra) {
+            v.daQuaNen = v.muon.quaCu;
+            Object.assign(v, { nen: tu, buoc: '', taiKhoan: '', tkLoi: [], vongTk: 0, thu: 0 });
+            delete v.muon;
+            if (tu === 'flow') delete v.tuFlow;
+          }
+          this.log('info', `🔀 ${TEN_NEN[tu]} đã có lại tài khoản chạy được (dự án "${this._tenDuAn(duAn)}") — ` +
+            `${tra.length} ${loai === 'video' ? 'video' : 'ảnh'} chưa chạy quay về ${TEN_NEN[tu]}: #${tra.map((v) => v.so).join(', #')}.`);
+          this.luu();
+        }
+      }
+      if (thieu) this._muonTk.set(`${duAn}|${den}`, Math.max(this._muonTk.get(`${duAn}|${den}`) || 0, thieu));
+    }
+  }
   /** Dự án còn tài khoản `nen` nào chạy được loại việc này (đăng nhập rồi, không nghỉ, không bị chặn loại). */
   _conDung(duAnId, nen, loai) {
     return this._dsTk(duAnId, nen).some((id) => !this._nghi(id) && !this._nghiLoai(id, loai));
@@ -970,6 +1039,7 @@ class DieuPhoi {
     const tu = chuyen[0].nen, den = this._nenKhac(tu);
     for (const v of chuyen) {
       v.daQuaNen = [...new Set([...(v.daQuaNen || []), v.nen, den])];
+      delete v.muon;
       Object.assign(v, { nen: den, trangThai: 'cho', buoc: '', thread: '', taiKhoan: '', tkLoi: [], vongTk: 0, thu: 0, loi: '' });
       if (den === 'muse') v.tuFlow = true;
       delete v.flowAnh;
