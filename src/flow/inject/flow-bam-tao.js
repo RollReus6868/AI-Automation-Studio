@@ -332,6 +332,48 @@
     return { x, y, o2, trung: !o2 || o2 === el || el.contains(o2) || o2.contains(el) };
   }
 
+  // ── LỚP PHỦ CÒN SÓT SAU KHI GẮN ẢNH (1.3.2) ─────────────────────────────
+  //  Nhật ký 17/10/2026 21:51: gắn ảnh @tên xong (bảng kho [+] → "Thêm vào câu lệnh"), bảng đóng nhưng lớp nền tối
+  //  <div.cdk-overlay-backdrop.cdk-overlay-dark-backdrop.cdk-overlay-backdrop-showing> vẫn phủ cả trang.
+  //  Lúc bấm Tạo thì không được có bảng / menu nào mở: đóng hết (Escape + bấm lớp nền, như người bấm ra ngoài).
+  function lopConMo() {
+    const ra = [];
+    for (const el of document.querySelectorAll('.cdk-overlay-backdrop, .cdk-overlay-pane')) {
+      if (el.classList.contains('cdk-overlay-pane') && !el.firstElementChild) continue;   // khung rỗng CDK để lại
+      if (nhinThay(el)) ra.push(el);
+    }
+    return ra;
+  }
+  async function dongLopPhu(soLan) {
+    let ta = '';
+    for (let lan = 0; lan < (soLan || 3); lan++) {
+      const ds = lopConMo();
+      if (!ds.length) break;
+      if (!ta) ta = moTaLop(ds[0]);
+      const esc = { key: 'Escape', code: 'Escape', keyCode: 27, which: 27, bubbles: true, cancelable: true };
+      try { (document.activeElement || document.body).dispatchEvent(new KeyboardEvent('keydown', esc)); } catch (_) {}
+      try { document.body.dispatchEvent(new KeyboardEvent('keydown', esc)); } catch (_) {}
+      const nen = ds.find((el) => el.classList.contains('cdk-overlay-backdrop'));
+      try { if (nen && nen.isConnected) nen.click(); } catch (_) {}
+      await wait(400);
+    }
+    return { daDong: ta, conMo: lopConMo().map(moTaLop) };
+  }
+  window.__flowDongLopPhu = dongLopPhu;
+
+  /** Khung ô nhập đã sẵn sàng chưa: ô nhập hiện + gõ được, nút Tạo hiện, không còn lớp phủ nào mở. */
+  window.__flowKhungNhap = function (tuyChon) {
+    const o = tuyChon || {};
+    const ed = timEditor();
+    const { el } = timNut(o.selector || null);
+    return {
+      oNhap: !!(ed && (ed.tagName === 'TEXTAREA' || ed.isContentEditable)),
+      nut: !!el,
+      dai: doDaiChu(ed),
+      lop: lopConMo().map(moTaLop)
+    };
+  };
+
   window.__flowBamTaoChuanBi = async function (tuyChon) {
     const o = tuyChon || {};
     let { el, via } = timNut(o.selector || null);
@@ -343,8 +385,16 @@
       return { ok: false, wasDisabled: true, via, nut: taNut(el), truoc,
         error: 'Nút Tạo đang bị Flow tắt (disabled) — chưa bấm được.', loiTrenTrang: docLoiTrenTrang() };
     }
+    // Bảng / lớp nền còn mở (vd lớp nền tối của bảng kho sau khi gắn ảnh) → đóng hết trước khi bấm (1.3.2).
+    let daGo = '';
+    if (lopConMo().length) {
+      const r = await dongLopPhu(2);
+      daGo = r.daDong;
+      if (!el.isConnected) ({ el, via } = timNut(o.selector || null));
+      if (!el) return { ok: false, error: 'Không tìm thấy nút Tạo trên trang Flow.', debug: window.__flowBamTaoDebug() };
+    }
     // Tâm nút có bị lớp khác đè lên không? Bị đè thì chuột thật bấm trúng lớp đè, không phải nút.
-    let d = doNut(el), che = '', daGo = '';
+    let d = doNut(el), che = '';
     if (!d.trung) {
       che = moTaLop(d.o2);
       // Lớp đè là menu / bảng nổi còn mở → đóng nó (Escape + bấm lớp nền, như người dùng bấm ra ngoài) rồi đo lại.
@@ -416,6 +466,10 @@
     const KIEU = ['click', 'chuot', 'enter', 'space'];
     const thu = [];
 
+    // Bảng / lớp nền còn mở thì đóng trước (1.3.2) — kiểu "chuột" bắn sự kiện thẳng vào nút nên lọt qua lớp nền,
+    // nhưng Flow coi như người dùng đang thao tác trong bảng.
+    const lop = lopConMo().length ? await dongLopPhu(2) : null;
+
     for (const kieu of KIEU) {
       try { el.scrollIntoView({ block: 'center', behavior: 'instant' }); } catch (_) {}
       try {
@@ -432,14 +486,14 @@
       if (kq.an) {
         return {
           ok: true, wasDisabled: false, kieu, via, nut: taNut(el),
-          method: 'bam-' + kieu, truoc, thu
+          method: 'bam-' + kieu, truoc, thu, lopDaDong: lop ? lop.daDong : ''
         };
       }
     }
 
     // Cả ba kiểu đều không ăn. Đây là lúc chữ trên trang đáng giá nhất.
     return {
-      ok: false, wasDisabled: false, via, nut: taNut(el), truoc, thu,
+      ok: false, wasDisabled: false, via, nut: taNut(el), truoc, thu, lopDaDong: lop ? lop.daDong : '',
       loiTrenTrang: docLoiTrenTrang(),
       error: 'Đã thử cả bốn kiểu bấm (click, chuột, Enter, Space) mà Flow không nhận: ' +
              'chữ trong ô nhập không mất đi, không có thẻ chờ nào mới, nút cũng không bị tắt.',

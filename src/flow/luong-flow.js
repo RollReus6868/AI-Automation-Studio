@@ -203,6 +203,7 @@ class LuongFlow {
     };
     let thieu = await kiem();
     if (thieu === null) thieu = [...canCo.keys()];
+    let canDongY = null;     // Flow hỏi "Quyền sử dụng hình ảnh này" mà app không được bấm thay
     if (thieu.length) {
       const anh = [];
       for (const m of thieu) {
@@ -232,16 +233,26 @@ class LuongFlow {
             }
           } catch (err) { this.log('error', `❌ [${this.id}] Không chép được ảnh để tải lên: ${err.message}`); }
           const k = dsFile.length && t.view && !t.view.webContents.isDestroyed()
-            ? await this.taiAnhLen(t.view.webContents, dsFile) : { ok: false, loi: 'không có ảnh / tab đã đóng' };
+            ? await this.taiAnhLen(t.view.webContents, dsFile, { dongY: !!chuanHoaFlow(ctx.caiDat).dongYQuyenAnh })
+            : { ok: false, loi: 'không có ảnh / tab đã đóng' };
           daTai = k.ok;
           const CACH = { 'o-tai-len': 'đặt vào ô tải lên', 'hop-chon-file': `bấm ${k.buoc && k.buoc.length ? k.buoc.map((b) => b.split(': ')[1]).filter(Boolean).join(' → ') : 'Tải lên'}`, 'keo-tha': 'kéo-thả vào ô nhập prompt' };
-          if (k.ok) this.log(k.chacChan ? 'success' : 'warning', `⬆️ [${this.id}] Đã đưa ${dsFile.length} ảnh lên Flow (${CACH[k.cach] || k.cach})${k.chacChan ? '' : ' — chưa chắc Flow nhận, kiểm lại kho'}.`);
+          if (k.dongY && k.dongY.daDongY) this.log('info', `☑ [${this.id}] Flow hỏi "${k.dongY.tieuDe}" — app đã bấm "Tôi đồng ý" (Cài đặt → Google Flow → tự đồng ý).`);
+          if (k.canDongY) {
+            canDongY = k;
+            this.log('error', `✋ [${this.id}] Tài khoản "${this.taiKhoan.ten}": ${k.loi}. Flow chỉ hỏi một lần mỗi tài khoản — ` +
+              'mục Tài khoản → Đăng nhập ở tài khoản này → trong Flow bấm [+] → Tải nội dung nghe nhìn lên → chọn một ảnh → bấm "Tôi đồng ý". ' +
+              'Hoặc bật Cài đặt → Google Flow → "Tự bấm Tôi đồng ý…". Việc chuyển sang tài khoản khác.');
+          }
+          else if (k.ok) this.log(k.chacChan ? 'success' : 'warning', `⬆️ [${this.id}] Đã đưa ${dsFile.length} ảnh lên Flow (${CACH[k.cach] || k.cach})${k.chacChan ? '' : ' — chưa chắc Flow nhận, kiểm lại kho'}.`);
           else this.log('error', `❌ [${this.id}] Tải ảnh lên Flow hỏng: ${k.loi || 'không rõ'}`);
+          const sau = taiAnhLenMd.moTaSauTai(k.sauTai);
+          if (sau) this.log('warning', `🔎 [${this.id}] Flow hiện ngay sau khi nhận ảnh: ${sau}`);
           if (!k.ok || !k.chacChan) {
             const cd = taiAnhLenMd.moTaChanDoan(k.chanDoan);
             if (cd) this.log('info', `🔎 [${this.id}] Quanh ô nhập Flow: ${cd}`);
           }
-          if (!k.ok) await this._chupChanDoan(`tải ảnh lên hỏng: ${k.loi || 'không rõ'}`);
+          if (!k.ok && !k.canDongY) await this._chupChanDoan(`tải ảnh lên hỏng: ${k.loi || 'không rõ'}`);
           // Tải lên từ ô nhập prompt thì Flow có thể gắn luôn ảnh vào ô nhập → prompt đầu mẻ mang theo MỌI ảnh
           // vừa tải. Gỡ ra; engine gắn đúng ảnh cho từng prompt bằng @tên.
           if (k.ok && t.view && !t.view.webContents.isDestroyed()) {
@@ -251,7 +262,7 @@ class LuongFlow {
         }
       }
       // Flow cần một lúc để xử lý ảnh vừa tải lên — kiểm lại vài lần.
-      for (let lan = 0; lan < 6 && thieu.length; lan++) {
+      for (let lan = 0; lan < 6 && thieu.length && !canDongY; lan++) {
         if (!(await this._ngu(lan ? 8000 : 4000, huyLuc))) return { dung: true };
         const k = await kiem();
         if (k !== null) thieu = k;
@@ -263,12 +274,26 @@ class LuongFlow {
         }
       }
       if (thuMucLen) try { fs.rmSync(thuMucLen, { recursive: true, force: true }); } catch (_) {}
-      if (thieu.length) await this._chupChanDoan(`kho Flow vẫn thiếu ảnh ${thieu.join(', ')} sau khi tải lên`);
+      // Bảng [+] vẫn tìm không ra → xem lưới trang dự án: ảnh đã hiện ở đó thì Flow đã nhận, cứ giao (1.3.2).
+      if (thieu.length && !canDongY && t.view && !t.view.webContents.isDestroyed()) {
+        const luoi = await t.view.webContents.executeJavaScript(
+          `window.__flowKhoAnh && window.__flowKhoAnh.trongLuoi ? window.__flowKhoAnh.trongLuoi(${JSON.stringify(thieu)}) : null`, true).catch(() => null);
+        if (Array.isArray(luoi) && luoi.length) {
+          this.log('warning', `⚠ [${this.id}] Ảnh ${luoi.join(', ')} đã có trong dự án Flow nhưng bảng [+] chưa tìm ra — vẫn giao, engine tự gắn ảnh @tên.`);
+          thieu = thieu.filter((m) => !luoi.includes(m));
+        }
+        if (thieu.length && Array.isArray(luoi)) {
+          this.log('warning', `⚠ [${this.id}] Không thấy ảnh ${thieu.join(', ')} trong dự án Flow — Flow chưa nhận ảnh vừa tải lên.`);
+        }
+      }
+      if (thieu.length && !canDongY) await this._chupChanDoan(`kho Flow vẫn thiếu ảnh ${thieu.join(', ')} sau khi tải lên`);
     }
     const hong = new Map();
     for (const [j, ma] of maCua) {
       const mat = ma.filter((m) => thieu.includes(m));
-      if (mat.length) hong.set(j, `Không đưa được ảnh lên kho Flow (${mat.join(', ')})`);
+      if (mat.length) hong.set(j, canDongY
+        ? `Flow (tài khoản "${this.taiKhoan.ten}") cần bấm "Tôi đồng ý" ở hộp "Quyền sử dụng hình ảnh này" một lần trước khi nhận ảnh (${mat.join(', ')})`
+        : `Không đưa được ảnh lên kho Flow (${mat.join(', ')})`);
     }
     return { maCua, hong };
   }
@@ -449,7 +474,7 @@ class LuongFlow {
           daKet = true;
           clearInterval(gac);
           this._ketMe = null;
-          t.onBang = t.onDung = t.onTai = t.onLoiChatLuong = null;
+          t.onBang = t.onDung = t.onTai = t.onLoiChatLuong = t.onLoiKhungNhap = null;
           t.busy = false;
           if (vi === 'dung' || this.huy !== huyLuc) {
             const lyDo = this.lyDoDung;
@@ -508,6 +533,8 @@ class LuongFlow {
         t.onDung = () => setTimeout(() => ket('dung-engine'), 1500);
         // Menu Tải xuống không còn mục chất lượng nào bấm được (nhật ký 17/10/2026) → lưu menu đó để sửa tiếp.
         t.onLoiChatLuong = () => { this._chupChanDoan('engine không chọn được chất lượng tải xuống', false).catch(() => {}); };
+        // Engine không thấy nút Tạo / ô tìm kiếm của bảng kho sau khi gắn ảnh → lưu khung ô nhập + lớp phủ để sửa tiếp.
+        t.onLoiKhungNhap = (chu) => { this._chupChanDoan(`engine: ${chu}`, false).catch(() => {}); };
         const gac = setInterval(() => {
           if (this.huy !== huyLuc) return;
           if (hetViecLuc && Date.now() - hetViecLuc > 180000) {
@@ -544,6 +571,7 @@ class LuongFlow {
         t.busy = true;
         t.assigned = chay.length;
         t.caiDatEngine = cb.caiDat;
+        t.promptsMe = prompts;      // máy Flow dán bù khi engine bỏ qua bước dán (src/flow/main/dan-bu.js)
         this.log('info', `🚀 [${this.id}] Giao mẻ ${chay.length} ${loai === 'video' ? 'video' : 'ảnh'} cho Flow (#${chay.map((j) => j.so).join(', #')})`);
         for (const j of chay) ctx.capNhat(j, { buoc: TRANG_THAI_BUOC.WAITING });
         const msg = buildStartMessage(prompts, prompts.map((text, i) => ({ index: i + 1, text })), cb.caiDat);

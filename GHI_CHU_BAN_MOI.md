@@ -1,4 +1,13 @@
-# AI Automation Studio 1.3.1
+# AI Automation Studio 1.3.2
+
+- **Sửa lỗi Flow không nhận ảnh tải lên ở một số tài khoản** (nhật ký 17/10/2026 21:49: *"Không đưa được ảnh lên kho Flow"* ở Flow 2, 3, 4, 5). Bốn tệp chẩn đoán bạn gửi cho thấy: ở tài khoản chưa từng tải ảnh lên, Flow mở hộp **"Quyền sử dụng hình ảnh này"** (Huỷ / Tôi đồng ý), và ảnh chỉ vào kho khi bấm **Tôi đồng ý**. App không bấm nên ảnh không bao giờ vào kho. Theo lựa chọn của bạn, giờ app tự bấm **Tôi đồng ý** và nhật ký ghi lại mỗi lần bấm. Công tắc nằm ở *Cài đặt → Google Flow → Tự bấm "Tôi đồng ý"…* (bật sẵn). Nếu tắt công tắc, app báo ngay tài khoản nào cần bạn tự bấm một lần, không chờ 60 giây vô ích.
+- **Sửa lỗi bấm Tạo mà Flow không nhận khi làm video từ ảnh** (nhật ký 21:48: *"Đã thử cả bốn kiểu bấm … mà Flow không nhận"*). Ngay sau khi gắn ảnh vào ô nhập, engine bỏ qua bước dán prompt mà không báo gì, rồi bấm Tạo với ô nhập trống. Giờ app nhận ra trường hợp này, chờ ô nhập gõ được, dán đúng prompt rồi mới bấm Tạo (nhật ký ghi *"🩹 Engine bỏ qua bước dán prompt … app tự dán"*).
+- Sau khi gắn ảnh, nếu bảng ảnh của Flow còn để lại lớp nền tối che nút Tạo, app đóng nó trước khi bấm.
+- Nếu ô tìm kiếm của bảng [+] chưa tìm ra ảnh vừa tải nhưng ảnh đã hiện trong lưới dự án Flow, app vẫn giao việc thay vì báo thiếu ảnh. Nếu Flow hiện hộp thoại lạ ngay sau khi nhận ảnh, nhật ký ghi lại chữ và các nút của hộp đó.
+
+Lưu ý: đã kiểm trên trang Flow giả dựng theo HTML thật bạn gửi (hộp "Quyền sử dụng hình ảnh này", bảng ảnh [+]), chưa chạy trên Flow thật. Thẻ *"hoạt động bất thường"* ở Flow 5, 6, 7 là Google tự chặn. App chỉ cho các tài khoản đó nghỉ.
+
+## Bản 1.3.1
 
 - **Sửa lỗi Flow không tạo được dự án mới** (nhật ký 17/10/2026 18:00: cả 7 tài khoản Flow báo *"Không vào được trang dự án Flow sau 120 giây"*, tab nằm ở trang chủ Flow, rồi mọi ảnh chuyển sang Muse). Từ bản 1.3.0, mỗi dự án của tool chạy trên một dự án Flow mới, nên app phải tự bấm nút **"+ Dự án mới"** ở trang chủ Flow. Nút này nổi giữa đáy trang, mà cách app kiểm "nút có đang hiện không" lại bỏ qua mọi phần tử nổi kiểu đó, nên app không bao giờ thấy nút. Giờ app kiểm theo kích thước thật trên màn hình và bấm được nút.
 - Nếu Flow tự mở lại một dự án cũ khi tab vào trang chủ, app tự về trang chủ (như bấm nút ngôi nhà) rồi bấm **"+ Dự án mới"**, không dùng dự án cũ.

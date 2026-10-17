@@ -27,6 +27,9 @@ const FLOW_MAC_DINH = {
   addIndex: true,
   randomScroll: false,
   goAnhThamChieu: true,
+  // Hộp "Quyền sử dụng hình ảnh này" khi tài khoản tải ảnh lên lần đầu: tự bấm "Tôi đồng ý"? (1.3.2) Bấm là người dùng
+  // xác nhận với Google họ có quyền với ảnh — người dùng chọn "App tự bấm" ngày 17/10/2026 nên bật sẵn; tắt được trong Cài đặt.
+  dongYQuyenAnh: true,
   // Nghỉ giữa thao tác (tiến trình chính đọc)
   nghiThaoTacBat: false,
   nghiThaoTacMin: 1,
@@ -83,7 +86,7 @@ function chuanHoaFlow(raw) {
   m.tabMoiTK = Math.round(so(m.tabMoiTK, 1, 4, 1));
   m.meToiDa = Math.round(so(m.meToiDa, 1, 50, 10));
   m.networkGuard = m.networkGuard === 'off' ? 'off' : 'auto';
-  for (const k of ['randomDelay', 'voiceSync', 'addIndex', 'randomScroll', 'goAnhThamChieu', 'nghiThaoTacBat', 'doiTenTrenFlow']) m[k] = !!m[k];
+  for (const k of ['randomDelay', 'voiceSync', 'addIndex', 'randomScroll', 'goAnhThamChieu', 'nghiThaoTacBat', 'doiTenTrenFlow', 'dongYQuyenAnh']) m[k] = !!m[k];
   delete m.sangMuseKhiHong;   // 1.2.1: thành công tắc chung caiDat.doiNenKhiLoi (dieu-phoi.js, mốc 4)
   if (!['img_4k', 'img_2k', 'img_1k'].includes(m.chatLuongAnh)) m.chatLuongAnh = 'img_2k';
   if (!['4k', '1080p', '720p'].includes(m.chatLuongVideo)) m.chatLuongVideo = '1080p';

@@ -44,6 +44,19 @@
       Nút là <button aria-pressed> chứa <mat-icon> dính liền chữ (textContent "imageHình ảnh").
   Ghi lại cho bài kiểm: __kho (tên mục kho), __nhan (tệp trang nhận được, có nội dung), __soMoHop, __gan (tên ảnh
   đang gắn trong ô nhập), __cheDo ('image'|'video'), __phu ('khung-hinh'|'thanh-phan'), __dan (chữ đã dán).
+  Hành vi Flow thật thấy trong nhật ký 17/10/2026 (bật bằng tham số, mặc định tắt — tests/flow/gan-anh-video-main.js):
+    ?khoaNhap=ms ảnh ĐẦU TIÊN gắn vào ô nhập → ô nhập tạm khoá (contenteditable=false) trong ms mili giây lúc Flow xử lý ảnh
+                (engine thấy ô không gõ được → bỏ qua bước dán, không báo gì; __khoaNhap = số lần khoá).
+    ?giuNen=1   bấm "Thêm vào câu lệnh" → bảng kho đóng nhưng lớp nền tối .cdk-overlay-dark-backdrop.cdk-overlay-backdrop-showing
+                còn phủ cả trang (chuột bấm nút Tạo trúng lớp nền, lớp nền đóng, nút không nhận).
+    ?luoi=1     ảnh tải lên hiện trong lưới trang dự án, nhãn "<tên tệp>" (video quay màn hình 17/10/2026).
+    ?khoCham=ms ảnh vừa tải hiện ngay trong lưới dự án nhưng chỉ vào danh sách bảng kho [+] sau ms mili giây.
+    ?hopTai=1   nhận file xong Flow mở một hộp thoại lạ (role=dialog) — để kiểm app ghi được chữ của hộp thoại.
+    ?dongY=1    tài khoản chưa từng đồng ý: nhận file xong Flow mở hộp "Quyền sử dụng hình ảnh này" (chép từ 4 tệp chẩn đoán
+                người dùng gửi 17/10/2026: <flow-upload-consent-dialog> trong mat-dialog-container, lớp nền tối, nút Huỷ /
+                Tôi đồng ý). Ảnh CHỈ vào kho / lưới khi bấm "Tôi đồng ý" (__dongY = số lần bấm); Huỷ / Escape → bỏ ảnh.
+  Nút Tạo: bấm (chuột thật hay JS) khi ô nhập có chữ → __tao nhận { chu, anh }, ô nhập + ảnh gắn được dọn; ô nhập trống
+  thì bấm không ra gì (như Flow thật). Nút tắt khi ô nhập trống, bật khi có chữ.
 -->
 <flow-project-page>
   <!-- Thanh bên dự án — chép cấu trúc từ HTML thật (div[flow-sidenav-top] KHÔNG có class, nút mat-list-item). Dự án có cả ảnh
@@ -60,6 +73,7 @@
   <!-- Chép NGUYÊN khối flow-prompt-box từ trang thật (bỏ svg, thuộc tính _ngcontent / ripple / describedby); thêm id cho bài kiểm và #chips. -->
   <flow-prompt-box class="prompt-box-container"><!----><flow-prompt-box-instruction-card-wrapper><div class="wrapper-container"><!----><div class="prompt-box-content"><!----><flow-base-prompt-box><div cdkoverlayorigin="" class="base-prompt-box"><flow-border-glow class="loop"></flow-border-glow><div class="prompt-top-row"><!----><flow-rich-text-editor class="prompt-input"><span aria-hidden="true" class="prosemirror-placeholder">Bạn muốn tạo những gì?</span><!----><div class="prosemirror-editor"><div role="textbox" aria-multiline="true" aria-label="Bạn muốn tạo những gì?" contenteditable="true" translate="no" class="ProseMirror"><p><br class="ProseMirror-trailingBreak"></p></div></div></flow-rich-text-editor><!----><!----><!----><div class="top-right-actions"><div id="chips"></div></div></div><!----><!----><div class="bottom-controls"><flow-add-menu><div cdkoverlayorigin="" class="add-menu-container"><button maticonbutton="" type="button" aria-haspopup="true" class="mdc-icon-button mat-mdc-icon-button mat-mdc-button-base mat-mdc-tooltip-trigger add-menu-trigger mat-unthemed" id="nutThem" aria-label="Thêm thành phần vào ô nhập câu lệnh" aria-expanded="false"><span class="mat-mdc-button-persistent-ripple mdc-icon-button__ripple"></span><mat-icon role="img" class="mat-icon notranslate add-menu-icon google-symbols mat-icon-no-color" aria-hidden="true" data-mat-icon-type="font">add</mat-icon><!----><span class="mat-focus-indicator"></span><span class="mat-mdc-button-touch-target"></span></button><!----><!----></div><!----><!----><!----></flow-add-menu><!----><flow-agent-mode-toggle-chip bottomcontrolextra=""><button class="agent-mode-chip" aria-pressed="false"><!----><span class="agent-mode-chip-label">Tác nhân</span></button></flow-agent-mode-toggle-chip><!----><div class="submit-controls"><button matbutton="" flow-button="" aria-label="Điều kiện kích hoạt cài đặt" cdkoverlayorigin="" id="nutCaiDat" class="mdc-button mat-mdc-button-base settings-trigger-button mdc-button--unelevated mat-mdc-unelevated-button mat-unthemed flow-button-primary flow-button-small flow-button-no-touch-target"><span class="mat-mdc-button-persistent-ripple mdc-button__ripple"></span><span class="mdc-button__label"><span settingstriggercontent="" class="settings-summary" id="chuCaiDat"></span></span><!----><span class="mat-focus-indicator"></span><span class="mat-mdc-button-touch-target"></span><span class="mat-ripple mat-mdc-button-ripple"></span></button><!----><!----><!----><flow-generate-icon-button class="mat-mdc-tooltip-trigger"><button flow-icon-button="" maticonbutton="" type="submit" aria-label="Bắt đầu tạo" cdkoverlayorigin="" class="mdc-icon-button mat-mdc-icon-button mat-mdc-button-base generate-icon-button mat-mdc-button-disabled mat-unthemed flow-icon-button-secondary flow-button-small flow-icon-button-no-touch-target" disabled="true"><span class="mat-mdc-button-persistent-ripple mdc-icon-button__ripple"></span><!----><mat-icon role="img" class="mat-icon notranslate flow-icon-m mat-icon-rtl-mirror google-symbols mat-icon-no-color" aria-hidden="true" data-mat-icon-type="font">arrow_forward</mat-icon><!----><!----><span class="mat-focus-indicator"></span><span class="mat-mdc-button-touch-target"></span></button><!----></flow-generate-icon-button><!----><!----><!----></div></div></div></flow-base-prompt-box><!----></div></div></flow-prompt-box-instruction-card-wrapper><!----></flow-prompt-box>
   <flow-media-upload></flow-media-upload>
+  <div id="luoi" style="position:absolute;left:200px;top:240px;width:600px"></div>
   <!-- Thẻ video đã tạo (ảnh chụp 16/10): chuột phải / ⋯ → menu thẻ → Tải xuống → 270p · 720p · 1080p (khoá) · 4K (khoá). -->
   <div class="o-tai" id="oTai" style="position:absolute;left:200px;top:100px;width:186px;height:105px;background:#333">Du_an_4_347</div>
 </flow-project-page>
@@ -69,7 +83,10 @@
   const q = new URLSearchParams(location.search);
   const ANH = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFElEQVR4nGP8z8DwnwEJMDGgAQAy2wIDqvFBJQAAAABJRU5ErkJggg==';
   window.__kho = (q.get('kho') || '').split(',').filter(Boolean);
-  window.__nhan = []; window.__soMoHop = 0; window.__gan = []; window.__dan = [];
+  window.__nhan = []; window.__soMoHop = 0; window.__gan = []; window.__dan = []; window.__tao = [];
+  const KHOA_NHAP = +q.get('khoaNhap') || 0, GIU_NEN = q.get('giuNen') === '1', LUOI = q.get('luoi') === '1';
+  const KHO_CHAM = +q.get('khoCham') || 0, HOP_TAI = q.get('hopTai') === '1', DONG_Y = q.get('dongY') === '1';
+  window.__dongY = 0;
   window.__cheDo = q.get('cheDo') || 'image';
   window.__phu = 'khung-hinh';
   const oc = document.querySelector('.cdk-overlay-container');
@@ -109,7 +126,14 @@
     const x = pane.querySelector('.xem');
     x.innerHTML = chon ? `<img src="${ANH}" style="width:100%"><button class="them-cau">Thêm vào câu lệnh</button>` : '';
     const b = x.querySelector('.them-cau');
-    if (b) b.addEventListener('click', () => { ganVao(chon); dong(); });
+    if (b) b.addEventListener('click', () => {
+      ganVao(chon);
+      if (!GIU_NEN) { dong(); return; }
+      // Bảng đóng, lớp nền tối ở lại (nhật ký 17/10/2026 21:51).
+      oc.innerHTML = '<div class="cdk-overlay-backdrop cdk-overlay-dark-backdrop cdk-overlay-backdrop-showing" style="background:rgba(0,0,0,.4)"></div>';
+      nutThem.setAttribute('aria-expanded', 'false');
+      oc.querySelector('.cdk-overlay-backdrop').addEventListener('click', dong);
+    });
   }
   function ganVao(ten) {
     window.__gan.push(ten);
@@ -117,8 +141,34 @@
     c.className = 'chip';
     c.innerHTML = `<img src="${ANH}" alt="${ten}"><button aria-label="Xoá"><mat-icon>close</mat-icon></button>`;
     c.querySelector('button').addEventListener('click', () => { c.remove(); window.__gan.splice(window.__gan.indexOf(ten), 1); });
-    document.getElementById('chips').appendChild(c);
+    const chips = document.getElementById('chips');
+    const dau = !chips.children.length;
+    chips.appendChild(c);
+    if (KHOA_NHAP && dau) {
+      const o = document.querySelector('[role=textbox]');
+      o.setAttribute('contenteditable', 'false');
+      window.__khoaNhap = (window.__khoaNhap || 0) + 1;
+      setTimeout(() => o.setAttribute('contenteditable', 'true'), KHOA_NHAP);
+    }
   }
+  // ── Nút Tạo ───────────────────────────────────────────────────────────
+  const nutTao = document.querySelector('button.generate-icon-button');
+  const chuONhap = () => { const o = document.querySelector('[role=textbox]'); return o ? (o.innerText || '').trim() : ''; };
+  document.addEventListener('input', () => {
+    const co = !!chuONhap();
+    if (co) { nutTao.removeAttribute('disabled'); nutTao.classList.remove('mat-mdc-button-disabled'); }
+    else { nutTao.setAttribute('disabled', 'true'); nutTao.classList.add('mat-mdc-button-disabled'); }
+  }, true);
+  nutTao.addEventListener('click', () => {
+    const chu = chuONhap();
+    if (!chu) return;                       // ô nhập trống: Flow không làm gì
+    window.__tao.push({ chu, anh: window.__gan.slice() });
+    const o = document.querySelector('[role=textbox]');
+    o.innerHTML = '<p><br class="ProseMirror-trailingBreak"></p>';
+    document.getElementById('chips').innerHTML = '';
+    window.__gan = [];
+    nutTao.setAttribute('disabled', 'true');
+  });
   nutThem.addEventListener('click', () => {
     if (nutThem.getAttribute('aria-expanded') === 'true') { dong(); return; }
     chon = null;
@@ -134,11 +184,46 @@
       const i = document.createElement('input');
       i.type = 'file'; i.accept = 'image/*,video/*,audio/*'; i.multiple = true;
       i.addEventListener('change', async () => {
-        for (const f of i.files) {
-          if ((await f.arrayBuffer()).byteLength > 0) { window.__nhan.push(f.name); window.__kho.unshift(f.name); }
+        const ten = [];
+        for (const f of i.files) if ((await f.arrayBuffer()).byteLength > 0) { window.__nhan.push(f.name); ten.push(f.name); }
+        if (DONG_Y) {
+          const h = document.createElement('div');
+          h.setAttribute('popover', 'manual');
+          h.className = 'cdk-overlay-popover cdk-global-overlay-wrapper';
+          h.innerHTML = '<div class="cdk-overlay-backdrop cdk-overlay-dark-backdrop cdk-overlay-backdrop-showing" style="background:rgba(0,0,0,.5)"></div>' +
+            '<div class="cdk-overlay-pane mat-mdc-dialog-panel" style="left:420px;top:200px;width:360px"><mat-dialog-container class="mat-mdc-dialog-container mdc-dialog" role="dialog" aria-modal="false">' +
+            '<flow-upload-consent-dialog class="mat-mdc-dialog-component-host"><h2 mat-dialog-title="" class="mat-mdc-dialog-title mdc-dialog__title">Quyền sử dụng hình ảnh này</h2>' +
+            '<mat-dialog-content><p class="dialog-message">Hãy đảm bảo rằng bạn có <a href="#">các quyền cần thiết</a> đối với mọi nội dung hoặc tệp mà bạn tải lên…</p></mat-dialog-content>' +
+            '<mat-dialog-actions><button class="mdc-button huy"><span class="mdc-button__label">Huỷ</span></button><div class="agree-actions-group">' +
+            '<button class="mdc-button dong-y"><span class="mdc-button__label">Tôi đồng ý</span></button></div></mat-dialog-actions></flow-upload-consent-dialog></mat-dialog-container></div>';
+          oc.appendChild(h);
+          try { h.showPopover(); } catch (_) {}   // CDK mới mở lớp phủ bằng popover="manual" + showPopover()
+          const xong = (nhan) => { h.remove(); if (nhan) { window.__dongY++; vaoKho(ten); } };
+          h.querySelector('.dong-y').addEventListener('click', () => xong(true));
+          h.querySelector('.huy').addEventListener('click', () => xong(false));
+          h.querySelector('.cdk-overlay-backdrop').addEventListener('click', () => xong(false));
+          return;
         }
-        if (document.querySelector('.cdk-overlay-pane.kho')) veDs(document.querySelector('.cdk-overlay-pane.kho'));
+        vaoKho(ten);
       });
+      const vaoKho = (ten) => {
+        const vaoDs = () => {
+          for (const t of ten) window.__kho.unshift(t);
+          if (document.querySelector('.cdk-overlay-pane.kho')) veDs(document.querySelector('.cdk-overlay-pane.kho'));
+        };
+        if (KHO_CHAM) setTimeout(vaoDs, KHO_CHAM); else vaoDs();
+        if (LUOI) for (const t of ten) {
+          document.getElementById('luoi').insertAdjacentHTML('afterbegin',
+            `<div class="o-luoi" style="display:inline-block;width:120px;height:70px;background:#333;margin:4px"><span><mat-icon>image</mat-icon>${t}</span></div>`);
+        }
+        if (HOP_TAI) {
+          const h = document.createElement('div');
+          h.className = 'cdk-overlay-pane hop-tai';
+          h.style.cssText = 'left:420px;top:200px;width:300px';
+          h.innerHTML = '<div role="dialog" aria-modal="true"><h2>Không xử lý được tệp</h2><p>Định dạng tệp này chưa được hỗ trợ.</p><button>Đóng</button></div>';
+          oc.appendChild(h);
+        }
+      };
       window.__soMoHop++;
       i.click();
     });

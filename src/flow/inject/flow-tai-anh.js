@@ -19,6 +19,8 @@
 //    viTriTha()   → { ok, x, y } giữa ô nhập prompt (toạ độ khung nhìn, cho kéo-thả)
 //    dongMenu()   → đóng menu / popover đang mở (Escape)
 //    chanDoan()   → mô tả các nút quanh ô nhập — ghi vào nhật ký khi mọi cách đều hỏng
+//    sauTai()     → { hop: {chu, nut[]} | null, thongBao[] } hộp thoại / thông báo Flow hiện sau khi file vào (1.3.2)
+//    hopDongY()   → { co, tieuDe } hộp "Quyền sử dụng hình ảnh này" đang mở?   bamDongY() → bấm "Tôi đồng ý" (1.3.2)
 // ============================================================================
 
 (function () {
@@ -165,6 +167,64 @@
     return { oNhap: !!oNhap(), soInput: tatCa('input[type="file"]').length, nut: nut };
   }
 
+  // Sau khi file vào (1.3.2): Flow có hiện hộp thoại / thông báo gì không (xác nhận, cắt ảnh, lỗi định dạng…)?
+  // Nhật ký 17/10/2026: "Đã đưa 1 ảnh lên Flow" rồi 60 giây sau kho vẫn thiếu ảnh ở Flow 2/3/4/5 — chưa biết Flow nói gì.
+  // Bỏ qua bảng kho [+] (bảng có ô tìm kiếm) — đó không phải hộp thoại.
+  function sauTai() {
+    var hop = null;
+    var ds = tatCa('[role="dialog"], [role="alertdialog"], mat-dialog-container, .mat-mdc-dialog-container').filter(function (d) { return hien(d) || hopHien(d); });
+    for (var i = 0; i < ds.length && !hop; i++) {
+      var d = ds[i];
+      if (d.querySelector('input:not([type]), input[type="text"], input[type="search"]')) continue;
+      var chu = (d.innerText || '').replace(/\s+/g, ' ').trim();
+      if (!chu) continue;
+      hop = {
+        chu: chu.slice(0, 240),
+        nut: tatCa('button, [role="button"]', d).filter(hien).map(function (b) { var n = nhan(b); return (n.c || n.a || n.ic).slice(0, 30); }).filter(Boolean).slice(0, 8)
+      };
+    }
+    var tb = tatCa('[role="alert"], mat-snack-bar-container, .mat-mdc-snack-bar-container, simple-snack-bar, [aria-live="assertive"]').filter(hien)
+      .map(function (el) { return (el.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 160); }).filter(Boolean);
+    return { hop: hop, thongBao: tb.filter(function (x, k) { return tb.indexOf(x) === k; }).slice(0, 4) };
+  }
+
+  // Hộp "Quyền sử dụng hình ảnh này" (4 tệp chẩn đoán người dùng gửi 17/10/2026): Flow mở <flow-upload-consent-dialog>
+  // (mat-dialog, nút "Huỷ" / "Tôi đồng ý") ở tài khoản chưa từng đồng ý; ảnh CHỈ vào kho khi bấm "Tôi đồng ý".
+  // Bấm là người dùng xác nhận với Google họ có quyền với ảnh → app chỉ bấm khi người dùng bật công tắc trong Cài đặt.
+  var TIEU_DE_DONG_Y = /quyền sử dụng (hình ảnh|nội dung)|rights? to use|permission to use|use this (image|media)/i;
+  var NUT_DONG_Y = /^(tôi đồng ý|đồng ý|i agree|agree)$/i;
+  // Thẻ Angular (flow-upload-consent-dialog, mat-dialog-container) có thể là phần tử inline kích thước 0 → xét "đang hiện"
+  // theo tiêu đề / nút bên trong, không theo chính thẻ bọc.
+  function tieuDeHop(h) { return h.querySelector('h1, h2, h3, [mat-dialog-title], .mat-mdc-dialog-title'); }
+  function hopHien(h) {
+    var td = tieuDeHop(h);
+    return (td && hien(td)) || tatCa('button', h).some(hien);
+  }
+  function hopDongYEl() {
+    var ds = tatCa('flow-upload-consent-dialog').filter(hopHien);
+    if (ds.length) return ds[0];
+    var hop = tatCa('mat-dialog-container, [role="dialog"]').filter(hopHien);
+    for (var i = 0; i < hop.length; i++) {
+      var td = tieuDeHop(hop[i]);
+      if (td && TIEU_DE_DONG_Y.test((td.textContent || '').trim())) return hop[i];
+    }
+    return null;
+  }
+  function hopDongY() {
+    var h = hopDongYEl();
+    if (!h) return { co: false };
+    var td = tieuDeHop(h);
+    return { co: true, tieuDe: ((td && td.textContent) || '').replace(/\s+/g, ' ').trim().slice(0, 80) };
+  }
+  function bamDongY() {
+    var h = hopDongYEl();
+    if (!h) return { ok: false, lyDo: 'không thấy hộp' };
+    var b = tatCa('button, [role="button"]', h).filter(hien).find(function (x) { return NUT_DONG_Y.test((x.innerText || x.textContent || '').trim()); });
+    if (!b) return { ok: false, lyDo: 'không thấy nút Tôi đồng ý' };
+    bam(b);
+    return { ok: true, nut: (b.innerText || '').trim() };
+  }
+
   window.__flowTaiAnh = { timInput: timInput, bamTaiLen: bamTaiLen, moTabAnh: moTabAnh, moMenu: moMenu,
-    viTriTha: viTriTha, dongMenu: dongMenu, chanDoan: chanDoan };
+    viTriTha: viTriTha, dongMenu: dongMenu, chanDoan: chanDoan, sauTai: sauTai, hopDongY: hopDongY, bamDongY: bamDongY };
 })();

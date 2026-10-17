@@ -19,6 +19,7 @@
 //    danhDau()  → { o, muc }  đánh dấu ngay (bình thường tự chạy khi trang đổi)
 //    chup()     → { html }    HTML bảng đang mở + khối ô nhập (bỏ ảnh, script, style) — app lưu ra tệp
 //                             chẩn đoán khi tải / gắn ảnh hỏng, để sửa tiếp theo giao diện thật.
+//    trongLuoi([tên]) → [tên] những ảnh đã hiện trong lưới trang dự án (nhãn "<tên>.jpg") (1.3.2)
 // ============================================================================
 
 (function () {
@@ -133,6 +134,28 @@
     return { html: html.length > 400000 ? html.slice(0, 400000) : html, luc: new Date().toISOString(), url: location.pathname };
   }
 
-  window.__flowKhoAnh = { danhDau: danhDau, chup: chup };
+  // ── Ảnh đã nằm trong lưới dự án chưa (1.3.2) ───────────────────────────
+  //  Ảnh tải lên hiện ngay trong lưới trang dự án, nhãn là tên tệp ("004_112652.jpg" — video quay màn hình 17/10/2026).
+  //  Bảng [+] tìm không ra mà lưới có → Flow đã nhận ảnh, chỉ ô tìm kiếm của bảng chậm / lệch; lưới không có → Flow
+  //  chưa nhận ảnh. Chỉ đọc chữ, không bấm gì; bỏ qua mọi thứ nằm trong lớp nổi (bảng kho, menu, hộp thoại).
+  var DUOI = /\.(png|jpe?g|webp|gif|heic|heif|avif|bmp|tiff?)$/i;
+  function trongLuoi(ten) {
+    var can = {};
+    (ten || []).forEach(function (t) { can[String(t).toLowerCase()] = String(t); });
+    var thay = {};
+    var w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    for (var n = w.nextNode(); n; n = w.nextNode()) {
+      var chu = (n.nodeValue || '').trim();
+      if (chu.length > 170 || !DUOI.test(chu)) continue;
+      var goc = chu.replace(DUOI, '').toLowerCase();
+      if (!can[goc] || thay[goc]) continue;
+      var el = n.parentElement;
+      if (!el || el.closest('.cdk-overlay-container, [role="dialog"], [role="menu"], [role="listbox"]')) continue;
+      thay[goc] = can[goc];
+    }
+    return Object.keys(thay).map(function (k) { return thay[k]; });
+  }
+
+  window.__flowKhoAnh = { danhDau: danhDau, chup: chup, trongLuoi: trongLuoi };
   try { danhDau(); } catch (_) {}
 })();
