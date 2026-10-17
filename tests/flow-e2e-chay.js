@@ -43,6 +43,8 @@ module.exports = function e2eFlow({ win, app, LENH, dieuPhoi, taiKhoan }) {
       // 1) Mẻ ảnh Flow → mỗi ảnh xong tự tạo video ở MUSE.
       ghi('-- 1. Flow tạo ảnh (một mẻ) → Muse tạo video');
       let nk = LENH.trangThai().nhatKy.length;
+      // Flow tự mở lại dự án cũ "gia-cu" khi tab vào trang chủ lần đầu (xem trang Flow giả).
+      await session.fromPartition('persist:flow-flow-1').cookies.set({ url: process.env.FLOW_TEST_URL, name: 'flow_mo_du_an_cu', value: 'gia-cu' });
       LENH.them({ duAn: 'mac-dinh', loai: 'anh', nen: 'flow', tyLe: '9:16', prompts: ['con mèo', 'con chó', 'con gà'],
         chuoiVideo: { prompt: 'chuyển động nhẹ', nen: 'muse' }, chay: true });
       const anh1 = viec().filter((j) => j.nen === 'flow' && j.loai === 'anh');
@@ -69,7 +71,10 @@ module.exports = function e2eFlow({ win, app, LENH, dieuPhoi, taiKhoan }) {
       const flowUrlLuu = (duAnId, tkId) => (((dieuPhoi.o.store.get('duAn').duAn || []).find((d) => d.id === duAnId) || {}).flowUrl || {})[tkId] || '';
       const luu1 = flowUrlLuu('mac-dinh', 'flow-1');
       kiem(/\/project\//.test(luu1), `nhớ (đã LƯU) trang dự án Flow của dự án "Mặc định" ở tài khoản: ${luu1}`);
-      kiem(LENH.trangThai().nhatKy.some((d) => /Mở dự án Flow mới/.test(d.chu)), 'trang chủ Flow: bấm được nút "Dự án mới" có biểu tượng chữ đứng trước');
+      kiem(LENH.trangThai().nhatKy.some((d) => /Mở dự án Flow mới/.test(d.chu)), 'trang chủ Flow: bấm được nút NỔI "+ Dự án mới" (position:fixed) có biểu tượng chữ đứng trước');
+      kiem(!luu1.includes('gia-cu') && LENH.trangThai().nhatKy.some((d) => /dự án Flow cũ — về trang chủ/.test(d.chu)),
+        'Flow mở lại dự án cũ → app về trang chủ, tạo dự án MỚI (không dùng dự án cũ)');
+      await session.fromPartition('persist:flow-flow-1').cookies.remove(process.env.FLOW_TEST_URL, 'flow_mo_du_an_cu');
       kiem(video1.length === 3 && video1.every((j) => j.nen === 'muse' && j.trangThai === 'xong' && j.taiKhoan === 'tk-1' && /\.mp4$/.test(j.files[0] || '')),
         'mỗi ảnh Flow sinh đúng 1 video chạy ở MUSE, xong có file .mp4');
       const gui1 = (await daGui()).filter((g) => /chuyển động nhẹ/.test(g.prompt));

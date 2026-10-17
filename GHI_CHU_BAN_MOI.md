@@ -1,4 +1,12 @@
-# AI Automation Studio 1.3.0
+# AI Automation Studio 1.3.1
+
+- **Sửa lỗi Flow không tạo được dự án mới** (nhật ký 17/10/2026 18:00: cả 7 tài khoản Flow báo *"Không vào được trang dự án Flow sau 120 giây"*, tab nằm ở trang chủ Flow, rồi mọi ảnh chuyển sang Muse). Từ bản 1.3.0, mỗi dự án của tool chạy trên một dự án Flow mới, nên app phải tự bấm nút **"+ Dự án mới"** ở trang chủ Flow. Nút này nổi giữa đáy trang, mà cách app kiểm "nút có đang hiện không" lại bỏ qua mọi phần tử nổi kiểu đó, nên app không bao giờ thấy nút. Giờ app kiểm theo kích thước thật trên màn hình và bấm được nút.
+- Nếu Flow tự mở lại một dự án cũ khi tab vào trang chủ, app tự về trang chủ (như bấm nút ngôi nhà) rồi bấm **"+ Dự án mới"**, không dùng dự án cũ.
+- Nếu vẫn không vào được dự án, nhật ký ghi tới 30 nút đang thấy trên trang (trước đây chỉ 12) để dễ tìm lỗi.
+
+Lưu ý: đã kiểm trên trang Flow giả dựng theo ảnh trang chủ Flow thật của bạn (nút nổi giữa đáy), chưa chạy trên Flow thật.
+
+## Bản 1.3.0
 
 Bản này chỉ phát hành cho **Windows**. Máy Mac giữ bản cũ (app báo *"chưa có file cho máy này"*) cho tới khi có bản macOS.
 
