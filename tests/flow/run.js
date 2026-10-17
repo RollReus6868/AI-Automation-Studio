@@ -2254,6 +2254,19 @@ test('nhật ký 17/10/2026 23:30 (1.3.2): tải lại ảnh sau khi bấm "Tôi
   assert.ok(/batDauNghi\(tab\.accountId, NGHI_HET_TIN_DUNG_MS/.test(mf) && /NGHI_HET_TIN_DUNG_MS = 3 \* 3600000/.test(mf), 'hết tín dụng → tài khoản nghỉ 3 giờ');
 });
 
+test('1.3.2 trang 404?reason=project (dự án Flow đã nhớ bị xoá): nhận ra, quên địa chỉ cũ, tạo dự án mới', () => {
+  const s = fs.readFileSync(path.join(__dirname, '../../src/flow/luong-flow.js'), 'utf8');
+  const la = eval(s.match(/const LA_404_DU_AN = (.*);\n/)[1]);
+  for (const u of ['https://flow.google.com/404?reason=project', 'https://flow.google.com/404', 'https://labs.google/fx/vi/tools/flow/404?reason=project'])
+    assert.ok(la(u), u);
+  for (const u of ['https://flow.google.com/', 'https://flow.google.com/project/404abc', 'https://flow.google.com/project/37c0b52d-240f-438b-b59b-9866f9fe1cba'])
+    assert.ok(!la(u), u);
+  const d = s.slice(s.indexOf('async _damBaoTab('), s.indexOf('async _ganAnh('));
+  assert.ok(/LA_404_DU_AN\(url\)/.test(d) && /this\.luuUrl\(this\.taiKhoan\.id, ''\)/.test(d) && /canMoi = true/.test(d) && /loadURL\(FLOW_URL\)/.test(d));
+  const m = fs.readFileSync(path.join(__dirname, '../../main.js'), 'utf8');
+  assert.ok(/if \(!url\) \{[\s\S]{0,200}dieuPhoi\.boFlowTen\(tkId, duAnId\)/.test(m), 'quên cả ảnh trong dự án Flow đã bị xoá');
+});
+
 // ── Kết luận ───────────────────────────────────────────────────────────────
 (async () => {
 await Promise.all(choAsync);

@@ -94,6 +94,8 @@ const sv = http.createServer((req, res) => {
     setTimeout(() => { res.setHeader('content-type', 'text/html; charset=utf-8'); res.end(trangSuno); }, suno.treoKiem);
     return;
   }
+  // 1.3.2: dự án Flow đã bị xoá bên Flow → Flow chuyển sang trang 404?reason=project (nhật ký người dùng 18/10/2026).
+  if (req.url.startsWith('/fx/') && /\/project\/da-xoa/.test(req.url)) { res.writeHead(302, { location: '/fx/vi/tools/flow/404?reason=project' }); res.end(); return; }
   if (req.url.startsWith('/fx/')) { res.setHeader('content-type', 'text/html; charset=utf-8'); res.end(trangFlow); return; }
   if (req.url.startsWith('/signin/')) { res.setHeader('content-type', 'text/html; charset=utf-8'); res.end('<!doctype html><title>Đăng nhập Google giả</title><input type=email>'); return; }
   if (req.method === 'POST' && req.url === '/__gui') {

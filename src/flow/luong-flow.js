@@ -59,6 +59,8 @@ const BAM_DU_AN_MOI = `(() => {
   nut.click();
   return nut.tagName.toLowerCase() + ' "' + chu(nut).slice(0, 40) + '"';
 })()`;
+/** Trang "không có dự án" của Flow: flow.google.com/404?reason=project (dự án đã bị xoá / không thuộc tài khoản). */
+const LA_404_DU_AN = (url) => /^https?:\/\/[^/]+\/(fx\/[^/]+\/(tools\/flow\/)?)?404(\/|\?|#|$)/i.test(url) || /[?&]reason=project\b/i.test(url);
 // Hết giờ mà chưa vào được dự án: chụp lại thứ đang thấy để lần sau đọc nhật ký là biết vì sao.
 const CHAN_DOAN_TRANG = `(() => { ${HIEN} return {
   url: location.href,
@@ -135,7 +137,7 @@ class LuongFlow {
     let lanBam = 0, ngoaiFlow = 0, daBamMoi = false, veTrangChu = 0;
     // 1.3.0: dự án của app chưa có dự án Flow riêng trên tài khoản này → phải TỰ TẠO dự án mới (bấm "+ Dự án mới"
     // ở trang chủ), không nhận dự án cũ Flow tự mở lại.
-    const canMoi = !this.taiKhoan.flowUrl;
+    let canMoi = !this.taiKhoan.flowUrl, daBao404 = false;
     // Tab cũ còn nằm ở trang chủ mà tài khoản đã có dự án (người dùng vừa đăng nhập + bấm Xong) → mở thẳng dự án.
     const urlNay = wc.getURL();
     if (this.taiKhoan.flowUrl && urlNay && !/\/project\//.test(urlNay)) wc.loadURL(this.taiKhoan.flowUrl).catch(() => {});
@@ -147,6 +149,20 @@ class LuongFlow {
         // Google đưa sang trang đăng nhập → tài khoản chưa đăng nhập Flow.
         if (++ngoaiFlow >= 8 && /accounts\.google\.com|signin|ServiceLogin/i.test(url)) return { canDangNhap: true };
       } else ngoaiFlow = 0;
+      // 1.3.2 (nhật ký 18/10/2026 01:34): dự án Flow đã nhớ bị xoá trên Flow → Flow chuyển sang trang
+      // flow.google.com/404?reason=project ("Quay lại dự án"), tab nằm đó 120 giây. Giờ bỏ địa chỉ cũ (ảnh trong
+      // dự án đó cũng mất theo), về trang chủ Flow và bấm "+ Dự án mới".
+      if (url && !wc.isLoading() && LA_404_DU_AN(url) && !daBao404) {
+        daBao404 = true;
+        const cu = this.taiKhoan.flowUrl;
+        this.log('warning', `🗑 [${this.id}] Dự án Flow đã lưu không còn nữa (Flow báo 404${cu ? `: ${cu}` : ''}) — có thể đã bị xoá trên Flow. Tạo dự án Flow mới.`);
+        this.taiKhoan.flowUrl = '';
+        this.luuUrl(this.taiKhoan.id, '');
+        canMoi = true;
+        wc.loadURL(FLOW_URL).catch(() => {});
+        await cho(2000);
+        continue;
+      }
       if (t.ready) {
         const coONhap = await wc.executeJavaScript(CO_O_NHAP, true).catch(() => false);
         if (coONhap && canMoi && !daBamMoi && /\/project\//.test(url) && veTrangChu < 2) {

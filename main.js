@@ -215,6 +215,12 @@ function taoLuong(tk, stt, duAnId) {
       thuMucChanDoan: process.env.MUSE_DATA_DIR ? path.join(app.getPath('userData'), 'chan-doan-flow')
         : path.join(app.getPath('documents'), 'AI Automation Studio', 'chan-doan-flow'),
       docAnh, luuUrl: (tkId, url) => {
+        if (!url) {
+          // Dự án Flow đã lưu không còn (Flow báo 404): quên địa chỉ + ảnh đã tải lên dự án đó (phải tải lại).
+          if (duAnId) dieuPhoi.boFlowTen(tkId, duAnId); else taiKhoan.sua(tkId, { flowUrl: '' });
+          baoTrangThai();
+          return;
+        }
         if (duAnId) {
           if (dieuPhoi.datFlowUrl(duAnId, tkId, url)) log('info', `📁 Dự án "${tenDa}" chạy trên dự án Flow riêng của "${tk.ten}": ${url}`);
         } else {
