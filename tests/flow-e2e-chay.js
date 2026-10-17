@@ -213,7 +213,7 @@ module.exports = function e2eFlow({ win, app, LENH, dieuPhoi, taiKhoan }) {
       await cho(xongHet(v7c), 120000, 'chạy khi dự án Flow đã bị xoá');
       const url7c = flowUrlLuu(d7id, 'flow-1');
       inViec(v7c);
-      kiem(v7c.every((j) => j.trangThai === 'xong') && /\/project\//.test(url7c) && !/da-xoa/.test(url7c) && Date.now() - t7c < 60000,
+      kiem(v7c.every((j) => j.trangThai === 'xong') && /\/project\//.test(url7c) && !/da-xoa|\/404/.test(url7c) && Date.now() - t7c < 60000,
         `trang 404 → tự tạo dự án Flow mới, việc xong (${url7c}, ${Math.round((Date.now() - t7c) / 1000)} giây)`);
       kiem(LENH.trangThai().nhatKy.slice(nk).some((d) => /Dự án Flow đã lưu không còn nữa \(Flow báo 404/.test(d.chu)), 'nhật ký nói rõ dự án Flow đã lưu không còn');
       kiem(v7b.every((j) => !j.flowTen), 'quên tên ảnh nằm trong dự án Flow đã bị xoá (video Flow sẽ tải ảnh lên lại)');
