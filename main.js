@@ -310,9 +310,15 @@ async function daDangNhapFlow(tk) {
   } catch (_) { return false; }
 }
 
-async function kiemTaiKhoan(id) {
+async function kiemTaiKhoan(id, nguoiBam = false) {
   const tk = taiKhoan.tim(id);
   if (!tk) return null;
+  // Người dùng tự bấm Kiểm tra = muốn thử lại: bỏ mốc "Muse chặn video" (lần chạy sau thử tạo video lại).
+  // Không bỏ ở lần kiểm tự động lúc mở app — không thì mỗi lần mở app lại phí một lượt gửi video bị chặn.
+  if (nguoiBam && (tk.chanVideoDen || 0) > Date.now()) {
+    taiKhoan.sua(id, { chanVideoDen: 0 });
+    log('info', `👤 "${tk.ten}": đã bỏ đánh dấu "Muse chặn video" — lần chạy sau thử tạo video lại ở tài khoản này`);
+  }
   if (tk.nen === 'flow') {
     const co = await daDangNhapFlow(tk);
     taiKhoan.sua(id, { trangThai: co ? 'da-dang-nhap' : 'can-dang-nhap' });
@@ -527,7 +533,7 @@ const LENH = {
     log('warning', `🚪 Đã đăng xuất "${tk.ten}"`);
     baoTrangThai();
   },
-  kiemTaiKhoan: ({ id }) => kiemTaiKhoan(id),
+  kiemTaiKhoan: ({ id }) => kiemTaiKhoan(id, true),
   capNhatToken: () => capNhatToken(),
   xoaChatTaiKhoan: ({ id }) => xoaChat(id),
   /** Xoá chat Muse của các việc đã chọn (việc nào còn đường dẫn chat). */
@@ -571,6 +577,14 @@ const LENH = {
     dieuPhoi.datCaiDat({ thuMucVideoAnh: r.filePaths[0], videoCanhAnh: false });
     return r.filePaths[0];
   },
+  /** 1.2.9: thư mục lưu video "Ảnh xong → tự tạo video" RIÊNG của một dự án (trang Tạo ảnh). */
+  chonThuMucVideoDuAn: async ({ id }) => {
+    const r = await dialog.showOpenDialog(win, { title: 'Thư mục lưu video tạo từ ảnh của dự án này', properties: ['openDirectory', 'createDirectory'] });
+    if (r.canceled || !r.filePaths[0]) return null;
+    dieuPhoi.datThuMucVideoDuAn(id, r.filePaths[0]);
+    return r.filePaths[0];
+  },
+  boThuMucVideoDuAn: ({ id }) => dieuPhoi.datThuMucVideoDuAn(id, ''),
   chonThuMucRa: async ({ loai }) => {
     const r = await dialog.showOpenDialog(win, { properties: ['openDirectory', 'createDirectory'] });
     if (r.canceled || !r.filePaths[0]) return null;

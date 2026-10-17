@@ -142,6 +142,10 @@
                   <select id="tyLeVideoChuoi"><option value="">Giống ảnh</option><option>9:16</option><option>16:9</option><option>1:1</option><option>4:3</option><option>3:4</option></select>
                 </label>
               </div>
+              <div class="thu-muc-video-du-an">
+                <b>Lưu video của dự án này vào</b>
+                <div class="dong-o"><button class="nut-vien nho" id="nutThuMucVideoDuAn"><i data-icon="folder-open"></i>Chọn thư mục</button><span class="mo" id="ghiThuMucVideoDuAn"></span><button class="lien-ket" id="boThuMucVideoDuAn" title="Bỏ thư mục riêng, dùng Cài đặt chung" hidden>Bỏ</button></div>
+              </div>
             </div>
           </div>
 
@@ -330,7 +334,7 @@
         </div>
         <div class="the-cai">
           <h3><i data-icon="download"></i>Tải về &amp; dọn dẹp</h3>
-          <div class="dong-cong-tac"><div><b>Video tạo từ ảnh lưu cạnh ảnh, cùng tên</b><small>Ảnh xong → tự tạo video (Flow ⇄ Muse): video tải về ngay cạnh ảnh nguồn, ví dụ <code>325.jpg</code> → <code>325.mp4</code>. Tắt: lưu vào thư mục chọn ở dưới (vẫn cùng tên ảnh); chưa chọn thì theo thư mục và mẫu tên của trang Tạo video.</small></div><label class="cong-tac"><input type="checkbox" id="cdVideoCanhAnh"><span></span></label></div>
+          <div class="dong-cong-tac"><div><b>Video tạo từ ảnh lưu cạnh ảnh, cùng tên</b><small>Ảnh xong → tự tạo video (Flow ⇄ Muse): video tải về ngay cạnh ảnh nguồn, ví dụ <code>325.jpg</code> → <code>325.mp4</code>. Tắt: lưu vào thư mục chọn ở dưới (vẫn cùng tên ảnh); chưa chọn thì theo thư mục và mẫu tên của trang Tạo video. Dự án đã chọn thư mục riêng ở trang Tạo ảnh (mục <i>Ảnh xong → tự tạo video</i>) thì luôn lưu vào thư mục của dự án đó.</small></div><label class="cong-tac"><input type="checkbox" id="cdVideoCanhAnh"><span></span></label></div>
           <div class="o-thu-muc-video" id="khoiThuMucVideoAnh"><b>Thư mục lưu video tạo từ ảnh</b>
             <div class="dong-o"><input id="cdThuMucVideoAnh" readonly placeholder="Chưa chọn — theo thư mục của trang Tạo video"><button class="nut-vien nho" id="cdChonThuMucVideoAnh"><i data-icon="folder-open"></i>Chọn…</button><button class="nut-vien nho" id="cdMoThuMucVideoAnh">Mở</button><button class="nut-vien nho" id="cdBoThuMucVideoAnh" title="Bỏ thư mục riêng">Bỏ</button></div></div>
           <div class="dong-cong-tac"><div><b>Chạy xong thì tự xoá chat Muse</b><small>Chạy hết hàng chờ → xoá đoạn chat trên muse.ai của các việc đã xong (file đã tải vẫn giữ, không khôi phục được chat).</small></div><label class="cong-tac"><input type="checkbox" id="cdXoaChat"><span></span></label></div>

@@ -1039,12 +1039,59 @@ testAsync('Muse chặn video (403) ở một tài khoản → tài khoản đó 
   await chayHet(dp);
   assert.ok(dp.viec.every((j) => j.trangThai === 'xong' && j.taiKhoan === 'hai' && !j.thu), dp.viec.map((j) => j.trangThai + j.taiKhoan + j.thu).join());
   assert.strictEqual(daChay.filter((x) => x[0] === 'tk-1' && x[1] === 'video').length, 1, 'chỉ phí đúng MỘT lần ở tài khoản bị chặn');
-  assert.ok(nhatKy.some((x) => /thôi nhận việc video/.test(x)));
+  assert.ok(nhatKy.some((x) => /thôi nhận VIDEO 24 giờ \(vẫn tạo ảnh\)/.test(x)), nhatKy.filter((x) => /403/.test(x)).join(' | '));
   assert.ok(!dp._nghi('tk-1'), 'không nghỉ cả tài khoản');
   dp.them({ loai: 'anh', prompts: ['a1'] });
   dp.chayTatCa();
   await chayHet(dp);
   assert.strictEqual(dp.viec.find((j) => j.loai === 'anh').taiKhoan, 'tk-1', 'ảnh vẫn chạy ở tài khoản chính');
+  // 1.2.9: mốc chặn video lưu TRÊN TÀI KHOẢN (~24 giờ) — bấm Chạy lần sau (xoá nghiLoai) vẫn không gửi video vào tk-1.
+  const a1 = tk.tim('tk-1');
+  assert.ok(a1.chanVideoDen > Date.now() + 23 * 3600e3 && a1.chanVideoDen <= Date.now() + 24 * 3600e3, String(a1.chanVideoDen - Date.now()));
+  assert.ok(/403/.test(a1.lyDoChanVideo));
+  dp.them({ loai: 'video', prompts: ['v4'] });
+  dp.chayTatCa();
+  await chayHet(dp);
+  assert.strictEqual(daChay.filter((x) => x[0] === 'tk-1' && x[1] === 'video').length, 1, 'lần chạy sau không phí thêm lượt video ở tài khoản bị chặn');
+  assert.strictEqual(dp.viec.find((j) => j.prompt === 'v4').taiKhoan, 'hai');
+  tk.sua('tk-1', { chanVideoDen: 0 });                       // bấm Kiểm tra (main.js) = bỏ mốc
+  assert.ok(!dp._nghiLoai('tk-1', 'video') && !tk.tim('tk-1').lyDoChanVideo);
+});
+test('1.2.9: Kiểm tra do NGƯỜI DÙNG bấm mới bỏ mốc "Muse chặn video"; lần kiểm tự động lúc mở app thì giữ', () => {
+  const m = docNguon('main.js');
+  assert.ok(/kiemTaiKhoan: \(\{ id \}\) => kiemTaiKhoan\(id, true\)/.test(m), 'nút Kiểm tra phải truyền nguoiBam');
+  assert.ok(/if \(nguoiBam && \(tk\.chanVideoDen \|\| 0\) > Date\.now\(\)\) \{\s*taiKhoan\.sua\(id, \{ chanVideoDen: 0 \}\)/.test(m));
+  assert.ok(/await kiemTaiKhoan\(a\.id\); \}/.test(m), 'cập nhật token tự động không được bỏ mốc');
+  const a = docNguon('src/ui/app.js');
+  assert.ok(/veHanMuc\(a\.hanMuc\) \+ veChanVideo\(a\)/.test(a), 'thẻ tài khoản Muse chưa hiện mốc chặn video');
+});
+test('1.2.9: thư mục video "Ảnh xong → tự tạo video" RIÊNG từng dự án — ưu tiên hơn cài đặt chung, dự án khác không bị ảnh hưởng', () => {
+  const { dp } = dungDieuPhoi();
+  const d1 = dp.duAn[0], d2 = dp.taoDuAn('Hai', []);
+  dp.datCaiDat({ thuMucAnh: '/anh', thuMucVideo: '/video', videoCanhAnh: true });
+  assert.ok(dp.datThuMucVideoDuAn(d1.id, '  /video-du-an-1 ').ok);
+  assert.strictEqual(d1.thuMucVideoAnh, '/video-du-an-1');
+  const xong = (d, ten) => {
+    dp.them({ duAn: d.id, loai: 'anh', prompts: [ten], chuoiVideo: { prompt: 'đi bộ' } });
+    const a = dp.viec[dp.viec.length - 1];
+    Object.assign(a, { trangThai: 'chay', taiKhoan: 'tk-1' });
+    dp._ketThuc(a, { ok: true, files: [{ mime: 'image/png', b64: 'AA==' }] }, null);
+    const v = dp.viec.find((j) => j.tuAnh === a.id);
+    Object.assign(v, { trangThai: 'chay', taiKhoan: 'tk-1' });
+    dp._ketThuc(v, { ok: true, files: [{ mime: 'video/mp4', b64: 'AA==' }] }, null);
+    return [a.files[0], v.files[0]];
+  };
+  const [anh1, video1] = xong(d1, 'p1');
+  assert.strictEqual(path.dirname(video1), path.normalize('/video-du-an-1'), video1);
+  assert.strictEqual(path.basename(video1, '.mp4'), path.basename(anh1, path.extname(anh1)), 'video cùng tên ảnh');
+  const [anh2, video2] = xong(d2, 'p2');
+  assert.strictEqual(path.dirname(video2), path.dirname(anh2), 'dự án chưa chọn thư mục → theo cài đặt chung (cạnh ảnh)');
+  assert.ok(dp.datThuMucVideoDuAn(d1.id, '').ok && !('thuMucVideoAnh' in d1), 'Bỏ → về cài đặt chung');
+  const m = docNguon('main.js'), h = docNguon('src/ui/index.html'), a = docNguon('src/ui/app.js');
+  assert.ok(/chonThuMucVideoDuAn: async \(\{ id \}\)/.test(m) && /boThuMucVideoDuAn: \(\{ id \}\)/.test(m));
+  const khu = h.slice(h.indexOf('id="khuChuoi"'), h.indexOf('id="nangCao"'));
+  assert.ok(/id="nutThuMucVideoDuAn"/.test(khu) && /id="ghiThuMucVideoDuAn"/.test(khu), 'nút chọn thư mục phải nằm trong mục "Ảnh xong → tự tạo video" của trang Tạo ảnh');
+  assert.ok(/api\.call\('chonThuMucVideoDuAn', \{ id: d\.id \}\)/.test(a) && /api\.call\('boThuMucVideoDuAn', \{ id: d\.id \}\)/.test(a));
 });
 test('1.2.0 mục Tài khoản: thẻ riêng Muse / Google Flow / Suno, mỗi thẻ chỉ hiện tài khoản và nút Thêm của nơi đó', () => {
   const h = docNguon('src/ui/index.html'), a = docNguon('src/ui/app.js');
