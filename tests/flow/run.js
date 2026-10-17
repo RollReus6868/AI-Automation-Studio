@@ -2256,7 +2256,7 @@ test('nhật ký 17/10/2026 23:30 (1.3.2): tải lại ảnh sau khi bấm "Tôi
 
 test('1.3.2 trang 404?reason=project (dự án Flow đã nhớ bị xoá): nhận ra, quên địa chỉ cũ, tạo dự án mới', () => {
   const s = fs.readFileSync(path.join(__dirname, '../../src/flow/luong-flow.js'), 'utf8');
-  const la = eval(s.match(/const LA_404_DU_AN = (.*);\n/)[1]);
+  const la = eval(s.match(/const LA_404_DU_AN = (.*);\r?\n/)[1]);
   for (const u of ['https://flow.google.com/404?reason=project', 'https://flow.google.com/404', 'https://labs.google/fx/vi/tools/flow/404?reason=project'])
     assert.ok(la(u), u);
   for (const u of ['https://flow.google.com/', 'https://flow.google.com/project/404abc', 'https://flow.google.com/project/37c0b52d-240f-438b-b59b-9866f9fe1cba'])
