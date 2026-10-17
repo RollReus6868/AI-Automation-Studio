@@ -314,9 +314,27 @@
   //    __flowBamTaoKiem()    — so với trạng thái trước: đã ăn chưa.
   let truocBamThat = null;
 
-  window.__flowBamTaoChuanBi = function (tuyChon) {
+  // Lớp nổi của Flow (menu / bảng / hộp thoại Angular CDK) còn mở thì phủ lên nút Tạo: chuột thật bấm trúng lớp
+  // nền trong suốt chứ không trúng nút (nhật ký 17/10/2026: "Tâm nút Tạo đang bị lớp khác che" rồi "Flow không nhận").
+  const LOP_NOI = '.cdk-overlay-container, [role="dialog"], [role="menu"], [role="listbox"], [data-radix-popper-content-wrapper]';
+  function moTaLop(el) {
+    if (!el) return '';
+    const cls = String(el.className || '').trim().replace(/\s+/g, '.');
+    const chu = (el.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 40);
+    return '<' + (el.tagName || '').toLowerCase() + (cls ? '.' + cls.slice(0, 80) : '') + '>' + (chu ? ' "' + chu + '"' : '');
+  }
+  function doNut(el) {
+    try { el.scrollIntoView({ block: 'center', behavior: 'instant' }); } catch (_) {}
+    const r = el.getBoundingClientRect();
+    const x = r.left + r.width / 2, y = r.top + r.height / 2;
+    let o2 = null;
+    try { o2 = document.elementFromPoint(x, y); } catch (_) {}
+    return { x, y, o2, trung: !o2 || o2 === el || el.contains(o2) || o2.contains(el) };
+  }
+
+  window.__flowBamTaoChuanBi = async function (tuyChon) {
     const o = tuyChon || {};
-    const { el, via } = timNut(o.selector || null);
+    let { el, via } = timNut(o.selector || null);
     if (!el) {
       return { ok: false, error: 'Không tìm thấy nút Tạo trên trang Flow.', debug: window.__flowBamTaoDebug() };
     }
@@ -325,18 +343,27 @@
       return { ok: false, wasDisabled: true, via, nut: taNut(el), truoc,
         error: 'Nút Tạo đang bị Flow tắt (disabled) — chưa bấm được.', loiTrenTrang: docLoiTrenTrang() };
     }
-    try { el.scrollIntoView({ block: 'center', behavior: 'instant' }); } catch (_) {}
-    const r = el.getBoundingClientRect();
-    const x = r.left + r.width / 2, y = r.top + r.height / 2;
-    // Tâm nút có bị lớp khác đè lên không? Bị đè thì chuột thật bấm trúng lớp
-    // đè, không phải nút — nói ra thay vì bấm bừa.
-    let trung = true;
-    try {
-      const o2 = document.elementFromPoint(x, y);
-      trung = !!o2 && (o2 === el || el.contains(o2) || o2.contains(el));
-    } catch (_) {}
+    // Tâm nút có bị lớp khác đè lên không? Bị đè thì chuột thật bấm trúng lớp đè, không phải nút.
+    let d = doNut(el), che = '', daGo = '';
+    if (!d.trung) {
+      che = moTaLop(d.o2);
+      // Lớp đè là menu / bảng nổi còn mở → đóng nó (Escape + bấm lớp nền, như người dùng bấm ra ngoài) rồi đo lại.
+      if (d.o2 && d.o2.closest && d.o2.closest(LOP_NOI)) {
+        for (let lan = 0; lan < 2 && !d.trung && d.o2 && d.o2.closest && d.o2.closest(LOP_NOI); lan++) {
+          const nen = d.o2.classList && d.o2.classList.contains('cdk-overlay-backdrop') ? d.o2 : document.querySelector('.cdk-overlay-backdrop');
+          const esc = { key: 'Escape', code: 'Escape', keyCode: 27, which: 27, bubbles: true, cancelable: true };
+          try { document.body.dispatchEvent(new KeyboardEvent('keydown', esc)); } catch (_) {}
+          try { if (nen && nen.isConnected) nen.click(); } catch (_) {}
+          await new Promise((r) => setTimeout(r, 500));
+          if (!el.isConnected) ({ el, via } = timNut(o.selector || null));
+          if (!el) return { ok: false, error: 'Không tìm thấy nút Tạo trên trang Flow.', debug: window.__flowBamTaoDebug() };
+          d = doNut(el);
+        }
+        daGo = che;
+      }
+    }
     truocBamThat = { truoc, el, sel: o.selector || null };
-    return { ok: true, x, y, trung, via, nut: taNut(el), truoc,
+    return { ok: true, x: d.x, y: d.y, trung: d.trung, che, daGo, via, nut: taNut(el), truoc,
       khung: { w: window.innerWidth, h: window.innerHeight } };
   };
 

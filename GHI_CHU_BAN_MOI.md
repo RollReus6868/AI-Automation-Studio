@@ -1,4 +1,14 @@
-# AI Automation Studio 1.2.7
+# AI Automation Studio 1.2.8
+
+- **Sửa lỗi Flow bị báo lỗi và cho nghỉ oan trong khi Flow vẫn tạo bình thường** (nhật ký 17/10/2026 12:03). Có hai chỗ hỏng:
+  - **Đổi Video ⇄ Hình ảnh bấm nhầm thanh bên của Flow.** Khi dự án Flow đã có cả ảnh lẫn video, thanh bên trái của Flow hiện hai mục lọc *Hình ảnh* và *Video*. App tưởng đó là bảng chọn chế độ nên bấm vào mục lọc, không mở bảng cài đặt thật. Flow vẫn ở chế độ Video, app báo *"Đã bấm nút image 3 lần nhưng giao diện Flow không đổi"* rồi cho tài khoản nghỉ 15 phút (Flow 1, Flow 6 ULTRA, Flow 7 Ultra). Lưới dự án còn bị lọc theo loại. Giờ app không bao giờ bấm thanh bên hay bảng kho [+] khi đổi chế độ, chỉ bấm trong bảng cài đặt cạnh ô nhập.
+  - **Nút Tạo bị một menu còn mở che.** Nhật ký ghi *"Tâm nút Tạo đang bị lớp khác che"* rồi *"Flow không nhận"*, sau 60 giây thì báo *"Google Flow không đẻ ra thẻ nào"* và cho tài khoản nghỉ (Flow 2, 3, 5). Giờ nếu một menu / bảng nổi của Flow còn mở đè lên nút Tạo, app đóng nó trước rồi mới bấm. Nhật ký ghi tên lớp đã che để dễ kiểm tra tiếp.
+- Hai lỗi trên làm mọi tài khoản Flow lần lượt bị cho nghỉ, nên app chuyển các ảnh còn lại sang Muse (*"Flow → Muse: mọi tài khoản Flow của dự án đều đang lỗi / nghỉ"*). Những ảnh đã chuyển sang Muse trong lần chạy đó vẫn ở Muse.
+- Lưu ý: thẻ lỗi *"Chúng tôi nhận thấy có hoạt động bất thường…"* trên Flow 4 là cảnh báo của chính Google, không phải lỗi app. App vẫn cho tài khoản đó nghỉ như cũ.
+
+Lưu ý: đã kiểm trên trang Flow giả dựng lại thanh bên theo HTML trang thật của bạn, chưa chạy trên Flow thật. Lần đầu hãy chạy vài ảnh và vài video lẫn nhau rồi gửi lại Nhật ký.
+
+## Bản 1.2.7
 
 - **Sửa lỗi Flow tạo ảnh xong mà không tải về được** (nhật ký 17/10/2026: *"Media 1/1 lỗi: Không chọn được chất lượng tải xuống"* ở mọi lần thử, cả Flow 1, 2, 3). Lỗi do bản **1.2.3** gây ra: để bỏ qua mục 1080p / 4K bị khoá, bản đó ẩn **mọi mục đang mờ** trong menu *Tải xuống* và không bao giờ hiện lại. Menu tải ảnh của Flow lúc mới mở có các mục còn mờ một lúc (Flow đang chuẩn bị file), nên cả **1K, 2K, 4K đều bị ẩn**, app không còn mục nào để bấm. Giờ:
   - Mục chỉ bị coi là khoá khi có chữ / nút **Nâng cấp**, hoặc còn mờ trong lúc mục khác đã sáng. Mờ hết = Flow đang chuẩn bị, app không ẩn gì.
