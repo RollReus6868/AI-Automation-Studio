@@ -660,6 +660,28 @@ test('1.3.0 xoá chat Muse: dò cả giao diện mới (liên kết /thread/, n�
   const m = docNguon('main.js');
   assert.ok(/chan-doan-muse/.test(m) && /luuChanDoanMuse\(/.test(m.slice(m.indexOf('async function xoaChat('), m.indexOf('async function donDep('))));
 });
+test('1.3.2 xoá chat Muse: nhận ra đã xoá bằng id nút ⋯ (danh sách nạp bù nên số hàng không đổi), xét HÀNG chứa nút (nút ẩn tới khi rê chuột)', () => {
+  const s = docNguon('src/inject/muse-trang.js');
+  const x = s.slice(s.indexOf('function daXoa('), s.indexOf('const thongBaoMuse'));
+  assert.ok(/document\.getElementById\(chup\.idNut\)/.test(x) && /conHien\(hangCuaNut\(b\)\)/.test(x) && !/conHien\(b\)/.test(x), 'không xét chính nút ⋯ (display:none khi chưa rê chuột)');
+  assert.ok(/con \* 2 >= chup\.idKhac\.length/.test(x), 'Muse vẽ lại cả danh sách (mất hết id) thì không tin là đã xoá');
+  const h = s.slice(s.indexOf('async function xoaHang('), s.indexOf('async function diemXoa('));
+  assert.ok(/cho\(\(\) => daXoa\(h, chup\), 15000\)/.test(h) && !/hangGoc\(\)\.length < truoc/.test(h));
+  assert.ok(/hopLoi = /.test(h) && /thongBaoMuse\(\)/.test(h), 'chẩn đoán giữ HTML hộp xác nhận + thông báo Muse');
+});
+test('1.3.2 xoá chat Muse: bấm JavaScript không xoá được → tiến trình chính bấm chuột thật (rê vào hàng cho nút ⋯ hiện, rồi bấm)', () => {
+  const m = docNguon('main.js');
+  const x = m.slice(m.indexOf('async function xoaChat('), m.indexOf('async function donDep('));
+  assert.ok(/nenThuChuotThat\(r\)/.test(x) && /xoaChatChuotThat\(wc, \{ dangMo \}\)/.test(x) && /chuotThat = true/.test(x));
+  const t = docNguon('src/main/xoa-chat-muse.js');
+  const i = t.indexOf("reChuotThat(wc, hang.x, hang.y)"), k = t.indexOf("choDiem('nutHien'"), b = t.indexOf("bamChuotThat(wc, nut.x, nut.y)");
+  assert.ok(i > 0 && k > i && b > k, 'rê chuột thật vào hàng TRƯỚC khi tìm nút ⋯');
+  const { nenThuChuotThat } = require('../src/main/xoa-chat-muse');
+  for (const loi of ['xoa-xong-nhung-danh-sach-khong-doi', 'xoa-xong-nhung-danh-sach-khong-doi · Muse báo: x', 'khong-mo-duoc-menu', 'khong-thay-nut-xac-nhan'])
+    assert.ok(nenThuChuotThat({ ok: false, loi }), loi);
+  for (const r of [{ ok: true }, { ok: false, loi: 'menu-khong-co-delete: Pin' }, { ok: false, loi: 'khong-thay-chat' }, null])
+    assert.ok(!nenThuChuotThat(r), JSON.stringify(r));
+});
 test('trình trợ giúp kết thúc bằng undefined; (executeJavaScript không phải sao chép hàm)', () => {
   assert.ok(/\nundefined;\s*$/.test(docNguon('src/inject/muse-trang.js', true)));
 });

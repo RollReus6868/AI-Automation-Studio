@@ -391,11 +391,34 @@ module.exports = function e2e({ win, app, LENH, dieuPhoi }) {
         /menu-khong-co-delete/.test(fs.readFileSync(r14h.chanDoan, 'utf8')) && (await dsThread()).length === sau14.length,
         `menu Muse không có mục Delete → không xoá gì, lưu tệp chẩn đoán (${r14h && r14h.loi})`);
       await tk1.cookies.remove(process.env.MUSE_URL, 'muse_xoa_hong');
+      // 1.3.2 (HTML thật 18/10/2026): Muse bỏ qua cú bấm JavaScript ở nút ⋯ / Delete / xác nhận → app bấm chuột thật.
+      // Danh sách giả chỉ hiện 3 chat, xoá thì nạp bù (số hàng không đổi) — đúng kiểu Muse thật.
+      await tk1.cookies.set({ url: process.env.MUSE_URL, name: 'muse_xoa_that', value: '1' });
+      const jv2 = viec().find((j) => j.loai === 'video' && j.trangThai === 'xong' && j.thread);
+      const nkThat = LENH.trangThai().nhatKy.length;
+      const r14t = jv2 ? await LENH.xoaChatViec({ ids: [jv2.id] }) : null;
+      const sau14t = await dsThread();
+      kiem(r14t && r14t.ok && r14t.da === 1 && sau14t.length === sau14.length - 1 &&
+        LENH.trangThai().nhatKy.slice(nkThat).some((d) => /🖱 .*chuyển sang bấm chuột thật/.test(d.chu)),
+        `Muse bỏ qua cú bấm JavaScript → xoá chat của việc bằng chuột thật (${sau14.length} → ${sau14t.length})`);
+      await tk1.cookies.remove(process.env.MUSE_URL, 'muse_xoa_that');
       await tk1.cookies.set({ url: process.env.MUSE_URL, name: 'muse_xoa_moi', value: '1' });
       const r14b = await LENH.xoaChatTaiKhoan({ id: 'tk-1' });
       const con14 = await dsThread();
-      kiem(r14b && r14b.ok && r14b.da === sau14.length && con14.length === 0, `giao diện chat phụ KIỂU MỚI: xoá toàn bộ chat (${r14b && r14b.da} cái), không còn chat nào`);
+      kiem(r14b && r14b.ok && r14b.da === sau14t.length && con14.length === 0, `giao diện chat phụ KIỂU MỚI: xoá toàn bộ chat (${r14b && r14b.da} cái), không còn chat nào`);
       await tk1.cookies.remove(process.env.MUSE_URL, 'muse_xoa_moi');
+      // Xoá toàn bộ trên danh sách kiểu thật (nạp bù) — lần đầu bằng JavaScript, rồi khi Muse bỏ qua JavaScript.
+      const taoChat = async (n) => { for (let i = 0; i < n; i++) await net.fetch(`${process.env.MUSE_URL}/__gui`, { method: 'POST', body: JSON.stringify({ prompt: `chat thử xoá ${i}`, soFile: 0, thread: `xoa${Date.now()}${i}`, t0: Date.now() }) }); };
+      await taoChat(5);
+      const r14c = await LENH.xoaChatTaiKhoan({ id: 'tk-1' });
+      kiem(r14c && r14c.ok && r14c.da === 5 && !r14c.hong && (await dsThread()).length === 0,
+        `danh sách kiểu thật (3 hàng, nạp bù khi xoá): xoá đủ 5/5 chat, không báo nhầm "danh sách không đổi" (${r14c && (r14c.loi || r14c.da)})`);
+      await taoChat(5);
+      await tk1.cookies.set({ url: process.env.MUSE_URL, name: 'muse_xoa_that', value: '1' });
+      const r14d = await LENH.xoaChatTaiKhoan({ id: 'tk-1' });
+      kiem(r14d && r14d.ok && r14d.da === 5 && !r14d.hong && (await dsThread()).length === 0,
+        `Muse bỏ qua cú bấm JavaScript: xoá toàn bộ 5/5 chat bằng chuột thật (${r14d && (r14d.loi || r14d.da)})`);
+      await tk1.cookies.remove(process.env.MUSE_URL, 'muse_xoa_that');
 
       // 15) Tài khoản chính + dự phòng: chọn trong hộp "Dự án mới"; chính lỗi → việc sang dự phòng NGAY;
       //     chính lỗi 2 việc liền → nghỉ, việc sau chạy thẳng dự phòng; tài khoản ngoài dự án không đụng tới.

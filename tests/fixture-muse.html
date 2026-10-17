@@ -1,6 +1,8 @@
 <!doctype html>
 <html><head><meta charset="utf-8"><title>Muse giả</title>
-<style>body{font-family:sans-serif;background:#111;color:#eee} textarea{width:400px;height:60px} img,video{max-width:200px}</style>
+<style>body{font-family:sans-serif;background:#111;color:#eee} textarea{width:400px;height:60px} img,video{max-width:200px}
+[role=menu],[role=dialog],[role=alertdialog]{position:fixed;top:120px;left:420px;background:#222;padding:8px;z-index:9}
+.hang-that .nut-an{display:none} .hang-that:hover .nut-an{display:flex}</style>
 </head><body>
 <!--
   TRANG MUSE GIẢ cho kiểm thử — dựng lại đúng các thuộc tính đã đo trên muse.ai (10/10/2026).
@@ -109,7 +111,9 @@ function moMenu() {
   const m = document.createElement('div');
   m.setAttribute('role', 'menu');
   m.innerHTML = L.menu.map((t) => `<div role="menuitem">${t}</div>`).join('');
-  m.lastElementChild.addEventListener('click', () => {
+  const THAT = document.cookie.includes('muse_xoa_that=1');
+  m.lastElementChild.addEventListener('click', (e) => {
+    if (THAT && !e.isTrusted) return;
     m.remove();
     const d = document.createElement('div');
     d.setAttribute('role', 'dialog');
@@ -143,14 +147,28 @@ async function veDsChat() {
     }
     return;
   }
-  o.innerHTML = '<div data-testid="hatch-thread-row" role="button">Main chat</div>' + ds.map((t) =>
-    `<div data-testid="hatch-thread-row" role="button" data-id="${t.thread}" ${t.thread === dangMo ? 'aria-current="page"' : ''}>${t.tieuDe}` +
-    '<span><button type="button" aria-label="More thread actions" aria-haspopup="menu" data-pel-click="chat_thread_options_open">⋯</button></span></div>').join('');
-  for (const h of o.querySelectorAll('[data-id]')) {
-    h.addEventListener('click', () => { history.pushState({}, '', '/thread/' + h.dataset.id); veThread(h.dataset.id); });
-    h.querySelector('button').addEventListener('pointerdown', () => moMenuChat(h.dataset.id));
-  }
+  // 1.3.2 — đúng HTML thật người dùng gửi 18/10/2026: hàng KHÔNG có href / data-id; tên trong span[title];
+  // nút ⋯ "More thread actions" có id radix-_r_xx_ (giữ nguyên khi vẽ lại) và bị ẩn (display:none) tới khi rê
+  // chuột vào hàng; hàng là context-menu-trigger. Danh sách nạp dần: chỉ hiện TRANG chat đầu (+ chat đang mở),
+  // xoá một chat thì chat kế được nạp bù → SỐ HÀNG KHÔNG ĐỔI (app cũ đếm hàng nên tưởng chưa xoá).
+  // Cookie muse_xoa_that=1: nút ⋯, mục Delete, nút xác nhận BỎ QUA cú bấm JavaScript (isTrusted = false).
+  const TRANG = 3, THAT = document.cookie.includes('muse_xoa_that=1');
+  const hien = ds.filter((t, i) => i < TRANG || t.thread === dangMo);
+  o.innerHTML = `<div data-testid="hatch-thread-row" role="button" tabindex="0" ${dangMo ? '' : 'aria-current="page"'} data-pel-click="chat_thread_options_open"><div><p><span title="Main chat">Main chat</span></p></div></div>` +
+    hien.map((t) => `<div data-testid="hatch-thread-row" role="button" tabindex="0" class="hang-that" ${t.thread === dangMo ? 'aria-current="page"' : ''} draggable="false" data-state="closed" data-slot="context-menu-trigger" data-pel-click="chat_thread_options_open">` +
+    `<div><p><span title="${t.tieuDe}">${t.tieuDe}</span></p></div><span>11m</span><div class="nut-an"><span class="contents">` +
+    `<button aria-label="More thread actions" data-slot="dropdown-menu-trigger" type="button" id="${idNutChat(t.thread)}" aria-haspopup="menu" aria-expanded="false" data-state="closed" data-pel-click="chat_thread_options_open">⋯</button></span></div></div>`).join('');
+  [...o.querySelectorAll('.hang-that')].forEach((h, i) => {
+    const id = hien[i].thread;
+    h.addEventListener('click', () => { history.pushState({}, '', '/thread/' + id); veThread(id); });
+    const b = h.querySelector('button');
+    b.addEventListener('pointerdown', (e) => { if (!THAT || e.isTrusted) moMenuChat(id); });
+    // Như Muse thật: bấm chuột thật vào ⋯ chỉ mở menu, không chuyển sang chat (chỉ cú click JavaScript trần mới nổi lên hàng).
+    b.addEventListener('click', (e) => { if (e.isTrusted) e.stopPropagation(); });
+  });
 }
+const ID_NUT_CHAT = new Map();
+const idNutChat = (t) => { if (!ID_NUT_CHAT.has(t)) ID_NUT_CHAT.set(t, `radix-_r_${(0x2a0 + ID_NUT_CHAT.size * 2).toString(36)}_`); return ID_NUT_CHAT.get(t); };
 function moMenuChatMoi(id) {
   const m = document.createElement('div');
   m.setAttribute('role', 'menu');
@@ -177,13 +195,16 @@ function moMenuChat(id) {
   const m = document.createElement('div');
   m.setAttribute('role', 'menu');
   m.innerHTML = '<div role="menuitem" data-pel-click="chat_thread_pin_click">Pin</div><div role="menuitem" data-pel-click="chat_thread_delete_open">Delete</div>';
-  m.lastElementChild.addEventListener('click', () => {
+  const THAT = document.cookie.includes('muse_xoa_that=1');
+  m.lastElementChild.addEventListener('click', (e) => {
+    if (THAT && !e.isTrusted) return;
     m.remove();
     const d = document.createElement('div');
     d.setAttribute('role', 'dialog');
     d.innerHTML = '<h2>Delete side chat?</h2><button data-pel-click="chat_thread_delete_cancel">Cancel</button><button data-pel-click="chat_thread_delete_confirm">Delete</button>';
     d.firstElementChild.nextElementSibling.onclick = () => d.remove();
-    d.lastElementChild.onclick = async () => {
+    d.lastElementChild.onclick = async (e) => {
+      if (THAT && !e.isTrusted) return;
       await fetch('/__xoa', { method: 'POST', body: JSON.stringify({ thread: id }) });
       d.remove();
       if (location.pathname.endsWith('/' + id)) { history.pushState({}, '', '/'); veKhung(''); } else veDsChat();
