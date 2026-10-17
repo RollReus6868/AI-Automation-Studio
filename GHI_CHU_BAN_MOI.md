@@ -1,4 +1,12 @@
-# AI Automation Studio 1.2.9
+# AI Automation Studio 1.2.10
+
+- **Sửa lỗi video Flow bị tải về thừa, thành nhiều file trùng tên `_2`, `_3`…** (lần chạy 17/10/2026, từ video `280` trở đi: `280_2.mp4`, `280_3.mp4`, `298_6.mp4`, `304_9.mp4`…). App **không nhập sai số prompt**, tên `280.mp4` vẫn là video tạo từ ảnh `280.png`. Lỗi nằm ở bước tải về của Flow: để tìm video vừa tạo, Flow lọc bằng ô *Tìm kiếm* theo đầu câu prompt. Mọi video tạo từ ảnh dùng chung một câu prompt, nên ô tìm kiếm trả về cả các video cũ đã tạo trước đó trong cùng dự án Flow của tài khoản, và app tải hết về, đặt tên `_2`, `_3`… Càng về sau dự án Flow càng có nhiều video cũ nên số file thừa tăng dần. Lỗi chỉ xảy ra với video **chạy ở Flow** (từ khoảng 280, khi Muse lỗi và video chuyển sang Flow); video chạy ở Muse không bị.
+  - Giờ khi Flow tải về nhiều file hơn số bản mỗi prompt, app bỏ các file trùng hệt kết quả đã có, chỉ giữ video mới (video mới nhất luôn được tải về đầu tiên), xoá file thừa và ghi vào nhật ký *"bỏ N file thừa"*. Nếu chỉ tải được video cũ, việc báo lỗi và chạy lại chứ không nhận nhầm.
+  - Các file `_2`, `_3`… đã có trong thư mục Videos là bản sao của video khác, app không tự xoá.
+
+Lưu ý: đã kiểm bằng bài kiểm mô phỏng đúng thứ tự file trong nhật ký của bạn và trang Flow giả, chưa chạy trên Flow thật. Lần chạy tới hãy để ý nhật ký có dòng *"bỏ … file thừa"* và thư mục Videos không còn file `_2`.
+
+## Bản 1.2.9
 
 - **Mỗi dự án có thư mục lưu video riêng.** Ở trang **Tạo ảnh**, bật *Ảnh xong → tự tạo video*, mục mới **Lưu video của dự án này vào** → *Chọn thư mục*. Video tạo từ ảnh của dự án đó lưu vào đúng thư mục này (vẫn cùng tên ảnh, `049.jpg` → `049.mp4`). Mỗi dự án chọn riêng, không ảnh hưởng dự án khác. Bấm *Bỏ* thì dự án về theo Cài đặt chung (mặc định: lưu cạnh ảnh nguồn).
 - **Muse chặn tạo video theo khu vực**: tài khoản Muse nào báo *chặn khu vực / lỗi 403* khi tạo video thì app **nhớ 24 giờ** (kể cả khi tắt app, bấm Chạy lại), không gửi video vào tài khoản đó nữa mà chỉ dùng nó tạo **ảnh**. Video chuyển sang tài khoản Muse khác còn tạo được, hết tài khoản Muse thì sang Flow (khi bật *Muse ⇄ Flow* trong Cài đặt → Chạy). Thẻ tài khoản ở mục Tài khoản hiện dòng đỏ *"Muse chặn tạo video ở khu vực của tài khoản này"*. Bấm **Kiểm tra** ở tài khoản để thử tạo video lại sớm. Trước đây mỗi lần bấm Chạy app lại gửi thử video vào từng tài khoản bị chặn, phí thời gian.

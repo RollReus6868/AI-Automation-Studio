@@ -1103,6 +1103,53 @@ testAsync('an toàn: nghỉ hạ nhiệt — chạy thật LuongFlow: engine d�
   }
 });
 
+testAsync('tải về: engine tải cả video CŨ cùng prompt (ô Tìm kiếm Flow) → chỉ giữ video mới, xoá file thừa', async () => {
+  // Nhật ký 17/10/2026: video nối từ ảnh dùng chung một prompt → "Đã bốc 4 thẻ từ bộ lọc Search" → 280.mp4,
+  // 280_2.mp4 (= video 285), 280_3.mp4 (= video 074)… lưu vào thư mục người dùng.
+  const { LuongFlow } = require('../../src/flow/luong-flow');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fs-thua-'));
+  const url = 'https://labs.google/fx/vi/tools/flow/project/thu';
+  const wc = { isDestroyed: () => false, getURL: () => url, isLoading: () => false, executeJavaScript: async () => true };
+  const tab = { id: 'flow1', ready: true, view: { webContents: wc } };
+  const tabs = { find: () => tab, taoTab: () => tab, dispatch: async () => ({ ok: true }) };
+  const may = { chuanBiMe: async (_t, s) => ({ ok: true, caiDat: s }) };
+  const ghi = (ten, noiDung) => { const p = path.join(dir, ten); fs.writeFileSync(p, noiDung); return p; };
+  const chayMot = async (dsTai, fileCu) => {
+    let giao; const daGiao = new Promise((r) => { giao = r; });
+    tabs.dispatch = async (_id, m) => { if (m.action === 'START_AUTOMATION') giao(m); return { ok: true }; };
+    const l = new LuongFlow({ id: 'L1', taiKhoan: { id: 'tk', ten: 'TK', flowUrl: url }, tabs, may, thuMucTam: dir });
+    const kq = new Map();
+    const j = { so: 642, loai: 'video', tyLe: '9:16', prompt: 'cung mot prompt' };
+    const chay = l.chayMe([j], { caiDat: {}, tenFile: () => 'Du_an_642', anhCua: () => [], capNhat: () => {},
+      fileCu: () => fileCu, xong: (v, r) => kq.set(v.so, r) });
+    await daGiao;
+    for (const p of dsTai) tab.onTai(p);
+    tab.onBang([{ index: 1, status: 'COMPLETED', downloaded: true, totalVideos: dsTai.length }], { isRunning: false });
+    await chay;
+    return kq.get(642);
+  };
+  try {
+    const cu285 = ghi('285.mp4', 'video-285'), cu074 = ghi('074.mp4', 'video-074-dai-hon');
+    // Thứ tự engine tải: mới nhất trước — video mới, rồi 285, rồi 074.
+    const a = [ghi('Du_an_642_1.mp4', 'video-280-moi'), ghi('Du_an_642_2.mp4', 'video-285'), ghi('Du_an_642_3.mp4', 'video-074-dai-hon')];
+    let r = await chayMot(a, [cu285, cu074]);
+    assert.ok(r && r.ok, 'việc phải xong');
+    assert.deepStrictEqual(r.files.map((f) => path.basename(f.duongDan)), ['Du_an_642_1.mp4'], 'chỉ giữ video mới');
+    assert.ok(!fs.existsSync(a[1]) && !fs.existsSync(a[2]), 'file thừa phải bị xoá khỏi thư mục tạm');
+    assert.ok(fs.existsSync(cu285) && fs.existsSync(cu074), 'không được đụng kết quả cũ của việc khác');
+    // Video cũ đứng ĐẦU (thứ tự lạ) nhưng trùng hệt kết quả đã có → vẫn giữ đúng video mới.
+    const b = [ghi('Du_an_642_1.mp4', 'video-285'), ghi('Du_an_642_2.mp4', 'video-280-moi'), ghi('Du_an_642_3.mp4', 'video-cu-khong-con-tren-dia')];
+    r = await chayMot(b, [cu285, cu074]);
+    assert.deepStrictEqual(r.files.map((f) => path.basename(f.duongDan)), ['Du_an_642_2.mp4'], 'phải bỏ file trùng kết quả cũ rồi giữ video mới');
+    // Chỉ tải về được video cũ → không nhận nhầm là xong.
+    const c = [ghi('Du_an_642_1.mp4', 'video-074-dai-hon')];
+    r = await chayMot([c[0], ghi('Du_an_642_2.mp4', 'video-285')], [cu285, cu074]);
+    assert.ok(r && !r.ok, 'chỉ có video cũ thì việc phải báo lỗi để chạy lại');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 // ── Model video (2.8.0) ────────────────────────────────────────────────────
 const modelKH = require('../../src/flow/main/model');
 const LP = 'Veo 3.1 - Lite [Lower Priority]';
