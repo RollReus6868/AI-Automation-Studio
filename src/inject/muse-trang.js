@@ -363,47 +363,137 @@
   // ── Xoá đoạn chat (đo 12/10/2026 ở 1280×800: danh sách chat phụ ghim bên trái) ───────────
   // Mỗi chat là [data-testid=hatch-thread-row] (chat đang mở có aria-current=page), các hàng là anh
   // em cùng cha; nút ⋯ nằm TRONG hàng. "Main chat" không có nút ⋯ → không xoá được, tự bỏ qua.
-  const nutChat = (h) => h && ($('button[data-pel-click="chat_thread_options_open"]', h) || $('button[aria-haspopup="menu"]', h));
-  const hangChat = () => $$('[data-testid="hatch-thread-row"]').filter(nutChat);
+  // 1.3.0 (ảnh chụp người dùng 17/10/2026: "Side chats", menu ⋯ = Pin / Rename / Archive / Delete) — xoá chat
+  // không còn chạy. Chưa có HTML thật nên dò THÊM đường dự phòng không cần thuộc tính data-*: hàng = liên kết
+  // /thread/<id> ngoài khung tin nhắn; nút ⋯ có thể chỉ hiện khi rê chuột (gửi sự kiện rê chuột trước);
+  // mục menu / nút xác nhận nhận theo CHỮ "Delete" / "Xoá" (cả hộp role=alertdialog); menu mở bằng
+  // pointerdown, không mở thì bấm đủ (click). Hỏng thì trả HTML khung danh sách + menu để chẩn đoán.
+  const XOA = /^\s*(delete|xoá|xóa)(\s+(chat|side chat|đoạn chat|cuộc trò chuyện))?\s*$/i;
+  const chuCua = (e) => String((e && (e.innerText || e.textContent)) || '').trim();
+  const nutTrongVung = (h) => h && ($('button[data-pel-click="chat_thread_options_open"]', h) || $('button[aria-haspopup="menu"]', h) ||
+    $$('button,[role="button"]', h).find((b) => b !== h && (/^(more|options|tuỳ chọn|tùy chọn|thêm)/i.test(nhan(b)) || /^(⋯|…|\.\.\.)$/.test(chuCua(b)))));
+  /** Hàng + các thẻ bọc nó mà vẫn chỉ chứa ĐÚNG một chat (nút ⋯ có thể nằm cạnh liên kết, trong thẻ bọc hàng). */
+  const vungHang = (h) => {
+    const ds = [h];
+    if (!h || !h.matches('a[href*="/thread/"]')) return ds;
+    for (let e = h.parentElement, i = 0; e && e !== document.body && i < 3 && e.querySelectorAll('a[href*="/thread/"]').length === 1; e = e.parentElement, i++) ds.push(e);
+    return ds;
+  };
+  const nutTrongHang = (h) => { for (const v of vungHang(h)) { const b = nutTrongVung(v); if (b) return b; } return null; };
+  const laTrongKhungTin = (e) => !!e.closest('[role="log"],[data-message-role]');
+  /** Hàng chat phụ: theo thuộc tính đã đo; không có thì theo liên kết /thread/<id> (Muse đổi giao diện). */
+  const hangGoc = () => {
+    const theoMa = $$('[data-testid="hatch-thread-row"]');
+    if (theoMa.length) return theoMa;
+    // Hàng = chính liên kết; nút ⋯ tìm trong liên kết và các thẻ bọc chỉ chứa nó (vungHang). Đừng leo lên thẻ
+    // bọc làm hàng: còn MỘT chat thì thẻ bọc là cả khung danh sách, rê chuột vào đó không hiện nút ⋯ của hàng.
+    return $$('a[href*="/thread/"]').filter((a) => !laTrongKhungTin(a) && !/\/thread\/new\b/.test(a.getAttribute('href') || ''));
+  };
+  function reChuot(h) {
+    const o = { bubbles: true, cancelable: true, pointerType: 'mouse', isPrimary: true };
+    for (const e of vungHang(h).reverse()) {
+      for (const [ten, Kieu] of [['pointerover', PointerEvent], ['pointerenter', PointerEvent], ['mouseover', MouseEvent], ['mouseenter', MouseEvent], ['pointermove', PointerEvent], ['mousemove', MouseEvent]]) {
+        try { e.dispatchEvent(new Kieu(ten, o)); } catch (_) {}
+      }
+    }
+  }
+  const nutChat = (h) => nutTrongHang(h);
+  const hangChat = () => hangGoc().filter(nutChat);
+  const maThread = (h) => {
+    const a = h && (h.matches('a[href*="/thread/"]') ? h : $('a[href*="/thread/"]', h));
+    return (a && ((a.getAttribute('href') || '').match(/\/thread\/([^/?#]+)/) || [])[1]) || (h && h.getAttribute('data-id')) || '';
+  };
+  /** Hàng chat phụ (kể cả hàng chỉ hiện nút ⋯ khi rê chuột). */
+  async function cacHang() {
+    let ds = hangChat();
+    if (ds.length) return ds;
+    const goc = hangGoc();
+    if (!goc.length) return [];
+    for (const h of goc) reChuot(h);
+    await ngu(300);
+    ds = hangChat();
+    return ds;
+  }
   const dongMenu = () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+  const menuMo = () => $$('[role="menu"]').pop();
+  const mucXoa = () => $('[role="menu"] [data-pel-click="chat_thread_delete_open"]') ||
+    $$('[role="menu"] [role="menuitem"], [role="menu"] button').find((e) => XOA.test(chuCua(e)));
+  const nutXacNhan = () => $('[role="dialog"] [data-pel-click="chat_thread_delete_confirm"], [role="alertdialog"] [data-pel-click="chat_thread_delete_confirm"]') ||
+    $$('[role="alertdialog"] button, [role="dialog"] button').filter((b) => XOA.test(chuCua(b)) || XOA.test(nhan(b))).pop();
+  let loiCuoi = '', menuLoi = '';
 
   async function xoaHang(h) {
-    const truoc = hangChat().length;
-    // Menu Radix mở bằng pointerdown. KHÔNG bắn click: click nổi lên hàng → Muse chuyển sang chat đó.
-    nutChat(h).dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, button: 0, pointerType: 'mouse', isPrimary: true }));
-    const muc = await cho(() => $('[role="menu"] [data-pel-click="chat_thread_delete_open"]'), 5000);
-    if (!muc) { dongMenu(); return false; }
+    const truoc = hangGoc().length, ma = maThread(h);
+    let nut = nutChat(h);
+    if (!nut) { reChuot(h); nut = await cho(() => nutChat(h), 2000); }
+    if (!nut) { loiCuoi = 'khong-thay-nut-3-cham'; return false; }
+    // Menu Radix mở bằng pointerdown. KHÔNG bắn click trước: click nổi lên hàng → Muse chuyển sang chat đó.
+    nut.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, button: 0, pointerType: 'mouse', isPrimary: true }));
+    let muc = await cho(mucXoa, 1500);
+    if (!muc && !menuMo()) { bam(nut); muc = await cho(mucXoa, 3500); }
+    if (!muc) {
+      loiCuoi = menuMo() ? `menu-khong-co-delete: ${chuCua(menuMo()).replace(/\s+/g, ' | ').slice(0, 120)}` : 'khong-mo-duoc-menu';
+      menuLoi = menuMo() ? menuMo().outerHTML.slice(0, 100000) : '';   // giữ HTML menu trước khi đóng — cho tệp chẩn đoán
+      dongMenu(); return false;
+    }
     bam(muc);
-    const ok = await cho(() => $('[role="dialog"] [data-pel-click="chat_thread_delete_confirm"]'), 5000);
-    if (!ok) { dongMenu(); return false; }
-    ok.click();
-    // Xoá xong = danh sách ngắn đi (KHÔNG dựa vào hàng rời DOM: Muse vẽ lại danh sách là hàng cũ rời ngay).
-    return !!(await cho(() => hangChat().length < truoc, 15000));
+    const ok = await cho(nutXacNhan, 5000);
+    if (ok) ok.click();
+    else if (!(await cho(() => hangGoc().length < truoc, 1500))) { loiCuoi = 'khong-thay-nut-xac-nhan'; dongMenu(); return false; }
+    // Xoá xong = danh sách ngắn đi, hoặc không còn hàng của chat đó (KHÔNG dựa vào hàng rời DOM: Muse vẽ lại
+    // danh sách là hàng cũ rời ngay).
+    const xong = await cho(() => hangGoc().length < truoc || (ma && !hangGoc().some((x) => maThread(x) === ma)), 15000);
+    if (!xong) loiCuoi = 'xoa-xong-nhung-danh-sach-khong-doi';
+    return !!xong;
+  }
+
+  /** HTML gọn của khung danh sách chat + menu / hộp thoại đang mở — để chẩn đoán khi xoá không được. */
+  function chanDoanXoa() {
+    const goc = hangGoc()[0];
+    let khung = goc;
+    for (let i = 0; khung && i < 6 && khung.parentElement && khung.parentElement !== document.body; i++) khung = khung.parentElement;
+    const lay = (e) => (e ? e.outerHTML.slice(0, 200000) : '');
+    return {
+      url: location.href, loi: loiCuoi, soHang: hangGoc().length, soHangCoNut: hangChat().length,
+      danhSach: lay(khung || $('[data-testid="hatch-side-chats-panel-content"]') || $('nav') || $('aside')),
+      menu: [menuLoi, ...$$('[role="menu"],[role="dialog"],[role="alertdialog"]').map(lay)].filter(Boolean).join('\n')
+    };
   }
 
   /** Xoá chat đang mở (mở /thread/<id> trước). */
   async function xoaChatDangMo() {
-    const h = await cho(() => hangChat().find((x) => x.getAttribute('aria-current') === 'page'), 20000);
-    if (!h) return { ok: false, loi: 'khong-thay-chat' };
-    return (await xoaHang(h)) ? { ok: true } : { ok: false, loi: 'xoa-khong-duoc' };
+    loiCuoi = ''; menuLoi = '';
+    const ma = (location.pathname.match(/\/thread\/([^/?#]+)/) || [])[1] || '';
+    const tim = () => hangGoc().find((x) => x.getAttribute('aria-current') === 'page' || $('[aria-current="page"]', x) || (ma && maThread(x) === ma));
+    const h = await cho(tim, 20000);
+    if (!h) return { ok: false, loi: 'khong-thay-chat', chanDoan: chanDoanXoa() };
+    return (await xoaHang(h)) ? { ok: true } : { ok: false, loi: loiCuoi || 'xoa-khong-duoc', chanDoan: chanDoanXoa() };
   }
 
   /** Xoá lần lượt mọi chat phụ trong danh sách, tối đa `toiDa` cái mỗi lần gọi. */
   async function xoaNhieuChat(p) {
+    loiCuoi = ''; menuLoi = '';
     const toiDa = (p && p.toiDa) || 10;
-    await cho(() => hangChat().length || $('[data-testid="hatch-side-chats-panel-content"]'), 20000);
+    await cho(() => hangGoc().length || $('[data-testid="hatch-side-chats-panel-content"]'), 20000);
     await ngu(1500);
     let da = 0;
     while (da < toiDa) {
-      let h = hangChat()[0];
+      let h = (await cacHang())[0];
       if (!h) {
         // Danh sách nạp dần: kéo tới "nạp thêm" rồi xem còn không.
         const s = $('[data-testid="active-side-chat-load-more-sentinel"]');
         if (s) s.scrollIntoView();
         h = await cho(() => hangChat()[0], 4000);
-        if (!h) break;
+        if (!h) { const c = await cacHang(); h = c[0]; }
+        if (!h) {
+          // Không thấy hàng nào có nút ⋯ mà vẫn có hàng chat → giao diện Muse lạ: báo kèm chẩn đoán.
+          // ("Main chat" không có nút ⋯ và không mang mã chat → một hàng như thế không tính.)
+          const goc = hangGoc();
+          if (!da && (goc.length > 1 || goc.some(maThread))) { loiCuoi = 'khong-thay-nut-3-cham'; return { ok: false, da, loi: loiCuoi, chanDoan: chanDoanXoa() }; }
+          break;
+        }
       }
-      if (!(await xoaHang(h))) return { ok: false, da, loi: 'xoa-khong-duoc' };
+      if (!(await xoaHang(h))) return { ok: false, da, loi: loiCuoi || 'xoa-khong-duoc', chanDoan: chanDoanXoa() };
       da++;
       await ngu(400);
     }

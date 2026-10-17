@@ -6,11 +6,18 @@
 #    3. Day ma nguon len GitHub.
 #    4. Tab "Actions" -> "Phat hanh ban moi" -> "Run workflow".
 #  REPO PHAI DE CONG KHAI (public) thi app moi doc duoc ban phat hanh.
+#  "chi_windows" = true: chi dong goi + phat hanh ban Windows (ban macOS phat hanh sau).
+#  May Mac dang cai ban cu se thay "ban nay chua co file cho may nay" va giu ban cu.
 # ============================================================================
 name: Phat hanh ban moi
 
 on:
   workflow_dispatch:
+    inputs:
+      chi_windows:
+        description: 'Chi phat hanh ban Windows (bo qua macOS)'
+        type: boolean
+        default: false
   push:
     tags:
       - 'v*'
@@ -48,10 +55,12 @@ jobs:
 
   mac:
     needs: kiem
+    if: ${{ !inputs.chi_windows }}
     uses: ./.github/workflows/build-mac.yml
 
   dang:
     needs: [kiem, windows, mac]
+    if: ${{ always() && needs.kiem.result == 'success' && needs.windows.result == 'success' && (needs.mac.result == 'success' || (inputs.chi_windows && needs.mac.result == 'skipped')) }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -66,9 +75,11 @@ jobs:
       - name: Kiem du file ma app can
         run: |
           VER=$(node -p "require('./package.json').version")
-          for f in "AIAutomationStudio-$VER-setup.exe" \
-                   "AIAutomationStudio-$VER-mac-arm64.zip" \
-                   "AIAutomationStudio-$VER-mac-x64.zip"; do
+          CAN="AIAutomationStudio-$VER-setup.exe"
+          if [ "${{ inputs.chi_windows }}" != "true" ]; then
+            CAN="$CAN AIAutomationStudio-$VER-mac-arm64.zip AIAutomationStudio-$VER-mac-x64.zip"
+          fi
+          for f in $CAN; do
             [ -f "ra/$f" ] || { echo "::error::Thieu $f — app tu cap nhat can dung ten nay"; exit 1; }
           done
           (cd ra && sha256sum * > SHA256SUMS.txt)
@@ -79,6 +90,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           THE="${{ needs.kiem.outputs.the }}"
+          shopt -s nullglob
           gh release create "$THE" ra/*.exe ra/*.zip ra/SHA256SUMS.txt \
             --repo "${{ github.repository }}" \
             --target "${{ github.sha }}" \

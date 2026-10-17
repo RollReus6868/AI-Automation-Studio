@@ -149,22 +149,64 @@ function chonKhoang(prompts, tu, den) {
 }
 
 /**
+ * 1.3.0 — đọc ô "Chạy prompt số": "98, 303, 305-350" → [98, 303, 305, 306, …, 350] (tăng dần, không trùng).
+ * Chịu dấu phẩy / chấm phẩy / khoảng trắng, gạch nối "-" "–" "—", "350-" (tới cuối), "-20" (từ đầu).
+ * @param n  số prompt đang có (giới hạn khoảng mở và loại số vượt quá)
+ * @returns {{so:number[], loi:string[], ngoai:number[]}}  loi = đoạn không đọc được, ngoai = số > n
+ */
+function docSoChay(chuoi, n) {
+  const kq = new Set(), loi = [], ngoai = new Set();
+  const doan = String(chuoi || '').replace(/\s*([-–—])\s*/g, '$1').split(/[,;\s]+/).filter(Boolean);
+  for (const d of doan) {
+    const m = d.match(/^(\d*)[-–—](\d*)$/);
+    let a, b;
+    if (/^\d+$/.test(d)) a = b = parseInt(d, 10);
+    else if (m && (m[1] || m[2])) { a = m[1] ? parseInt(m[1], 10) : 1; b = m[2] ? parseInt(m[2], 10) : n; }
+    else { loi.push(d); continue; }
+    if (a > b) [a, b] = [b, a];
+    if (a < 1) { loi.push(d); continue; }
+    for (let i = a; i <= b; i++) { if (i > n) { ngoai.add(i); if (i > n + 100000) break; continue; } kq.add(i); }
+  }
+  return { so: [...kq].sort((x, y) => x - y), loi, ngoai: [...ngoai].sort((x, y) => x - y) };
+}
+
+/** Chọn prompt theo ô "Chạy prompt số" (trống = mọi prompt). Trả [{prompt, stt}] như chonKhoang. */
+function chonTheoSo(prompts, chuoi) {
+  if (!String(chuoi || '').trim()) return prompts.map((prompt, i) => ({ prompt, stt: i + 1 }));
+  return docSoChay(chuoi, prompts.length).so.map((i) => ({ prompt: prompts[i - 1], stt: i }));
+}
+
+/** Rút gọn danh sách số để hiện lại: [98,303,305,306,307] → "98, 303, 305–307". */
+function gonSo(ds) {
+  const ra = [];
+  for (let i = 0; i < ds.length; i++) {
+    let k = i;
+    while (k + 1 < ds.length && ds[k + 1] === ds[k] + 1) k++;
+    ra.push(k > i ? `${ds[i]}–${ds[k]}` : String(ds[i]));
+    i = k;
+  }
+  return ra.join(', ');
+}
+
+/**
  * Việc kế tiếp nên chạy: cũ nhất trước.
  * uuTien(job) → true: lấy ngay (việc có chat dở của chính tài khoản này).
  * boQua(job)  → true: luồng này không được nhận (chat dở của tài khoản khác đang chạy).
  */
 function viecKeTiep(jobs, uuTien, boQua) {
   const truoc = (a, b) => !b || a.taoLuc < b.taoLuc || (a.taoLuc === b.taoLuc && a.id < b.id);
-  let tot = null, video = null;
+  let tot = null, video = null, bam = null;
   for (const j of jobs) {
     if (j.trangThai !== 'cho') continue;
     if (boQua && boQua(j)) continue;
     if (uuTien && uuTien(j)) return j;
+    // 1.3.0: người dùng bấm Chạy ở đúng việc này → lên đầu hàng (bấm trước chạy trước).
+    if (j.uuTienLuc && (!bam || j.uuTienLuc < bam.uuTienLuc)) bam = j;
     // Video nối từ ảnh vừa xong được chạy NGAY (song song với các ảnh còn lại), không xếp sau cả mẻ ảnh.
     if (j.tuAnh && truoc(j, video)) video = j;
     if (truoc(j, tot)) tot = j;
   }
-  return video || tot;
+  return bam || video || tot;
 }
 
 /** Thời gian dự kiến (giây) = trung bình 10 việc xong gần nhất cùng loại, mặc định ảnh 35s, video 80s. */
@@ -289,6 +331,7 @@ function keHoachTai(viec, tonTai) {
 
 const HD = {
   TY_LE, MAU_MAC_DINH, MAU_TEN_MAC_DINH, MAU_TEN_ANH_MAC_DINH, PROMPT_VIDEO_MAC_DINH, slugTen, tachPrompt, timNhanVat, taoTinNhan, tenFile, mimeTuDuoi, chonKhoang,
+  docSoChay, chonTheoSo, gonSo,
   viecKeTiep, taiKhoanChoViec, taiKhoanChoViecDs, thoiGianDuKien, tienDoUoc, daXong, laTraLoiChu, laChanKhuVuc, laTuChoi, soSanhTuNhien, keHoachTai
 };
 // Dùng chung cho tiến trình chính (require) và giao diện (<script> → window.HD).

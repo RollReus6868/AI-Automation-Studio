@@ -1624,8 +1624,13 @@ test('selector người dùng tự chỉ đi đủ đường: cài đặt Flow �
   // 2. Lưu: chuẩn hoá giữ selectors; lưu cài đặt (gộp với bản cũ) không làm rơi selectors.
   const sel = { createBtn: 'button.tao', tile: 'div.the' };
   assert.deepStrictEqual(chuanHoaFlow({ selectors: sel }).selectors, sel);
-  assert.ok(/m\.flow = chuanHoaFlow\(\{ \.\.\.this\.caiDat\.flow, \.\.\.\(c\.flow \|\| \{\}\) \}\)/.test(docGoc('src', 'main', 'dieu-phoi.js')),
+  // 1.3.0: cài đặt chung + cài đặt riêng từng dự án cùng đi qua chuanCaiDat(c, flowGoc, flowMoi).
+  const dp = docGoc('src', 'main', 'dieu-phoi.js');
+  assert.ok(/m\.flow = chuanHoaFlow\(\{ \.\.\.\(flowGoc \|\| \{\}\), \.\.\.\(flowMoi \|\| \{\}\) \}\)/.test(dp) &&
+    /chuanCaiDat\(\{ \.\.\.this\.caiDat, \.\.\.c \}, this\.caiDat\.flow, c\.flow\)/.test(dp) &&
+    /chuanCaiDat\(\{ \.\.\.goc, \.\.\.cuaDuAn \}, goc\.flow, cuaDuAn\.flow\)/.test(dp),
     'lưu Cài đặt → Flow ghi đè mất selectors đã lưu');
+  assert.deepStrictEqual(chuanHoaFlow({ ...{ selectors: sel }, ...{ meToiDa: 4 } }).selectors, sel);
   // 3. Gửi engine: bộ cài đặt của mẻ mang selectors (và là bản sao, không dính object gốc).
   const s = caiDatEngine({ selectors: sel }, { loai: 'anh', ten: [] });
   assert.deepStrictEqual(s.selectors, sel);

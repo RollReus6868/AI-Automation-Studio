@@ -11,6 +11,8 @@ module.exports = function e2e({ win, app, LENH, dieuPhoi }) {
   const ngu = (ms) => new Promise((r) => setTimeout(r, ms));
   const loi = [];
   const kiem = (dk, ten) => { ghi(`${dk ? '  ✔' : '  ✘'} ${ten}`); if (!dk) loi.push(ten); };
+  // 1.3.0: cài đặt theo dự án — bài kiểm đặt cho bộ chung (dự án tạo bằng LENH.taoDuAn theo bộ chung) và MỌI dự án đang có.
+  const datCD = (c) => { LENH.datCaiDat(c); for (const d of dieuPhoi.duAn) LENH.datCaiDat({ duAn: d.id, ...c }); };
   const cho = async (dk, ms, ten) => {
     const het = Date.now() + ms;
     while (Date.now() < het) { if (dk()) return true; await ngu(250); }
@@ -44,7 +46,7 @@ module.exports = function e2e({ win, app, LENH, dieuPhoi }) {
       // TK hai thấy Muse tiếng Việt: màn đăng nhập không có câu tiếng Anh nào → phải nhận ra qua ô email.
       await session.fromPartition(tk2.partition).cookies.set({ url: process.env.MUSE_URL, name: 'muse_lang', value: 'vi' });
       const ra = path.join(tam, 'ra');
-      LENH.datCaiDat({ luongMoiTK: 3, nghiGiuaLanGui: 0, choChuGiay: 15, tuThuLai: 0, tuChayLaiLoi: 0, thuMucAnh: ra, thuMucVideo: ra });
+      datCD({ luongMoiTK: 3, nghiGiuaLanGui: 0, choChuGiay: 15, tuThuLai: 0, tuChayLaiLoi: 0, thuMucAnh: ra, thuMucVideo: ra });
       const anhNV = path.join(tam, 'lan.png'), anhRef = path.join(tam, 'ref.png');
       fs.writeFileSync(anhNV, PNG1); fs.writeFileSync(anhRef, PNG1);
       LENH.luuNhanVat({ ten: 'Lan', moTa: 'tóc ngắn', anh: [anhNV] });
@@ -172,7 +174,7 @@ module.exports = function e2e({ win, app, LENH, dieuPhoi }) {
       ghi('-- 4. Khoảng prompt + ảnh→video tự động + tên file');
       const rv = path.join(tam, 'video-rieng');
       // Bài này kiểm thư mục + mẫu tên VIDEO riêng → tắt "video cạnh ảnh" (bài 16 kiểm phần đó).
-      LENH.datCaiDat({ thuMucVideo: rv, tenAnh: '{duAn}/anh_{stt}', tenVideo: 'clip_{stt}', videoCanhAnh: false });
+      datCD({ thuMucVideo: rv, tenAnh: '{duAn}/anh_{stt}', tenVideo: 'clip_{stt}', videoCanhAnh: false });
       const soGuiTruoc = (await daGui()).length;
       const truoc4 = viec().length;
       await js(`window.__diToi('anh')`);
@@ -180,15 +182,14 @@ module.exports = function e2e({ win, app, LENH, dieuPhoi }) {
       await js(`(() => {
         const o = document.querySelector('#oPrompt'); o.value = 'cảnh một\\ncảnh hai\\ncảnh ba\\ncảnh bốn'; o.dispatchEvent(new Event('input'));
         document.querySelector('#nangCao').open = true;
-        const t = document.querySelector('#tuSo'); t.value = '2'; t.dispatchEvent(new Event('input'));
-        const d = document.querySelector('#denSo'); d.value = '3'; d.dispatchEvent(new Event('input'));
+        const t = document.querySelector('#chonSo'); t.value = '2-3'; t.dispatchEvent(new Event('input'));
         const c = document.querySelector('#batChuoi'); c.checked = true; c.dispatchEvent(new Event('change'));
         const v = document.querySelector('#promptVideoChung'); v.value = 'máy quay đẩy chậm'; v.dispatchEvent(new Event('input'));
       })()`);
       await ngu(300);
-      await choJs(`/prompt 2–3/.test(document.querySelector('#ghiKhoang').textContent)`, 5000, 'dòng báo khoảng prompt');
+      await choJs(`/số 2–3/.test(document.querySelector('#ghiKhoang').textContent)`, 5000, 'dòng báo khoảng prompt');
       const ghiKhoang = await js(`document.querySelector('#ghiKhoang').textContent`);
-      kiem(/prompt 2–3 \(2\/4\)/.test(ghiKhoang), `giao diện báo khoảng sẽ chạy ("${ghiKhoang}")`);
+      kiem(/Sẽ chạy 2\/4 prompt: số 2–3/.test(ghiKhoang), `giao diện báo khoảng sẽ chạy ("${ghiKhoang}")`);
       await chup('e2e-chuoi-video.png');
       await js(`document.querySelector('#nutTaoChay').click()`);
       await cho(() => viec().length >= truoc4 + 4 && !dieuPhoi.dangChay && !dieuPhoi.coViecDangChay(), 90000, 'chạy xong ảnh + video nối tiếp');
@@ -213,12 +214,12 @@ module.exports = function e2e({ win, app, LENH, dieuPhoi }) {
       kiem(oAnh.ten === '{duAn}/anh_{stt}' && oVid.ten === 'clip_{stt}' && /video/.test(oVid.nhan) && /clip_005\.mp4/.test(oVid.vd),
         `ô tên file đổi theo trang (ảnh "${oAnh.ten}", video "${oVid.ten}", ${oVid.vd})`);
       await js(`(() => { const o = document.querySelector('#ncTen'); o.value = 'vid_{stt}'; o.dispatchEvent(new Event('input')); o.dispatchEvent(new Event('change')); })()`);
-      await cho(() => dieuPhoi.caiDat.tenVideo === 'vid_{stt}', 5000, 'lưu tên video');
-      kiem(dieuPhoi.caiDat.tenVideo === 'vid_{stt}' && dieuPhoi.caiDat.tenAnh === '{duAn}/anh_{stt}', 'sửa tên ở trang video chỉ đổi tên video');
+      await cho(() => dieuPhoi.cd('mac-dinh').tenVideo === 'vid_{stt}', 5000, 'lưu tên video');
+      kiem(dieuPhoi.cd('mac-dinh').tenVideo === 'vid_{stt}' && dieuPhoi.cd('mac-dinh').tenAnh === '{duAn}/anh_{stt}', 'sửa tên ở trang video chỉ đổi tên video');
       await js(`window.__diToi('anh')`); await ngu(300);
       // Tắt chuỗi video và khoảng prompt của bước 4.
       await js(`(() => { const c = document.querySelector('#batChuoi'); c.checked = false; c.dispatchEvent(new Event('change'));
-        for (const id of ['#tuSo', '#denSo']) { const o = document.querySelector(id); o.value = ''; o.dispatchEvent(new Event('input')); } })()`);
+        for (const id of ['#chonSo']) { const o = document.querySelector(id); o.value = ''; o.dispatchEvent(new Event('input')); } })()`);
       LENH.nhapNhieuFile = async () => [
         { ten: 'Tập 1', noiDung: 'tập một cảnh A\ntập một cảnh B' },
         { ten: 'Tập 2', noiDung: '\uFEFFtập hai cảnh A' },
@@ -247,7 +248,7 @@ module.exports = function e2e({ win, app, LENH, dieuPhoi }) {
 
       // 6) 1.3.0: ảnh và video song song — 1 luồng, 3 ảnh nối video: video 1 phải chạy TRƯỚC ảnh 2.
       ghi('-- 6. Ảnh và video song song');
-      LENH.datCaiDat({ luongMoiTK: 1 });
+      datCD({ luongMoiTK: 1 });
       const truoc6 = viec().length;
       LENH.them({ duAn: 'mac-dinh', loai: 'anh', prompts: ['ss một', 'ss hai', 'ss ba'], chuoiVideo: { prompt: 'ss chuyển động' }, chay: true });
       await cho(() => viec().length >= truoc6 + 6 && !dieuPhoi.dangChay && !dieuPhoi.coViecDangChay(), 90000, 'chạy xong 3 ảnh + 3 video');
@@ -255,18 +256,18 @@ module.exports = function e2e({ win, app, LENH, dieuPhoi }) {
         .map((j) => (j.loai === 'video' ? 'V' : 'A') + j.stt);
       ghi(`   thứ tự chạy: ${thuTu.join(' → ')}`);
       kiem(thuTu.join(',') === 'A1,V1,A2,V2,A3,V3', 'ảnh xong là video của nó chạy ngay, không chờ hết mẻ ảnh');
-      LENH.datCaiDat({ luongMoiTK: 3 });
+      datCD({ luongMoiTK: 3 });
 
       // 7) Hết lượt còn việc lỗi → tự chạy lại.
       ghi('-- 7. Tự chạy lại việc lỗi');
-      LENH.datCaiDat({ tuChayLaiLoi: 1 });
+      datCD({ tuChayLaiLoi: 1 });
       const gui7 = (await daGui()).length;
       LENH.them({ duAn: 'mac-dinh', loai: 'anh', prompts: ['HOI_LAI lần hai'], chay: true });
       const j7 = viec()[viec().length - 1];
       await cho(() => !dieuPhoi.dangChay && !dieuPhoi.coViecDangChay(), 90000, 'chạy xong việc lỗi + lượt lại');
       const lan7 = (await daGui()).slice(gui7).filter((g) => /HOI_LAI lần hai/.test(g.prompt)).length;
       kiem(j7.trangThai === 'loi' && j7.vongLai === 1 && lan7 === 2, `việc lỗi được tự chạy lại đúng 1 lượt (gửi ${lan7} lần, vongLai=${j7.vongLai})`);
-      LENH.datCaiDat({ tuChayLaiLoi: 0 });
+      datCD({ tuChayLaiLoi: 0 });
 
       // 8) Tạo video từ thư mục ảnh có sẵn: để trống prompt → mỗi ảnh một video, tên video = tên ảnh.
       ghi('-- 8. Video từ thư mục ảnh');
@@ -275,12 +276,12 @@ module.exports = function e2e({ win, app, LENH, dieuPhoi }) {
       const tenAnh = ['canh 10.png', 'canh 2.png', 'canh 1.png'];
       for (const t of tenAnh) fs.writeFileSync(path.join(thuMucAnh, t), PNG1);
       LENH.chonThuMucAnh = async () => ({ thuMuc: thuMucAnh, anh: ['canh 1.png', 'canh 2.png', 'canh 10.png'].map((t) => path.join(thuMucAnh, t)) });
-      LENH.datCaiDat({ tenVideo: 'tu-anh/{tenAnh}' });
+      datCD({ tenVideo: 'tu-anh/{tenAnh}' });
       const gui8 = (await daGui()).length, truoc8 = viec().length;
       await js(`window.__diToi('video')`);
       await choJs(`!document.querySelector('#khuVideoThuMuc').hidden`, 5000, 'khối video từ thư mục');
       await js(`(() => { const o = document.querySelector('#oPrompt'); o.value = ''; o.dispatchEvent(new Event('input'));
-        for (const id of ['#tuSo', '#denSo']) { const x = document.querySelector(id); x.value = ''; x.dispatchEvent(new Event('input')); }
+        for (const id of ['#chonSo']) { const x = document.querySelector(id); x.value = ''; x.dispatchEvent(new Event('input')); }
         const c = document.querySelector('#promptThuMuc'); c.value = 'chung cho thư mục lắc lư'; c.dispatchEvent(new Event('input'));
         document.querySelector('#nutVideoThuMuc').click(); })()`);
       await choJs(`/3 ảnh/.test(document.querySelector('#ghiVideoThuMuc').textContent)`, 5000, 'báo 3 ảnh');
@@ -380,9 +381,19 @@ module.exports = function e2e({ win, app, LENH, dieuPhoi }) {
       const sau14 = await dsThread();
       kiem(r14 && r14.ok && r14.da === 1 && sau14.length === truoc14 - 1 && !sau14.some((t) => t.thread === id14) && !jv.thread,
         `xoá chat của 1 việc đã chọn (${truoc14} → ${sau14.length}), việc bỏ đường dẫn chat`);
+      // 1.3.0: Muse đổi giao diện chat phụ (ảnh người dùng 17/10/2026) — menu không có mục Delete → không xoá
+      // được nhưng phải lưu tệp chẩn đoán; giao diện mới (liên kết, nút ⋯ hiện khi rê chuột, hộp alertdialog) → xoá hết.
+      await tk1.cookies.set({ url: process.env.MUSE_URL, name: 'muse_xoa_hong', value: '1' });
+      const r14h = await LENH.xoaChatTaiKhoan({ id: 'tk-1' });
+      kiem(r14h && r14h.hong >= 1 && r14h.da === 0 && r14h.chanDoan && fs.existsSync(r14h.chanDoan) &&
+        /menu-khong-co-delete/.test(fs.readFileSync(r14h.chanDoan, 'utf8')) && (await dsThread()).length === sau14.length,
+        `menu Muse không có mục Delete → không xoá gì, lưu tệp chẩn đoán (${r14h && r14h.loi})`);
+      await tk1.cookies.remove(process.env.MUSE_URL, 'muse_xoa_hong');
+      await tk1.cookies.set({ url: process.env.MUSE_URL, name: 'muse_xoa_moi', value: '1' });
       const r14b = await LENH.xoaChatTaiKhoan({ id: 'tk-1' });
       const con14 = await dsThread();
-      kiem(r14b && r14b.ok && r14b.da === sau14.length && con14.length === 0, `xoá toàn bộ chat (${r14b && r14b.da} cái), không còn chat nào`);
+      kiem(r14b && r14b.ok && r14b.da === sau14.length && con14.length === 0, `giao diện chat phụ KIỂU MỚI: xoá toàn bộ chat (${r14b && r14b.da} cái), không còn chat nào`);
+      await tk1.cookies.remove(process.env.MUSE_URL, 'muse_xoa_moi');
 
       // 15) Tài khoản chính + dự phòng: chọn trong hộp "Dự án mới"; chính lỗi → việc sang dự phòng NGAY;
       //     chính lỗi 2 việc liền → nghỉ, việc sau chạy thẳng dự phòng; tài khoản ngoài dự án không đụng tới.
@@ -390,16 +401,17 @@ module.exports = function e2e({ win, app, LENH, dieuPhoi }) {
       const tk3 = await LENH.themTaiKhoan({ ten: 'TK ba' });
       await session.fromPartition(tk3.partition).cookies.set({ url: process.env.MUSE_URL, name: 'muse_login', value: '1' });
       await tk1.cookies.set({ url: process.env.MUSE_URL, name: 'muse_hong', value: '1' });
-      LENH.datCaiDat({ luongMoiTK: 1 });
+      datCD({ luongMoiTK: 1 });
       await js(`window.__diToi('taikhoan')`);
       await choJs(`/TK ba/.test(document.querySelector('#dsTaiKhoan').innerText)`, 5000, 'giao diện thấy TK ba');
       await js(`window.__diToi('anh')`);
       await js(`document.querySelector('#nutThemDuAn').click()`);
-      await choJs(`!!document.querySelector('#hopNoiDung [name="du_${tk3.id}"]')`, 5000, 'hộp dự án mới có ô tài khoản');
+      // 1.3.0: mỗi tài khoản chọn đích danh vai Chạy / Dự phòng / Không dùng.
+      await choJs(`!!document.querySelector('#hopNoiDung [name="vai_${tk3.id}"]')`, 5000, 'hộp dự án mới có ô tài khoản');
       await js(`(() => { const h = document.querySelector('#hopNoiDung');
         h.querySelector('[name=ten]').value = 'Du phong';
-        h.querySelector('[name=tkChinh_muse]').value = 'tk-1';
-        for (const c of h.querySelectorAll('input[type=checkbox]')) c.checked = c.name === 'du_${tk3.id}';
+        const ids = h.querySelector('[name=thuTu_muse]').value.split(',');
+        for (const id of ids) h.querySelector('[name="vai_' + id + '"]').value = id === 'tk-1' ? 'chay' : id === '${tk3.id}' ? 'du' : 'khong';
         document.querySelector('#hopOk').click(); })()`);
       await cho(() => LENH.trangThai().duAn.some((d) => d.ten === 'Du phong'), 5000, 'tạo dự án');
       const d15 = LENH.trangThai().duAn.find((d) => d.ten === 'Du phong');
@@ -427,7 +439,7 @@ module.exports = function e2e({ win, app, LENH, dieuPhoi }) {
       ghi('-- 16. Video cạnh ảnh + tự xoá chat khi xong');
       LENH.xoaViec({ ids: viec().map((j) => j.id) });   // việc cũ (còn chat) của các mục trước — chỉ đo việc mục này
       const thuMuc16 = path.join(tam, 'anh-16');
-      LENH.datCaiDat({ xoaChatKhiXong: true, videoCanhAnh: true, thuMucAnh: thuMuc16, tenAnh: '' });
+      datCD({ xoaChatKhiXong: true, videoCanhAnh: true, thuMucAnh: thuMuc16, tenAnh: '' });
       const d16 = LENH.taoDuAn({ ten: 'Tu xoa', taiKhoan: ['tk-1'] });
       const nk16 = LENH.trangThai().nhatKy.length;
       LENH.them({ duAn: d16.id, loai: 'anh', tyLe: '1:1', prompts: ['tự xoá một', 'tự xoá hai'], chuoiVideo: { prompt: 'chuyển động', nen: 'muse' }, chay: true });
@@ -446,7 +458,7 @@ module.exports = function e2e({ win, app, LENH, dieuPhoi }) {
       const da16 = (await daGui()).filter((g) => g.prompt && /tự xoá|chuyển động/.test(g.prompt)).map((g) => g.thread);
       kiem(v16.every((j) => !j.thread) && da16.length >= 4 && !da16.some((t) => con16.includes(t)),
         `chat Muse của 4 việc đã xong bị xoá trên Muse (${da16.length} chat của mục này, còn ${da16.filter((t) => con16.includes(t)).length})`);
-      LENH.datCaiDat({ xoaChatKhiXong: false });
+      datCD({ xoaChatKhiXong: false });
 
       // 17) 1.0.3: tải về hàng loạt, đặt tên mới, thư mục mới. File trên máy còn → chép; mất → mở lại
       //     chat Muse cũ lấy file (KHÔNG gửi lại prompt); mất cả file lẫn chat → báo, không làm gì.

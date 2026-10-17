@@ -38,6 +38,8 @@
         <button class="nut-icon" id="nutMenuDuAn" title="Đổi tên / xoá dự án"><i data-icon="ellipsis-vertical"></i></button>
         <div class="menu menu-phai" id="menuDuAnThem" hidden>
           <button data-lenh="taiKhoan"><i data-icon="users"></i>Tài khoản chạy dự án…</button>
+          <button data-lenh="chayHet"><i data-icon="play"></i>Chạy tất cả dự án</button>
+          <button data-lenh="dungHet"><i data-icon="pause"></i>Dừng tất cả dự án</button>
           <button data-lenh="doiTen"><i data-icon="pencil"></i>Đổi tên dự án</button>
           <button data-lenh="xoaXong"><i data-icon="circle-check"></i>Xoá các việc đã xong khỏi danh sách</button>
           <button data-lenh="xoaDuAn" class="do"><i data-icon="trash-2"></i>Xoá dự án</button>
@@ -47,7 +49,7 @@
       <button class="chip chip-moi" id="chipCapNhat" hidden><i data-icon="sparkles"></i><span></span></button>
       <span class="chip" id="chipChay"><span class="cham"></span><span>Đang nghỉ</span></span>
       <span class="chip" id="chipHomNay"><i data-icon="crown"></i><span>Hôm nay 0 ảnh · 0 video · 0 nhạc</span></span>
-      <button class="nut-gradient" id="nutChayTatCa"><i data-icon="play"></i><span>Chạy tất cả</span></button>
+      <button class="nut-gradient" id="nutChayTatCa" title="Chạy / dừng hàng chờ của dự án đang mở — các dự án khác chạy riêng"><i data-icon="play"></i><span>Chạy dự án</span></button>
     </header>
 
     <!-- ── Trang Tạo ảnh / Tạo video (dùng chung) ─────────────────── -->
@@ -157,10 +159,8 @@
                 <select id="tachPrompt"><option value="dong">Mỗi dòng</option><option value="doan">Dòng trống</option></select>
               </label>
             </div>
-            <div class="luoi-2">
-              <label>Chạy từ prompt số<input type="number" id="tuSo" min="1" placeholder="1"></label>
-              <label>đến prompt số<input type="number" id="denSo" min="1" placeholder="cuối"></label>
-            </div>
+            <label>Chỉ chạy prompt số <small>(trống = mọi prompt)</small><input type="text" id="chonSo" placeholder="vd: 98, 303, 305-350" spellcheck="false"></label>
+            <small class="mo">Ghi số lẻ cách nhau bằng dấu phẩy, khoảng thì dùng gạch nối: <code>98, 303, 305-350</code>. <code>305-</code> = từ 305 tới cuối.</small>
             <label>Thêm vào cuối mỗi prompt<input type="text" id="hauTo" placeholder="vd: phong cách điện ảnh, ánh sáng mềm"></label>
             <label class="khong-nhac">Số luồng mỗi tài khoản <small>(áp dụng ngay, cả khi đang chạy)</small><input type="number" id="luongNhanh" min="1" max="20"></label>
             <small class="mo khong-nhac">Ảnh trong "chọn thư mục" được gán lần lượt: ảnh 1 → prompt 1, ảnh 2 → prompt 2… (xếp theo tên).</small>
@@ -200,6 +200,8 @@
         <div class="thanh-chon" id="thanhChon" hidden>
           <span id="soChon">0 đã chọn</span>
           <button class="nut-vien nho" id="chonTai" title="Chép file kết quả của các việc đã chọn vào một thư mục"><i data-icon="download"></i>Tải về</button>
+          <button class="nut-vien nho" id="chonChay" title="Chạy ngay các việc đã chọn (việc đã dừng / đang chờ / lỗi)"><i data-icon="play"></i>Chạy</button>
+          <button class="nut-vien nho" id="chonDung" title="Dừng riêng các việc đã chọn — việc khác vẫn chạy"><i data-icon="square"></i>Dừng</button>
           <button class="nut-vien nho" id="chonChayLai"><i data-icon="rotate-ccw"></i>Tạo lại</button>
           <button class="nut-vien nho khong-nhac" id="chonXoaChat" title="Xoá đoạn chat trên muse.ai của các việc đã chọn"><i data-icon="message-square-x"></i>Xoá chat Muse</button>
           <button class="nut-vien nho do" id="chonXoa"><i data-icon="trash-2"></i>Xoá</button>
@@ -256,7 +258,7 @@
             <button class="nut-gradient nho chi-suno" id="nutThemTKSuno"><i data-icon="plus"></i>Thêm Suno</button>
           </div>
         </div>
-        <p class="mo">Mỗi tài khoản đăng nhập riêng một lần trong khung bên phải, app nhớ phiên (app không bao giờ hỏi hay lưu mật khẩu). Mỗi dự án chọn một tài khoản <b>chính</b> và các tài khoản <b>dự phòng</b> cho từng nơi chạy, và mấy tài khoản <b>chạy cùng lúc</b> — bấm nút tài khoản cạnh tên dự án. Muse: <b id="soLuongTK">3</b> luồng mỗi tài khoản; Flow: <b id="soTabFlow">1</b> tab mỗi tài khoản; Suno: 1 luồng mỗi tài khoản. Việc lỗi ở tài khoản chính thì chuyển ngay sang dự phòng; tài khoản Suno hết lượt tạo / tải thì bài được tạo lại ở tài khoản Suno dự phòng.</p>
+        <p class="mo">Mỗi tài khoản đăng nhập riêng một lần trong khung bên phải, app nhớ phiên (app không bao giờ hỏi hay lưu mật khẩu). Mỗi dự án chọn đích danh tài khoản nào <b>Chạy</b> (chạy cùng lúc), tài khoản nào <b>Dự phòng</b> và tài khoản nào <b>Không dùng</b> cho từng nơi chạy — bấm nút tài khoản cạnh tên dự án. Muse: <b id="soLuongTK">3</b> luồng mỗi tài khoản; Flow: <b id="soTabFlow">1</b> tab mỗi tài khoản; Suno: 1 luồng mỗi tài khoản. Việc lỗi ở tài khoản chính thì chuyển ngay sang dự phòng; tài khoản Suno hết lượt tạo / tải thì bài được tạo lại ở tài khoản Suno dự phòng.</p>
         <div class="phan-doan" id="nenTk">
           <button data-v="muse" class="on">Muse <span class="dem-nen" data-dem="muse"></span></button>
           <button data-v="flow">Flow <span class="dem-nen" data-dem="flow"></span></button>
@@ -286,18 +288,21 @@
           <li><b>Ảnh tham chiếu:</b> kéo thả ảnh để gửi kèm mọi prompt. <i>Chọn thư mục</i> để gán ảnh 1 → prompt 1, ảnh 2 → prompt 2 (dùng làm khung đầu khi tạo video từ ảnh).</li>
           <li><b>Nhân vật:</b> lưu ảnh nhân vật kèm tên. Bật <i>Giữ nguyên nhân vật</i>, prompt nhắc tên nào thì tự gửi ảnh nhân vật đó. Chế độ <i>Người mẫu</i>: chọn nhân vật gắn vào mọi prompt.</li>
           <li><b>Ảnh → video:</b> ở một ảnh đã xong, bấm <i>⋮ → Tạo video từ ảnh này</i>. Muốn cả mẻ: bật <i>Ảnh xong → tự tạo video</i> ở cột Tạo ảnh và nhập một prompt video dùng chung — ảnh nào xong là tự có video tương ứng.</li>
-          <li><b>Chạy một đoạn:</b> <i>Cài đặt nâng cao → Chạy từ prompt số … đến số …</i>. Đặt tên file bằng <code>{stt}</code> để số trong tên khớp số dòng prompt.</li>
+          <li><b>Chạy một số prompt:</b> <i>Cài đặt nâng cao → Chỉ chạy prompt số</i>, ghi ví dụ <code>98, 303, 305-350</code> (để trống = chạy hết). Đặt tên file bằng <code>{stt}</code> để số trong tên khớp số dòng prompt.</li>
+          <li><b>Nhiều dự án chạy song song:</b> mỗi dự án có <i>Cài đặt</i> riêng và luồng riêng. Bấm <i>Chạy dự án</i> ở dự án 1, chuyển sang dự án 2 bấm <i>Chạy dự án</i> nữa — hai dự án chạy cùng lúc, kể cả khi dùng chung tài khoản. Menu dự án có <i>Chạy tất cả dự án</i> / <i>Dừng tất cả dự án</i>. Số thứ tự ảnh và video đếm riêng (350 ảnh → video cũng số 1–350).</li>
+          <li><b>Dừng / chạy từng việc:</b> mỗi dòng đang chạy có nút <i>Dừng</i>; việc đã dừng có nút <i>Chạy</i> (chạy ngay, kể cả khi dự án đang dừng). Chọn nhiều dòng rồi bấm <i>Chạy</i> / <i>Dừng</i> / <i>Tạo lại</i> ở thanh chọn.</li>
+          <li><b>Dự án Flow mới:</b> mỗi dự án của tool chạy trên một dự án Flow MỚI riêng ở từng tài khoản Flow, không dùng chung dự án Flow cũ.</li>
           <li><b>Video từ ảnh có sẵn:</b> trang Tạo video → <i>Tạo video từ thư mục ảnh</i> → chọn thư mục; gõ prompt vào ô <i>Prompt dùng chung</i> rồi Tạo &amp; chạy — mỗi ảnh một video. Đặt tên video <code>{tenAnh}</code> để video trùng tên ảnh.</li>
           <li><b>Ảnh và video chạy song song:</b> khi bật <i>Ảnh xong → tự tạo video</i>, ảnh nào xong là video của nó được chạy ngay ở luồng rảnh kế tiếp, không chờ hết mẻ ảnh.</li>
           <li><b>Việc lỗi:</b> hết hàng chờ mà còn việc lỗi, tool tự chạy lại chúng (mặc định tối đa 2 lượt — đổi ở Cài đặt).</li>
-          <li><b>Nhiều luồng hơn:</b> tăng <i>Số luồng mỗi tài khoản</i> (Cài đặt nâng cao), hoặc cho dự án <b>chạy nhiều tài khoản cùng lúc</b>: bấm nút tài khoản cạnh tên dự án → <i>Chạy cùng lúc</i> = 2, 3… tài khoản. Các tài khoản đầu danh sách (chính + dự phòng theo thứ tự) chạy song song, việc chia đều; tài khoản nào lỗi thì nghỉ và tài khoản dự phòng kế tiếp vào thay.</li>
-          <li><b>Tài khoản chính + dự phòng:</b> bấm nút tài khoản cạnh tên dự án (hoặc khi tạo dự án mới) để chọn. Việc nào lỗi hoặc quá lâu (ảnh quá 3 phút, video quá 5 phút — chỉnh ở Cài đặt) thì chạy lại NGAY ở tài khoản dự phòng kế tiếp; tài khoản chính lỗi 2 việc liền (hoặc Muse "Connecting...") thì nghỉ 15 phút, cả dự án sang dự phòng. Bấm <i>Chạy tất cả</i> lại là cho mọi tài khoản cơ hội mới.</li>
+          <li><b>Nhiều luồng hơn:</b> tăng <i>Số luồng mỗi tài khoản</i> (Cài đặt nâng cao), hoặc cho dự án <b>chạy nhiều tài khoản cùng lúc</b>: bấm nút tài khoản cạnh tên dự án → đặt các tài khoản muốn chạy là <i>Chạy</i>. Các tài khoản <i>Chạy</i> chạy song song, việc chia đều; tài khoản nào lỗi thì nghỉ và tài khoản <i>Dự phòng</i> vào thay.</li>
+          <li><b>Tài khoản chính + dự phòng:</b> bấm nút tài khoản cạnh tên dự án (hoặc khi tạo dự án mới) để chọn. Việc nào lỗi hoặc quá lâu (ảnh quá 3 phút, video quá 5 phút — chỉnh ở Cài đặt) thì chạy lại NGAY ở tài khoản dự phòng kế tiếp; tài khoản chính lỗi 2 việc liền (hoặc Muse "Connecting...") thì nghỉ 15 phút, cả dự án sang dự phòng. Bấm <i>Chạy dự án</i> lại là cho mọi tài khoản cơ hội mới.</li>
           <li><b>Kết quả</b>: thư mục lưu, công tắc tải về và mẫu tên file nằm trong <i>Cài đặt nâng cao</i> của từng trang Tạo ảnh / Tạo video (mặc định <code>Mac_dinh/Mac_dinh_001.png</code>).</li>
           <li><b>Nhiều file .txt:</b> bấm <i>Nhập nhiều file .txt</i>, chọn cả loạt — mỗi file thành một dự án mang tên file, dùng chung tuỳ chọn đang chọn ở cột Tạo, rồi tự chạy.</li>
           <li><b>Dừng giữa chừng</b> không mất lượt: chạy lại, tool mở lại đúng chat cũ để lấy kết quả chứ không gửi lại prompt.</li>
           <li><b>Muse trả lời chữ thay vì ảnh</b> (hỏi lại): dòng đó báo lỗi kèm câu Muse nói. Sửa prompt rồi bấm <i>Tạo lại</i>. Muse <i>từ chối</i> tạo thì việc tự sang Flow (xem Muse ⇄ Flow).</li>
           <li><b>Xoá đoạn chat trên Muse:</b> nút <i>Xoá chat</i> ở thẻ tài khoản xoá MỌI đoạn chat phụ của tài khoản đó trên muse.ai (phải bấm Dừng trước). Muốn xoá một số: chọn việc ở hàng đợi → <i>Xoá chat Muse</i>. Không khôi phục được; file đã tải về vẫn giữ.</li>
-          <li><b>Muse "Connecting...":</b> Muse mất kết nối thì không tải được chat/ảnh/video. Tool tự <i>tạm dừng</i> hàng chờ (không phí lượt); khi muse.ai hết "Connecting..." bấm <i>Chạy tất cả</i>.</li>
+          <li><b>Muse "Connecting...":</b> Muse mất kết nối thì không tải được chat/ảnh/video. Tool tự <i>tạm dừng</i> hàng chờ (không phí lượt); khi muse.ai hết "Connecting..." bấm <i>Chạy dự án</i>.</li>
           <li><b>Đặt lại hàng đợi:</b> nút <i>Đặt lại</i> trên hàng đợi đưa mọi việc của dự án đang xem (trang ảnh hoặc video) về <i>Chờ</i> như lúc mới thêm; bấm chạy là tạo lại từ đầu, kết quả mới ghi đè file cũ cùng tên.</li>
           <li><b>Google Flow:</b> Tài khoản → <i>Thêm Flow</i> → <i>Đăng nhập</i> → đăng nhập Google, mở (hoặc tạo) một dự án Flow → <i>Xong</i>. Ở trang Tạo ảnh / Tạo video chọn <i>Chạy trên: Google Flow</i> rồi Tạo &amp; chạy như Muse. Flow nhận việc theo mẻ (mặc định 10 prompt), engine Flow tự dán, bấm Tạo, thử lại, tải về; từng việc vẫn hiện riêng trên hàng đợi. App tự chuyển Flow sang mục <i>Hình ảnh</i> hay <i>Video</i> theo việc (video từ ảnh thì chọn thêm <i>Thành phần</i>), và tự tải ảnh lên kho Flow bằng nút [+] → <i>Tải nội dung nghe nhìn lên</i>. Tài khoản không được tải 1080p / 4K (mục bị khoá, có nút <i>Nâng cấp</i>) thì app tự tải 720p (ảnh: cỡ gốc). Vẫn không tải / gắn được ảnh thì app lưu một tệp chẩn đoán vào <code>Tài liệu/AI Automation Studio/chan-doan-flow</code> — gửi tệp đó kèm nhật ký.</li>
           <li><b>Flow ⇄ Muse tự động:</b> bật <i>Ảnh xong → tự tạo video</i> và chọn <i>Video chạy ở</i>: ảnh Flow → video Muse, ảnh Muse → video Flow, hoặc cùng một nơi. Ảnh lưu vào thư mục chung (mặc định <code>Tài liệu/AI Automation Studio</code>), video tự lấy ảnh từ đó. Video Flow gắn ảnh bằng <code>@tên</code> (Character Sync) — ảnh chưa có trên Flow thì app tự tải lên.</li>
@@ -313,7 +318,8 @@
     <!-- ── Cài đặt ────────────────────────────────────────────────── -->
     <main class="trang" id="trang-caidat" hidden>
       <section class="panel trang-don cuon">
-        <div class="panel-dau"><h2><i data-icon="settings"></i>Cài đặt</h2><button class="nut-gradient nho" id="cdLuu"><i data-icon="check"></i>Lưu cài đặt</button></div>
+        <div class="panel-dau"><h2><i data-icon="settings"></i><span id="cdTieuDe">Cài đặt</span></h2><button class="nut-gradient nho" id="cdLuu"><i data-icon="check"></i>Lưu cài đặt</button></div>
+        <p class="ghi-cai-dat-du-an" id="cdDuAnGhi">Mỗi dự án có cài đặt riêng: trang này đổi cài đặt của dự án đang mở (chọn dự án ở thanh trên cùng). Dự án mới chép cài đặt của dự án đang mở lúc tạo.</p>
         <div class="the-cai">
           <h3><i data-icon="sliders-horizontal"></i>Chạy</h3>
           <div class="luoi-3">
@@ -330,7 +336,7 @@
           <div class="dong-cong-tac"><div><b>Lưu ảnh dạng PNG</b><small>Muse trả webp; bật để đổi sang png (nặng hơn, dễ dùng hơn).</small></div><label class="cong-tac"><input type="checkbox" id="cdPng"><span></span></label></div>
           <div class="dong-cong-tac"><div><b>Hiện các luồng chạy ngầm</b><small>Để soi lỗi: trang Muse / Flow của các luồng sẽ hiện đè lên app.</small></div><label class="cong-tac"><input type="checkbox" id="cdXemLuong"><span></span></label></div>
           <small class="mo">Lỗi → chuyển lần lượt sang các tài khoản dự phòng → hết dự phòng thì quay về tài khoản chính thử lại, cứ thế theo vòng. Việc chỉ báo Lỗi khi đã hỏng ở mọi tài khoản thêm số vòng trên; tài khoản lỗi liên tiếp được cho nghỉ 15 phút, mọi tài khoản đều nghỉ thì hàng chờ tạm dừng.</small>
-          <div class="dong-cong-tac"><div><b>Tắt máy khi chạy hết hàng chờ</b><small>Windows, macOS. Tắt sau 60 giây; Windows huỷ bằng lệnh <code>shutdown /a</code>.</small></div><label class="cong-tac"><input type="checkbox" id="cdTatMay"><span></span></label></div>
+          <div class="dong-cong-tac"><div><b>Tắt máy khi chạy hết hàng chờ</b><small>Chung cho mọi dự án: tắt khi MỌI dự án đang chạy đều xong. Windows, macOS. Tắt sau 60 giây; Windows huỷ bằng lệnh <code>shutdown /a</code>.</small></div><label class="cong-tac"><input type="checkbox" id="cdTatMay"><span></span></label></div>
         </div>
         <div class="the-cai">
           <h3><i data-icon="download"></i>Tải về &amp; dọn dẹp</h3>
