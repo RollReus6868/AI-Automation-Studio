@@ -292,7 +292,9 @@ module.exports = function e2e({ win, app, LENH, dieuPhoi }) {
       const g8 = (await daGui()).slice(gui8);
       kiem(v8.length === 3 && v8.every((j) => j.loai === 'video' && j.trangThai === 'xong'), 'thư mục 3 ảnh → 3 video xong');
       kiem(g8.length === 3 && g8.every((g) => g.soFile === 1 && g.prompt.includes('chung cho thư mục lắc lư')), 'mỗi video gửi kèm đúng 1 ảnh, dùng prompt ở ô "dùng chung"');
-      kiem(v8.map((j) => path.relative(rv, j.files[0]).replace(/\\/g, '/')).join(',') === 'tu-anh/canh 1.mp4,tu-anh/canh 2.mp4,tu-anh/canh 10.mp4',
+      // 1.3.0: đang mở dự án "Tập 1" (mục 5) — dự án tạo từ file .txt lưu vào thư mục con mang tên nó.
+      const rv8 = dieuPhoi.thuMucRa('video', v8[0].duAn);
+      kiem(path.dirname(rv8) === rv && v8.map((j) => path.relative(rv8, j.files[0]).replace(/\\/g, '/')).join(',') === 'tu-anh/canh 1.mp4,tu-anh/canh 2.mp4,tu-anh/canh 10.mp4',
         `tên video = tên ảnh, theo thứ tự tự nhiên (${v8.map((j) => path.basename(j.files[0] || '?')).join(', ')})`);
 
       // 9) Prompt rất dài không bị cắt.
