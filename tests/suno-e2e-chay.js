@@ -14,6 +14,8 @@ module.exports = function e2eSuno({ win, app, LENH, dieuPhoi, taiKhoan }) {
   const ngu = (ms) => new Promise((r) => setTimeout(r, ms));
   const loi = [];
   const kiem = (dk, ten) => { ghi(`${dk ? '  ✔' : '  ✘'} ${ten}`); if (!dk) loi.push(ten); };
+  // 1.3.0: cài đặt theo dự án — bài kiểm đặt cho bộ chung (dự án tạo bằng LENH.taoDuAn theo bộ chung) và MỌI dự án đang có.
+  const datCD = (c) => { LENH.datCaiDat(c); for (const d of dieuPhoi.duAn) LENH.datCaiDat({ duAn: d.id, ...c }); };
   const cho = async (dk, ms, ten) => {
     const het = Date.now() + ms;
     while (Date.now() < het) { if (dk()) return true; await ngu(250); }
@@ -35,7 +37,7 @@ module.exports = function e2eSuno({ win, app, LENH, dieuPhoi, taiKhoan }) {
     try {
       ghi('== E2E Suno (trang Create giả) ==');
       const nhac = path.join(tam, 'nhac');
-      LENH.datCaiDat({ nghiGiuaLanGui: 0, tuThuLai: 0, tuChayLaiLoi: 0, choNhacGiay: 120, thuMucNhac: nhac, tenNhac: '{stt}' });
+      datCD({ nghiGiuaLanGui: 0, tuThuLai: 0, tuChayLaiLoi: 0, choNhacGiay: 120, thuMucNhac: nhac, tenNhac: '{stt}' });
       kiem(taiKhoan.ds.some((a) => a.id === 'suno-1' && a.nen === 'suno' && a.partition === 'persist:suno-suno-1'),
         'có sẵn tài khoản "Suno 1" (phiên riêng persist:suno-suno-1)');
 

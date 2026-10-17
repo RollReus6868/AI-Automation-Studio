@@ -199,17 +199,27 @@ function donKhoFlow() {
 const viewCuaLuong = new Map();
 let xemLuong = !!process.env.MUSE_SHOW_LANES;
 
-function taoLuong(tk, stt) {
-  const id = `${tk.ten} · L${stt}`;
+/**
+ * @param duAnId  1.3.0: luồng Muse / tab Flow RIÊNG của một dự án (null = luồng dùng chung, Suno). Tab Flow chạy
+ *                trên dự án Flow riêng của dự án đó (chưa có thì mở dự án Flow MỚI, không dùng dự án Flow cũ).
+ */
+function taoLuong(tk, stt, duAnId) {
+  const tenDa = duAnId ? (dieuPhoi.duAn.find((d) => d.id === duAnId) || { ten: duAnId }).ten : '';
+  const id = `${tk.ten}${tenDa ? ` · ${tenDa}` : ''} · L${stt}`;
   if (tk.nen === 'flow') {
-    return new LuongFlow({ id, taiKhoan: tk, tabs: tabsFlow, may: mayFlow, log,
-      thuMucTam: path.join(app.getPath('userData'), 'flow-tai-tam', slugThuMuc(`${tk.id}-${stt}`)),
+    const tkDuAn = duAnId ? { ...tk, flowUrl: dieuPhoi.flowUrlCua(duAnId, tk.id) } : tk;
+    return new LuongFlow({ id, taiKhoan: tkDuAn, tabs: tabsFlow, may: mayFlow, log,
+      thuMucTam: path.join(app.getPath('userData'), 'flow-tai-tam', slugThuMuc(`${tk.id}-${duAnId ? `${duAnId}-` : ''}${stt}`)),
       // Bài kiểm (MUSE_DATA_DIR) ghi vào thư mục dữ liệu tạm, không rơi vào Tài liệu của máy.
       thuMucChanDoan: process.env.MUSE_DATA_DIR ? path.join(app.getPath('userData'), 'chan-doan-flow')
         : path.join(app.getPath('documents'), 'AI Automation Studio', 'chan-doan-flow'),
       docAnh, luuUrl: (tkId, url) => {
-        taiKhoan.sua(tkId, { flowUrl: url });
-        if (taiKhoan.tim(tkId).flowUrl === url) log('info', `📁 Nhớ trang dự án Flow của "${tk.ten}": ${url}`);
+        if (duAnId) {
+          if (dieuPhoi.datFlowUrl(duAnId, tkId, url)) log('info', `📁 Dự án "${tenDa}" chạy trên dự án Flow riêng của "${tk.ten}": ${url}`);
+        } else {
+          taiKhoan.sua(tkId, { flowUrl: url });
+          if (taiKhoan.tim(tkId).flowUrl === url) log('info', `📁 Nhớ trang dự án Flow của "${tk.ten}": ${url}`);
+        }
         baoTrangThai();
       } });
   }
@@ -379,6 +389,22 @@ function capNhatToken() {
  */
 let dangXoaChat = false;
 let dangTaiNhieu = false;
+/** 1.3.0: xoá chat Muse không được → lưu HTML khung danh sách chat + menu để người dùng gửi lại (Muse đổi giao diện). */
+function luuChanDoanMuse(tk, r) {
+  try {
+    const cd = r && r.chanDoan;
+    if (!cd) return '';
+    const thuMuc = process.env.MUSE_DATA_DIR ? path.join(app.getPath('userData'), 'chan-doan-muse')
+      : path.join(app.getPath('documents'), 'AI Automation Studio', 'chan-doan-muse');
+    fs.mkdirSync(thuMuc, { recursive: true });
+    const t = new Date(), so = (n) => String(n).padStart(2, '0');
+    const p = path.join(thuMuc, `xoa-chat-${t.getFullYear()}${so(t.getMonth() + 1)}${so(t.getDate())}-${so(t.getHours())}${so(t.getMinutes())}${so(t.getSeconds())}.html`);
+    const esc = (x) => String(x || '').replace(/</g, '&lt;');
+    fs.writeFileSync(p, `<!-- Chẩn đoán xoá chat Muse · ${esc(tk.ten)} · ${t.toISOString()}\n url: ${esc(cd.url)}\n lỗi: ${esc(cd.loi || r.loi)}\n` +
+      ` số hàng chat: ${cd.soHang} · có nút ⋯: ${cd.soHangCoNut} -->\n<h3>Danh sách chat</h3>\n${cd.danhSach || ''}\n<h3>Menu / hộp thoại đang mở</h3>\n${cd.menu || ''}\n`, 'utf8');
+    return p;
+  } catch (_) { return ''; }
+}
 async function xoaChat(id, threads) {
   const tk = taiKhoan.tim(id);
   if (!tk) return { ok: false, loi: 'Không tìm thấy tài khoản' };
@@ -389,19 +415,23 @@ async function xoaChat(id, threads) {
   const w = taoCuaSoAn(tk, 'Muse · xoá đoạn chat');
   const wc = w.webContents;
   const mo = async (url) => { wc.loadURL(url).catch(() => {}); const tt = await docTrangThai(wc, 25000); return !!(tt && tt.coONhap); };
-  let da = 0, hong = 0;
+  let da = 0, hong = 0, chanDoan = '', lyDo = '';
+  const ghiHong = (r) => {
+    if (r && r.loi && !lyDo) lyDo = r.loi;
+    if (!chanDoan && r && r.chanDoan) chanDoan = luuChanDoanMuse(tk, r);
+  };
   try {
     if (threads) {
       for (const url of threads) {
         const r = (await mo(url)) ? await wc.executeJavaScript('window.__muse.xoaChatDangMo()', true).catch(() => null) : null;
-        if (r && r.ok) da++; else hong++;
+        if (r && r.ok) da++; else { hong++; ghiHong(r); }
       }
     } else {
       if (!(await mo(GOC_MUSE))) return { ok: false, loi: 'Không mở được Muse (chưa đăng nhập?)' };
       for (;;) {
         const r = await wc.executeJavaScript('window.__muse.xoaNhieuChat({ toiDa: 10 })', true).catch(() => null);
         if (r) da += r.da;
-        if (!r || !r.ok) { hong++; break; }
+        if (!r || !r.ok) { hong++; ghiHong(r); break; }
         if (!r.da) break;
         log('info', `🗑 "${tk.ten}": đã xoá ${da} đoạn chat…`);
       }
@@ -410,15 +440,16 @@ async function xoaChat(id, threads) {
     dongCuaSoAn(w);
     dangXoaChat = false;
   }
-  log(hong ? 'warning' : 'success', `🗑 "${tk.ten}": đã xoá ${da} đoạn chat trên Muse${hong ? ` · ${hong} không xoá được` : ''}`);
-  return { ok: true, da, hong };
+  log(hong ? 'warning' : 'success', `🗑 "${tk.ten}": đã xoá ${da} đoạn chat trên Muse${hong ? ` · ${hong} không xoá được${lyDo ? ` (${lyDo})` : ''}` : ''}` +
+    (chanDoan ? ` — đã lưu tệp chẩn đoán ${chanDoan}, gửi tệp này cho người phát triển để sửa theo giao diện Muse mới.` : ''));
+  return { ok: true, da, hong, loi: lyDo, chanDoan };
 }
 
 /**
  * Chạy hết hàng chờ → dọn theo tuỳ chọn trong Cài đặt: xoá chat Muse của các việc đã xong, xoá dự án
  * Flow đã dùng (lần chạy sau app tự mở dự án mới). Lỗi chỉ ghi nhật ký, không chặn tắt máy.
  */
-async function donDep({ muse, flow }) {
+async function donDep({ muse, flow, duAn }) {
   for (const [tkId, ds] of muse) {
     const tk = taiKhoan.tim(tkId);
     if (!tk) continue;
@@ -429,19 +460,25 @@ async function donDep({ muse, flow }) {
   }
   for (const tkId of flow) {
     const tk = taiKhoan.tim(tkId);
-    if (!tk || !tk.flowUrl) continue;
-    // Đợi luồng Flow của tài khoản đóng tab (điều phối đóng ở nhịp kế tiếp) — tab còn mở trên dự án
-    // sẽ nhớ lại đúng địa chỉ dự án vừa xoá.
-    for (let i = 0; i < 20 && dieuPhoi.luong.some((x) => x.taiKhoanId === tkId); i++) await new Promise((r) => setTimeout(r, 500));
-    if (dieuPhoi.dangChay) { log('warning', `⚠ "${tk.ten}": hàng chờ đang chạy lại — bỏ qua tự xoá dự án Flow.`); continue; }
-    log('info', `🗑 "${tk.ten}": tự xoá dự án Flow ${tk.flowUrl}…`);
-    const r = await xoaDuAnFlow(tk.flowUrl, {
+    // 1.3.0: mỗi dự án của app có dự án Flow riêng trên tài khoản → xoá đúng dự án Flow của dự án vừa chạy xong.
+    const url = duAn ? dieuPhoi.flowUrlCua(duAn, tkId) : tk && tk.flowUrl;
+    if (!tk || !url) continue;
+    // Đợi luồng Flow của tài khoản (của dự án này) đóng tab (điều phối đóng ở nhịp kế tiếp) — tab còn mở trên
+    // dự án sẽ nhớ lại đúng địa chỉ dự án vừa xoá.
+    const cuaDuAn = (x) => x.taiKhoanId === tkId && (!duAn || x.duAn === duAn);
+    for (let i = 0; i < 20 && dieuPhoi.luong.some(cuaDuAn); i++) await new Promise((r) => setTimeout(r, 500));
+    if (duAn ? dieuPhoi.duAnChay.has(duAn) || dieuPhoi.luong.some(cuaDuAn) : dieuPhoi.dangChay) {
+      log('warning', `⚠ "${tk.ten}": dự án đang chạy lại — bỏ qua tự xoá dự án Flow.`);
+      continue;
+    }
+    log('info', `🗑 "${tk.ten}": tự xoá dự án Flow ${url}…`);
+    const r = await xoaDuAnFlow(url, {
       taoCuaSo: () => taoCuaSoAn(tk, 'Flow · xoá dự án'), dongCuaSo: dongCuaSoAn, trangChu: FLOW_URL,
       choMs: Number(process.env.FLOW_CHO_SAN_SANG_MS) || 25000
     });
     if (r.ok) {
-      taiKhoan.sua(tkId, { flowUrl: '' });
-      dieuPhoi.boFlowTen(tkId);
+      if (!duAn || tk.flowUrl === url) taiKhoan.sua(tkId, { flowUrl: '' });
+      dieuPhoi.boFlowTen(tkId, duAn);
       log('success', `🗑 "${tk.ten}": đã xoá dự án Flow — lần chạy sau app tự mở dự án mới.`);
     } else {
       log('warning', `⚠ "${tk.ten}": không tự xoá được dự án Flow — ${r.lyDo}. Dự án vẫn giữ nguyên.` +
@@ -494,12 +531,15 @@ function chepAnhNhanVat(nvId, ds) {
 const LENH = {
   trangThai: () => ({ ...trangThai(), nhatKy }),
   them: (p) => dieuPhoi.them(p),
-  chay: () => dieuPhoi.chayTatCa(),
-  dung: () => dieuPhoi.dungTatCa(),
-  taoLai: ({ ids }) => dieuPhoi.taoLai(ids),
+  // 1.3.0: Chạy / Dừng theo dự án (có duAn) — không có duAn = mọi dự án như bản cũ.
+  chay: ({ duAn } = {}) => (duAn ? dieuPhoi.chayDuAn(duAn) : dieuPhoi.chayTatCa()),
+  dung: ({ duAn } = {}) => (duAn ? dieuPhoi.dungDuAn(duAn) : dieuPhoi.dungTatCa()),
+  taoLai: ({ ids, chay }) => dieuPhoi.taoLai(ids, chay),
+  dungViec: ({ ids }) => dieuPhoi.dungViec(ids),
+  chayViec: ({ ids }) => dieuPhoi.chayViec(ids),
   xoaViec: ({ ids }) => dieuPhoi.xoaViec(ids),
   suaViec: ({ id, thay }) => dieuPhoi.suaViec(id, thay),
-  taoDuAn: ({ ten, taiKhoan: ds, chaySong }) => dieuPhoi.taoDuAn(ten, ds, chaySong),
+  taoDuAn: ({ ten, taiKhoan: ds, chaySong, tuDuAn }) => dieuPhoi.taoDuAn(ten, ds, chaySong, tuDuAn),
   datTaiKhoanDuAn: ({ id, taiKhoan: ds, chaySong }) => dieuPhoi.datTaiKhoanDuAn(id, ds, chaySong),
   doiTenDuAn: ({ id, ten }) => dieuPhoi.doiTenDuAn(id, ten),
   xoaDuAn: ({ id }) => dieuPhoi.xoaDuAn(id),
@@ -514,7 +554,8 @@ const LENH = {
     try { fs.rmSync(path.join(app.getPath('userData'), 'nhan-vat', id), { recursive: true, force: true }); } catch (_) {}
   },
   luuMauPrompt: ({ ds }) => dieuPhoi.luuMauPrompt(ds),
-  datCaiDat: (c) => dieuPhoi.datCaiDat(c),
+  // 1.3.0: { duAn, ...cài đặt } → lưu vào cài đặt RIÊNG của dự án đó.
+  datCaiDat: (c) => { const { duAn, ...m } = c || {}; return dieuPhoi.datCaiDat(m, duAn); },
 
   themTaiKhoan: ({ ten, nen }) => { const a = taiKhoan.them(ten, nen); baoTrangThai(); return a; },
   suaTaiKhoan: ({ id, thay }) => { taiKhoan.sua(id, thay); baoTrangThai(); },
@@ -571,10 +612,10 @@ const LENH = {
     return { thuMuc: r.filePaths[0], anh: anhTrongThuMuc(r.filePaths[0]) };
   },
   /** Thư mục riêng cho video nối từ ảnh: chọn xong là thôi lưu cạnh ảnh. */
-  chonThuMucVideoAnh: async () => {
+  chonThuMucVideoAnh: async ({ duAn } = {}) => {
     const r = await dialog.showOpenDialog(win, { title: 'Thư mục lưu video tạo từ ảnh', properties: ['openDirectory', 'createDirectory'] });
     if (r.canceled || !r.filePaths[0]) return null;
-    dieuPhoi.datCaiDat({ thuMucVideoAnh: r.filePaths[0], videoCanhAnh: false });
+    dieuPhoi.datCaiDat({ thuMucVideoAnh: r.filePaths[0], videoCanhAnh: false }, duAn);
     return r.filePaths[0];
   },
   /** 1.2.9: thư mục lưu video "Ảnh xong → tự tạo video" RIÊNG của một dự án (trang Tạo ảnh). */
@@ -585,10 +626,10 @@ const LENH = {
     return r.filePaths[0];
   },
   boThuMucVideoDuAn: ({ id }) => dieuPhoi.datThuMucVideoDuAn(id, ''),
-  chonThuMucRa: async ({ loai }) => {
+  chonThuMucRa: async ({ loai, duAn }) => {
     const r = await dialog.showOpenDialog(win, { properties: ['openDirectory', 'createDirectory'] });
     if (r.canceled || !r.filePaths[0]) return null;
-    dieuPhoi.datCaiDat({ [{ video: 'thuMucVideo', nhac: 'thuMucNhac' }[loai] || 'thuMucAnh']: r.filePaths[0] });
+    dieuPhoi.datCaiDat({ [{ video: 'thuMucVideo', nhac: 'thuMucNhac' }[loai] || 'thuMucAnh']: r.filePaths[0] }, duAn);
     return r.filePaths[0];
   },
   nhapPrompt: async () => {
@@ -679,7 +720,7 @@ const LENH = {
           for (const j of ds) {
             // Bản sao có thread → luồng chỉ mở chat và chờ lấy kết quả, không bao giờ gửi prompt.
             const r = await l.chay({ ...j, files: [] }, {
-              tinNhan: '', files: [], png: dieuPhoi.caiDat.png, choToiDaGiay: 90, choChuGiay: 30,
+              tinNhan: '', files: [], png: dieuPhoi.cd(j.duAn).png, choToiDaGiay: 90, choChuGiay: 30,
               choGui: async () => {}, capNhat: () => {}
             });
             if (!r.ok) { hong.push(`#${j.so}: ${r.loi || 'không lấy được từ chat'}`); continue; }

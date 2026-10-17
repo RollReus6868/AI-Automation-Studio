@@ -14,6 +14,8 @@ module.exports = function e2eFlow({ win, app, LENH, dieuPhoi, taiKhoan }) {
   const ngu = (ms) => new Promise((r) => setTimeout(r, ms));
   const loi = [];
   const kiem = (dk, ten) => { ghi(`${dk ? '  ✔' : '  ✘'} ${ten}`); if (!dk) loi.push(ten); };
+  // 1.3.0: cài đặt theo dự án — bài kiểm đặt cho bộ chung (dự án tạo bằng LENH.taoDuAn theo bộ chung) và MỌI dự án đang có.
+  const datCD = (c) => { LENH.datCaiDat(c); for (const d of dieuPhoi.duAn) LENH.datCaiDat({ duAn: d.id, ...c }); };
   const cho = async (dk, ms, ten) => {
     const het = Date.now() + ms;
     while (Date.now() < het) { if (dk()) return true; await ngu(250); }
@@ -33,7 +35,7 @@ module.exports = function e2eFlow({ win, app, LENH, dieuPhoi, taiKhoan }) {
       ghi('== E2E Google Flow (trang + engine giả) ==');
       await session.fromPartition('persist:muse-tk-1').cookies.set({ url: process.env.MUSE_URL, name: 'muse_login', value: '1' });
       const ra = path.join(tam, 'ra');
-      LENH.datCaiDat({ luongMoiTK: 2, nghiGiuaLanGui: 0, choChuGiay: 15, tuThuLai: 0, tuChayLaiLoi: 0, thuMucAnh: ra, thuMucVideo: ra,
+      datCD({ luongMoiTK: 2, nghiGiuaLanGui: 0, choChuGiay: 15, tuThuLai: 0, tuChayLaiLoi: 0, thuMucAnh: ra, thuMucVideo: ra,
         flow: { delayMin: 1, delayMax: 1, randomDelay: false, modelAnh: '', maxRetries: 1, anToan: { bat: false } } });
       kiem(taiKhoan.ds.some((a) => a.id === 'flow-1' && a.nen === 'flow' && a.partition === 'persist:flow-flow-1'),
         'có sẵn tài khoản "Flow 1" (phiên riêng persist:flow-flow-1)');
@@ -63,8 +65,10 @@ module.exports = function e2eFlow({ win, app, LENH, dieuPhoi, taiKhoan }) {
       kiem(new Set(anh1.map((j) => fs.readFileSync(j.files[0]).length)).size === 1 && fs.readFileSync(anh1[0].files[0]).equals(PNG1),
         'nội dung file ảnh đúng là file Flow tải về');
       // Đọc từ KHO đã lưu (không phải object trong bộ nhớ — luồng gán thẳng vào đó nên che mất lỗi kho từ chối địa chỉ).
-      const luu1 = (taiKhoan.store.get('taiKhoan').taiKhoan || []).find((a) => a.id === 'flow-1') || {};
-      kiem(/\/project\//.test(luu1.flowUrl || ''), `nhớ (đã LƯU) trang dự án Flow của tài khoản: ${luu1.flowUrl}`);
+      // 1.3.0: địa chỉ dự án Flow lưu theo DỰ ÁN của app (mỗi dự án app một dự án Flow riêng ở từng tài khoản).
+      const flowUrlLuu = (duAnId, tkId) => (((dieuPhoi.o.store.get('duAn').duAn || []).find((d) => d.id === duAnId) || {}).flowUrl || {})[tkId] || '';
+      const luu1 = flowUrlLuu('mac-dinh', 'flow-1');
+      kiem(/\/project\//.test(luu1), `nhớ (đã LƯU) trang dự án Flow của dự án "Mặc định" ở tài khoản: ${luu1}`);
       kiem(LENH.trangThai().nhatKy.some((d) => /Mở dự án Flow mới/.test(d.chu)), 'trang chủ Flow: bấm được nút "Dự án mới" có biểu tượng chữ đứng trước');
       kiem(video1.length === 3 && video1.every((j) => j.nen === 'muse' && j.trangThai === 'xong' && j.taiKhoan === 'tk-1' && /\.mp4$/.test(j.files[0] || '')),
         'mỗi ảnh Flow sinh đúng 1 video chạy ở MUSE, xong có file .mp4');
@@ -150,7 +154,7 @@ module.exports = function e2eFlow({ win, app, LENH, dieuPhoi, taiKhoan }) {
       const tk3 = await LENH.themTaiKhoan({ ten: 'Flow 3', nen: 'flow' });
       await session.fromPartition(tk3.partition).cookies.set({ url: process.env.MUSE_URL, name: 'flow_dang_xuat', value: '1' });
       // Tắt "Muse ⇄ Flow" ở bước này: chỉ kiểm nhận ra chưa đăng nhập (bật thì ảnh sang Muse — mục 9).
-      LENH.datCaiDat({ doiNenKhiLoi: false });
+      datCD({ doiNenKhiLoi: false });
       const d6id = LENH.taoDuAn({ ten: 'Chi Flow 3', taiKhoan: [tk3.id] }).id;
       nk = LENH.trangThai().nhatKy.length;
       LENH.them({ duAn: d6id, loai: 'anh', nen: 'flow', tyLe: '9:16', prompts: ['chưa đăng nhập'], chay: true });
@@ -162,13 +166,13 @@ module.exports = function e2eFlow({ win, app, LENH, dieuPhoi, taiKhoan }) {
       kiem(LENH.trangThai().nhatKy.slice(nk).some((d) => /"Flow 3" chưa đăng nhập Flow/.test(d.chu)), 'nhật ký nói rõ tài khoản Flow nào chưa đăng nhập');
       LENH.dung();
       LENH.xoaViec({ ids: v6.map((j) => j.id) });
-      LENH.datCaiDat({ doiNenKhiLoi: true });
+      datCD({ doiNenKhiLoi: true });
 
       // 7) 1.0.2: chạy hết hàng chờ → tự xoá dự án Flow vừa dùng (đúng dự án đó, dự án khác của người dùng
       //    giữ nguyên); tài khoản quên địa chỉ dự án → lần chạy sau tự mở dự án mới.
       ghi('-- 7. Tự xoá dự án Flow khi chạy xong');
       const dsDuAn = async () => (await net.fetch(`${process.env.MUSE_URL}/__flow-du-an`)).json();
-      LENH.datCaiDat({ xoaDuAnFlowKhiXong: true });
+      datCD({ xoaDuAnFlowKhiXong: true });
       const d7id = LENH.taoDuAn({ ten: 'Xoa du an', taiKhoan: ['flow-1'] }).id;
       nk = LENH.trangThai().nhatKy.length;
       LENH.them({ duAn: d7id, loai: 'anh', nen: 'flow', tyLe: '9:16', prompts: ['xoá dự án sau khi xong'], chay: true });
@@ -182,13 +186,13 @@ module.exports = function e2eFlow({ win, app, LENH, dieuPhoi, taiKhoan }) {
       kiem(v7.every((j) => j.trangThai === 'xong'), 'việc Flow xong trước khi dọn');
       kiem(ma7 && !con7.includes(ma7), `dự án Flow vừa dùng (${ma7}) đã bị xoá trên trang chủ Flow`);
       kiem(con7.includes('gia-khac'), 'dự án khác của người dùng (gia-khac) vẫn còn');
-      kiem(!taiKhoan.store.get('taiKhoan').taiKhoan.find((a) => a.id === 'flow-1').flowUrl, 'tài khoản quên địa chỉ dự án đã xoá');
+      kiem(!flowUrlLuu(d7id, 'flow-1'), 'dự án app quên địa chỉ dự án Flow đã xoá');
       // Lần chạy sau tự mở dự án mới.
-      LENH.datCaiDat({ xoaDuAnFlowKhiXong: false });
+      datCD({ xoaDuAnFlowKhiXong: false });
       LENH.them({ duAn: d7id, loai: 'anh', nen: 'flow', tyLe: '9:16', prompts: ['chạy sau khi xoá dự án'], chay: true });
       const v7b = viec().filter((j) => j.duAn === d7id && !v7.includes(j));
       await cho(xongHet(v7b), 120000, 'chạy lại sau khi xoá dự án');
-      const url7b = taiKhoan.store.get('taiKhoan').taiKhoan.find((a) => a.id === 'flow-1').flowUrl;
+      const url7b = flowUrlLuu(d7id, 'flow-1');
       kiem(v7b.every((j) => j.trangThai === 'xong') && /\/project\//.test(url7b) && !url7b.includes(ma7), `lần sau tự mở dự án mới (${url7b})`);
       dongNhatKy(Math.max(0, LENH.trangThai().nhatKy.length - 8));
 

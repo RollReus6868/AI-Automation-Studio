@@ -21,6 +21,10 @@
   mở menu bằng pointerdown; click nổi lên hàng thì chuyển sang chat đó (như thật). Xoá → hộp xác nhận.
   Mỗi lần gửi báo về máy chủ kiểm thử: POST /__gui {prompt, soFile, thread, t0}; mở chat: GET /__thread/<id>;
   danh sách chat: GET /__ds-thread; xoá chat: POST /__xoa {thread}.
+  1.3.0 — cookie muse_xoa_moi=1: danh sách chat KIỂU MỚI dựng theo ảnh chụp người dùng 17/10/2026 ("Side chats",
+  menu ⋯ = Pin / Rename / Archive / Delete), CỐ Ý không có data-testid / data-pel-click: hàng là liên kết
+  /thread/<id>, nút ⋯ chỉ gắn vào khi rê chuột, menu mở bằng click, xác nhận trong hộp role=alertdialog.
+  Cookie muse_xoa_hong=1 (cùng kiểu mới): menu KHÔNG có mục Delete → kiểm app lưu tệp chẩn đoán.
 -->
 <div id="goc"></div>
 <script>
@@ -122,6 +126,23 @@ async function veDsChat() {
   const o = document.getElementById('dsChat');
   if (!o) return;
   const dangMo = (location.pathname.match(/\/thread\/([^/]+)$/) || [])[1];
+  if (document.cookie.includes('muse_xoa_moi=1') || document.cookie.includes('muse_xoa_hong=1')) {
+    // Hàng chẵn: nút ⋯ nằm TRONG liên kết; hàng lẻ: liên kết bọc trong thẻ div, nút ⋯ gắn vào div (cạnh liên kết).
+    const lienKet = (t) => `<a href="/thread/${t.thread}" data-tid="${t.thread}" ${t.thread === dangMo ? 'aria-current="page"' : ''}><span>${t.tieuDe}</span><span>18m</span></a>`;
+    o.innerHTML = '<div><b>Side chats</b></div><a href="/">Main chat</a>' + ds.map((t, i) => (i % 2 ? `<div class="hang-chat">${lienKet(t)}</div>` : lienKet(t))).join('');
+    for (const a of o.querySelectorAll('a[data-tid]')) {
+      a.addEventListener('click', (e) => { e.preventDefault(); history.pushState({}, '', '/thread/' + a.dataset.tid); veThread(a.dataset.tid); });
+      const h = a.parentElement.classList.contains('hang-chat') ? a.parentElement : a;
+      h.addEventListener('mouseenter', () => {
+        if (h.querySelector('button')) return;
+        const b = document.createElement('button');
+        b.type = 'button'; b.setAttribute('aria-label', 'Options'); b.textContent = '⋯';
+        b.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); moMenuChatMoi(a.dataset.tid); });
+        h.appendChild(b);
+      });
+    }
+    return;
+  }
   o.innerHTML = '<div data-testid="hatch-thread-row" role="button">Main chat</div>' + ds.map((t) =>
     `<div data-testid="hatch-thread-row" role="button" data-id="${t.thread}" ${t.thread === dangMo ? 'aria-current="page"' : ''}>${t.tieuDe}` +
     '<span><button type="button" aria-label="More thread actions" aria-haspopup="menu" data-pel-click="chat_thread_options_open">⋯</button></span></div>').join('');
@@ -129,6 +150,28 @@ async function veDsChat() {
     h.addEventListener('click', () => { history.pushState({}, '', '/thread/' + h.dataset.id); veThread(h.dataset.id); });
     h.querySelector('button').addEventListener('pointerdown', () => moMenuChat(h.dataset.id));
   }
+}
+function moMenuChatMoi(id) {
+  const m = document.createElement('div');
+  m.setAttribute('role', 'menu');
+  const muc = ['Pin', 'Rename', 'Archive'].concat(document.cookie.includes('muse_xoa_hong=1') ? [] : ['Delete']);
+  m.innerHTML = muc.map((t) => `<div role="menuitem"><svg viewBox="0 0 24 24"></svg><span>${t}</span></div>`).join('');
+  const xoa = [...m.children].find((e) => e.textContent.trim() === 'Delete');
+  if (xoa) xoa.addEventListener('click', () => {
+    m.remove();
+    const d = document.createElement('div');
+    d.setAttribute('role', 'alertdialog');
+    d.innerHTML = '<h2>Delete chat?</h2><p>This will delete the side chat.</p><button>Cancel</button><button>Delete</button>';
+    d.children[2].onclick = () => d.remove();
+    d.children[3].onclick = async () => {
+      await fetch('/__xoa', { method: 'POST', body: JSON.stringify({ thread: id }) });
+      d.remove();
+      veDsChat();
+    };
+    document.body.appendChild(d);
+  });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') m.remove(); }, { once: true });
+  document.body.appendChild(m);
 }
 function moMenuChat(id) {
   const m = document.createElement('div');
