@@ -125,6 +125,7 @@
       (document.querySelector('[role="textbox"][contenteditable="true"], .ProseMirror') || {}).parentElement;
     if (khung) phan.push(lamSach(khung));
     if (window.__flowTaiVe && window.__flowTaiVe.menuCuoi) phan.push('<!-- menu Tải xuống gần nhất -->\n' + window.__flowTaiVe.menuCuoi);
+    if (window.__flowTaiVe && window.__flowTaiVe.menuMo) phan.push('<!-- menu gần nhất không có mục chất lượng -->\n' + window.__flowTaiVe.menuMo);
     var html = phan.join('\n\n<!-- ──────────── -->\n\n');
     // Không để lọt địa chỉ email / tên tài khoản Google (nếu menu tài khoản đang mở) vào tệp gửi đi.
     html = html.replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, '[email]')
