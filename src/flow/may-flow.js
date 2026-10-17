@@ -430,6 +430,11 @@ function taoMayFlow(o) {
     tab._daDemXong = new Set();
     tab._meKhoa = Date.now();
     datCaiDatAnToan(settings.anToan);
+    // Lưới dự án đang lọc theo loại (bản cũ từng bấm nhầm mục lọc ở thanh bên) → về "Tất cả", không thì thẻ mới khác loại không hiện.
+    try {
+      const loc = await tab.view.webContents.executeJavaScript('window.__flowBoLocLuoi ? window.__flowBoLocLuoi() : null', true);
+      if (loc && loc.daBo) { log('info', `🧹 [${tab.id}] Lưới dự án Flow đang lọc "${loc.tu}" — đã chuyển về "Tất cả nội dung nghe nhìn".`); await cho(1500); }
+    } catch (_) {}
     const doi = await datCheDoKienTri(tab, settings.runMode, 4, 8000, conChay, tuyCheDo(settings));
     if (!doi.ok) return { ok: false, lyDo: doi.lyDo };
     if (settings.runMode === 'image') await datModelAnh(tab, settings);
@@ -508,7 +513,8 @@ function taoMayFlow(o) {
           const cb = await wc.executeJavaScript(`window.__flowBamTaoChuanBi ? window.__flowBamTaoChuanBi(${JSON.stringify({ selector: sel })}) : null`, true);
           if (cb && cb.wasDisabled) { log('error', `❌ [${tab.id}] ${cb.error}`); return cb; }
           if (cb && cb.ok) {
-            if (!cb.trung) log('warning', `⚠️ [${tab.id}] Tâm nút Tạo đang bị lớp khác che — vẫn thử bấm chuột thật.`);
+            if (cb.daGo && cb.trung) log('info', `🧹 [${tab.id}] Nút Tạo bị lớp ${cb.daGo} che — đã đóng lớp đó rồi bấm.`);
+            else if (!cb.trung) log('warning', `⚠️ [${tab.id}] Tâm nút Tạo đang bị lớp khác che${cb.che ? ` (${cb.che})` : ''} — vẫn thử bấm chuột thật.`);
             const b = await bamChuotThat(wc, cb.x, cb.y);
             if (b.ok) {
               let kq = null;

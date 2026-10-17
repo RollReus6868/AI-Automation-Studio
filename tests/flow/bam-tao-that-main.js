@@ -70,6 +70,13 @@ app.whenReady().then(async () => {
   ok('Flow 3 giây mới xoá chữ → vẫn nhận ra là đã ăn, không bấm thêm', r.kq && r.kq.an && (await js('__soLanGui')) === 1,
      `gửi ${await js('__soLanGui')} lần`);
 
+  // 1.2.8 — nhật ký 17/10/2026: "Tâm nút Tạo đang bị lớp khác che" → chuột thật trúng lớp nền của menu còn mở.
+  await dat({ che: true });
+  r = await bamNhuApp('');
+  ok('menu CDK còn mở đè nút Tạo → app đóng lớp đó rồi bấm, Flow nhận', r.kq && r.kq.an && r.cb.trung === true && (await js('__soLanGui')) === 1,
+     JSON.stringify({ trung: r.cb.trung, daGo: r.cb.daGo, gui: await js('__soLanGui') }));
+  ok('...nói rõ lớp nào đã che', /cdk-overlay-backdrop/.test(r.cb.daGo || ''), r.cb.daGo);
+
   await dat({ tat: true });
   const cb = await js('window.__flowBamTaoChuanBi({})');
   ok('nút đang tắt → nói ra, không bấm', cb.ok === false && cb.wasDisabled === true);

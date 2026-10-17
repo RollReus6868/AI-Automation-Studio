@@ -70,6 +70,16 @@
     return t.replace(/\s+/g, ' ').trim().toLowerCase();
   };
 
+  // ── KHÔNG PHẢI bảng chế độ (1.2.8) ───────────────────────────────────
+  // Nhật ký 17/10/2026 12:03: thanh bên của dự án (div[flow-sidenav-top], không class) có MỤC LỌC "Hình ảnh" và
+  // "Video" một khi dự án có cả ảnh lẫn video. Lối dò cuối của timBang() tưởng đó là bảng chọn chế độ → không mở
+  // bảng thật, bấm mục lọc 3 lần ("Đã bấm nút image 3 lần nhưng giao diện Flow không đổi") → tài khoản bị cho nghỉ oan,
+  // lưới dự án còn bị lọc theo loại. Bảng kho [+] (ô "Tìm kiếm thành phần") cũng có mục lọc Hình ảnh / Video.
+  const NGOAI_BANG = '[role="navigation"], mat-sidenav, mat-nav-list, flow-project-nav-list, [flow-sidenav-top], nav, flow-asset-picker';
+  const laMucLoc = (el) => !!(el && el.closest && el.closest(NGOAI_BANG));
+  const coONhapChu = (el) => !!(el && el.querySelector &&
+    el.querySelector('input:not([type]), input[type="text"], input[type="search"], textarea'));
+
   // Nhãn hai chế độ. Flow chạy tiếng Anh kể cả khi trang đang là tiếng Việt,
   // nhưng vẫn để sẵn cả hai cho chắc.
   const NHAN = {
@@ -218,16 +228,19 @@
     const nuts = [...document.querySelectorAll(
       'button, [role="tab"], [role="radio"], [role="menuitemradio"], mat-button-toggle'
     )].filter((el) => nhinThay(el) && nhanNut(el).length <= 24 &&
-      !(trig && (el === trig || el.contains(trig) || trig.contains(el))) && !el.closest('[role="article"]'));
+      !(trig && (el === trig || el.contains(trig) || trig.contains(el))) && !el.closest('[role="article"]') && !laMucLoc(el));
     // Bảng bật lên của Angular CDK (Flow 16/10/2026) chứa cả hai nút → lấy cả bảng (còn cặp Khung hình | Thành phần).
     for (const pane of document.querySelectorAll('.cdk-overlay-pane')) {
-      if (!nhinThay(pane)) continue;
+      if (!nhinThay(pane) || coONhapChu(pane)) continue;     // bảng kho có ô tìm kiếm — không phải bảng chế độ
       const trong = nuts.filter((el) => pane.contains(el));
       if (trong.some((el) => khopNhan(el, 'video')) && trong.some((el) => khopNhan(el, 'image'))) return pane;
     }
 
-    const coVideo = nuts.find((el) => khopNhan(el, 'video'));
-    const coImage = nuts.find((el) => khopNhan(el, 'image'));
+    // Ngoài bảng bật lên thì chỉ nhận cặp nút nằm trong một lớp nổi (popup / dialog / menu), không lấy khối trên trang.
+    const trongLopNoi = (el) => !!el.closest('.cdk-overlay-container, [role="dialog"], [role="menu"], [data-radix-popper-content-wrapper], flow-prompt-box, flow-prompt-box-settings') &&
+      !coONhapChu(el.closest('.cdk-overlay-pane') || null);
+    const coVideo = nuts.find((el) => khopNhan(el, 'video') && trongLopNoi(el));
+    const coImage = nuts.find((el) => khopNhan(el, 'image') && trongLopNoi(el));
     if (coVideo && coImage) {
       let n = coVideo;
       for (let i = 0; i < 8 && n; i++) {
@@ -336,7 +349,7 @@
     // ── Lưới an toàn: khớp theo chữ ────────────────────────────────────
     const ds = [...goc.querySelectorAll(
       'button, [role="tab"], [role="radio"], [role="menuitemradio"], [role="option"], mat-button-toggle'
-    )].filter((el) => nhinThay(el) && khopNhan(el, mode));
+    )].filter((el) => nhinThay(el) && khopNhan(el, mode) && !laMucLoc(el));
     if (ds.length) {
       const el = ds[ds.length - 1];                 // nút trong bảng vừa mở nằm cuối
       return { nut: el.tagName === 'MAT-BUTTON-TOGGLE' ? (el.querySelector('button') || el) : el, boc: el };
@@ -353,7 +366,7 @@
   };
   function timNutPhu(goc, phu) {
     const ds = [...(goc || document).querySelectorAll('button, [role="tab"], [role="radio"], mat-button-toggle')]
-      .filter((el) => nhinThay(el) && (NHAN_PHU[phu] || []).includes(nhanNut(el)));
+      .filter((el) => nhinThay(el) && !laMucLoc(el) && (NHAN_PHU[phu] || []).includes(nhanNut(el)));
     return ds.length ? ds[ds.length - 1] : null;
   }
   async function datPhu(phu) {
@@ -399,6 +412,22 @@
   window.__flowTimBang   = timBang;
   window.__flowDongBang  = dongBang;
   window.__flowNhinThay  = nhinThay;
+
+  /**
+   * Thanh bên dự án đang lọc lưới theo loại (Hình ảnh / Video…) → về "Tất cả nội dung nghe nhìn" (1.2.8).
+   * Bản ≤ 1.2.7 từng bấm nhầm mục lọc khi đổi chế độ; lưới bị lọc thì thẻ mới khác loại không hiện ra,
+   * engine báo "không đẻ ra thẻ nào" dù Flow vẫn tạo. Mục đầu tiên của thanh bên là "Tất cả".
+   */
+  window.__flowBoLocLuoi = function () {
+    const nhom = document.querySelector('[flow-sidenav-top]');
+    if (!nhom) return { co: false };
+    const ds = [...nhom.querySelectorAll('button, a, [role="link"], [mat-list-item]')].filter(nhinThay);
+    const tatCa = ds.find((el) => /dashboard/.test(el.textContent || '') || /^tất cả|^all/i.test(nhanNut(el))) || ds[0];
+    const dangChon = ds.find((el) => /--activated|\bactive\b/.test(String(el.className || '')) || el.getAttribute('aria-current') === 'page');
+    if (!tatCa || !dangChon || dangChon === tatCa) return { co: true, daBo: false };
+    try { tatCa.click(); } catch (_) {}
+    return { co: true, daBo: true, tu: nhanNut(dangChon) };
+  };
 
   /** Chụp lại những gì đang thấy — để gửi kèm khi báo lỗi. */
   window.__flowModeDebug = function () {

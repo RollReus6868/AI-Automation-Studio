@@ -16,6 +16,20 @@
     document.querySelector('.ProseMirror').innerText = 'một con mèo ngồi trên mái nhà';
     document.getElementById('luoi').innerHTML = '';
     const n = document.getElementById('nut'); n.disabled = !!cfg.tat;
+    // ?che: menu Angular CDK còn mở (lớp nền trong suốt phủ cả trang) — chuột thật bấm trúng lớp nền, không trúng nút.
+    // Lớp nền đóng khi bấm (click giả cũng được, như CDK) hoặc Escape trên body.
+    document.querySelectorAll('.cdk-overlay-container').forEach((x) => x.remove());
+    if (cfg.che) {
+      const oc = document.createElement('div');
+      oc.className = 'cdk-overlay-container';
+      oc.style.cssText = 'position:fixed;inset:0;z-index:1000';
+      oc.innerHTML = '<div class="cdk-overlay-backdrop cdk-overlay-transparent-backdrop" style="position:absolute;inset:0"></div>' +
+        '<div class="cdk-overlay-pane" style="position:absolute;left:10px;top:10px"><div role="menu" class="mat-mdc-menu-panel">menu</div></div>';
+      const dong = () => oc.remove();
+      oc.querySelector('.cdk-overlay-backdrop').addEventListener('click', dong);
+      document.body.addEventListener('keydown', (e) => { if (e.key === 'Escape') dong(); });
+      document.body.appendChild(oc);
+    }
   };
   function gui() {
     window.__soLanGui++;

@@ -93,6 +93,7 @@ app.whenReady().then(async () => {
     let m = await js('window.__flowSetMode("video", { phu: "thanh-phan" })');
     ok('tự đổi sang mục Video', m.ok && (await js('window.__cheDo')) === 'video' && (await js('window.__flowGetMode()')) === 'video', JSON.stringify(m));
     ok('...và chọn "Thành phần" (ảnh gắn @tên là thành phần của video)', (await js('window.__phu')) === 'thanh-phan', JSON.stringify(m));
+    ok('...không bấm nhầm mục lọc "Video" ở thanh bên dự án', (await js('window.__locTrang || ""')) === '', await js('window.__locTrang || ""'));
     m = await js('window.__flowSetMode("video", { phu: "thanh-phan" })');
     ok('...gọi lại khi đã đúng: không bấm gì thêm', m.ok && !m.daDoi, JSON.stringify(m));
 
@@ -108,6 +109,24 @@ app.whenReady().then(async () => {
     // 6. Quay về Hình ảnh.
     m = await js('window.__flowSetMode("image")');
     ok('tự đổi về mục Hình ảnh', m.ok && (await js('window.__cheDo')) === 'image' && (await js('window.__flowGetMode()')) === 'image', JSON.stringify(m));
+    ok('...không bấm nhầm mục lọc "Hình ảnh" ở thanh bên (nhật ký 17/10 12:03)', (await js('window.__locTrang || ""')) === '', await js('window.__locTrang || ""'));
+    // Bảng kho [+] đang mở (cũng có Hình ảnh / Video): không nhận nhầm là bảng chế độ.
+    await js('document.getElementById("nutThem").click()'); await wait(300);
+    m = await js('window.__flowSetMode("video")');
+    ok('bảng kho đang mở: vẫn đổi đúng sang Video (không bấm mục lọc trong kho)', m.ok && (await js('window.__cheDo')) === 'video', JSON.stringify(m));
+    m = await js('window.__flowSetMode("image")');
+    ok('...và về lại Hình ảnh', m.ok && (await js('window.__cheDo')) === 'image', JSON.stringify(m));
+    await js('document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); undefined;');
+
+    // 6b. Lưới đang lọc "Hình ảnh" (bản cũ bấm nhầm) → về "Tất cả"; đang ở "Tất cả" thì không bấm gì.
+    let bo = await js('window.__flowBoLocLuoi()');
+    ok('lưới đang ở "Tất cả": không bấm gì', bo.co && !bo.daBo && (await js('window.__locTrang || ""')) === '', JSON.stringify(bo));
+    await js('document.querySelector(\'.nav-loc[data-loc="image"]\').click(); undefined;');
+    bo = await js('window.__flowBoLocLuoi()');
+    ok('lưới đang lọc "Hình ảnh" → chuyển về "Tất cả nội dung nghe nhìn"', bo.daBo && (await js('window.__locTrang')) === 'tat-ca', JSON.stringify(bo));
+    const mf = require('fs').readFileSync(path.join(__dirname, '..', '..', 'src', 'flow', 'may-flow.js'), 'utf8');
+    const cb = mf.slice(mf.indexOf('async function chuanBiMe'));
+    ok('may-flow: bỏ lọc lưới TRƯỚC khi đổi chế độ mỗi mẻ', cb.indexOf('__flowBoLocLuoi') > 0 && cb.indexOf('__flowBoLocLuoi') < cb.indexOf('datCheDoKienTri('));
 
     // 7. Chụp chẩn đoán bảng kho để người dùng gửi khi Flow đổi giao diện.
     await js('document.getElementById("nutThem").click()');
