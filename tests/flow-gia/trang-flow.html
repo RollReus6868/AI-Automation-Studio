@@ -40,9 +40,16 @@
     // Chưa đăng nhập: Google đưa sang trang đăng nhập (ngoài /fx/ → app coi là ngoài Flow).
     location.replace(location.href.replace(/\/fx\/.*/, '/signin/v2/identifier'));
   } else {
-    // Như Flow thật: biểu tượng là CHỮ (font google-symbols) đứng trước nhãn → innerText "add_2 Dự án mới".
-    document.body.innerHTML = '<h3>Flow</h3><button id="moi"><i class="google-symbols">add_2</i> Dự án mới</button><div id="dsDuAn"></div>';
     const goc = location.pathname.replace(/\/$/, '');
+    // Cookie flow_mo_du_an_cu=<mã>: lần đầu tab vào trang chủ, Flow tự mở lại dự án cũ đó (app phải tự về trang chủ
+    // rồi bấm "+ Dự án mới", không được dùng dự án cũ).
+    const cu = (document.cookie.match(/(?:^|;\s*)flow_mo_du_an_cu=([^;]+)/) || [])[1];
+    if (cu && !sessionStorage.getItem('daMoDuAnCu')) { sessionStorage.setItem('daMoDuAnCu', '1'); location.replace(goc + '/project/' + cu); }
+    // Như Flow thật (ảnh người dùng 17/10/2026): nút "+ Dự án mới" NỔI giữa đáy trang chủ (chính nút là
+    // position:fixed → offsetParent = null), biểu tượng là CHỮ (font google-symbols) dính liền nhãn trong thẻ
+    // riêng → innerText "add_2Dự án mới" (không có dấu cách).
+    document.body.innerHTML = '<h3>Flow</h3><div id="dsDuAn"></div>' +
+      '<button id="moi" style="position:fixed;left:50%;bottom:40px;transform:translateX(-50%);padding:30px 50px"><i class="google-symbols">add_2</i><span>Dự án mới</span></button>';
     document.getElementById('moi').onclick = async () => {
       const id = 'gia-' + Math.random().toString(36).slice(2, 8);
       await fetch('/__flow-du-an', { method: 'POST', body: JSON.stringify({ id }) }).catch(() => {});

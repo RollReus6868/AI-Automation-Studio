@@ -31,27 +31,42 @@ const thamChieuMd = require('./main/anh-tham-chieu');
 const cho = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const CO_O_NHAP = `!!document.querySelector('.ProseMirror[contenteditable="true"], [data-slate-editor="true"][contenteditable="true"], [role="textbox"][contenteditable="true"]')`;
-// Trang chủ Flow (chưa vào dự án): bấm "Dự án mới". Nút của Flow có biểu tượng chữ (vd "add_2") đứng trước
-// nhãn → so phần CUỐI chữ của nút. Không tìm thấy thì thôi — người dùng mở dự án khi đăng nhập.
+// Phần tử đang hiện trên màn hình. KHÔNG dùng offsetParent: phần tử position:fixed luôn có offsetParent = null
+// — nút "+ Dự án mới" của Flow thật nổi giữa đáy trang chủ (ảnh người dùng 17/10/2026), nên 1.3.0 không thấy nó.
+const HIEN = `const hien = (e) => { const r = e.getBoundingClientRect(); if (r.width < 4 || r.height < 4) return false;
+    const s = getComputedStyle(e); return s.display !== 'none' && s.visibility !== 'hidden' && Number(s.opacity) !== 0; };`;
+// Trang chủ Flow (chưa vào dự án): bấm "+ Dự án mới". Nút của Flow có biểu tượng chữ (vd "add_2") đứng trước
+// nhãn → so phần CUỐI chữ. Nhận cả nút là thẻ div / span (lấy phần tử nhỏ nhất mang chữ đó rồi leo lên tổ
+// tiên bấm được). Không tìm thấy thì thôi — chờ rồi thử lại. Trả tên thẻ đã bấm (để ghi nhật ký) hoặc ''.
 const BAM_DU_AN_MOI = `(() => {
+  ${HIEN}
   const re = /(^|\\s)(new project|dự án mới|tạo dự án( mới)?)$/i;
   const chu = (e) => String(e.innerText || e.textContent || '').replace(/\\s+/g, ' ').trim();
-  const ds = [...document.querySelectorAll('button, a, [role="button"]')].filter((e) => e.offsetParent && chu(e).length <= 40);
-  const nut = ds.find((e) => re.test(chu(e)));
-  if (!nut) return false;
-  const r = nut.getBoundingClientRect(), o = { bubbles: true, cancelable: true, view: window, clientX: r.x + r.width / 2, clientY: r.y + r.height / 2 };
+  const khop = (e) => (chu(e).length <= 40 && re.test(chu(e))) || re.test(String(e.getAttribute('aria-label') || '').trim());
+  const BAM = 'button, a, [role="button"], [role="link"], [role="menuitem"]';
+  let nut = [...document.querySelectorAll(BAM)].find((e) => hien(e) && !e.disabled && khop(e));
+  if (!nut) {
+    const la = [...document.querySelectorAll('body *')].filter((e) => !/^(SCRIPT|STYLE|SVG|PATH)$/i.test(e.tagName) && hien(e) && khop(e));
+    la.sort((a, b) => { const x = a.getBoundingClientRect(), y = b.getBoundingClientRect(); return x.width * x.height - y.width * y.height; });
+    nut = la[0];
+    for (let e = nut, i = 0; e && e !== document.body && i < 5; e = e.parentElement, i++) {
+      if (e.matches(BAM + ', [tabindex]') || getComputedStyle(e).cursor === 'pointer') { nut = e; break; }
+    }
+  }
+  if (!nut) return '';
+  const r = nut.getBoundingClientRect(), o = { bubbles: true, cancelable: true, view: window, button: 0, clientX: r.x + r.width / 2, clientY: r.y + r.height / 2 };
   for (const t of ['pointerdown', 'mousedown', 'pointerup', 'mouseup']) nut.dispatchEvent(new (t.startsWith('pointer') ? PointerEvent : MouseEvent)(t, o));
   nut.click();
-  return true;
+  return nut.tagName.toLowerCase() + ' "' + chu(nut).slice(0, 40) + '"';
 })()`;
 // Hết giờ mà chưa vào được dự án: chụp lại thứ đang thấy để lần sau đọc nhật ký là biết vì sao.
-const CHAN_DOAN_TRANG = `(() => ({
+const CHAN_DOAN_TRANG = `(() => { ${HIEN} return {
   url: location.href,
-  oNhap: [...document.querySelectorAll('[contenteditable="true"], textarea, [role="textbox"]')].filter((e) => e.offsetParent)
+  oNhap: [...document.querySelectorAll('[contenteditable="true"], textarea, [role="textbox"]')].filter(hien)
     .map((e) => e.tagName.toLowerCase() + (e.className && typeof e.className === 'string' ? '.' + e.className.split(/\\s+/).slice(0, 2).join('.') : '')).slice(0, 5),
-  nut: [...document.querySelectorAll('button, a, [role="button"]')].filter((e) => e.offsetParent)
-    .map((e) => String(e.innerText || e.getAttribute('aria-label') || '').replace(/\\s+/g, ' ').trim()).filter(Boolean).slice(0, 12)
-}))()`;
+  nut: [...document.querySelectorAll('button, a, [role="button"], [role="link"]')].filter(hien)
+    .map((e) => String(e.innerText || e.getAttribute('aria-label') || '').replace(/\\s+/g, ' ').trim()).filter(Boolean).slice(0, 30)
+}; })()`;
 
 const TRANG_THAI_BUOC = { WAITING: 'Chờ trong mẻ Flow', PASTING: 'Đang dán prompt', CREATING: 'Flow đang tạo', COMPLETED: 'Đang tải về' };
 
@@ -117,7 +132,10 @@ class LuongFlow {
     const t = this.tab;
     const wc = t.view.webContents;
     const het = Date.now() + this.choSanSangMs;
-    let lanBam = 0, ngoaiFlow = 0;
+    let lanBam = 0, ngoaiFlow = 0, daBamMoi = false, veTrangChu = 0;
+    // 1.3.0: dự án của app chưa có dự án Flow riêng trên tài khoản này → phải TỰ TẠO dự án mới (bấm "+ Dự án mới"
+    // ở trang chủ), không nhận dự án cũ Flow tự mở lại.
+    const canMoi = !this.taiKhoan.flowUrl;
     // Tab cũ còn nằm ở trang chủ mà tài khoản đã có dự án (người dùng vừa đăng nhập + bấm Xong) → mở thẳng dự án.
     const urlNay = wc.getURL();
     if (this.taiKhoan.flowUrl && urlNay && !/\/project\//.test(urlNay)) wc.loadURL(this.taiKhoan.flowUrl).catch(() => {});
@@ -131,6 +149,14 @@ class LuongFlow {
       } else ngoaiFlow = 0;
       if (t.ready) {
         const coONhap = await wc.executeJavaScript(CO_O_NHAP, true).catch(() => false);
+        if (coONhap && canMoi && !daBamMoi && /\/project\//.test(url) && veTrangChu < 2) {
+          // Đang ở dự án CŨ (vd Flow mở lại dự án dùng lần trước) → về trang chủ (như nút ngôi nhà) rồi bấm "+ Dự án mới".
+          veTrangChu++;
+          this.log('info', `🏠 [${this.id}] Tab đang ở dự án Flow cũ — về trang chủ Flow để tạo dự án mới.`);
+          wc.loadURL(FLOW_URL).catch(() => {});
+          await cho(2000);
+          continue;
+        }
         if (coONhap) {
           if (/\/project\//.test(url) && url !== this.taiKhoan.flowUrl) {
             this.taiKhoan.flowUrl = url;
@@ -140,8 +166,8 @@ class LuongFlow {
         }
         if (!/\/project\//.test(url) && Date.now() - lanBam > 10000) {
           lanBam = Date.now();
-          const bam = await wc.executeJavaScript(BAM_DU_AN_MOI, true).catch(() => false);
-          if (bam) this.log('info', `📁 [${this.id}] Mở dự án Flow mới cho tài khoản này.`);
+          const bam = await wc.executeJavaScript(BAM_DU_AN_MOI, true).catch(() => '');
+          if (bam) { daBamMoi = true; this.log('info', `📁 [${this.id}] Mở dự án Flow mới cho tài khoản này (bấm ${bam}).`); }
         }
       }
       await cho(1000);

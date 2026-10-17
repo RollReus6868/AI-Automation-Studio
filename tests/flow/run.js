@@ -2161,6 +2161,22 @@ testAsync('lỗi chọn chất lượng tải xuống (máy Flow): gọi tab.onL
   assert.ok(/t\.onBang = t\.onDung = t\.onTai = t\.onLoiChatLuong = null/.test(lf), 'kết thúc mẻ phải gỡ onLoiChatLuong');
 });
 
+// 1.3.1 (nhật ký 17/10/2026 18:00, 7 tài khoản Flow kẹt ở trang chủ): nút "+ Dự án mới" của Flow thật nổi giữa đáy
+// trang (position:fixed) → offsetParent luôn null → 1.3.0 lọc mất nút, không bao giờ tạo được dự án Flow mới.
+test('trang chủ Flow: tìm nút "+ Dự án mới" không dựa vào offsetParent (nút nổi position:fixed)', () => {
+  const lf = require('fs').readFileSync(require('path').join(__dirname, '..', '..', 'src', 'flow', 'luong-flow.js'), 'utf8');
+  const a = lf.indexOf('const HIEN ='), b = lf.indexOf('const TRANG_THAI_BUOC');
+  assert.ok(a > 0 && b > a, 'không tìm thấy khối HIEN / BAM_DU_AN_MOI trong luong-flow.js');
+  const { BAM_DU_AN_MOI, CHAN_DOAN_TRANG } = new Function(lf.slice(a, b) + ';return { BAM_DU_AN_MOI, CHAN_DOAN_TRANG };')();
+  for (const [ten, js] of [['BAM_DU_AN_MOI', BAM_DU_AN_MOI], ['CHAN_DOAN_TRANG', CHAN_DOAN_TRANG]]) {
+    new Function(js);   // cú pháp đúng sau khi ghép chuỗi
+    assert.ok(!/offsetParent/.test(js), `${ten} còn dùng offsetParent — bỏ sót nút nổi position:fixed`);
+    assert.ok(/getBoundingClientRect/.test(js), `${ten} phải xét phần tử hiện bằng kích thước thật`);
+  }
+  // Dự án app chưa có dự án Flow riêng mà Flow tự mở lại dự án cũ → về trang chủ để tạo dự án mới.
+  assert.ok(/canMoi && !daBamMoi && \/\\\/project\\\/\/\.test\(url\)/.test(lf) && /wc\.loadURL\(FLOW_URL\)/.test(lf), 'thiếu bước về trang chủ khi đang ở dự án Flow cũ');
+});
+
 // ── Kết luận ───────────────────────────────────────────────────────────────
 (async () => {
 await Promise.all(choAsync);
