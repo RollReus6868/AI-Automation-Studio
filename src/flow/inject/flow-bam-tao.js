@@ -370,8 +370,32 @@
       oNhap: !!(ed && (ed.tagName === 'TEXTAREA' || ed.isContentEditable)),
       nut: !!el,
       dai: doDaiChu(ed),
-      lop: lopConMo().map(moTaLop)
+      lop: lopConMo().map(moTaLop),
+      hetTinDung: el ? '' : canhBaoTinDung()
     };
+  };
+
+  // ── HẾT TÍN DỤNG (1.3.2) ─────────────────────────────────────────────────
+  //  Tệp chẩn đoán 17/10/2026 23:27 (tài khoản báo "Create button not found" cả 3 lần thử): trong .submit-controls
+  //  KHÔNG còn <flow-generate-icon-button>; Flow đặt vào chỗ đó
+  //    <flow-credit-warning-button><flow-prompt-warning-button><button class="prompt-warning-button"
+  //      aria-label="Cảnh báo về việc không đủ tín dụng"> (ảnh quả cầu + icon info)
+  //  = tài khoản không đủ credit cho model đang chọn. Không có nút Tạo để bấm — đổi tài khoản, đừng thử lại.
+  function canhBaoTinDung() {
+    for (const b of document.querySelectorAll('flow-credit-warning-button button, flow-credit-warning-button, button.prompt-warning-button')) {
+      const chu = String(b.getAttribute('aria-label') || '').trim();
+      if (!b.closest('flow-credit-warning-button') && !/tín dụng|credit/i.test(chu)) continue;
+      if (!nhinThay(b)) continue;
+      return chu || 'Cảnh báo về việc không đủ tín dụng';
+    }
+    return '';
+  }
+  /** Nút Tạo bị Flow thay bằng nút cảnh báo hết tín dụng? → { co, chu }. Còn nút Tạo thì co = false. */
+  window.__flowCanhBaoTinDung = function (tuyChon) {
+    const o = tuyChon || {};
+    if (timNut(o.selector || null).el) return { co: false };
+    const chu = canhBaoTinDung();
+    return { co: !!chu, chu };
   };
 
   window.__flowBamTaoChuanBi = async function (tuyChon) {

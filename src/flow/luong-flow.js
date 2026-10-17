@@ -232,12 +232,26 @@ class LuongFlow {
               dsFile.push(dich);
             }
           } catch (err) { this.log('error', `❌ [${this.id}] Không chép được ảnh để tải lên: ${err.message}`); }
-          const k = dsFile.length && t.view && !t.view.webContents.isDestroyed()
-            ? await this.taiAnhLen(t.view.webContents, dsFile, { dongY: !!chuanHoaFlow(ctx.caiDat).dongYQuyenAnh })
-            : { ok: false, loi: 'không có ảnh / tab đã đóng' };
+          const taiLen = (files) => files.length && t.view && !t.view.webContents.isDestroyed()
+            ? this.taiAnhLen(t.view.webContents, files, { dongY: !!chuanHoaFlow(ctx.caiDat).dongYQuyenAnh })
+            : Promise.resolve({ ok: false, loi: 'không có ảnh / tab đã đóng' });
+          let k = await taiLen(dsFile);
+          if (k.dongY && k.dongY.daDongY) {
+            this.log('info', `☑ [${this.id}] Flow hỏi "${k.dongY.tieuDe}" — app đã bấm "Tôi đồng ý" (Cài đặt → Google Flow → tự đồng ý).`);
+            // Nhật ký 17/10/2026 23:26–23:29: cả 4 lần app bấm "Tôi đồng ý", ảnh KHÔNG vào kho (tệp chẩn đoán: bảng [+]
+            // không có ảnh); lần tải sau ở cùng tài khoản (Flow không hỏi nữa) thì vào ngay. Flow bỏ tệp đang chờ khi hỏi
+            // quyền → chờ một chút, ảnh chưa vào kho thì tải lại đúng các ảnh còn thiếu.
+            if (!(await this._ngu(3000, huyLuc))) return { dung: true };
+            const con = await kiem();
+            const lai = dsFile.filter((f) => con === null || con.includes(path.basename(f, path.extname(f))));
+            if (lai.length) {
+              this.log('info', `⬆️ [${this.id}] Bấm "Tôi đồng ý" xong Flow chưa giữ ảnh — tải lại ${lai.length} ảnh (Flow không hỏi lại nữa).`);
+              const k2 = await taiLen(lai);
+              k = { ...k2, dongY: k2.dongY && (k2.dongY.daDongY || k2.canDongY) ? k2.dongY : k.dongY, daTaiLai: true };
+            } else thieu = con;
+          }
           daTai = k.ok;
           const CACH = { 'o-tai-len': 'đặt vào ô tải lên', 'hop-chon-file': `bấm ${k.buoc && k.buoc.length ? k.buoc.map((b) => b.split(': ')[1]).filter(Boolean).join(' → ') : 'Tải lên'}`, 'keo-tha': 'kéo-thả vào ô nhập prompt' };
-          if (k.dongY && k.dongY.daDongY) this.log('info', `☑ [${this.id}] Flow hỏi "${k.dongY.tieuDe}" — app đã bấm "Tôi đồng ý" (Cài đặt → Google Flow → tự đồng ý).`);
           if (k.canDongY) {
             canDongY = k;
             this.log('error', `✋ [${this.id}] Tài khoản "${this.taiKhoan.ten}": ${k.loi}. Flow chỉ hỏi một lần mỗi tài khoản — ` +

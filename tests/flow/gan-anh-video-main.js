@@ -10,6 +10,8 @@
 //    ?giuNen=1 (bảng kho đóng, lớp nền tối ở lại), ?dongY=1 (hộp "Quyền sử dụng hình ảnh này"); ENGINE THẬT flow-engine.js nói chuyện với MÁY FLOW THẬT
 //    (src/flow/may-flow.js) qua preload-flow.js + ipcMain như main.js; dán bằng CDP, bấm Tạo bằng chuột thật.
 //  Rồi kiểm tiếp: ảnh vừa tải hiện trong lưới dự án (trongLuoi), hộp thoại Flow mở sau khi nhận file (sauTai).
+//  Nhật ký 17/10/2026 23:30: bấm "Tôi đồng ý" xong Flow bỏ ảnh (?dongY=bo) → luồng Flow tải lại; tài khoản không đủ
+//  credit, nút Tạo bị thay bằng nút cảnh báo (?hetTinDung=1) → máy Flow cho tài khoản nghỉ ngay.
 // ============================================================================
 const { app, BaseWindow, WebContentsView, ipcMain } = require('electron');
 const path = require('path');
@@ -17,6 +19,7 @@ const fs = require('fs');
 const os = require('os');
 const { taoMayFlow } = require('../../src/flow/may-flow');
 const { taiAnhLen, moTaSauTai } = require('../../src/flow/main/tai-anh-len');
+const { LuongFlow } = require('../../src/flow/luong-flow');
 
 const GOC = path.join(__dirname, '..', '..');
 const INJ = path.join(GOC, 'src', 'flow', 'inject');
@@ -148,6 +151,63 @@ app.whenReady().then(async () => {
     await t.js('document.getElementById("nutThem").click()'); await wait(400);
     const luoi2 = await t.js('window.__flowKhoAnh.trongLuoi(["cu_khac"])');
     ok('...tên chỉ nằm trong bảng kho [+] (lớp nổi) thì KHÔNG tính là có trong lưới', luoi2.length === 0, JSON.stringify(luoi2));
+    dongTab(t);
+
+    // ── 6. Bấm "Tôi đồng ý" xong Flow BỎ ảnh đang chờ (nhật ký 23:26–23:29) → luồng Flow tải lại, lần này vào kho ──
+    const ganAnhQua = async (q, ma) => {
+      const x = await moTab(q);
+      const nk = [];
+      const lf = new LuongFlow({ id: 'L1', taiKhoan: { id: 'flow-1', ten: 'Flow 1' }, thuMucTam: tam, log: (m, c) => nk.push(`${m} ${c}`),
+        tabs: { dispatch: (id, m) => guiEngine(x.js, m) },
+        docAnh: (f) => ({ dataUrl: 'data:image/png;base64,' + fs.readFileSync(f).toString('base64'), type: 'image/png' }) });
+      lf.tab = tab;
+      const j = { so: 1 };
+      const bd = Date.now();
+      const g = await lf._ganAnh([j], { anhCua: () => [anh(`${ma}.png`)], caiDat: { dongYQuyenAnh: true } }, lf.huy);
+      return { x, nk: nk.join('\n'), g, giay: Math.round((Date.now() - bd) / 1000) };
+    };
+    let gq = await ganAnhQua({ kho: 'cu_khac.png', dongY: 'bo' }, '004_112652');
+    ok('Flow bỏ ảnh sau khi đồng ý: app tải lại, ảnh vào kho, việc KHÔNG hỏng', gq.g.hong && gq.g.hong.size === 0,
+      `${gq.giay}s · ${[...(gq.g.hong || new Map()).values()].join()} · ${gq.nk.split('\n').filter((l) => /☑|⬆️|⚠/.test(l)).join(' | ')}`);
+    ok('...đúng một lần "Tôi đồng ý", trang nhận file hai lần', (await gq.x.js('window.__dongY')) === 1 && (await gq.x.js('window.__nhan.length')) === 2,
+      JSON.stringify(await gq.x.js('window.__nhan')));
+    ok('...nhật ký nói rõ app tải lại', /Bấm "Tôi đồng ý" xong Flow chưa giữ ảnh — tải lại 1 ảnh/.test(gq.nk));
+    dongTab(gq.x);
+    gq = await ganAnhQua({ kho: 'cu_khac.png', dongY: '1' }, '006_33430e');
+    ok('Flow giữ ảnh sau khi đồng ý: không tải lại', gq.g.hong.size === 0 && (await gq.x.js('window.__nhan.length')) === 1 && !/tải lại/.test(gq.nk),
+      `${gq.giay}s · ${JSON.stringify(await gq.x.js('window.__nhan'))}`);
+    dongTab(gq.x);
+
+    // ── 7. Không đủ credit: Flow thay nút Tạo bằng <flow-credit-warning-button> (tệp chẩn đoán 23:27:36) ──
+    nhatKy.length = 0;
+    t = await moTrang(w, { kho: '006_33430e.png', cheDo: 'video', hetTinDung: '1' });
+    const P7 = ['Bờ biển lúc bình minh, sóng vỗ nhẹ, máy quay bay thấp dọc bãi cát @006_33430e'];
+    tab = { id: 't1', view: t.v, ready: true, accountId: 'flow-1', accountName: 'Flow 1', promptsMe: P7, caiDatEngine: SETTINGS };
+    // Trong app tab đang chạy mẻ (engine báo isRunning); ở đây gọi thẳng pastePrompt nên giữ cờ bận cố định.
+    Object.defineProperty(tab, 'busy', { get: () => true, set: () => {} });
+    const tc = await t.js('window.__flowCanhBaoTinDung({})');
+    ok('nhận ra nút cảnh báo "không đủ tín dụng" ở chỗ nút Tạo', tc && tc.co && /không đủ tín dụng/.test(tc.chu), JSON.stringify(tc));
+    const bd7 = Date.now();
+    await chayMotPrompt(t.js, P7, SETTINGS);
+    const nk7 = nhatKy.join('\n');
+    ok('tài khoản không đủ credit → báo 💳 và cho tài khoản nghỉ (không thử lại)', /💳 \[t1\] Flow thay nút Tạo bằng nút "Cảnh báo về việc không đủ tín dụng"/.test(nk7) &&
+      /🛑 \[Flow 1\] Tài khoản lỗi \(Flow báo không đủ tín dụng \(hết credit\)\)/.test(nk7),
+      `${Math.round((Date.now() - bd7) / 1000)}s · ${nhatKy.filter((l) => /💳|🛑|Create/.test(l)).join(' | ')}`);
+    ok('...báo đúng một lần', (nk7.match(/💳/g) || []).length === 1);
+    ok('...nghỉ 3 giờ', /nghỉ 3 giờ|tự chạy lại sau 3 giờ/.test(nk7), nhatKy.filter((l) => /🛑/.test(l)).join(' | '));
+    ok('...không còn cảnh báo "ô nhập chưa sẵn sàng sau 15 giây"', !/chưa sẵn sàng sau/.test(nk7));
+    // Engine báo "Create button not found" ngay sau khi gắn ảnh, chưa tới bước dán (nhật ký 23:27:35–36) → cũng nhận ra.
+    nhatKy.length = 0;
+    tab.accountId = 'flow-2'; tab.accountName = 'Flow 2'; tab._meKhoa = Date.now();   // mẻ mới
+    await may.handleEngineMessage({ action: 'LOG', type: 'error', message: '[1] ❌ Create button not found!' }, t.wc);
+    for (let i = 0; i < 20 && !/🛑/.test(nhatKy.join()); i++) await wait(100);
+    ok('dòng "Create button not found" của engine → app xem nút cảnh báo, cho tài khoản nghỉ', /💳/.test(nhatKy.join()) && /🛑 \[Flow 2\]/.test(nhatKy.join()),
+      nhatKy.join(' | '));
+    dongTab(t);
+    nhatKy.length = 0;
+    t = await moTrang(w, { kho: '', cheDo: 'video' });
+    tab = { id: 't1', view: t.v, ready: true, accountId: 'flow-1' };
+    ok('trang có nút Tạo bình thường → không báo hết credit', !(await t.js('window.__flowCanhBaoTinDung({})')).co);
   } catch (err) {
     loi.push(err.stack || err.message);
   }

@@ -1007,6 +1007,8 @@ test('an toàn: đổi mili-giây sang chữ người đọc được', () => {
   assert.strictEqual(anToan.doDai(30000), '30 giây');
   assert.strictEqual(anToan.doDai(600000), '10 phút');
   assert.strictEqual(anToan.doDai(330000), '5 phút 30 giây');
+  assert.strictEqual(anToan.doDai(3 * 3600000), '3 giờ');
+  assert.strictEqual(anToan.doDai(3600000), '60 phút');
 });
 
 // Bản gộp: các ô nằm ở Cài đặt → Google Flow (src/ui), app.js nối ô ↔ khoá bằng
@@ -2232,10 +2234,24 @@ test('hộp "Quyền sử dụng hình ảnh này" (1.3.2): bật sẵn tự đ�
   assert.strictEqual(chuanHoaFlow({ dongYQuyenAnh: false }).dongYQuyenAnh, false, 'tắt rồi thì giữ tắt');
   assert.ok(/\['fDongY', 'dongYQuyenAnh'\]/.test(docGoc('src', 'ui', 'app.js')) && /id="fDongY"/.test(docGoc('src', 'ui', 'index.html')), 'thiếu công tắc trong Cài đặt → Google Flow');
   const lf = docNguon('src', 'flow', 'luong-flow.js');
-  assert.ok(/this\.taiAnhLen\(t\.view\.webContents, dsFile, \{ dongY: !!chuanHoaFlow\(ctx\.caiDat\)\.dongYQuyenAnh \}\)/.test(lf), 'luồng chưa truyền dongY');
+  assert.ok(/this\.taiAnhLen\(t\.view\.webContents, files, \{ dongY: !!chuanHoaFlow\(ctx\.caiDat\)\.dongYQuyenAnh \}\)/.test(lf), 'luồng chưa truyền dongY');
   assert.ok(/lan < 6 && thieu\.length && !canDongY/.test(lf), 'chưa đồng ý thì không được chờ kho 60 giây vô ích');
   const ta = docNguon('src', 'flow', 'inject', 'flow-tai-anh.js');
   assert.ok(/flow-upload-consent-dialog/.test(ta) && /tôi đồng ý/.test(ta), 'trình tìm hộp đồng ý thiếu thẻ / chữ thật của Flow');
+});
+
+test('nhật ký 17/10/2026 23:30 (1.3.2): tải lại ảnh sau khi bấm "Tôi đồng ý"; nút Tạo thành nút hết tín dụng → nghỉ tài khoản', () => {
+  const lf = docNguon('src', 'flow', 'luong-flow.js');
+  const i = lf.indexOf('k.dongY && k.dongY.daDongY'), j = lf.indexOf('const k2 = await taiLen(lai)'), kk = lf.indexOf('daTai = k.ok;');
+  assert.ok(i > 0 && j > i && kk > j, 'bấm "Tôi đồng ý" xong phải kiểm kho và tải lại ảnh còn thiếu TRƯỚC khi chốt daTai');
+  assert.ok(/con === null \|\| con\.includes\(path\.basename\(f, path\.extname\(f\)\)\)/.test(lf), 'chỉ tải lại ảnh còn thiếu (không dò được kho thì tải lại hết)');
+  const bt = docNguon('src', 'flow', 'inject', 'flow-bam-tao.js');
+  assert.ok(/flow-credit-warning-button/.test(bt) && /window\.__flowCanhBaoTinDung = /.test(bt) && /hetTinDung: el \? '' : canhBaoTinDung\(\)/.test(bt),
+    'thiếu nhận diện <flow-credit-warning-button> ở chỗ nút Tạo');
+  const mf = docNguon('src', 'flow', 'may-flow.js');
+  assert.ok(/❌ Create button not found\/\.test\(chu\)\) kiemHetTinDung\(tab\)/.test(mf), 'dòng "Create button not found" của engine phải xem nút hết tín dụng');
+  assert.ok(/if \(k\.hetTinDung\) \{ await baoHetTinDung\(tab, k\.hetTinDung\)/.test(mf), 'chờ khung ô nhập thấy hết tín dụng thì báo ngay, không chờ 15 giây');
+  assert.ok(/batDauNghi\(tab\.accountId, NGHI_HET_TIN_DUNG_MS/.test(mf) && /NGHI_HET_TIN_DUNG_MS = 3 \* 3600000/.test(mf), 'hết tín dụng → tài khoản nghỉ 3 giờ');
 });
 
 // ── Kết luận ───────────────────────────────────────────────────────────────

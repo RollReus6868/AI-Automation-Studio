@@ -55,6 +55,11 @@
     ?dongY=1    tài khoản chưa từng đồng ý: nhận file xong Flow mở hộp "Quyền sử dụng hình ảnh này" (chép từ 4 tệp chẩn đoán
                 người dùng gửi 17/10/2026: <flow-upload-consent-dialog> trong mat-dialog-container, lớp nền tối, nút Huỷ /
                 Tôi đồng ý). Ảnh CHỈ vào kho / lưới khi bấm "Tôi đồng ý" (__dongY = số lần bấm); Huỷ / Escape → bỏ ảnh.
+                Đồng ý rồi thì Flow không hỏi lại ở các lần tải sau.
+    ?dongY=bo   như dongY=1 nhưng bấm "Tôi đồng ý" thì Flow BỎ tệp đang chờ (nhật ký 17/10/2026 23:26–23:29: cả 4 lần đồng ý,
+                ảnh không vào kho; lần tải sau không hỏi nữa thì vào).
+    ?hetTinDung=1 tài khoản không đủ credit: chỗ nút Tạo là <flow-credit-warning-button> (chép từ tệp chẩn đoán 23:27:36),
+                không có nút Tạo.
   Nút Tạo: bấm (chuột thật hay JS) khi ô nhập có chữ → __tao nhận { chu, anh }, ô nhập + ảnh gắn được dọn; ô nhập trống
   thì bấm không ra gì (như Flow thật). Nút tắt khi ô nhập trống, bật khi có chữ.
 -->
@@ -85,7 +90,9 @@
   window.__kho = (q.get('kho') || '').split(',').filter(Boolean);
   window.__nhan = []; window.__soMoHop = 0; window.__gan = []; window.__dan = []; window.__tao = [];
   const KHOA_NHAP = +q.get('khoaNhap') || 0, GIU_NEN = q.get('giuNen') === '1', LUOI = q.get('luoi') === '1';
-  const KHO_CHAM = +q.get('khoCham') || 0, HOP_TAI = q.get('hopTai') === '1', DONG_Y = q.get('dongY') === '1';
+  const KHO_CHAM = +q.get('khoCham') || 0, HOP_TAI = q.get('hopTai') === '1', DONG_Y = q.get('dongY') === '1' || q.get('dongY') === 'bo';
+  const DONG_Y_BO = q.get('dongY') === 'bo';
+  let daDongYRoi = false;
   window.__dongY = 0;
   window.__cheDo = q.get('cheDo') || 'image';
   window.__phu = 'khung-hinh';
@@ -153,6 +160,11 @@
   }
   // ── Nút Tạo ───────────────────────────────────────────────────────────
   const nutTao = document.querySelector('button.generate-icon-button');
+  if (q.get('hetTinDung') === '1') {
+    nutTao.closest('flow-generate-icon-button').outerHTML = '<flow-credit-warning-button><flow-prompt-warning-button arialabel="Cảnh báo về việc không đủ tín dụng">' +
+      '<button type="button" cdkoverlayorigin="" class="prompt-warning-button" aria-label="Cảnh báo về việc không đủ tín dụng" style="width:32px;height:32px">' +
+      '<img alt="" class="prompt-warning-sphere-image" src=""><mat-icon role="img" class="mat-icon notranslate prompt-warning-sphere-icon flow-icon-l google-symbols mat-icon-no-color" aria-hidden="true" data-mat-icon-type="font">info</mat-icon></button></flow-prompt-warning-button></flow-credit-warning-button>';
+  }
   const chuONhap = () => { const o = document.querySelector('[role=textbox]'); return o ? (o.innerText || '').trim() : ''; };
   document.addEventListener('input', () => {
     const co = !!chuONhap();
@@ -186,7 +198,7 @@
       i.addEventListener('change', async () => {
         const ten = [];
         for (const f of i.files) if ((await f.arrayBuffer()).byteLength > 0) { window.__nhan.push(f.name); ten.push(f.name); }
-        if (DONG_Y) {
+        if (DONG_Y && !daDongYRoi) {
           const h = document.createElement('div');
           h.setAttribute('popover', 'manual');
           h.className = 'cdk-overlay-popover cdk-global-overlay-wrapper';
@@ -198,7 +210,7 @@
             '<button class="mdc-button dong-y"><span class="mdc-button__label">Tôi đồng ý</span></button></div></mat-dialog-actions></flow-upload-consent-dialog></mat-dialog-container></div>';
           oc.appendChild(h);
           try { h.showPopover(); } catch (_) {}   // CDK mới mở lớp phủ bằng popover="manual" + showPopover()
-          const xong = (nhan) => { h.remove(); if (nhan) { window.__dongY++; vaoKho(ten); } };
+          const xong = (nhan) => { h.remove(); if (nhan) { window.__dongY++; daDongYRoi = true; if (!DONG_Y_BO) vaoKho(ten); } };
           h.querySelector('.dong-y').addEventListener('click', () => xong(true));
           h.querySelector('.huy').addEventListener('click', () => xong(false));
           h.querySelector('.cdk-overlay-backdrop').addEventListener('click', () => xong(false));

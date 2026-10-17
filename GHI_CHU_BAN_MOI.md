@@ -1,11 +1,13 @@
 # AI Automation Studio 1.3.2
 
 - **Sửa lỗi Flow không nhận ảnh tải lên ở một số tài khoản** (nhật ký 17/10/2026 21:49: *"Không đưa được ảnh lên kho Flow"* ở Flow 2, 3, 4, 5). Bốn tệp chẩn đoán bạn gửi cho thấy: ở tài khoản chưa từng tải ảnh lên, Flow mở hộp **"Quyền sử dụng hình ảnh này"** (Huỷ / Tôi đồng ý), và ảnh chỉ vào kho khi bấm **Tôi đồng ý**. App không bấm nên ảnh không bao giờ vào kho. Theo lựa chọn của bạn, giờ app tự bấm **Tôi đồng ý** và nhật ký ghi lại mỗi lần bấm. Công tắc nằm ở *Cài đặt → Google Flow → Tự bấm "Tôi đồng ý"…* (bật sẵn). Nếu tắt công tắc, app báo ngay tài khoản nào cần bạn tự bấm một lần, không chờ 60 giây vô ích.
+- **Sửa lỗi Flow vẫn không nhận ảnh sau khi app bấm "Tôi đồng ý"** (lần thử 17/10/2026 23:26–23:29). Cả 4 lần app bấm *Tôi đồng ý* (Flow 2, 3, 4, 5), ảnh đều không vào kho. Lần tải sau ở cùng tài khoản thì Flow không hỏi nữa và ảnh vào ngay. Nghĩa là khi hỏi quyền, Flow bỏ luôn ảnh đang chờ. Giờ bấm *Tôi đồng ý* xong, app kiểm kho và tải lại ảnh còn thiếu (nhật ký ghi *"Bấm "Tôi đồng ý" xong Flow chưa giữ ảnh — tải lại…"*), không mất 60 giây rồi chuyển tài khoản nữa.
+- **Tài khoản Flow hết credit giờ được nhận ra ngay** (Flow 1, nhật ký 23:27–23:29: *"Create button not found"* 3 lần). Tệp chẩn đoán cho thấy chỗ nút Tạo, Flow đặt nút **"Cảnh báo về việc không đủ tín dụng"**, tức là tài khoản không đủ credit cho model đang chọn (Veo 3.1 - Lite, 10 credit mỗi lần). Giờ app nhận ra nút đó, ghi *"💳 … không đủ credit"*, cho tài khoản nghỉ 3 giờ và chuyển việc sang tài khoản khác ngay, không thử lại 3 lần nữa. Bấm **Chạy** lại thì mọi tài khoản được thử lại từ đầu.
 - **Sửa lỗi bấm Tạo mà Flow không nhận khi làm video từ ảnh** (nhật ký 21:48: *"Đã thử cả bốn kiểu bấm … mà Flow không nhận"*). Ngay sau khi gắn ảnh vào ô nhập, engine bỏ qua bước dán prompt mà không báo gì, rồi bấm Tạo với ô nhập trống. Giờ app nhận ra trường hợp này, chờ ô nhập gõ được, dán đúng prompt rồi mới bấm Tạo (nhật ký ghi *"🩹 Engine bỏ qua bước dán prompt … app tự dán"*).
 - Sau khi gắn ảnh, nếu bảng ảnh của Flow còn để lại lớp nền tối che nút Tạo, app đóng nó trước khi bấm.
 - Nếu ô tìm kiếm của bảng [+] chưa tìm ra ảnh vừa tải nhưng ảnh đã hiện trong lưới dự án Flow, app vẫn giao việc thay vì báo thiếu ảnh. Nếu Flow hiện hộp thoại lạ ngay sau khi nhận ảnh, nhật ký ghi lại chữ và các nút của hộp đó.
 
-Lưu ý: đã kiểm trên trang Flow giả dựng theo HTML thật bạn gửi (hộp "Quyền sử dụng hình ảnh này", bảng ảnh [+]), chưa chạy trên Flow thật. Thẻ *"hoạt động bất thường"* ở Flow 5, 6, 7 là Google tự chặn. App chỉ cho các tài khoản đó nghỉ.
+Lưu ý: đã kiểm trên trang Flow giả dựng theo HTML thật bạn gửi (hộp "Quyền sử dụng hình ảnh này", bảng ảnh [+], nút cảnh báo hết credit), chưa chạy trên Flow thật. Thẻ *"hoạt động bất thường"* (Flow 4, 6, 7 lần thử 23:27) là Google tự chặn. App chỉ cho các tài khoản đó nghỉ.
 
 ## Bản 1.3.1
 

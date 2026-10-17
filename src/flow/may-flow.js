@@ -224,8 +224,38 @@ function taoMayFlow(o) {
     const n = danBu.soCuaDongBatDauDan(chu);
     if (n) { tab._dan = { n, daDan: false, ganAnh: false }; return; }
     if (tab._dan && /🧑 Đã đính kèm ảnh/.test(chu)) tab._dan.ganAnh = true;
+    if (/❌ Create button not found/.test(chu)) kiemHetTinDung(tab).catch(() => {});
     if (tab.onLoiKhungNhap && /❌ (Create button not found|Không tìm thấy ô tìm kiếm \(Search Box\))/.test(chu)) {
       try { tab.onLoiKhungNhap(chu.replace(/^\[\d+\]\s*/, '')); } catch (_) {}
+    }
+  }
+
+  // Tài khoản không đủ tín dụng: Flow thay nút Tạo bằng nút cảnh báo (flow-bam-tao.js → canhBaoTinDung). Thử lại
+  // không bao giờ ăn → nghỉ lâu, việc sang tài khoản khác ngay. Bấm Chạy lại thì mọi tài khoản được thử lại từ đầu.
+  const NGHI_HET_TIN_DUNG_MS = 3 * 3600000;
+  async function kiemHetTinDung(tab) {
+    if (!tab || !tab.ready || !tab.view || tab.view.webContents.isDestroyed()) return null;
+    const thamSo = JSON.stringify({ selector: selectorNguoiDung().createBtn || '' });
+    const r = await tab.view.webContents.executeJavaScript(
+      `window.__flowCanhBaoTinDung ? window.__flowCanhBaoTinDung(${thamSo}) : null`, true).catch(() => null);
+    if (r && r.co) await baoHetTinDung(tab, r.chu);
+    return r;
+  }
+  async function baoHetTinDung(tab, chu) {
+    const so = soAnToanCua(tab.accountId);
+    if (so.dangNghi || so.dangXuLy) return;
+    if (tab._hetTinDung === (tab._meKhoa || 0)) return;   // mỗi mẻ báo một lần
+    tab._hetTinDung = tab._meKhoa || 0;
+    log('error', `💳 [${tab.id}] Flow thay nút Tạo bằng nút "${chu}" — tài khoản "${tab.accountName || tab.accountId}" không đủ credit ` +
+      `cho model ${tab.modelHienTai || 'đang chọn'}. Không thử lại nữa.`);
+    so.coCauChan = true;
+    so.promptLoi.add(`${tab.id}#${tab._meKhoa || 0}#tin-dung`);
+    so.dangXuLy = true;
+    try {
+      await batDauNghi(tab.accountId, NGHI_HET_TIN_DUNG_MS,
+        { nghi: true, chacChan: true, soLoi: 1, lyDo: 'Flow báo không đủ tín dụng (hết credit)' });
+    } finally {
+      so.dangXuLy = false;
     }
   }
   /** Chờ ô nhập gõ được + nút Tạo hiện; bảng / lớp nền còn mở thì đóng. */
@@ -244,13 +274,14 @@ function taoMayFlow(o) {
         continue;
       }
       if (k.oNhap && k.nut) return { ok: true, k, daDong, cho: Date.now() - batDau };
+      if (k.hetTinDung) { await baoHetTinDung(tab, k.hetTinDung); return { ok: false, k, daDong, hetTinDung: k.hetTinDung, cho: Date.now() - batDau }; }
       await cho(400);
     }
     return { ok: false, k, daDong, cho: Date.now() - batDau };
   }
   function baoKhungNhap(tab, k) {
     if (k.daDong) log('info', `🧹 [${tab.id}] Gắn ảnh xong, Flow còn để lớp ${k.daDong} mở — đã đóng.`);
-    if (!k.ok) log('warning', `⚠️ [${tab.id}] Sau khi gắn ảnh, ô nhập Flow chưa sẵn sàng sau ${Math.round(k.cho / 1000)} giây` +
+    if (!k.ok && !k.hetTinDung) log('warning', `⚠️ [${tab.id}] Sau khi gắn ảnh, ô nhập Flow chưa sẵn sàng sau ${Math.round(k.cho / 1000)} giây` +
       (k.k ? ` (ô nhập ${k.k.oNhap ? 'gõ được' : 'CHƯA gõ được'}, nút Tạo ${k.k.nut ? 'có' : 'CHƯA thấy'})` : '') + ' — vẫn làm tiếp.');
   }
 
