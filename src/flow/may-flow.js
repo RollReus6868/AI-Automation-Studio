@@ -457,6 +457,8 @@ function taoMayFlow(o) {
       case 'LOG': {
         const chu = String(message.message || '');
         if (tab && tab.ghiNhatKy) tab.ghiNhatKy(message.type || 'info', chu);
+        // Engine không chọn được mục chất lượng nào trong menu Tải xuống → luồng lưu tệp chẩn đoán (kèm menu).
+        if (tab && tab.onLoiChatLuong && /Không chọn được chất lượng tải xuống/.test(chu)) { try { tab.onLoiChatLuong(chu); } catch (_) {} }
         // Nhật ký engine rất dày: chỉ đẩy lên nhật ký app dòng cảnh báo / lỗi / thành công.
         if (message.type === 'error' || message.type === 'warning' || message.type === 'success') log(message.type, `[${tabId}] ${chu}`);
         return { success: true };

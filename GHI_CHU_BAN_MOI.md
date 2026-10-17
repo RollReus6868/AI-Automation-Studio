@@ -1,4 +1,16 @@
-# AI Automation Studio 1.2.6
+# AI Automation Studio 1.2.7
+
+- **Sửa lỗi Flow tạo ảnh xong mà không tải về được** (nhật ký 17/10/2026: *"Media 1/1 lỗi: Không chọn được chất lượng tải xuống"* ở mọi lần thử, cả Flow 1, 2, 3). Lỗi do bản **1.2.3** gây ra: để bỏ qua mục 1080p / 4K bị khoá, bản đó ẩn **mọi mục đang mờ** trong menu *Tải xuống* và không bao giờ hiện lại. Menu tải ảnh của Flow lúc mới mở có các mục còn mờ một lúc (Flow đang chuẩn bị file), nên cả **1K, 2K, 4K đều bị ẩn**, app không còn mục nào để bấm. Giờ:
+  - Mục chỉ bị coi là khoá khi có chữ / nút **Nâng cấp**, hoặc còn mờ trong lúc mục khác đã sáng. Mờ hết = Flow đang chuẩn bị, app không ẩn gì.
+  - Mục **Kích thước gốc** không bao giờ bị ẩn, và app không bao giờ ẩn hết mọi mục. Mục hết mờ thì hiện lại.
+  - Nếu app lỡ bấm trúng mục bị khoá (vì lúc đọc menu nó chưa hiện chữ *Nâng cấp*), app bấm ngay mục cao nhất còn mở (ảnh: 1K, video: 720p). Nhật ký ghi *Mục 2K bị khoá (cần nâng cấp) — tải 1K thay.*
+  - Nhật ký ghi mục nào bị bỏ qua: *🔒 Menu Tải xuống: bỏ qua mục bị khoá (cần nâng cấp) 2K, 4K — chọn trong: 1K*.
+  - Nếu vẫn gặp *"Không chọn được chất lượng tải xuống"*, app tự lưu tệp chẩn đoán (kèm menu *Tải xuống*) vào `Tài liệu/AI Automation Studio/chan-doan-flow`. Gửi tệp đó cho mình là sửa được đúng chỗ.
+- **Muse**: đã rà lại quy trình Muse và nối *ảnh Flow → video Muse*, chạy lại toàn bộ bài kiểm tra Muse, không thấy lỗi. Trong nhật ký 17/10 các tài khoản Muse đều đăng nhập bình thường; video Muse chưa chạy vì ảnh Flow chưa tải về được.
+
+Lưu ý: đã kiểm trên trang Flow giả (menu ảnh 1K / 2K / 4K, mục mờ lúc mở, chạy đúng đoạn chọn chất lượng của engine Flow), chưa chạy trên Flow thật. Lần đầu hãy chạy 2–3 ảnh và gửi lại Nhật ký.
+
+## Bản 1.2.6
 
 - **Hộp "Tài khoản chạy dự án" gọn hơn và cuộn được.** Trước đây hộp dài quá màn hình khi có nhiều tài khoản, phần Suno và nút *Lưu* bị che mà không cuộn xuống được. Giờ *Tài khoản chính* và *Chạy cùng lúc* nằm cùng một hàng, các tài khoản dự phòng xếp thành nhiều cột, và hộp tự cuộn khi vẫn dài; nút *Huỷ* / *Lưu* luôn hiện ở dưới cùng. Các hộp thoại khác của app cũng cuộn được như vậy.
 

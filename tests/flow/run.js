@@ -1468,7 +1468,7 @@ test('1.2.3 nhật ký 16/10 "Chờ 120s mà Google chưa xuất file" ×3: tab 
   const iEngine = t.indexOf("['engine dò DOM'"), iTai = t.indexOf("['trình ẩn chất lượng bị khoá', n.taiVe]"), iChot = t.indexOf("['chốt hoàn tất'");
   assert.ok(iEngine > 0 && iTai > iEngine && iChot > iTai, 'thiếu / sai chỗ giai đoạn "trình ẩn chất lượng bị khoá"');
   const { docNguon: nguon } = require('../../src/flow/tab-flow');
-  assert.ok(/window\.__flowTaiVe = \{ anKhoa: anKhoa, menuCuoi: '' \}/.test(nguon().taiVe));
+  assert.ok(/window\.__flowTaiVe = \{ anKhoa: anKhoa, menuCuoi: '', menuMo: '' \}/.test(nguon().taiVe));
   // Engine chỉ hạ chất lượng khi KHÔNG thấy mục 1080p, và bỏ qua mục không hiện — hai điều trình ẩn dựa vào.
   const e = nguon().engine;
   assert.ok(e.includes("'1080p': ['720p', '270p', '4k']") && e.includes("return st.visibility !== 'hidden'"), 'engine đổi cách chọn chất lượng — xem lại flow-tai-ve.js');
@@ -2090,6 +2090,23 @@ testAsync('tài khoản lỗi (máy Flow): 2 prompt khác nhau hỏng → đổi
   assert.strictEqual(doi.length, 2, 'không tab nào chạy thì không đổi tài khoản');
   await bang([{ index: 1, status: 'ERROR', retries: 0 }]);
   assert.strictEqual(doi.length, 2, 'mẻ mới hỏng 1 prompt — dấu lỗi cũ không được cộng dồn vào');
+});
+
+// ── 1.2.7: "Không chọn được chất lượng tải xuống" → luồng lưu tệp chẩn đoán (kèm menu Tải xuống) ──
+testAsync('lỗi chọn chất lượng tải xuống (máy Flow): gọi tab.onLoiChatLuong để lưu tệp chẩn đoán; dòng khác thì không', async () => {
+  const { taoMayFlow } = require('../../src/flow/may-flow');
+  const goi = [], nhatKy = [];
+  const tab = { id: 'T1', accountId: 'flow-1', busy: true, ready: true, ghiNhatKy: () => {}, onLoiChatLuong: (c) => goi.push(c),
+    view: { webContents: { id: 7, isDestroyed: () => false, executeJavaScript: async () => null } } };
+  const tabs = { tabs: [tab], findByWcId: (id) => (id === 7 ? tab : null), find: () => tab, dispatch: async () => ({ ok: true }) };
+  const may = taoMayFlow({ tabs, taiVe: {}, log: (m, c) => nhatKy.push(c), thongBao: () => {}, nghiTaiKhoan: () => true });
+  await may.handleEngineMessage({ action: 'LOG', type: 'error', message: '[1] Media 1/1 lỗi: Đã chọn độ phân giải' }, { id: 7 });
+  assert.strictEqual(goi.length, 0);
+  await may.handleEngineMessage({ action: 'LOG', type: 'error', message: '[1] Media 1/1 lỗi: Không chọn được chất lượng tải xuống' }, { id: 7 });
+  assert.strictEqual(goi.length, 1, 'phải báo luồng lưu tệp chẩn đoán');
+  const lf = require('fs').readFileSync(require('path').join(__dirname, '..', '..', 'src', 'flow', 'luong-flow.js'), 'utf8');
+  assert.ok(/t\.onLoiChatLuong = \(\) => \{ this\._chupChanDoan\(/.test(lf), 'luong-flow phải gắn onLoiChatLuong → _chupChanDoan');
+  assert.ok(/t\.onBang = t\.onDung = t\.onTai = t\.onLoiChatLuong = null/.test(lf), 'kết thúc mẻ phải gỡ onLoiChatLuong');
 });
 
 // ── Kết luận ───────────────────────────────────────────────────────────────

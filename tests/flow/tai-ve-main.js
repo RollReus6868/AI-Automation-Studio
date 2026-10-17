@@ -11,6 +11,8 @@
 //  lấy mục bằng getOpenMenuItems() THẬT của engine và chạy NGUYÊN ĐOẠN "PHASE 4: CHỌN CHẤT LƯỢNG" cắt từ
 //  flow-engine.js, với hai kiểu khoá (nút "Nâng cấp" cạnh mục / aria-disabled) và tài khoản không khoá.
 //  Thêm: tệp chẩn đoán chụp được trên trang bật Trusted Types (nhật ký: "Script failed to execute").
+//  1.2.7: menu ẢNH 1K / 2K / 4K, mục mờ lúc mở (?tre), engine nghỉ giữa lúc lấy danh sách và lúc bấm (cho),
+//  chữ "Nâng cấp" hiện muộn (?muon). Phá thử: chép flow-tai-ve.js của 1.2.6 vào → các bài ảnh đỏ "clicked:false".
 // ============================================================================
 const { app, BaseWindow, WebContentsView } = require('electron');
 const path = require('path');
@@ -39,9 +41,9 @@ const cuoi = ENGINE.lastIndexOf('if (!clicked) {', ENGINE.indexOf('// Rút tên 
 if (dau < 0 || cuoi < 0) throw new Error('Không cắt được đoạn PHASE 4 của engine — engine đã đổi?');
 const PHASE4 = ENGINE.slice(dau, cuoi);
 
-async function chay(wc, khoa, coAn) {
+async function chay(wc, khoa, coAn, them = {}) {
   const js = (c) => wc.executeJavaScript(c, true);
-  await wc.loadFile(path.join(__dirname, '..', 'fixture-flow-moi.html'), { query: { khoa } });
+  await wc.loadFile(path.join(__dirname, '..', 'fixture-flow-moi.html'), { query: { khoa, ...(them.anh ? { anh: '1' } : {}), ...(them.tre ? { tre: String(them.tre) } : {}), ...(them.cach ? { cach: '1' } : {}), ...(them.muon ? { muon: '1' } : {}) } });
   const boc = (src) => `(function(){\n${src}\n})();`;
   for (const [ten, src] of [
     ['cầu nối', CAU_NOI], ['đánh dấu tab', 'window.__FLOW_TAB_ID = "t1"; undefined;'],
@@ -56,8 +58,8 @@ async function chay(wc, khoa, coAn) {
   // Như engine: chuột phải vào thẻ → tìm mục Tải xuống → mở menu con bằng phím → chờ 2 s → lấy mục chất lượng.
   return js(`(async () => {
     const w = (ms) => new Promise((r) => setTimeout(r, ms));
-    window.__tState.settings.runMode = 'video';
-    window.__tState.settings.downloadQuality = '1080p';
+    window.__tState.settings.runMode = ${them.anh ? "'image'" : "'video'"};
+    window.__tState.settings.downloadQuality = ${them.anh ? "'img_2k'" : "'1080p'"};
     const tile = document.getElementById('oTai'), r = tile.getBoundingClientRect();
     tile.dispatchEvent(new MouseEvent('contextmenu', { view: window, bubbles: true, cancelable: true, clientX: r.left + 5, clientY: r.top + 5, button: 2, buttons: 2 }));
     await w(1500);
@@ -66,6 +68,7 @@ async function chay(wc, khoa, coAn) {
     window.__tMoCon(dl);
     await w(2000);
     const sub = window.__tMenu().filter((el) => el !== dl && !el.contains(dl));
+    await w(${them.cho || 0});   // engine nghỉ "trước khi chọn chất lượng tải về" giữa lúc lấy danh sách và lúc bấm
     const clicked = await window.__tChon(sub, 1);
     await w(200);
     return { clicked, thay: sub.map((e) => e.dataset.q || e.textContent.trim()), taiVe: window.__taiVe, nk: window.__nk || [],
@@ -91,6 +94,36 @@ app.whenReady().then(async () => {
     }
     const r = await chay(wc, 'khong', !KHONG_AN);
     ok('[tài khoản không khoá] vẫn tải 1080p như cũ', r.clicked && JSON.stringify(r.taiVe) === '["1080p"]', JSON.stringify({ thay: r.thay, taiVe: r.taiVe }));
+
+    // 1.2.7 — nhật ký 17/10/2026: ẢNH tạo xong, "Không chọn được chất lượng tải xuống" mọi lần thử. Menu mở ra với
+    // mọi mục còn MỜ ~1 s (Flow chuẩn bị file); 1.2.3 ẩn luôn cả 1K → engine không còn mục nào.
+    for (const khoa of ['nut', 'aria']) {
+      const a = await chay(wc, khoa, !KHONG_AN, { anh: true, tre: 1000 });
+      ok(`[ảnh, mục mờ 1 s lúc mở, khoá "${khoa}"] engine hạ 2K → 1K và tải được`, a.clicked && JSON.stringify(a.taiVe) === '["1K"]', JSON.stringify({ clicked: a.clicked, thay: a.thay, taiVe: a.taiVe }));
+      ok(`[ảnh, khoá "${khoa}"] ...nhật ký nói mục nào bị bỏ qua`, a.nk.some((x) => /Menu Tải xuống: bỏ qua mục bị khoá \(cần nâng cấp\) 2K, 4K — chọn trong: 1K/.test(x)), a.nk.slice(-4).join(' | '));
+    }
+    // Chữ mục có dấu cách ("1K Kích thước gốc"): 1.2.3 nhận ra cả 1K là mục chất lượng, ẩn HẾT → y lỗi 17/10.
+    for (const khoa of ['nut', 'aria']) {
+      const c = await chay(wc, khoa, !KHONG_AN, { anh: true, tre: 1000, cach: true });
+      ok(`[ảnh, chữ có dấu cách, mục mờ 1 s, khoá "${khoa}"] tải 1K`, c.clicked && JSON.stringify(c.taiVe) === '["1K"]', JSON.stringify({ clicked: c.clicked, thay: c.thay, taiVe: c.taiVe }));
+    }
+    // Mục còn mờ LÚC ENGINE LẤY DANH SÁCH (3 s > 2 s), sáng trong lúc engine nghỉ 2,5 s rồi mới bấm.
+    const n3 = await chay(wc, 'nut', !KHONG_AN, { anh: true, tre: 3000, cho: 2500, cach: true });
+    ok('[ảnh, mờ quá lúc lấy danh sách, khoá "nut"] tải 1K', JSON.stringify(n3.taiVe) === '["1K"]', JSON.stringify({ clicked: n3.clicked, thay: n3.thay, taiVe: n3.taiVe }));
+    // Chữ "Nâng cấp" chỉ hiện SAU khi menu sáng: lúc engine lấy danh sách chưa biết mục nào khoá, tới lúc bấm 2K / 1080p
+    // (đã khoá) thì lưới an toàn chặn cú bấm và bấm 1K / 720p thay.
+    for (const anh of [true, false]) {
+      const b = await chay(wc, 'aria', !KHONG_AN, { anh, tre: 3000, cho: 2500, cach: true, muon: true });
+      const [k, t] = anh ? ['2K', '1K'] : ['1080P', '720P'];
+      ok(`[${anh ? 'ảnh' : 'video'}, "Nâng cấp" hiện muộn] bấm ${k} khoá → tải ${t} thay`, JSON.stringify(b.taiVe) === JSON.stringify([anh ? '1K' : '720p']), JSON.stringify({ clicked: b.clicked, thay: b.thay, taiVe: b.taiVe }));
+      ok(`[${anh ? 'ảnh' : 'video'}] ...nhật ký ghi "Mục ${k} bị khoá … tải ${t} thay"`, b.nk.some((x) => x.includes(`Mục ${k} bị khoá (cần nâng cấp) — tải ${t} thay`)), b.nk.slice(-3).join(' | '));
+    }
+    const a4 = await chay(wc, 'khong', !KHONG_AN, { anh: true, tre: 3000, cho: 2500, cach: true });
+    ok('[ảnh, tài khoản không khoá, mờ quá lúc lấy danh sách] vẫn tải 2K', JSON.stringify(a4.taiVe) === '["2K"]', JSON.stringify({ thay: a4.thay, taiVe: a4.taiVe }));
+    const a2 = await chay(wc, 'nut', !KHONG_AN, { anh: true });
+    ok('[ảnh, menu sáng ngay] tải 1K', a2.clicked && JSON.stringify(a2.taiVe) === '["1K"]', JSON.stringify({ thay: a2.thay, taiVe: a2.taiVe }));
+    const a3 = await chay(wc, 'khong', !KHONG_AN, { anh: true, tre: 1000 });
+    ok('[ảnh, tài khoản không khoá, mục mờ 1 s] vẫn tải 2K', a3.clicked && JSON.stringify(a3.taiVe) === '["2K"]', JSON.stringify({ thay: a3.thay, taiVe: a3.taiVe }));
 
     // Tệp chẩn đoán trên trang bật Trusted Types (Google bật; gán innerHTML là ném lỗi).
     const tt = path.join(require('os').tmpdir(), `tt-${process.pid}.html`);

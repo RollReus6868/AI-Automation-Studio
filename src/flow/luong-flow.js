@@ -375,7 +375,7 @@ class LuongFlow {
           daKet = true;
           clearInterval(gac);
           this._ketMe = null;
-          t.onBang = t.onDung = t.onTai = null;
+          t.onBang = t.onDung = t.onTai = t.onLoiChatLuong = null;
           t.busy = false;
           if (vi === 'dung' || this.huy !== huyLuc) {
             const lyDo = this.lyDoDung;
@@ -432,6 +432,8 @@ class LuongFlow {
         };
         // AUTOMATION_STOPPED: engine đã kết thúc mẻ (máy Flow gọi trễ 1,5 s cho file cuối kịp về).
         t.onDung = () => setTimeout(() => ket('dung-engine'), 1500);
+        // Menu Tải xuống không còn mục chất lượng nào bấm được (nhật ký 17/10/2026) → lưu menu đó để sửa tiếp.
+        t.onLoiChatLuong = () => { this._chupChanDoan('engine không chọn được chất lượng tải xuống', false).catch(() => {}); };
         const gac = setInterval(() => {
           if (this.huy !== huyLuc) return;
           if (hetViecLuc && Date.now() - hetViecLuc > 180000) {

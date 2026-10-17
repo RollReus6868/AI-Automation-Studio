@@ -133,22 +133,45 @@
   // ── Menu thẻ → Tải xuống (?khoa=nut|aria|khong: kiểu khoá 1080p / 4K) ──
   window.__taiVe = [];
   const KHOA = q.get('khoa') || 'nut';
+  const CACH = q.get('cach') === '1';
+  const MUON = q.get('muon') === '1';   // ?muon=1 (kiểu aria + tre): chữ "Nâng cấp" chỉ hiện SAU khi menu sáng   // ?cach=1: chữ mục có dấu cách ("1K Kích thước gốc") thay vì dán liền
   const mucTai = (nhan, phu, khoa) => {
     const m = `<button role="menuitem" class="mat-mdc-menu-item q${khoa && KHOA === 'aria' ? ' mat-mdc-menu-item-disabled' : ''}" data-q="${nhan}"` +
-      `${khoa && KHOA === 'aria' ? ' aria-disabled="true"' : ''}><span class="mat-mdc-menu-item-text">${nhan}<small>${phu}</small></span>` +
-      `${khoa && KHOA === 'aria' ? '<span class="nang-cap">Nâng cấp</span>' : ''}</button>`;
+      `${khoa && KHOA === 'aria' ? ' aria-disabled="true"' : ''}><span class="mat-mdc-menu-item-text">${nhan}${CACH ? ' ' : ''}<small>${phu}</small></span>` +
+      `${khoa && KHOA === 'aria' && !MUON ? '<span class="nang-cap">Nâng cấp</span>' : ''}</button>`;
     return khoa && KHOA === 'nut' ? `<div class="dong-khoa">${m}<button class="nang-cap">Nâng cấp</button></div>` : m;
   };
+  // ?anh=1: thẻ ẢNH → menu 1K (Kích thước gốc) · 2K · 4K (2K / 4K khoá).
+  // ?tre=<ms>: menu mở ra với MỌI mục mờ (aria-disabled — Flow đang chuẩn bị file) rồi mới sáng (nhật ký 17/10/2026:
+  // 1.2.3 ẩn mục mờ vĩnh viễn → "Không chọn được chất lượng tải xuống").
+  const LA_ANH = q.get('anh') === '1', TRE = +q.get('tre') || 0;
   const moMenuTai = () => {
     if (oc.querySelector('.menu-con')) return;
     const p2 = document.createElement('div');
     p2.className = 'cdk-overlay-pane menu-con';
-    p2.innerHTML = `<div role="menu" class="mat-mdc-menu-panel"><div class="mat-mdc-menu-content">${mucTai('270p', 'Ảnh GIF động')}${mucTai('720p', 'Kích thước gốc')}` +
-      `${mucTai('1080p', 'Đã tăng độ phân giải', KHOA !== 'khong')}${mucTai('4K', 'Đã tăng độ phân giải', KHOA !== 'khong')}</div></div>`;
+    p2.innerHTML = `<div role="menu" class="mat-mdc-menu-panel"><div class="mat-mdc-menu-content">` + (LA_ANH
+      ? `${mucTai('1K', 'Kích thước gốc')}${mucTai('2K', 'Đã tăng độ phân giải', KHOA !== 'khong')}${mucTai('4K', 'Đã tăng độ phân giải', KHOA !== 'khong')}`
+      : `${mucTai('270p', 'Ảnh GIF động')}${mucTai('720p', 'Kích thước gốc')}` +
+        `${mucTai('1080p', 'Đã tăng độ phân giải', KHOA !== 'khong')}${mucTai('4K', 'Đã tăng độ phân giải', KHOA !== 'khong')}`) + `</div></div>`;
     oc.appendChild(p2);
+    const mo = !TRE;
+    let sang = mo;
+    if (TRE) {
+      for (const b of p2.querySelectorAll('.q')) { b.setAttribute('aria-disabled', 'true'); b.classList.add('mat-mdc-menu-item-disabled'); }
+      setTimeout(() => {
+        sang = true;
+        for (const b of p2.querySelectorAll('.q')) {
+          if (KHOA === 'aria' && /1080p|2K|4K/.test(b.dataset.q)) {   // mục khoá vẫn mờ
+            if (MUON) { const n = document.createElement('span'); n.className = 'nang-cap'; n.textContent = 'Nâng cấp'; b.appendChild(n); }
+            continue;
+          }
+          b.removeAttribute('aria-disabled'); b.classList.remove('mat-mdc-menu-item-disabled');
+        }
+      }, TRE);
+    }
     for (const b of p2.querySelectorAll('.q')) b.addEventListener('click', () => {
-      const khoa = KHOA !== 'khong' && /1080p|4K/.test(b.dataset.q);
-      if (!khoa) { window.__taiVe.push(b.dataset.q); dong(); }       // mục khoá: bấm không ra gì (như Flow thật)
+      const khoa = KHOA !== 'khong' && /1080p|2K|4K/.test(b.dataset.q);
+      if (!khoa && sang) { window.__taiVe.push(b.dataset.q); dong(); }       // mục khoá / chưa sáng: bấm không ra gì (như Flow thật)
     });
   };
   document.getElementById('oTai').addEventListener('contextmenu', (e) => {
