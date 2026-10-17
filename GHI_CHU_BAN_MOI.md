@@ -1,4 +1,19 @@
-# AI Automation Studio 1.2.10
+# AI Automation Studio 1.3.0
+
+Bản này chỉ phát hành cho **Windows**. Máy Mac giữ bản cũ (app báo *"chưa có file cho máy này"*) cho tới khi có bản macOS.
+
+- **Nhiều dự án chạy song song, mỗi dự án một bộ cài đặt.** Trước đây dự án 1 đang chạy thì dự án 2 nằm trong hàng chờ, kể cả khi dùng tài khoản khác. Giờ mỗi dự án có luồng riêng: bấm **Chạy dự án** ở dự án 1, chuyển sang dự án 2 bấm **Chạy dự án** nữa, hai dự án chạy cùng lúc (dùng chung tài khoản cũng được). Nút **Dừng dự án** chỉ dừng dự án đang mở. Menu dự án (nút ⋮) có *Chạy tất cả dự án* / *Dừng tất cả dự án*.
+  - Trang **Cài đặt** giờ là cài đặt của **dự án đang mở** (tiêu đề ghi tên dự án). Dự án mới chép cài đặt của dự án đang mở lúc tạo, và lưu kết quả vào thư mục con mang tên dự án trong `Tài liệu/AI Automation Studio/`, để file của các dự án chạy song song không lẫn nhau. *Tắt máy khi chạy hết hàng chờ* vẫn là cài đặt chung: chỉ tắt khi mọi dự án đang chạy đều xong.
+- **Số thứ tự ảnh và video đếm riêng.** Tạo 350 ảnh thì video nối từ ảnh cũng đánh số 1–350 (video mang đúng số của ảnh nguồn), không cộng dồn sau số ảnh nữa. Việc đã có giữ nguyên số cũ.
+- **Chọn đích danh tài khoản chạy.** Hộp tài khoản của dự án (nút cạnh tên dự án) giờ cho mỗi tài khoản chọn một trong ba: **Chạy** (các tài khoản chạy cùng lúc, chọn bao nhiêu cũng được), **Dự phòng** (vào thay khi tài khoản đang chạy lỗi / nghỉ) hoặc **Không dùng**.
+- **Dừng / chạy từng ảnh, từng video.** Mỗi dòng đang chạy trong hàng đợi có nút **Dừng** riêng: dừng ảnh số 3 thì 9 ảnh kia vẫn chạy. Việc đã dừng có nút **Chạy** (chạy ngay, kể cả khi dự án đang dừng). Chọn nhiều dòng rồi bấm *Chạy* / *Dừng* / *Tạo lại* ở thanh chọn. *Tạo lại* giờ chạy ngay việc đó.
+- **Chạy prompt theo số cụ thể.** *Cài đặt nâng cao → Chỉ chạy prompt số*: ghi ví dụ `98, 303, 305-350` (để trống = chạy hết). `305-` = từ 305 tới cuối. App báo trước sẽ chạy bao nhiêu prompt, số nào không có.
+- **Xoá chat Muse ở mục Tài khoản.** Đã dựng lại cách xoá theo ảnh chụp menu *Side chats* của bạn (⋯ → Pin / Rename / Archive / **Delete** → xác nhận). App rê chuột vào từng chat để hiện nút ⋯, tìm mục *Delete* theo chữ, rồi bấm nút xác nhận. Nếu vẫn không xoá được, app lưu tệp chẩn đoán vào `Tài liệu/AI Automation Studio/chan-doan-muse` và nhật ký ghi đường dẫn tệp. Gửi tệp đó cho mình là sửa được đúng chỗ.
+- **Mỗi dự án của tool chạy trên một dự án Flow MỚI.** Lần đầu một dự án của tool chạy trên một tài khoản Flow, app mở dự án Flow mới cho riêng nó (nhật ký ghi *"Dự án … chạy trên dự án Flow riêng"*), không dùng dự án Flow cũ của tài khoản. Hai dự án của tool chạy cùng tài khoản Flow thì mỗi dự án một tab, một dự án Flow. Video Flow mang tên `<dự án>_v001` trên Flow để không trùng tên ảnh.
+
+Lưu ý: đã kiểm trên trang Muse / Flow / Suno giả, chưa chạy trên trang thật. Phần xoá chat Muse dựng theo ảnh chụp, chưa thử trên Muse thật.
+
+## Bản 1.2.10
 
 - **Sửa lỗi video Flow bị tải về thừa, thành nhiều file trùng tên `_2`, `_3`…** (lần chạy 17/10/2026, từ video `280` trở đi: `280_2.mp4`, `280_3.mp4`, `298_6.mp4`, `304_9.mp4`…). App **không nhập sai số prompt**, tên `280.mp4` vẫn là video tạo từ ảnh `280.png`. Lỗi nằm ở bước tải về của Flow: để tìm video vừa tạo, Flow lọc bằng ô *Tìm kiếm* theo đầu câu prompt. Mọi video tạo từ ảnh dùng chung một câu prompt, nên ô tìm kiếm trả về cả các video cũ đã tạo trước đó trong cùng dự án Flow của tài khoản, và app tải hết về, đặt tên `_2`, `_3`… Càng về sau dự án Flow càng có nhiều video cũ nên số file thừa tăng dần. Lỗi chỉ xảy ra với video **chạy ở Flow** (từ khoảng 280, khi Muse lỗi và video chuyển sang Flow); video chạy ở Muse không bị.
   - Giờ khi Flow tải về nhiều file hơn số bản mỗi prompt, app bỏ các file trùng hệt kết quả đã có, chỉ giữ video mới (video mới nhất luôn được tải về đầu tiên), xoá file thừa và ghi vào nhật ký *"bỏ N file thừa"*. Nếu chỉ tải được video cũ, việc báo lỗi và chạy lại chứ không nhận nhầm.
