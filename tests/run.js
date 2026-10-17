@@ -928,6 +928,101 @@ testAsync('Flow hỏng mọi tài khoản → dừng Flow, việc còn lại (�
   const v = dp.viec.find((j) => j.loai === 'video');
   assert.ok(v.nen === 'muse' && v.trangThai === 'xong' && v.daQuaNen, '1.2.1: video Flow cũng sang Muse (bên nào lỗi đổi sang bên kia) — ' + v.nen + v.trangThai);
 });
+// ── Nhật ký 18/10/2026 00:42: 5 tài khoản Flow chạy cùng lúc, lần lượt lỗi, chỉ còn 1 chạy mà Muse ngồi không ──
+const duAnHaiBen = (o = {}) => {
+  const b = dungDieuPhoi({ taoLuong: o.taoLuong || (() => ({ ranh: true, dung() {} })), tonTai: (p) => String(p).startsWith('/anh/') });
+  const flow = ['flow-1', ...['Flow 2', 'Flow 3', 'Flow 4', 'Flow 5', 'Flow 6'].map((t) => b.tk.them(t, 'flow').id)];
+  const muse = ['tk-1', ...['Muse 2', 'Muse 3', 'Muse 4'].map((t) => b.tk.them(t).id)];
+  for (const id of [...flow, ...muse]) b.tk.sua(id, { trangThai: 'da-dang-nhap' });
+  b.dp.datCaiDat({ luongMoiTK: 2, nghiGiuaLanGui: 0, tuThuLai: 1, tuChayLaiLoi: 0, flow: { meToiDa: 1, tabMoiTK: 1 } });
+  // Flow: 5 Chạy + 1 Dự phòng; Muse: 1 Chạy + 3 Dự phòng (như ảnh hộp tài khoản của người dùng).
+  const d = b.dp.taoDuAn('Judah', [...flow, ...muse], { flow: 5, muse: 1 });
+  b.dp.them({ duAn: d.id, nen: 'flow', loai: 'video', prompts: Array.from({ length: 30 }, (_, i) => `v${i + 1}`),
+    thamChieuTheoDong: Array.from({ length: 30 }, (_, i) => [`/anh/${i + 1}.png`]) });
+  b.dp.duAnChay.add(d.id);
+  return { ...b, d, flow, muse };
+};
+test('giữ đủ số tài khoản chạy cùng lúc: dự phòng Flow vào thay trước, chưa thiếu thì KHÔNG mượn Muse', () => {
+  const { dp, flow, nhatKy } = duAnHaiBen();
+  dp._choNghi(flow[0], 'hết credit');
+  dp._canBang();
+  assert.ok(dp.viec.every((j) => j.nen === 'flow' && !j.muon), '1 tài khoản lỗi, Flow 6 dự phòng vào thay → vẫn đủ 5');
+  assert.ok(!nhatKy.some((x) => /🔀/.test(x)));
+  assert.strictEqual(dp._soSong(dp.viec[0].duAn, 'muse'), 1, 'Muse vẫn chạy 1 tài khoản');
+});
+test('giữ đủ số tài khoản chạy cùng lúc: còn 1/5 tài khoản Flow → Muse chạy thêm 4 tài khoản, nhận việc vừa đủ (không cả hàng chờ)', () => {
+  const { dp, d, flow, nhatKy } = duAnHaiBen();
+  for (const id of flow.slice(1)) dp._choNghi(id, 'hoạt động bất thường');   // 5/6 tài khoản Flow nghỉ, còn flow-1
+  dp._canBang();
+  const muon = dp.viec.filter((j) => j.nen === 'muse');
+  assert.strictEqual(muon.length, 8, `thiếu 4 tài khoản × 2 luồng Muse = 8 việc — được ${muon.length}`);
+  assert.deepStrictEqual(muon.map((j) => j.so), [1, 2, 3, 4, 5, 6, 7, 8], 'mượn việc đầu hàng chờ');
+  assert.ok(muon.every((j) => j.muon && j.muon.tu === 'flow' && j.tuFlow && j.thamChieu[0] === `/anh/${j.so}.png`), 'giữ ảnh nguồn');
+  assert.strictEqual(dp._soSong(d.id, 'muse'), 5, 'Muse: 1 tài khoản Chạy + 4 tài khoản mượn');
+  assert.strictEqual(dp._soSong(d.id, 'flow'), 5);
+  assert.ok(nhatKy.some((x) => /🔀 Flow → Muse: dự án "Judah" chạy 5 tài khoản Flow cùng lúc nhưng chỉ còn 1 tài khoản chạy được video — Muse chạy thêm 4 tài khoản, nhận 8 video/.test(x)), nhatKy.join('\n'));
+  dp._canBang();
+  assert.strictEqual(dp.viec.filter((j) => j.nen === 'muse').length, 8, 'gọi lại không mượn thêm khi chưa chạy xong');
+  // Một tài khoản Flow hết giờ nghỉ → thiếu 3 → trả 2 video chưa chạy (mới mượn trả trước).
+  dp.nghiDen[flow[1]] = 0;
+  dp._canBang();
+  assert.deepStrictEqual(dp.viec.filter((j) => j.nen === 'muse').map((j) => j.so), [1, 2, 3, 4, 5, 6]);
+  const tra = dp.viec.find((j) => j.so === 8);
+  assert.ok(tra.nen === 'flow' && !tra.muon && !tra.tuFlow && !(tra.daQuaNen || []).length, JSON.stringify(tra));
+  // Flow có lại đủ tài khoản → mọi việc mượn chưa chạy quay về Flow.
+  dp.nghiDen = {};
+  dp._canBang();
+  assert.ok(dp.viec.every((j) => j.nen === 'flow' && !j.muon), dp.viec.map((j) => j.nen).join());
+  assert.ok(nhatKy.some((x) => /🔀 Flow đã có lại tài khoản chạy được .* 6 video chưa chạy quay về Flow/.test(x)), nhatKy.join('\n'));
+  assert.strictEqual(dp._soSong(d.id, 'muse'), 1);
+});
+test('giữ đủ số tài khoản chạy cùng lúc: mọi tài khoản Flow nghỉ → Muse chạy thêm 5 tài khoản (mượn 10 việc, không phải cả 30)', () => {
+  const { dp, d, flow } = duAnHaiBen();
+  for (const id of flow) dp._choNghi(id, 'hoạt động bất thường');
+  dp._canBang();
+  assert.strictEqual(dp.viec.filter((j) => j.nen === 'muse').length, 10);
+  assert.strictEqual(dp._soSong(d.id, 'muse'), 6);
+  // Việc đang chạy ở Muse không bị kéo về.
+  dp.viec.filter((j) => j.nen === 'muse').forEach((j, i) => { if (i < 3) j.trangThai = 'chay'; });
+  dp.nghiDen = {};
+  dp._canBang();
+  assert.deepStrictEqual(dp.viec.filter((j) => j.nen === 'muse').map((j) => j.trangThai), ['chay', 'chay', 'chay']);
+});
+test('giữ đủ số tài khoản chạy cùng lúc — chiều ngược lại: Muse bị chặn video ở mọi tài khoản → Flow chạy thêm tài khoản', () => {
+  const b = dungDieuPhoi({ tonTai: (p) => String(p).startsWith('/anh/') });
+  const m2 = b.tk.them('Muse 2').id, f2 = b.tk.them('Flow 2', 'flow').id;
+  for (const id of ['tk-1', m2, 'flow-1', f2]) b.tk.sua(id, { trangThai: 'da-dang-nhap' });
+  b.dp.datCaiDat({ luongMoiTK: 3, nghiGiuaLanGui: 0, flow: { meToiDa: 2, tabMoiTK: 1 } });
+  const d = b.dp.taoDuAn('P', ['tk-1', m2, 'flow-1', f2], { muse: 2, flow: 1 });
+  b.dp.them({ duAn: d.id, loai: 'video', prompts: ['a', 'b', 'c', 'd', 'e', 'f'], thamChieu: ['/anh/x.png'] });
+  b.dp.them({ duAn: d.id, loai: 'anh', prompts: ['anh'] });
+  b.dp.duAnChay.add(d.id);
+  b.tk.sua('tk-1', { chanVideoDen: Date.now() + 3600000 });
+  b.dp._canBang();
+  assert.strictEqual(b.dp.viec.filter((j) => j.nen === 'flow').length, 2, 'thiếu 1 tài khoản Muse → Flow nhận 1 tài khoản × 1 tab × 2 mỗi mẻ');
+  b.tk.sua(m2, { chanVideoDen: Date.now() + 3600000 });
+  b.dp._canBang();
+  assert.strictEqual(b.dp.viec.filter((j) => j.nen === 'flow').length, 4, 'thiếu 2 → 4 việc');
+  assert.strictEqual(b.dp._soSong(d.id, 'flow'), 3);
+  assert.ok(b.dp.viec.find((j) => j.loai === 'anh').nen === 'muse', 'ảnh Muse không bị chặn → không mượn');
+});
+testAsync('giữ đủ số tài khoản chạy cùng lúc: chạy thật — Flow còn 1 tài khoản, Muse chạy song song nhiều tài khoản, xong hết', async () => {
+  const daChay = [];
+  let dang = 0, max = 0;
+  const muse = new Set();
+  const taoLuong = (a, stt) => (a.nen === 'flow' ? luongGiaHaiNen(daChay)(a, stt) : { id: `${a.id}-${stt}`, ranh: true, viec: null, dung() {},
+    async chay(j) {
+      this.ranh = false; this.viec = j; daChay.push([a.id, j.so]); dang++; max = Math.max(max, dang); muse.add(a.id);
+      await new Promise((r) => setTimeout(r, 30)); dang--; this.ranh = true; this.viec = null;
+      return { ok: true, files: [{ mime: 'video/mp4', b64: 'AA==' }] };
+    } });
+  const { dp, flow } = duAnHaiBen({ taoLuong });
+  for (const id of flow.slice(1)) dp._choNghi(id, 'hoạt động bất thường');
+  await chayHet(dp);
+  assert.ok(dp.viec.every((j) => j.trangThai === 'xong'), dp.viec.map((j) => j.trangThai).join());
+  assert.ok(daChay.some((x) => x.so && x.tk === 'flow-1'), 'Flow 1 vẫn chạy');
+  assert.ok(muse.size >= 4 && max >= 5, `Muse chạy nhiều tài khoản cùng lúc: ${[...muse]} · tối đa ${max} việc cùng lúc`);
+});
 testAsync('tắt "Muse ⇄ Flow": ảnh Flow không sang Muse', async () => {
   const daChay = [];
   const { dp, tk } = dungDieuPhoi({ taoLuong: luongGiaHaiNen(daChay, new Set(['flow-1'])) });
