@@ -203,6 +203,9 @@ module.exports = function e2eFlow({ win, app, LENH, dieuPhoi, taiKhoan }) {
       // 1.3.2 (nhật ký 18/10/2026 01:34): dự án Flow đã nhớ bị xoá BÊN FLOW → Flow mở trang 404?reason=project.
       // App phải quên địa chỉ đó + ảnh trong dự án đó, tạo dự án Flow mới, không kẹt 120 giây.
       ghi('-- 7b. Dự án Flow đã nhớ bị xoá bên Flow (trang 404)');
+      // Đợi luồng của lần chạy trước đóng hẳn: luồng còn sống thì tab đang ở dự án Flow cũ còn tốt và nhận luôn việc
+      // mới (Windows CI 18/10/2026: việc xong sau 2 giây ở dự án cũ, không đi qua địa chỉ đã bị xoá).
+      await cho(() => !dieuPhoi.luong.some((x) => x.duAn === d7id), 30000, 'luồng Flow lần trước đóng');
       const daXoa7 = `${process.env.FLOW_TEST_URL}/project/da-xoa-tren-flow`;
       dieuPhoi.datFlowUrl(d7id, 'flow-1', daXoa7);
       kiem(flowUrlLuu(d7id, 'flow-1') === daXoa7 && v7b.some((j) => j.flowTen && j.flowTen.tk === 'flow-1'), 'chuẩn bị: dự án app nhớ dự án Flow đã bị xoá');
