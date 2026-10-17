@@ -245,6 +245,12 @@
     $('#ghiVideoThuMuc').textContent = tm ? `${tm.anh.length} ảnh trong "${tm.thuMuc.split(/[\\/]/).pop()}" → ${tm.anh.length} video` : 'Chưa chọn';
     $('#batChuoi').checked = U.chuoi.bat;
     $('#khuPromptVideo').hidden = !U.chuoi.bat;
+    // 1.2.9: thư mục lưu video nối từ ảnh RIÊNG của dự án đang mở (chưa chọn thì nói rõ đang theo Cài đặt chung).
+    const dTm = duAnHienTai(), tmDa = (dTm && dTm.thuMucVideoAnh) || '';
+    $('#ghiThuMucVideoDuAn').textContent = tmDa || (S.caiDat.videoCanhAnh !== false ? 'Chưa chọn — lưu cạnh ảnh nguồn, cùng tên (theo Cài đặt)'
+      : S.caiDat.thuMucVideoAnh ? `Chưa chọn — theo Cài đặt: ${S.caiDat.thuMucVideoAnh}` : 'Chưa chọn — theo thư mục của trang Tạo video');
+    $('#ghiThuMucVideoDuAn').title = tmDa;
+    $('#boThuMucVideoDuAn').hidden = !tmDa;
     if (document.activeElement !== $('#luongNhanh')) $('#luongNhanh').value = S.caiDat.luongMoiTK;
     veTaiVe();
     $('#tachPrompt').value = S.caiDat.tachPrompt;
@@ -652,7 +658,7 @@
         <div class="tt"><b>${esc(a.ten)}</b><span class="tag nen-${nen}">${TEN_NEN[nen].toUpperCase()}</span><span class="pill ${cls}">${nhan}</span>${nen === 'suno'
           ? veHetLuot(a)
           : flow ? `<div class="han-muc mo du-an-flow" title="${esc(a.flowUrl || '')}">Dự án Flow: ${a.flowUrl ? esc(a.flowUrl.replace(/^https:\/\/labs\.google\/fx\/(\w+\/)?tools\/flow\//, '…/')) : 'chưa chọn — app tự mở dự án mới (hoặc Đăng nhập → mở một dự án → Xong)'}</div>`
-          : veHanMuc(a.hanMuc)}
+          : veHanMuc(a.hanMuc) + veChanVideo(a)}
           <div class="hang-nut">
             <button class="nut-vien nho" data-tk="dangNhap" data-id="${esc(a.id)}" ${dang ? 'disabled' : ''}>${ic('log-in')}Đăng nhập</button>
             <button class="nut-vien nho" data-tk="kiem" data-id="${esc(a.id)}">${ic('refresh-cw')}Kiểm tra</button>
@@ -674,6 +680,12 @@
     if (!a.hetLuotDen || a.hetLuotDen <= Date.now()) return '<div class="han-muc mo">Suno: chạy được. Hết lượt tạo / tải thì bài tự tạo lại ở tài khoản Suno dự phòng.</div>';
     const t = new Date(a.hetLuotDen), hai = (n) => String(n).padStart(2, '0');
     return `<div class="han-muc het-luot" title="${esc(a.lyDoHetLuot || '')}">Hết lượt — nghỉ đến ${hai(t.getHours())}:${hai(t.getMinutes())} ngày ${hai(t.getDate())}/${hai(t.getMonth() + 1)}${a.lyDoHetLuot ? ` (${esc(a.lyDoHetLuot)})` : ''}. Bấm Kiểm tra để cho chạy lại sớm.</div>`;
+  }
+  /** 1.2.9: Muse chặn tạo video theo khu vực ở tài khoản này — app tạm không giao video cho nó (vẫn tạo ảnh). */
+  function veChanVideo(a) {
+    if (!a.chanVideoDen || a.chanVideoDen <= Date.now()) return '';
+    const t = new Date(a.chanVideoDen), hai = (n) => String(n).padStart(2, '0');
+    return `<div class="han-muc het-luot" title="${esc(a.lyDoChanVideo || '')}">Muse chặn tạo video ở khu vực của tài khoản này — app chỉ dùng nó tạo ảnh tới ${hai(t.getHours())}:${hai(t.getMinutes())} ngày ${hai(t.getDate())}/${hai(t.getMonth() + 1)}; video chạy ở tài khoản khác hoặc Flow. Bấm Kiểm tra để thử lại sớm.</div>`;
   }
   /** Mức dùng token Muse (Cài đặt → Chung → Usage), chữ giữ nguyên như Muse hiện. */
   function veHanMuc(hm) {
@@ -925,6 +937,18 @@
     for (const id of ['#tuSo', '#denSo']) $(id).addEventListener('input', veTao);
     $('#batChuoi').onchange = (e) => { U.chuoi.bat = e.target.checked; luuUi(); veTao(); if (U.chuoi.bat) $('#promptVideoChung').focus(); };
     $('#promptVideoChung').addEventListener('input', (e) => { U.chuoi.prompt = e.target.value; luuUi(); });
+    $('#nutThuMucVideoDuAn').onclick = async () => {
+      const d = duAnHienTai();
+      if (!d) return;
+      const p = await api.call('chonThuMucVideoDuAn', { id: d.id });
+      if (p) toast(`Video tạo từ ảnh của dự án "${d.ten}" sẽ lưu vào ${p}`);
+    };
+    $('#boThuMucVideoDuAn').onclick = async () => {
+      const d = duAnHienTai();
+      if (!d) return;
+      await api.call('boThuMucVideoDuAn', { id: d.id });
+      toast(`Dự án "${d.ten}" bỏ thư mục video riêng — theo Cài đặt chung`);
+    };
     $('#promptThuMuc').addEventListener('input', (e) => { U.promptThuMuc = e.target.value; luuUi(); });
     $('#tyLeVideoChuoi').onchange = (e) => { U.chuoi.tyLe = e.target.value; luuUi(); };
     $('#luongNhanh').onchange = async (e) => {

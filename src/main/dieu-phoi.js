@@ -18,6 +18,7 @@ const { chuanHoaFlow, khoaMe } = require('../flow/cai-dat-flow');
 
 const NGHI_MS = 15 * 60 * 1000;   // tài khoản lỗi liên tiếp / mất kết nối → tạm nghỉ chừng này
 const LOI_LIEN_TIEP_NGHI = 2;
+const CHAN_VIDEO_MS = 24 * 60 * 60 * 1000;  // 1.2.9: Muse chặn video theo khu vực → tài khoản thôi nhận video 24 giờ (nhớ qua lần chạy / mở app)
 const NGHI_CHAN_LOAI_MS = 60 * 60 * 1000;  // Muse chặn tài khoản tạo video (403 / khu vực) → thôi giao video cho nó chừng này      // lỗi liên tiếp bao nhiêu việc thì cho tài khoản tạm nghỉ
 const TEN_NEN = { muse: 'Muse', flow: 'Flow', suno: 'Suno' };
 // Suno báo hết lượt (tạo / tải về) → tài khoản nghỉ lâu, việc tạo lại ở tài khoản dự phòng.
@@ -179,7 +180,13 @@ class DieuPhoi {
   _tkCho(j) {
     return hd.taiKhoanChoViecDs(j, this._dsTk(j.duAn, j.nen), (id) => this._nghi(id) || this._nghiLoai(id, j.loai), this._soSong(j.duAn, j.nen));
   }
-  _nghiLoai(id, loai) { return (this.nghiLoai[`${id}:${loai}`] || 0) > Date.now(); }
+  _nghiLoai(id, loai) {
+    if ((this.nghiLoai[`${id}:${loai}`] || 0) > Date.now()) return true;
+    // Muse chặn video theo khu vực: mốc lưu trên tài khoản, KHÔNG xoá khi bấm Chạy (chặn không tự hết sau vài phút).
+    if (loai !== 'video') return false;
+    const a = this.o.taiKhoan.tim(id);
+    return !!(a && (a.chanVideoDen || 0) > Date.now());
+  }
   /**
    * Tài khoản của dự án trên một nền tảng, theo thứ tự ưu tiên [chính, dự phòng…].
    * Dự án chưa chọn tài khoản nào của nền tảng đó = mọi tài khoản của nền tảng đó.
@@ -202,6 +209,17 @@ class DieuPhoi {
     return !!(a && (a.hetLuotDen || 0) > Date.now());
   }
   _tenTk(id) { const a = this.o.taiKhoan.tim(id); return a ? a.ten : id; }
+
+  /** 1.2.9: thư mục lưu video nối từ ảnh RIÊNG của dự án ('' = bỏ, dùng cài đặt chung). */
+  datThuMucVideoDuAn(id, thuMuc) {
+    const d = this.duAn.find((x) => x.id === id);
+    if (!d) return { ok: false, loi: 'Không tìm thấy dự án' };
+    d.thuMucVideoAnh = String(thuMuc || '').trim();
+    if (!d.thuMucVideoAnh) delete d.thuMucVideoAnh;
+    this.luu();
+    this.o.bao();
+    return { ok: true };
+  }
 
   doiTenDuAn(id, ten) {
     const d = this.duAn.find((x) => x.id === id);
@@ -657,7 +675,11 @@ class DieuPhoi {
         // 1.0.4: tắt "cạnh ảnh" mà đã chọn thư mục riêng cho video nối từ ảnh → lưu vào đó, vẫn cùng tên ảnh.
         if (video && j.tuAnh && tai) {
           const anhNguon = (j.thamChieu || []).slice(-1)[0] || '';
-          if (this.caiDat.videoCanhAnh) {
+          // 1.2.9: dự án đã chọn thư mục riêng (trang Tạo ảnh → Ảnh xong → tự tạo video) → ưu tiên hơn cài đặt chung.
+          if (d.thuMucVideoAnh) {
+            goc = d.thuMucVideoAnh;
+            mau = '{tenAnh}';
+          } else if (this.caiDat.videoCanhAnh) {
             if (anhNguon && !path.resolve(anhNguon).startsWith(path.resolve(this.o.thuMucTam))) {
               goc = path.dirname(anhNguon);
               mau = '{tenAnh}';
@@ -699,9 +721,16 @@ class DieuPhoi {
       const tkId = j.taiKhoan;
       Object.assign(j, { trangThai: 'cho', buoc: '', loi: r.loi, thread: '' });
       if (!this._nghiLoai(tkId, j.loai)) {
-        this.nghiLoai[`${tkId}:${j.loai}`] = Date.now() + NGHI_CHAN_LOAI_MS;
         this.lyDoNghi[tkId] = r.loi;
-        this.log('warning', `⚠ "${this._tenTk(tkId)}": ${r.loi} — tài khoản này thôi nhận việc ${TEN_LOAI[j.loai] || j.loai} ${Math.round(NGHI_CHAN_LOAI_MS / 60000)} phút, việc chuyển sang tài khoản khác.`);
+        if (j.loai === 'video' && this.o.taiKhoan.tim(tkId)) {
+          // Chặn khu vực không tự hết sau 1 giờ: nhớ trên tài khoản (24 giờ, qua cả lần mở app sau) để không gửi
+          // lại video vào tài khoản này mỗi lần bấm Chạy. Tài khoản vẫn tạo ảnh. Bấm Kiểm tra để thử lại sớm.
+          this.o.taiKhoan.sua(tkId, { chanVideoDen: Date.now() + CHAN_VIDEO_MS, lyDoChanVideo: r.loi });
+          this.log('warning', `⚠ "${this._tenTk(tkId)}": ${r.loi} — tài khoản này thôi nhận VIDEO 24 giờ (vẫn tạo ảnh); video chuyển sang tài khoản Muse khác, hết tài khoản Muse thì sang Flow. Bấm Kiểm tra ở tài khoản để thử lại sớm.`);
+        } else {
+          this.nghiLoai[`${tkId}:${j.loai}`] = Date.now() + NGHI_CHAN_LOAI_MS;
+          this.log('warning', `⚠ "${this._tenTk(tkId)}": ${r.loi} — tài khoản này thôi nhận việc ${TEN_LOAI[j.loai] || j.loai} ${Math.round(NGHI_CHAN_LOAI_MS / 60000)} phút, việc chuyển sang tài khoản khác.`);
+        }
       }
     } else if (r.tuChoi && this._coTheDoiNen(j)) {
       // Muse nói không tạo được video / ảnh từ CHÍNH ảnh này (lỗi của ảnh, không phải của tài khoản —

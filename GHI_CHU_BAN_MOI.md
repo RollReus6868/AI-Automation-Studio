@@ -1,4 +1,9 @@
-# AI Automation Studio 1.2.8
+# AI Automation Studio 1.2.9
+
+- **Mỗi dự án có thư mục lưu video riêng.** Ở trang **Tạo ảnh**, bật *Ảnh xong → tự tạo video*, mục mới **Lưu video của dự án này vào** → *Chọn thư mục*. Video tạo từ ảnh của dự án đó lưu vào đúng thư mục này (vẫn cùng tên ảnh, `049.jpg` → `049.mp4`). Mỗi dự án chọn riêng, không ảnh hưởng dự án khác. Bấm *Bỏ* thì dự án về theo Cài đặt chung (mặc định: lưu cạnh ảnh nguồn).
+- **Muse chặn tạo video theo khu vực**: tài khoản Muse nào báo *chặn khu vực / lỗi 403* khi tạo video thì app **nhớ 24 giờ** (kể cả khi tắt app, bấm Chạy lại), không gửi video vào tài khoản đó nữa mà chỉ dùng nó tạo **ảnh**. Video chuyển sang tài khoản Muse khác còn tạo được, hết tài khoản Muse thì sang Flow (khi bật *Muse ⇄ Flow* trong Cài đặt → Chạy). Thẻ tài khoản ở mục Tài khoản hiện dòng đỏ *"Muse chặn tạo video ở khu vực của tài khoản này"*. Bấm **Kiểm tra** ở tài khoản để thử tạo video lại sớm. Trước đây mỗi lần bấm Chạy app lại gửi thử video vào từng tài khoản bị chặn, phí thời gian.
+
+## Bản 1.2.8
 
 - **Sửa lỗi Flow bị báo lỗi và cho nghỉ oan trong khi Flow vẫn tạo bình thường** (nhật ký 17/10/2026 12:03). Có hai chỗ hỏng:
   - **Đổi Video ⇄ Hình ảnh bấm nhầm thanh bên của Flow.** Khi dự án Flow đã có cả ảnh lẫn video, thanh bên trái của Flow hiện hai mục lọc *Hình ảnh* và *Video*. App tưởng đó là bảng chọn chế độ nên bấm vào mục lọc, không mở bảng cài đặt thật. Flow vẫn ở chế độ Video, app báo *"Đã bấm nút image 3 lần nhưng giao diện Flow không đổi"* rồi cho tài khoản nghỉ 15 phút (Flow 1, Flow 6 ULTRA, Flow 7 Ultra). Lưới dự án còn bị lọc theo loại. Giờ app không bao giờ bấm thanh bên hay bảng kho [+] khi đổi chế độ, chỉ bấm trong bảng cài đặt cạnh ô nhập.

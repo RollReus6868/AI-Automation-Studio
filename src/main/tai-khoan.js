@@ -68,6 +68,8 @@ class QuanLyTaiKhoan {
     if (thay.hanMuc && Array.isArray(thay.hanMuc.muc)) a.hanMuc = thay.hanMuc;   // mức token đọc từ Muse
     // Suno hết lượt tạo / tải về: nghỉ tới lúc này (0 = bỏ).
     if (typeof thay.hetLuotDen === 'number') { a.hetLuotDen = thay.hetLuotDen; a.lyDoHetLuot = thay.hetLuotDen ? String(thay.lyDoHetLuot || '') : ''; }
+    // Muse chặn tạo VIDEO theo khu vực (1.2.9): nhớ qua các lần chạy / mở app — tài khoản vẫn tạo ảnh (0 = bỏ).
+    if (typeof thay.chanVideoDen === 'number') { a.chanVideoDen = thay.chanVideoDen; a.lyDoChanVideo = thay.chanVideoDen ? String(thay.lyDoChanVideo || '') : ''; }
     // Trang dự án Flow: chỉ nhận địa chỉ dự án Flow (flow.google.com hoặc labs.google; rỗng = app tự mở dự án mới).
     if (typeof thay.flowUrl === 'string' && a.nen === 'flow') {
       const u = thay.flowUrl.trim();
