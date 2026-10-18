@@ -52,6 +52,7 @@ module.exports = function e2eFlow({ win, app, LENH, dieuPhoi, taiKhoan }) {
         120000, 'ảnh Flow + video Muse xong');
       const video1 = viec().filter((j) => j.loai === 'video');
       inViec([...anh1, ...video1]);
+      if (!anh1.every((j) => j.trangThai === 'xong')) dongNhatKy(nk);   // hỏng thì in nhật ký app để biết vì sao (CI Windows)
       const g1 = await flowGhi();
       const start1 = g1.filter((x) => x.loai === 'start');
       kiem(start1.length === 1 && start1[0].d.videosToCreate.length === 3, `3 prompt ảnh giao trong MỘT mẻ (${start1.length} mẻ)`);
