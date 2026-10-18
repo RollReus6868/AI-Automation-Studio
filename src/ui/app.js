@@ -49,6 +49,125 @@
     el.innerHTML = html;
     return true;
   }
+
+  /**
+   * 1.3.4 — Danh sách vẽ theo TỪNG DÒNG: chỉ dòng có HTML đổi mới bị thay, dòng khác giữ nguyên phần tử.
+   * Trước đây mỗi lần trạng thái đổi (việc xong, đổi bước… vài lần mỗi giây khi đang chạy) cả danh sách bị
+   * vẽ lại → hàng trăm ảnh / video bị tạo lại, giao diện phình hàng GB RAM và giật.
+   * ds = [{ khoa, html }] theo đúng thứ tự; duoi = HTML phần cuối (vd "Còn N việc nữa") hoặc ''.
+   */
+  function veTheoDong(hop, ds, duoi) {
+    if (!hop.__dong || hop.__html !== undefined) { hop.innerHTML = ''; hop.__dong = new Map(); hop.__html = undefined; }
+    const cu = hop.__dong, moi = new Map();
+    const tam = document.createElement('template');
+    let truoc = null, doi = false;
+    for (const { khoa, html } of ds) {
+      let x = cu.get(khoa);
+      if (!x || x.html !== html) {
+        tam.innerHTML = html.trim();
+        const el = tam.content.firstElementChild;
+        if (x) { x.el.replaceWith(el); } 
+        x = { html, el };
+        doi = true;
+      }
+      cu.delete(khoa);
+      moi.set(khoa, x);
+      const dung = truoc ? truoc.nextSibling : hop.firstChild;
+      if (dung !== x.el) { hop.insertBefore(x.el, dung); doi = true; }
+      truoc = x.el;
+    }
+    for (const x of cu.values()) { x.el.remove(); doi = true; }
+    hop.__dong = moi;
+    // Phần cuối (không thuộc dòng nào): luôn nằm sau dòng cuối.
+    let c = hop.__duoi;
+    if (duoi) {
+      if (!c || c.__html !== duoi) { if (c) c.remove(); tam.innerHTML = duoi.trim(); c = tam.content.firstElementChild; c.__html = duoi; hop.__duoi = c; doi = true; }
+      if ((truoc ? truoc.nextSibling : hop.firstChild) !== c) hop.insertBefore(c, truoc ? truoc.nextSibling : hop.firstChild);
+    } else if (c) { c.remove(); hop.__duoi = null; doi = true; }
+    if (doi) ganAnhVideo(hop);
+    return doi;
+  }
+  /** Thay cả hộp bằng một khối HTML (vd "Hàng đợi trống") — bỏ bộ nhớ dòng của veTheoDong. */
+  function datHtmlHop(hop, html) {
+    if (hop.__dong) { hop.__dong = null; hop.__duoi = null; hop.__html = undefined; }
+    return datHtml(hop, html);
+  }
+
+  // ── Ảnh nhỏ cho video (1.3.4) ─────────────────────────────────────────────
+  // Danh sách / Thư viện từng đặt <video preload="metadata"> cho MỖI video đã xong: 200 video = 200 trình
+  // phát video sống cùng lúc (mỗi cái giữ bộ giải mã + khung hình) → hàng GB RAM. Giờ mỗi video chỉ được mở
+  // MỘT lần, chụp một khung hình nhỏ (JPEG ~160 px) rồi đóng ngay; danh sách hiện ảnh nhỏ đó. Chỉ chụp video
+  // đang hiện trên màn hình, lần lượt từng cái.
+  const ANH_VIDEO = new Map();          // khoá → dataURL ('' = không đọc được, hiện biểu tượng)
+  const ANH_VIDEO_TOI_DA = 3000;
+  const choChup = [];
+  let dangChup = false;
+  const nhinThay = 'IntersectionObserver' in window ? new IntersectionObserver((ds) => {
+    for (const e of ds) if (e.isIntersecting) { nhinThay.unobserve(e.target); xepChup(e.target.dataset.vthumb, e.target.dataset.vk); }
+  }, { rootMargin: '300px' }) : null;
+  /** HTML ảnh nhỏ của video f (khoá đổi khi video được tải lại). Ảnh được gắn sau bằng ganAnhVideo. */
+  const anhVideoHtml = (f, khoa) => `<img data-vthumb="${esc(f)}" data-vk="${esc(khoa)}" alt="">`;
+  function datAnhVideo(img) {
+    const u = ANH_VIDEO.get(img.dataset.vk);
+    if (u === undefined) return false;
+    if (u) { if (img.getAttribute('src') !== u) img.src = u; img.classList.remove('vthumb-loi'); }
+    else img.classList.add('vthumb-loi');
+    return true;
+  }
+  function ganAnhVideo(goc) {
+    for (const img of goc.querySelectorAll('img[data-vthumb]')) {
+      if (datAnhVideo(img)) continue;
+      if (nhinThay) nhinThay.observe(img); else xepChup(img.dataset.vthumb, img.dataset.vk);
+    }
+  }
+  function xepChup(f, khoa) {
+    if (ANH_VIDEO.has(khoa) || choChup.some((x) => x.khoa === khoa)) return;
+    choChup.push({ f, khoa });
+    chupTiep();
+  }
+  async function chupTiep() {
+    if (dangChup) return;
+    dangChup = true;
+    try {
+      while (choChup.length) {
+        const { f, khoa } = choChup.shift();
+        if (ANH_VIDEO.has(khoa)) continue;
+        const u = await chupVideo(f);
+        if (ANH_VIDEO.size >= ANH_VIDEO_TOI_DA) ANH_VIDEO.delete(ANH_VIDEO.keys().next().value);
+        ANH_VIDEO.set(khoa, u);
+        for (const img of document.querySelectorAll('img[data-vthumb]')) if (img.dataset.vk === khoa) datAnhVideo(img);
+      }
+    } finally { dangChup = false; }
+  }
+  window.__anhVideo = { soDaChup: () => ANH_VIDEO.size, cho: () => choChup.length };   // cho bài kiểm thử
+  /** Mở video, lấy khung hình ở giây 0,5 (video ngắn hơn: giữa video), thu nhỏ thành JPEG rồi đóng video. */
+  function chupVideo(f) {
+    return new Promise((xong) => {
+      const v = document.createElement('video');
+      v.muted = true; v.preload = 'auto';
+      let het = false;
+      const ket = (u) => {
+        if (het) return;
+        het = true; clearTimeout(hen);
+        v.removeAttribute('src');
+        try { v.load(); } catch (_) {}
+        xong(u);
+      };
+      const hen = setTimeout(() => ket(''), 15000);
+      v.onerror = () => ket('');
+      v.onloadedmetadata = () => { try { v.currentTime = Math.min(0.5, (v.duration || 1) / 2); } catch (_) { ket(''); } };
+      v.onseeked = () => {
+        try {
+          const r = 200, w = v.videoWidth || 16, h = v.videoHeight || 9, k = Math.min(1, r / Math.max(w, h));
+          const c = document.createElement('canvas');
+          c.width = Math.max(1, Math.round(w * k)); c.height = Math.max(1, Math.round(h * k));
+          c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
+          ket(c.toDataURL('image/jpeg', 0.75));
+        } catch (_) { ket(''); }
+      };
+      v.src = fileUrl(f);
+    });
+  }
   const loaiTrang = () => (U.trang === 'video' || U.trang === 'nhac' ? U.trang : 'anh');
   /** Nơi chạy đang chọn ở cột Tạo của trang hiện tại: 'muse' | 'flow' — trang nhạc luôn là 'suno'. */
   const nenTrang = () => (loaiTrang() === 'nhac' ? 'suno' : U.nen[loaiTrang()] === 'flow' ? 'flow' : 'muse');
@@ -335,20 +454,20 @@
 
     const hop = $('#dsHang');
     if (!ds.length) {
-      datHtml(hop, `<div class="trong">${ic(ICON_LOAI[loaiTrang()])}<div>${tatCa.length
+      datHtmlHop(hop, `<div class="trong">${ic(ICON_LOAI[loaiTrang()])}<div>${tatCa.length
         ? 'Không có việc nào khớp bộ lọc.' : 'Hàng đợi trống — dán prompt bên trái rồi bấm <b>Tạo &amp; chạy</b>.'}</div></div>`);
       return;
     }
     const cuon = hop.scrollTop;
     const MAX = 600;   // vẽ tối đa 600 dòng; nhiều hơn thì dùng ô tìm
-    if (datHtml(hop, ds.slice(0, MAX).map(dongViec).join('') +
-      (ds.length > MAX ? `<div class="trong" style="min-height:60px">Còn ${ds.length - MAX} việc nữa — dùng ô tìm để lọc.</div>` : ''))) hop.scrollTop = cuon;
+    if (veTheoDong(hop, ds.slice(0, MAX).map((j) => ({ khoa: j.id, html: dongViec(j) })),
+      ds.length > MAX ? `<div class="trong" style="min-height:60px">Còn ${ds.length - MAX} việc nữa — dùng ô tìm để lọc.</div>` : '')) hop.scrollTop = cuon;
     capNhatTienDo();
   }
 
   function thumbHtml(j) {
     const f = j.files && j.files[0];
-    if (f && j.loai === 'video') return `<div class="thumb"><video src="${esc(fileUrl(f))}#t=0.5" preload="metadata" muted></video></div>`;
+    if (f && j.loai === 'video') return `<div class="thumb">${ic('film')}${anhVideoHtml(f, `${f}|${j.xongLuc || ''}`)}</div>`;
     if (j.loai === 'nhac') return `<div class="thumb">${ic('music')}</div>`;
     if (f) return `<div class="thumb"><img loading="lazy" src="${esc(fileUrl(f))}"></div>`;
     if (j.thamChieu && j.thamChieu[0]) return `<div class="thumb"><img loading="lazy" style="opacity:.45" src="${esc(fileUrl(j.thamChieu[0]))}"></div>`;
@@ -684,11 +803,12 @@
     const ds = S.viec.filter((j) => j.trangThai === 'xong' && j.files && j.files.length &&
       (U.tvLoc === 'tat' || j.loai === U.tvLoc) && (!U.tvDuAn || j.duAn === U.tvDuAn))
       .sort((a, b) => b.xongLuc - a.xongLuc).slice(0, 500);
-    datHtml($('#dsThuVien'), ds.length ? ds.map((j) => `<div class="o-tv" data-tv="${j.id}" title="${esc(j.prompt)}">${
-      j.loai === 'video' ? `<video src="${esc(fileUrl(j.files[0]))}#t=0.5" preload="metadata" muted></video>`
+    const hop = $('#dsThuVien');
+    if (!ds.length) { datHtmlHop(hop, `<div class="trong" style="grid-column:1/-1">${ic('layout-grid')}<div>Chưa có kết quả nào.</div></div>`); return; }
+    veTheoDong(hop, ds.map((j) => ({ khoa: j.id, html: `<div class="o-tv" data-tv="${j.id}" title="${esc(j.prompt)}">${
+      j.loai === 'video' ? `<div class="vtv">${ic('film')}${anhVideoHtml(j.files[0], `${j.files[0]}|${j.xongLuc || ''}`)}</div>`
         : j.loai === 'nhac' ? `<div class="nhac-tv">${ic('music')}</div>` : `<img loading="lazy" src="${esc(fileUrl(j.files[0]))}">`
-    }<span>#${so3(j.so)} · ${{ video: 'VIDEO', nhac: 'NHẠC' }[j.loai] || 'ẢNH'}</span></div>`).join('')
-      : `<div class="trong" style="grid-column:1/-1">${ic('layout-grid')}<div>Chưa có kết quả nào.</div></div>`);
+    }<span>#${so3(j.so)} · ${{ video: 'VIDEO', nhac: 'NHẠC' }[j.loai] || 'ẢNH'}</span></div>` })), '');
   }
 
   // ── Tài khoản ────────────────────────────────────────────────────────────

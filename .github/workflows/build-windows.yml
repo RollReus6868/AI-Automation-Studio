@@ -46,6 +46,11 @@ jobs:
         timeout-minutes: 10
         run: node tests/e2e.js suno
 
+      # 1.3.4: giao dien voi 200 video xong khong phinh RAM (anh nho thay <video>, ve theo tung dong)
+      - name: Kiem thu RAM giao dien
+        timeout-minutes: 6
+        run: node tests/giao-dien-ram.js
+
       - name: Dong goi
         run: npx electron-builder --win --x64 --publish never
         env:
