@@ -414,13 +414,29 @@ select.canh-bao { border-color: #e0a100; }
 .chon-tk-du label.hang-tk[hidden] { display: none; }
 .chon-tk-du label.hang-tk span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* 1.3.0: vai từng tài khoản (Chạy / Dự phòng / Không dùng) */
-.chon-tk-vai { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 6px 10px; margin-bottom: 4px; }
+.chon-tk-vai { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 6px 10px; margin-bottom: 4px; }
 .hang-vai { display: flex; align-items: center; gap: 8px; margin: 0 !important; min-width: 0; padding: 5px 8px; border-radius: 8px; border: 1px solid var(--vien); }
 .hang-vai > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--chu); }
 .hang-vai select { width: 108px; flex: none; margin: 0 !important; padding: 4px 6px; }
 .hang-vai[data-vai="chay"] { border-color: rgba(52, 211, 153, .55); background: var(--xanh-nen); }
 .hang-vai[data-vai="du"] { border-color: rgba(251, 191, 36, .45); }
 .hang-vai[data-vai="khong"] > span { color: var(--chu-mo); }
+/* 1.3.7: ô Ảnh / Video của từng tài khoản trong hộp chọn tài khoản dự án */
+.hang-vai .loai-tk { display: flex; gap: 6px; flex: none; }
+.hang-vai .loai-tk label { display: inline-flex; align-items: center; gap: 3px; margin: 0 !important; font-size: 11.5px; color: var(--chu-phu); white-space: nowrap; cursor: pointer; }
+.hang-vai .loai-tk input { width: auto; margin: 0; }
+.hang-vai[data-vai="khong"] .loai-tk { opacity: .45; }
+/* 1.3.7: tình trạng tài khoản — đỏ: đang lỗi / nghỉ, xanh: chạy được, xám: chưa kiểm */
+.the-tk.sk-loi { border-color: rgba(248, 113, 113, .75) !important; box-shadow: inset 4px 0 0 #ef4444; }
+.the-tk.sk-tot { border-color: rgba(52, 211, 153, .6) !important; box-shadow: inset 4px 0 0 #10b981; }
+.suc-khoe { display: flex; align-items: flex-start; gap: 6px; margin: 6px 0 2px; font-size: 12px; line-height: 1.35; }
+.suc-khoe i, .cham-sk { flex: none; display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: #9ca3af; margin-top: 3px; }
+.cham-sk { margin: 0 6px 0 0; vertical-align: 1px; }
+.suc-khoe.sk-loi { color: #f87171; } .suc-khoe.sk-loi i, .cham-sk.sk-loi { background: #ef4444; }
+.suc-khoe.sk-tot { color: #34d399; } .suc-khoe.sk-tot i, .cham-sk.sk-tot { background: #10b981; }
+.suc-khoe.sk-cho { color: var(--chu-phu); }
+.suc-khoe small { color: var(--chu-phu); }
+.dem-nen.co-loi { color: #f87171; }
 .the-tk .tt .tag { display: inline-block; margin: 0 6px 0 0; }
 .du-an-flow { word-break: break-all; }
 

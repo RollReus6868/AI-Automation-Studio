@@ -260,7 +260,7 @@
             <button class="nut-gradient nho chi-suno" id="nutThemTKSuno"><i data-icon="plus"></i>Thêm Suno</button>
           </div>
         </div>
-        <p class="mo">Mỗi tài khoản đăng nhập riêng một lần trong khung bên phải, app nhớ phiên (app không bao giờ hỏi hay lưu mật khẩu). Mỗi dự án chọn đích danh tài khoản nào <b>Chạy</b> (chạy cùng lúc), tài khoản nào <b>Dự phòng</b> và tài khoản nào <b>Không dùng</b> cho từng nơi chạy — bấm nút tài khoản cạnh tên dự án. Muse: <b id="soLuongTK">3</b> luồng mỗi tài khoản; Flow: <b id="soTabFlow">1</b> tab mỗi tài khoản; Suno: 1 luồng mỗi tài khoản. Việc lỗi ở tài khoản chính thì chuyển ngay sang dự phòng; tài khoản Suno hết lượt tạo / tải thì bài được tạo lại ở tài khoản Suno dự phòng.</p>
+        <p class="mo">Mỗi tài khoản đăng nhập riêng một lần trong khung bên phải, app nhớ phiên (app không bao giờ hỏi hay lưu mật khẩu). Mỗi dự án chọn đích danh tài khoản nào <b>Chạy</b> (chạy cùng lúc), tài khoản nào <b>Dự phòng</b> và tài khoản nào <b>Không dùng</b> cho từng nơi chạy — bấm nút tài khoản cạnh tên dự án. Muse: <b id="soLuongTK">3</b> luồng mỗi tài khoản; Flow: <b id="soTabFlow">1</b> tab mỗi tài khoản; Suno: 1 luồng mỗi tài khoản. Việc lỗi ở tài khoản chính thì chuyển ngay sang dự phòng; tài khoản Suno hết lượt tạo / tải thì bài được tạo lại ở tài khoản Suno dự phòng. Viền <b style="color:#16a34a">xanh</b> = chạy được, viền <b style="color:#dc2626">đỏ</b> = đang lỗi / nghỉ (dòng dưới tên ghi lý do).</p>
         <div class="phan-doan" id="nenTk">
           <button data-v="muse" class="on">Muse <span class="dem-nen" data-dem="muse"></span></button>
           <button data-v="flow">Flow <span class="dem-nen" data-dem="flow"></span></button>
@@ -401,7 +401,7 @@
             <label>đến (giây)<input type="number" id="fChoMax" min="1" max="600"></label>
             <label>Thử lại cùng tài khoản (lần), rồi sang tài khoản khác<input type="number" id="fThuLai" min="0" max="10"></label>
             <label>Giãn nhịp bấm Tạo giữa các tab (giây)<input type="number" id="fGian" min="0" max="600"></label>
-            <label>Chất lượng ảnh tải về<select id="fChatAnh"><option value="img_1k">1K</option><option value="img_2k">2K</option><option value="img_4k">4K</option></select></label>
+            <label>Chất lượng ảnh tải về<select id="fChatAnh"><option value="img_1k">1K (kích thước gốc, không tốn tín dụng)</option><option value="img_2k">2K (Flow tăng độ phân giải, tốn tín dụng)</option><option value="img_4k">4K (tốn tín dụng)</option></select></label>
             <label>Chất lượng video tải về<select id="fChatVideo"><option value="720p">720p</option><option value="1080p">1080p</option><option value="4k">4K</option></select></label>
             <label>Khi nghi mất mạng<select id="fMang"><option value="auto">Gọi thử Flow rồi mới dừng</option><option value="off">Bỏ qua, không dừng</option></select></label>
           </div>

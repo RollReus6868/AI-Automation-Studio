@@ -371,6 +371,8 @@ async function kiemTaiKhoan(id, nguoiBam = false) {
     taiKhoan.sua(id, { chanVideoDen: 0 });
     log('info', `👤 "${tk.ten}": đã bỏ đánh dấu "Muse chặn video" — lần chạy sau thử tạo video lại ở tài khoản này`);
   }
+  // 1.3.7: bấm Kiểm tra = xem lại tài khoản từ đầu — bỏ màu đỏ "việc gần nhất lỗi" (đang nghỉ / hết lượt vẫn đỏ tới giờ).
+  if (nguoiBam && dieuPhoi && dieuPhoi.ketQuaTk) delete dieuPhoi.ketQuaTk[id];
   if (tk.nen === 'flow') {
     const co = await daDangNhapFlow(tk);
     taiKhoan.sua(id, { trangThai: co ? 'da-dang-nhap' : 'can-dang-nhap' });
@@ -612,8 +614,8 @@ const LENH = {
   chayViec: ({ ids }) => dieuPhoi.chayViec(ids),
   xoaViec: ({ ids }) => dieuPhoi.xoaViec(ids),
   suaViec: ({ id, thay }) => dieuPhoi.suaViec(id, thay),
-  taoDuAn: ({ ten, taiKhoan: ds, chaySong, tuDuAn }) => dieuPhoi.taoDuAn(ten, ds, chaySong, tuDuAn),
-  datTaiKhoanDuAn: ({ id, taiKhoan: ds, chaySong }) => dieuPhoi.datTaiKhoanDuAn(id, ds, chaySong),
+  taoDuAn: ({ ten, taiKhoan: ds, chaySong, tuDuAn, boLoai }) => dieuPhoi.taoDuAn(ten, ds, chaySong, tuDuAn, boLoai),
+  datTaiKhoanDuAn: ({ id, taiKhoan: ds, chaySong, boLoai }) => dieuPhoi.datTaiKhoanDuAn(id, ds, chaySong, boLoai),
   doiTenDuAn: ({ id, ten }) => dieuPhoi.doiTenDuAn(id, ten),
   xoaDuAn: ({ id }) => dieuPhoi.xoaDuAn(id),
   luuNhanVat: (nv) => {
@@ -932,6 +934,11 @@ app.whenReady().then(() => {
     thuMucTam: path.join(app.getPath('userData'), 'ket-qua-tam'),
     tonTai: (p) => fs.existsSync(p),
     donDep: (don) => donDep(don),
+    // 1.3.7: Flow cho tài khoản nghỉ mà dự án không còn tài khoản Flow nào khác (máy Flow tự tạm dừng tab) → thẻ tài khoản đỏ.
+    nghiFlow: (id) => {
+      const so = mayFlow && mayFlow.soAnToanCua ? mayFlow.soAnToanCua(id) : null;
+      return so && so.dangNghi ? { den: so.nghiDen, lyDo: 'Flow báo lỗi, tự chạy lại khi hết giờ nghỉ' } : null;
+    },
     hetLuot: () => {
       if (dieuPhoi.caiDat.tatMayKhiXong) mayFlow.handleEngineMessage({ action: 'TRIGGER_SHUTDOWN', delay: 60 }, { id: -1 });
       if (taiKhoan.ds.some((a) => a.nen === 'muse')) capNhatToken();   // chạy xong hàng chờ → cập nhật mức token Muse
