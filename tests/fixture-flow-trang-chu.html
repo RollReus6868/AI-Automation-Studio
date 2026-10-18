@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="vi"><head><meta charset="utf-8"><title>Trang chủ Flow giả — xoá dự án</title></head>
+<body>
+<!--
+  Trang chủ Flow giả cho tests/flow/xoa-du-an-main.js. Danh sách dự án lưu ở localStorage (trang nạp lại vẫn còn).
+  ?kieu=moi   thẻ Flow 10/2026: nút "edit" + "delete" nằm thẳng trong liên kết thẻ (chữ thẻ "Tháng 10 17 - 20:27 edit delete")
+  ?kieu=an    như "moi" nhưng hai nút chỉ hiện khi rê chuột vào thẻ
+  ?kieu=cu    thẻ cũ: nút ⋮ (pointerdown) → menu "Delete project" → hộp "Cancel / Delete"
+  Bấm "edit" mở hộp đổi tên (Huỷ / Lưu) và ghi localStorage.daBamSua = 1.
+-->
+<div id="ds"></div>
+<script>
+  const q = new URLSearchParams(location.search), KIEU = q.get('kieu') || 'moi';
+  if (!localStorage.duAn) localStorage.duAn = JSON.stringify(['du-an-1', 'du-an-2', 'du-an-3']);
+  const ds = () => JSON.parse(localStorage.duAn);
+  const xoa = (id) => { localStorage.duAn = JSON.stringify(ds().filter((x) => x !== id)); ve(); };
+  const el = (tag, thuocTinh = {}, ...con) => {
+    const e = document.createElement(tag);
+    for (const [k, v] of Object.entries(thuocTinh)) if (k === 'style') e.style.cssText = v; else e.setAttribute(k, v);
+    for (const c of con) e.append(c);
+    return e;
+  };
+  const icon = (t) => el('i', { class: 'google-symbols' }, t);
+  function hoi(cau, huy, ok, khiOk) {
+    const d = el('div', { role: 'alertdialog' }, el('p', {}, cau));
+    const bh = el('button', {}, huy), bo = el('button', {}, ok);
+    bh.onclick = () => d.remove();
+    bo.onclick = () => { d.remove(); khiOk(); };
+    d.append(bh, bo);
+    document.body.append(d);
+  }
+  function ve() {
+    const h = document.getElementById('ds');
+    h.replaceChildren();
+    for (const id of ds()) {
+      const a = el('a', { href: `/fx/tools/flow/project/${id}` }, el('div', { style: 'width:120px;height:60px;background:#333' }), el('div', {}, 'Tháng 10 17 - 20:27'));
+      const the = el('div', { class: 'the', style: 'border:1px solid #444;margin:6px;padding:6px' }, a);
+      if (KIEU === 'cu') {
+        const b = el('button', { 'aria-label': 'More options' }, icon('more_vert'));
+        b.addEventListener('pointerdown', () => {
+          const m = el('div', { role: 'menu' });
+          const r = el('button', { role: 'menuitem' }, icon('edit'), ' Rename'), x = el('button', { role: 'menuitem' }, icon('delete'), ' Delete project');
+          x.addEventListener('click', () => { m.remove(); hoi('Delete project?', 'Cancel', 'Delete', () => xoa(id)); });
+          m.append(r, x);
+          the.append(m);
+        });
+        the.append(b);
+      } else {
+        const sua = el('button', {}, icon('edit')), bx = el('button', {}, icon('delete'));
+        const nhom = el('div', KIEU === 'an' ? { style: 'display:none' } : {}, sua, bx);
+        if (KIEU === 'an') {
+          the.addEventListener('mouseover', () => { nhom.style.display = ''; });
+        }
+        sua.addEventListener('click', (e) => {
+          e.preventDefault(); e.stopPropagation();
+          localStorage.daBamSua = '1';
+          const d = el('div', { role: 'dialog' }, el('p', {}, 'Đổi tên dự án'), el('button', {}, 'Huỷ'), el('button', {}, 'Lưu'));
+          document.body.append(d);
+        });
+        bx.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); hoi('Xoá dự án?', 'Huỷ', 'Xoá', () => xoa(id)); });
+        a.append(nhom);
+      }
+      h.append(the);
+    }
+  }
+  ve();
+</script>
+</body></html>

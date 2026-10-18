@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="vi"><head><meta charset="utf-8"><title>Flow giả — lưới video cùng prompt + ô Tìm kiếm</title>
+<style>
+  body { font-family: sans-serif; margin: 0; }
+  .thanh { padding: 8px; }
+  flow-grid-tile-container, #kq { display: block; border: 1px solid #ccc; margin: 6px; padding: 4px; }
+  flow-tile-container { display: inline-block; width: 160px; height: 90px; margin: 4px; background: #eee; }
+  flow-video-tile, flow-image-tile { display: block; width: 100%; height: 100%; }
+  video, img { width: 60px; height: 34px; }
+</style></head>
+<body>
+<!--
+  Dự án Flow có nhiều video CÙNG prompt (video nối từ ảnh): mỗi lần tạo là một lưới "1. <prompt>".
+  ?cu=N        số lưới cũ (mặc định 9)
+  ?kieu=tai-cho  ô Tìm kiếm ẩn lưới không khớp, thẻ khớp giữ NGUYÊN phần tử (như Angular lọc tại chỗ)
+  ?kieu=ve-lai   ô Tìm kiếm vẽ lại kết quả thành phần tử MỚI (không còn data-tile-id / data-fe-grid-id,
+                 link media đổi chữ ký) — kiểu khó nhất
+  ?tre=ms      kết quả tìm hiện sau chừng ấy ms
+  ?anh=1       ảnh thay vì video
+  Mỗi thẻ có ảnh đại diện chung (avatar.png) — dấu chung, không được dùng để nhận thẻ.
+-->
+<div class="thanh"><form><i class="google-symbols">search</i><input type="text" id="tim" placeholder="Tìm kiếm"></form></div>
+<div id="luoi"></div>
+<script>
+  const q = new URLSearchParams(location.search);
+  const CU = parseInt(q.get('cu') || '9', 10), KIEU = q.get('kieu') || 'tai-cho', TRE = parseInt(q.get('tre') || '0', 10);
+  const ANH = q.get('anh') === '1';
+  const PROMPT = 'Animate this image with gentle camera motion, soft light, cinematic depth of field and slow push-in toward the subject';
+  let lanVe = 0;
+  const luoi = document.getElementById('luoi');
+  function the(id) {
+    const c = document.createElement('flow-tile-container');
+    c.dataset.ma = id;
+    const t = document.createElement(ANH ? 'flow-image-tile' : 'flow-video-tile');
+    const a = document.createElement('a');
+    a.setAttribute('href', `/fx/tools/flow/project/abc/edit/${id}`);
+    const m = document.createElement(ANH ? 'img' : 'video');
+    m.setAttribute('src', `https://storage.example.com/media/${id}.${ANH ? 'png' : 'mp4'}?Signature=s${lanVe}-${Math.random().toString(36).slice(2)}&Expires=99`);
+    a.appendChild(m);
+    const av = document.createElement('img');
+    av.setAttribute('src', 'https://example.com/avatar.png?sz=32');
+    t.appendChild(a); t.appendChild(av);
+    c.appendChild(t);
+    return c;
+  }
+  function uuid(n) { return `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`; }
+  const ds = [];   // { so, chu, ma: [uuid] }
+  function themLuoi(chu, ma) {
+    const g = document.createElement('flow-grid-tile-container');
+    const st = document.createElement('div'); st.className = 'text-part'; st.textContent = chu;
+    g.appendChild(st);
+    for (const m of ma) g.appendChild(the(m));
+    luoi.insertBefore(g, luoi.firstChild);
+    ds.push({ chu, ma, g });
+    return g;
+  }
+  for (let i = 1; i <= CU; i++) themLuoi(`1. ${PROMPT}`, [uuid(i)]);
+  // Lưới khác prompt — không bao giờ khớp ô tìm.
+  themLuoi('1. A completely different prompt about mountains', [uuid(500)]);
+  // Gọi từ bài kiểm thử: thêm lưới của lần tạo mới (như Flow sau khi bấm Tạo).
+  window.__taoMoi = (so = 1, ma = [uuid(900 + so)]) => themLuoi(`${so}. ${PROMPT}`, ma);
+
+  let henTim = 0, dangTim = '';
+  function locTheo(chu) {
+    lanVe++;
+    const kq = document.getElementById('kq');
+    if (kq) kq.remove();
+    if (!chu) { for (const x of ds) x.g.style.display = ''; return; }
+    const khop = ds.filter((x) => x.chu.toLowerCase().includes(chu.toLowerCase()));
+    if (KIEU === 've-lai') {
+      for (const x of ds) x.g.style.display = 'none';
+      const r = document.createElement('div'); r.id = 'kq';
+      for (const x of khop) for (const m of x.ma) r.appendChild(the(m));
+      luoi.parentNode.insertBefore(r, luoi);
+    } else {
+      for (const x of ds) x.g.style.display = khop.includes(x) ? '' : 'none';
+    }
+  }
+  function doi() {
+    const chu = document.getElementById('tim').value.trim();
+    if (chu === dangTim) return;
+    dangTim = chu;
+    clearTimeout(henTim);
+    if (TRE && chu) henTim = setTimeout(() => locTheo(chu), TRE); else locTheo(chu);
+  }
+  document.getElementById('tim').addEventListener('input', doi);
+  document.getElementById('tim').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); doi(); } });
+  document.querySelector('form').addEventListener('submit', (e) => e.preventDefault());
+</script>
+</body></html>

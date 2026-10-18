@@ -42,7 +42,8 @@ function docNguon(thay = {}) {
     bamTao: thay.bamTao || doc('flow-bam-tao.js'),
     thamChieu: thay.thamChieu || doc('flow-anh-tham-chieu.js'),
     khoAnh: thay.khoAnh || doc('flow-kho-anh.js'),
-    taiVe: thay.taiVe || doc('flow-tai-ve.js')
+    taiVe: thay.taiVe || doc('flow-tai-ve.js'),
+    locThe: thay.locThe || doc('flow-loc-the.js')
   };
 }
 
@@ -165,6 +166,8 @@ try {
       ['trình nắn kho ảnh', n.khoAnh],
       // Menu Tải xuống: ẩn mục chất lượng bị khoá (1080p / 4K "Nâng cấp") để engine tự hạ xuống 720p (1.2.3).
       ['trình ẩn chất lượng bị khoá', n.taiVe],
+      // Ô Tìm kiếm bắt cả video cũ cùng prompt → chỉ để hiện thẻ của lần tạo này cho engine tải (1.3.3).
+      ['trình lọc thẻ cũ khi tải', n.locThe],
       ['chốt hoàn tất', 'window.__flowEngineLoaded = true;']
     ];
     try {
