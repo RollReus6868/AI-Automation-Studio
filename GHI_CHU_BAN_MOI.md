@@ -1,4 +1,17 @@
-# AI Automation Studio 1.3.3
+# AI Automation Studio 1.3.4
+
+- **App hết phình RAM và giật khi hàng đợi có nhiều video** (ảnh Task Manager 18/10/2026: app 7,7 GB, một tiến trình 2,1 GB). Ở trang Tạo video và Thư viện, mỗi video đã xong là một trình phát video sống (200 video = 200 trình phát, mỗi cái giữ bộ giải mã và khung hình). Mỗi lần một việc đổi trạng thái (khi đang chạy là vài lần mỗi giây), cả danh sách bị vẽ lại và mọi trình phát bị tạo lại. Đo trên máy kiểm với 200 video: riêng giao diện tăng từ 1,8 GB lên 3,4 GB sau 10 giây đang chạy. Giờ:
+  - Mỗi video chỉ được mở **một lần** để chụp một ảnh nhỏ, rồi đóng ngay. Danh sách và Thư viện hiện ảnh nhỏ đó. App chỉ chụp video đang hiện trên màn hình, lần lượt từng cái. Bấm đúp hoặc mở Chi tiết vẫn xem được video như cũ.
+  - Việc đổi trạng thái thì chỉ dòng của việc đó được vẽ lại, các dòng khác giữ nguyên.
+  - Cùng 200 video, giao diện giờ chiếm khoảng 0,35–0,4 GB và không tăng khi đang chạy.
+- Nhật ký ghi **RAM của app theo từng phần** mỗi 10 phút khi đang chạy, ví dụ *"🧠 RAM app: 4,1 GB — Muse 1 · L1 1,2 · Muse 1 · L2 1,1 · giao diện 0,4 · …"*. Mỗi luồng Muse / tab Flow là một trang web thật, thường chiếm 1–1,5 GB. Nếu tổng quá 6 GB, nhật ký nhắc giảm số luồng / tab mỗi tài khoản khi máy chậm.
+- Khi lấy xong video, luồng Muse dừng video trên trang (trước đây video kết quả cứ phát lặp trong cửa sổ ẩn lúc luồng chờ việc kế tiếp).
+- File dữ liệu (`du-lieu.json`, khoảng 2 MB với vài trăm việc) được ghi gom 1,5 giây một lần thay vì 0,25 giây, nên app bớt khựng và bớt ghi đĩa. Tắt app vẫn ghi nốt.
+- `nhat-ky.txt` quá 20 MB thì được đổi tên thành `nhat-ky-cu.txt` và app ghi file mới.
+
+Lưu ý: đã đo trên máy kiểm (Linux, video mẫu), chưa đo trên máy Windows của bạn. Sau khi cài, chạy như thường 20–30 phút rồi gửi nhật ký, dòng 🧠 sẽ cho biết phần nào còn chiếm RAM.
+
+## Bản 1.3.3
 
 - **Tải video Flow nhanh hơn: chỉ tải đúng video vừa tạo** (nhật ký 18/10/2026 10:31–11:24). Mỗi video càng về sau càng lâu: #355 tải 3 file, #357 tải 5 file, từ #362 tải 11 file cho một prompt, mỗi việc mất khoảng 4,5 phút trong khi Flow tạo chỉ khoảng 1 phút. Video làm từ ảnh dùng chung một prompt, nên khi engine lọc bằng ô Tìm kiếm của Flow để tìm video vừa tạo, Flow trả về cả mọi video cũ cùng prompt trong dự án, và engine tải lại hết từng cái rồi app mới bỏ file thừa. Giờ app nhớ thẻ của lần tạo này và ẩn các thẻ cũ trong lúc engine lọc, nên engine chỉ tải 1 file. Nhật ký ghi *"🎯 Ô Tìm kiếm của Flow bắt N thẻ cùng prompt — chỉ để lại 1 thẻ của lần tạo này, ẩn … thẻ cũ"*. Nếu app không nhận ra thẻ mới, nó không ẩn gì và vẫn bỏ file thừa như bản cũ.
 - **Sửa lỗi tự xoá dự án Flow** (nhật ký 10:29, cả 5 tài khoản: *"không thấy nút tuỳ chọn trong thẻ dự án"*). Thẻ dự án trên trang chủ Flow giờ không còn nút ⋮ mà có sẵn hai nút **edit** (đổi tên) và **delete** (xoá). App bấm thẳng nút xoá rồi xác nhận, không bao giờ bấm nút đổi tên.

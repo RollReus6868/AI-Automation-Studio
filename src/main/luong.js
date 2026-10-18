@@ -67,6 +67,11 @@ class Luong {
       return { ok: false, loi: `Lỗi luồng: ${err.message}`, giuThread: true };
     } finally {
       this.viec = null;
+      // 1.3.4: cửa sổ luồng ẩn KHÔNG bị hãm (backgroundThrottling:false) → video kết quả Muse cứ phát lặp trong lúc
+      // luồng chờ việc kế tiếp, tốn CPU / RAM vô ích. Lấy file xong thì dừng mọi video / âm thanh trên trang.
+      try {
+        if (!this.wc.isDestroyed()) this.wc.executeJavaScript("document.querySelectorAll('video, audio').forEach((m) => { try { m.pause(); } catch (e) {} }); 0", true).catch(() => {});
+      } catch (_) {}
     }
   }
 

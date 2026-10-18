@@ -1783,6 +1783,47 @@ test('1.3.0 vai tài khoản trong hộp thoại → thứ tự [chạy…, dự
   assert.deepStrictEqual(f.laySong(v), { muse: 2, flow: 1, suno: 1 }, 'không chọn "Chạy" mà có dự phòng → dự phòng đầu thành Chạy');
 });
 
+console.log('\n── 1.3.4 RAM / giật ──────────────────────────');
+test('1.3.4 danh sách + Thư viện không còn <video> cho từng việc (ảnh nhỏ chụp sẵn), vẽ theo từng dòng', () => {
+  const a = docNguon('src/ui/app.js'), c = docNguon('src/ui/style.css');
+  assert.ok(!/<video[^>]*preload="metadata"/.test(a), 'không còn <video preload="metadata"> trong danh sách / thư viện');
+  const thumb = a.slice(a.indexOf('function thumbHtml'), a.indexOf('function dongViec'));
+  assert.ok(!/<video/.test(thumb) && /anhVideoHtml\(f, /.test(thumb), 'dòng video dùng ảnh nhỏ');
+  const tv = a.slice(a.indexOf('function veThuVien'), a.indexOf('// ── Tài khoản'));
+  assert.ok(!/<video/.test(tv) && /veTheoDong\(hop, ds\.map/.test(tv), 'thư viện dùng ảnh nhỏ + vẽ theo dòng');
+  const hang = a.slice(a.indexOf('function veHang'), a.indexOf('function thumbHtml'));
+  assert.ok(/veTheoDong\(hop, ds\.slice\(0, MAX\)\.map\(\(j\) => \(\{ khoa: j\.id, html: dongViec\(j\) \}\)\)/.test(hang), 'hàng đợi vẽ theo dòng');
+  assert.ok(/v\.removeAttribute\('src'\)/.test(a) && /toDataURL\('image\/jpeg'/.test(a), 'chụp xong thì nhả video');
+  assert.ok(/new IntersectionObserver/.test(a), 'chỉ chụp video đang hiện trên màn hình');
+  assert.ok(/img\[data-vthumb\]:not\(\[src\]\)[^{]*\{ visibility: hidden; \}/.test(c), 'ảnh chưa chụp: visibility (display:none làm IntersectionObserver không thấy)');
+  assert.ok(/\.luoi-tv \{[^}]*grid-auto-rows: max-content/.test(c), 'lưới thư viện không co hàng');
+});
+test('1.3.4 tiến trình chính: gom ghi du-lieu.json 1,5 s, báo giao diện 250 ms, RAM từng phần vào nhật ký, xoay vòng nhat-ky.txt, luồng Muse dừng video', () => {
+  const m = docNguon('main.js'), l = docNguon('src/main/luong.js'), st = docNguon('src/main/store.js');
+  assert.ok(/new Store\(path\.join\(app\.getPath\('userData'\), 'du-lieu\.json'\), \(m\) => log\('warning', m\), \{ nhipMs: 1500 \}\)/.test(m));
+  assert.ok(/this\.nhipMs = o\.nhipMs \|\| 250/.test(st) && /\}, this\.nhipMs\);/.test(st));
+  assert.ok(/win\.webContents\.send\('state', trangThai\(\)\);\n  \}, 250\);/.test(m));
+  assert.ok(/function baoRam\(\)/.test(m) && /if \(dieuPhoi\.dangChay \|\| dieuPhoi\.luong\.length\) baoRam\(\)/.test(m) && /app\.getAppMetrics\(\)/.test(m));
+  assert.ok(/nhat-ky-cu\.txt/.test(m) && /20 \* 1024 \* 1024/.test(m));
+  assert.ok(/spellcheck: false/.test(m));
+  assert.ok(/querySelectorAll\('video, audio'\)\.forEach\(\(m\) => \{ try \{ m\.pause\(\); \}/.test(l));
+});
+testAsync('1.3.4 Store ghi theo nhịp nhipMs (không ghi sớm hơn, vẫn ghi sau nhịp)', async () => {
+  const { Store } = require('../src/main/store');
+  const os = require('os');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'st-nhip-'));
+  const f = path.join(dir, 'd.json');
+  const s = new Store(f, null, { nhipMs: 600 });
+  assert.strictEqual(new Store(path.join(dir, 'e.json')).nhipMs, 250, 'mặc định 250');
+  s.set({ a: 1 });
+  await new Promise((r) => setTimeout(r, 300));
+  assert.ok(!fs.existsSync(f), 'chưa tới nhịp thì chưa ghi');
+  s.set({ a: 2 });
+  await new Promise((r) => setTimeout(r, 600));
+  assert.strictEqual(JSON.parse(fs.readFileSync(f, 'utf8')).a, 2, 'tới nhịp thì ghi bản mới nhất');
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
 Promise.all(choAsync).then(() => {
   console.log('\n──────────────────────────────────────────────');
   console.log(`KẾT QUẢ: ${pass}/${pass + loi.length} PASS`);

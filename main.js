@@ -44,14 +44,19 @@ let win = null;
 let store, storeFlow, taiKhoan, dieuPhoi, capNhat, tabsFlow, mayFlow, taiVeFlow;
 const nhatKy = [];
 let henBao = null;
+let soDongGhi = 0;
 
 // ── Nhật ký + đẩy trạng thái cho giao diện ─────────────────────────────────
 function log(muc, chu) {
   const dong = { t: Date.now(), muc, chu: String(chu) };
   nhatKy.push(dong);
   if (nhatKy.length > 800) nhatKy.splice(0, nhatKy.length - 800);
-  try { fs.appendFileSync(path.join(app.getPath('userData'), 'nhat-ky.txt'),
-    `${new Date(dong.t).toISOString()} [${muc}] ${dong.chu}\n`); } catch (_) {}
+  try {
+    const tep = path.join(app.getPath('userData'), 'nhat-ky.txt');
+    // 1.3.4: file nhật ký không phình mãi — quá 20 MB thì đổi thành nhat-ky-cu.txt (giữ 1 bản cũ) rồi ghi file mới.
+    if (++soDongGhi % 500 === 0 && fs.statSync(tep).size > 20 * 1024 * 1024) fs.renameSync(tep, path.join(app.getPath('userData'), 'nhat-ky-cu.txt'));
+    fs.appendFileSync(tep, `${new Date(dong.t).toISOString()} [${muc}] ${dong.chu}\n`);
+  } catch (_) {}
   if (win && !win.isDestroyed()) win.webContents.send('log', dong);
 }
 
@@ -61,7 +66,37 @@ function baoTrangThai() {
     henBao = null;
     if (!win || win.isDestroyed() || !dieuPhoi) return;
     win.webContents.send('state', trangThai());
-  }, 150);
+  }, 250);
+}
+
+/**
+ * 1.3.4 — Ghi RAM của app vào nhật ký (mỗi 10 phút khi đang chạy) theo TỪNG phần: giao diện, lõi app, GPU, từng
+ * luồng Muse / Suno, từng tab Flow. Người dùng gửi nhật ký là biết phần nào ngốn RAM, không phải đoán từ Task Manager.
+ */
+function docRam() {
+  const nhan = new Map();
+  const gan = (wc, ten) => { try { if (wc && !wc.isDestroyed()) nhan.set(wc.getOSProcessId(), ten); } catch (_) {} };
+  if (win && !win.isDestroyed()) gan(win.webContents, 'giao diện');
+  const ngan = (id) => { const p = String(id).split(' · '); return p.length > 2 ? `${p[0]} · ${p[p.length - 1]}` : String(id); };
+  for (const [l, w] of viewCuaLuong) if (w && !w.isDestroyed()) gan(w.webContents, ngan(l.id));
+  for (const t of (tabsFlow && tabsFlow.tabs) || []) { try { gan(t.view.webContents, `Flow ${t.id}`); } catch (_) {} }
+  if (dangNhap) { try { gan(dangNhap.view.webContents, 'khung đăng nhập'); } catch (_) {} }
+  const phan = new Map();
+  let tong = 0;
+  for (const m of app.getAppMetrics()) {
+    const kb = (m.memory && m.memory.workingSetSize) || 0;
+    tong += kb;
+    const ten = nhan.get(m.pid) || (m.type === 'Browser' ? 'lõi app' : m.type === 'GPU' ? 'GPU' : 'khác');
+    phan.set(ten, (phan.get(ten) || 0) + kb);
+  }
+  return { tong, phan: [...phan.entries()].sort((a, b) => b[1] - a[1]) };
+}
+function baoRam() {
+  const { tong, phan } = docRam();
+  const gb = (kb) => (kb / 1048576).toFixed(1).replace('.', ',');
+  const soTrang = phan.filter(([t]) => /· L\d+$|^Flow /.test(t)).length;
+  log(tong > 6 * 1048576 ? 'warning' : 'info', `🧠 RAM app: ${gb(tong)} GB — ${phan.slice(0, 10).map(([t, kb]) => `${t} ${gb(kb)}`).join(' · ')}` +
+    (tong > 6 * 1048576 && soTrang > 2 ? ` — ${soTrang} trang Muse/Flow chạy cùng lúc, mỗi trang thường 1–1,5 GB: máy chậm thì giảm số luồng / tab mỗi tài khoản.` : ''));
 }
 
 function trangThai() {
@@ -141,7 +176,7 @@ const WEB_PREFS = (tk) => (tk.nen === 'flow'
   // Engine Flow chạy trong main world, nói chuyện với tiến trình chính qua preload-flow.js (contextBridge).
   ? { session: phien(tk), preload: path.join(__dirname, 'src/flow/main/preload-flow.js'), backgroundThrottling: false,
     contextIsolation: true, nodeIntegration: false, sandbox: false }
-  : { session: phien(tk), backgroundThrottling: false, contextIsolation: true, sandbox: true });
+  : { session: phien(tk), backgroundThrottling: false, contextIsolation: true, sandbox: true, spellcheck: false });
 function ganWc(wc) {
   wc.setWindowOpenHandler(({ url }) => {
     if (/^https?:/.test(url)) wc.loadURL(url);
@@ -846,7 +881,9 @@ function taoCuaSo() {
 }
 
 app.whenReady().then(() => {
-  store = new Store(path.join(app.getPath('userData'), 'du-lieu.json'), (m) => log('warning', m));
+  // 1.3.4: du-lieu.json ~2 MB với vài trăm việc, mỗi lần đổi trạng thái là ghi lại cả file (đồng bộ, chặn tiến trình
+  // chính) — gom ghi mỗi 1,5 s thay vì 0,25 s. Thoát app vẫn ghi nốt (store.close()).
+  store = new Store(path.join(app.getPath('userData'), 'du-lieu.json'), (m) => log('warning', m), { nhipMs: 1500 });
   taiKhoan = new QuanLyTaiKhoan(store, log);
 
   // ── Google Flow: kho của engine (thay chrome.storage.local), tab ngầm, tải về, "background" ──
@@ -911,13 +948,16 @@ app.whenReady().then(() => {
 
   taoCuaSo();
   log('info', `AI Automation Studio ${pkg.version} đã mở. Dữ liệu: ${app.getPath('userData')}`);
+  // 1.3.4: RAM từng phần vào nhật ký mỗi 10 phút khi đang chạy (MUSE_RAM_MS đổi nhịp cho bài kiểm).
+  setInterval(() => { try { if (dieuPhoi.dangChay || dieuPhoi.luong.length) baoRam(); } catch (_) {} },
+    parseInt(process.env.MUSE_RAM_MS, 10) || 10 * 60 * 1000);
 
   if (!process.env.MUSE_NO_UPDATE_CHECK) {
     setTimeout(() => capNhat.kiemTra({ imLang: true }), 5000);
     setInterval(() => capNhat.kiemTra({ imLang: true }), 4 * 3600 * 1000);
   }
   // Bài kiểm thử: MUSE_TEST=tests/<bài>.js nhận đúng các đối tượng app đang dùng.
-  if (process.env.MUSE_TEST) require(path.resolve(process.env.MUSE_TEST))({ win, app, LENH, dieuPhoi, taiKhoan, nhatKy, tabsFlow, mayFlow, storeFlow });
+  if (process.env.MUSE_TEST) require(path.resolve(process.env.MUSE_TEST))({ win, app, LENH, dieuPhoi, taiKhoan, nhatKy, tabsFlow, mayFlow, storeFlow, docRam, baoRam, store });
 });
 
 let dangThoat = false;       // đang cài bản mới lúc thoát

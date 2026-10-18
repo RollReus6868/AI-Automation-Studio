@@ -15,8 +15,10 @@ const fs = require('fs');
 const path = require('path');
 
 class Store {
-  constructor(filePath, onWarn) {
+  /** @param o.nhipMs  gom các lần ghi trong chừng ấy ms thành một lần chạm đĩa (mặc định 250). */
+  constructor(filePath, onWarn, o = {}) {
     this.filePath = filePath;
+    this.nhipMs = o.nhipMs || 250;
     this.data = {};
     this.flushTimer = null;
     this.onWarn = onWarn || null;
@@ -81,14 +83,14 @@ class Store {
     return true;
   }
 
-  // Gom nhiều lần ghi trong 250ms thành một lần chạm đĩa. Engine gọi
+  // Gom nhiều lần ghi trong nhipMs (mặc định 250ms) thành một lần chạm đĩa. Engine gọi
   // saveProject() rất dày khi chạy nhiều tab; ghi thẳng mỗi lần sẽ nghẽn ổ đĩa.
   scheduleFlush() {
     if (this.flushTimer) return;
     this.flushTimer = setTimeout(() => {
       this.flushTimer = null;
       this.flushNow();
-    }, 250);
+    }, this.nhipMs);
   }
 
   flushNow() {
