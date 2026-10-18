@@ -1,4 +1,14 @@
-# AI Automation Studio 1.3.7
+# AI Automation Studio 1.3.8
+
+- **Tài khoản lỗi ghi rõ lỗi gì.** Thẻ tài khoản màu đỏ (mục *Tài khoản*) và hộp chọn tài khoản của dự án giờ ghi nguyên câu mà Muse / Flow báo, không còn ghi chung chung. Ví dụ theo nhật ký 19/10/2026 của bạn:
+  - Muse 1: *"Đang nghỉ: lỗi 8 việc liên tiếp, lần gần nhất: Muse trả lời chữ, không có video: "Lượt tạo video hôm nay đã hết…""*. Trước đây chỉ ghi *"lỗi 8 việc liên tiếp"*.
+  - Flow 3: *"Đang nghỉ: Flow lỗi: Trang Flow đang hiện thông báo hoạt động bất thường / hết lượt — Flow ghi: "Chúng tôi nhận thấy có hoạt động bất thường nào đó…""*.
+  - Dòng ⚠ / 🛑 trong nhật ký và dòng ⏸ (khi hàng chờ tạm dừng vì hết tài khoản) cũng ghi đúng câu đó cho từng tài khoản.
+  - Trong hộp chọn tài khoản của dự án, tài khoản đỏ có dòng lý do ngay dưới tên, không phải rê chuột mới thấy. Lỗi dài được cắt còn một dòng khoảng 200 ký tự.
+
+Lưu ý: đã kiểm bằng bài kiểm với đúng các câu trong nhật ký của bạn và trên trang giả, chưa chạy trên Muse / Flow thật.
+
+## Bản 1.3.7
 
 - **Ảnh Flow tạo xong mà không tải về được ("Chờ 120s mà Google chưa xuất file").** Nguyên nhân (nhật ký 19/10/2026 02:04–02:21 và file chẩn đoán): app tải ảnh Flow ở chất lượng **2K**. 2K không phải file gốc, mà là Flow **tăng độ phân giải**, việc này tốn tín dụng AI của tài khoản. Khi Flow không tăng được (thường do hết tín dụng), nó hiện thông báo đỏ *"Không tăng được độ phân giải!"* và không xuất file nào. Engine vẫn chờ đủ 120 giây, rồi thử lại đúng mục 2K đó, nên sau 5 phút việc bị tính lỗi và tài khoản bị tính lỗi oan. Giờ:
   - Ảnh Flow tải mặc định **1K (Kích thước gốc)**: file có ngay, không tốn tín dụng. Ai đang để 2K mặc định được chuyển sang 1K. Muốn 2K / 4K vẫn chọn được ở *Cài đặt → Google Flow → Chất lượng ảnh tải về*.

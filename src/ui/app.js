@@ -242,7 +242,9 @@
             `<label title="Dùng tài khoản này để tạo ${t.toLowerCase()}"><input type="checkbox" name="loai_${l}_${esc(id)}" ${boLoaiCua(d, l, id) ? '' : 'checked'}>${t}</label>`).join('')}</span>`;
           const sk = skTk(id);
           return `<div class="hang-vai" data-vai="${vai}"><span title="${esc(`${a.ten} — ${sk.chu}`)}"><i class="cham-sk sk-${sk.muc}"></i>${esc(a.ten)}${a.trangThai === 'can-dang-nhap' ? ' <small>(chưa đăng nhập)</small>' : ''}</span>` +
-            loai + `<select name="vai_${esc(id)}" data-vai-tk>${VAI_TK.map(([k, t]) => `<option value="${k}" ${k === vai ? 'selected' : ''}>${t}</option>`).join('')}</select></div>`;
+            loai + `<select name="vai_${esc(id)}" data-vai-tk>${VAI_TK.map(([k, t]) => `<option value="${k}" ${k === vai ? 'selected' : ''}>${t}</option>`).join('')}</select>` +
+            // 1.3.8: tài khoản đang lỗi → ghi rõ lỗi ngay dưới tên (không phải rê chuột mới thấy).
+            (sk.muc === 'loi' ? `<small class="ly-loi">${esc(sk.chu)}</small>` : '') + '</div>';
         }).join('')}</div><small class="mo">Để "Không dùng" hết = dự án dùng mọi tài khoản ${TEN_NEN[nen]}.</small></div>`;
       }).join('');
   }

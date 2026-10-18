@@ -351,7 +351,7 @@ testAsync('tài khoản chính lỗi → việc chuyển NGAY sang dự phòng; 
   assert.ok(!daChay.some((x) => x[0] === 'hai'), 'tài khoản ngoài dự án không bao giờ chạy');
   assert.strictEqual(daChay.filter((x) => x[0] === 'tk-1').length, 2, 'chính lỗi 2 việc liền thì tạm nghỉ, không thử thêm');
   assert.ok(nhatKy.some((x) => /↪ #1 .*chuyển sang "Ba"/.test(x)));
-  assert.ok(nhatKy.some((x) => /"Muse 1": lỗi 2 việc liên tiếp — tạm nghỉ/.test(x)));
+  assert.ok(nhatKy.some((x) => /"Muse 1": lỗi 2 việc liên tiếp, lần gần nhất: .+ — tạm nghỉ/.test(x)));
 });
 testAsync('một tài khoản: lỗi thì thử lại như cũ (không tạm nghỉ)', async () => {
   const daChay = [];
@@ -1112,6 +1112,34 @@ test('1.3.7 bỏ ô Video ở MỌI tài khoản Flow → video Flow tạm dừn
   b.dp.them({ duAn: d2.id, nen: 'flow', loai: 'video', prompts: ['v'] });
   b.dp.chayDuAn(d2.id);
   assert.deepStrictEqual([b.dp.viec[0].nen, b.dp.viec[0].taiKhoan], ['muse', 'tk-1'], 'Muse ⇄ Flow bật (mặc định) → video chạy ở Muse');
+});
+test('1.3.8 tài khoản lỗi ghi RÕ lỗi: nghỉ vì lỗi liên tiếp kèm lỗi gần nhất (chữ Muse/Flow báo), thẻ đỏ + hộp tạm dừng ghi đúng câu đó', () => {
+  const { dp, tk, nhatKy } = dungDieuPhoi();
+  const m2 = tk.them('Muse 2', 'muse');
+  for (const id of ['tk-1', m2.id]) tk.sua(id, { trangThai: 'da-dang-nhap' });
+  dp.them({ loai: 'video', prompts: ['a', 'b'] });
+  const cau = 'Muse trả lời chữ, không có video: "Your video limit for the last 24 hours has been reached. Please try again later."';
+  for (const j of dp.viec) { Object.assign(j, { trangThai: 'chay', taiKhoan: 'tk-1' }); dp._ketThuc(j, { ok: false, loi: cau }, tk.tim('tk-1')); }
+  const sk = dp.trangThai().sucKhoe['tk-1'];
+  assert.ok(sk.muc === 'loi' && sk.chu.includes('lỗi 2 việc liên tiếp, lần gần nhất: Muse trả lời chữ') && sk.chu.includes('Your video limit for the last 24 hours'), sk.chu);
+  assert.ok(nhatKy.some((x) => /⚠ "Muse 1": lỗi 2 việc liên tiếp, lần gần nhất: .*Your video limit/.test(x)), nhatKy.join('\n'));
+  // Lỗi rất dài → một dòng, cắt ở 200 ký tự.
+  const d = dungDieuPhoi();
+  d.tk.sua('tk-1', { trangThai: 'da-dang-nhap' });
+  d.dp.them({ prompts: ['x'] });
+  Object.assign(d.dp.viec[0], { trangThai: 'chay', taiKhoan: 'tk-1' });
+  d.dp._ketThuc(d.dp.viec[0], { ok: false, loi: 'dòng 1\n' + 'x'.repeat(400) }, d.tk.tim('tk-1'));
+  const loi = d.dp.ketQuaTk['tk-1'].loi;
+  assert.ok(loi.length === 200 && loi.endsWith('…') && !/\n/.test(loi), loi);
+  // Hộp tạm dừng: tài khoản không nghỉ mà lỗi → ghi lỗi đó thay vì "đang lỗi".
+  d.dp._baoTamDung(d.dp.viec, 'dự án');
+  assert.ok(d.nhatKy.some((x) => /⏸ .*"Muse 1": lỗi: dòng 1 xxx/.test(x)), d.nhatKy.slice(-1)[0]);
+});
+test('1.3.8 hộp chọn tài khoản: tài khoản đỏ ghi lý do ngay dưới tên; máy Flow nghỉ thì thẻ đỏ lấy lý do thật', () => {
+  const a = fs.readFileSync(path.join(__dirname, '..', 'src', 'ui', 'app.js'), 'utf8');
+  assert.ok(/sk\.muc === 'loi' \? `<small class="ly-loi">\$\{esc\(sk\.chu\)\}<\/small>`/.test(a));
+  const m = fs.readFileSync(path.join(__dirname, '..', 'main.js'), 'utf8');
+  assert.ok(/lyDo: so\.lyDoNghi \|\| /.test(m));
 });
 test('1.3.7 tình trạng tài khoản: xám chưa kiểm → xanh khi xong việc → đỏ khi lỗi / nghỉ / chặn / chưa đăng nhập', () => {
   const { dp, tk } = dungDieuPhoi();
