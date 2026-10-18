@@ -55,15 +55,44 @@
       await fetch('/__flow-du-an', { method: 'POST', body: JSON.stringify({ id }) }).catch(() => {});
       location.href = goc + '/project/' + id;
     };
-    // Danh sách dự án (lưu ở máy chủ test): mỗi thẻ có nút ⋮ (chỉ nhận pointerdown, như Radix) → menu
-    // → "Delete project" → hộp xác nhận "Cancel / Delete" → máy chủ xoá.
+    // Danh sách dự án (lưu ở máy chủ test). Thẻ kiểu Flow 10/2026 (nhật ký 18/10: chữ thẻ "Tháng 10 17 - 20:27 edit delete"):
+    // không còn nút ⋮, hai nút biểu tượng nằm ngay trong liên kết của thẻ — "edit" (đổi tên → hộp "Huỷ / Lưu", bấm nhầm là
+    // bài đỏ) và "delete" → hộp xác nhận "Huỷ / Xoá" → máy chủ xoá. Thẻ "gia-khac" kiểu cũ (nút ⋮ chỉ nhận pointerdown,
+    // như Radix → menu "Delete project" → hộp "Cancel / Delete").
     const ve = async () => {
       const ds = await (await fetch('/__flow-du-an')).json();
       const h = document.getElementById('dsDuAn');
-      h.innerHTML = ds.map((id) => `<div class="the" style="border:1px solid #444;margin:6px;padding:6px">
+      h.innerHTML = ds.map((id) => id === 'gia-khac'
+        ? `<div class="the" style="border:1px solid #444;margin:6px;padding:6px">
         <a href="${goc}/project/${id}">Dự án ${id}</a>
-        <button class="tuy" aria-label="More options" data-id="${id}"><i class="google-symbols">more_vert</i></button></div>`).join('');
+        <button class="tuy" aria-label="More options" data-id="${id}"><i class="google-symbols">more_vert</i></button></div>`
+        : `<div class="the" style="border:1px solid #444;margin:6px;padding:6px">
+        <a href="${goc}/project/${id}"><div style="width:120px;height:60px;background:#333"></div><div>Tháng 10 17 - 20:27</div>
+        <div><button class="sua" data-id="${id}"><i class="google-symbols">edit</i></button><button class="xoa-the" data-id="${id}"><i class="google-symbols">delete</i></button></div></a></div>`).join('');
       for (const b of h.querySelectorAll('.tuy')) b.addEventListener('pointerdown', () => moMenu(b.dataset.id, b));
+      for (const b of h.querySelectorAll('.sua')) b.addEventListener('click', (e) => {
+        e.preventDefault(); e.stopPropagation();
+        const d = document.createElement('div');
+        d.setAttribute('role', 'dialog');
+        d.innerHTML = '<p>Đổi tên dự án</p><input value="x"><button class="huy">Huỷ</button><button>Lưu</button>';
+        document.body.appendChild(d);
+        d.querySelector('.huy').onclick = () => d.remove();
+      });
+      for (const b of h.querySelectorAll('.xoa-the')) b.addEventListener('click', (e) => {
+        e.preventDefault(); e.stopPropagation();
+        hoiXoa(b.dataset.id, 'Xoá dự án?', 'Huỷ', 'Xoá');
+      });
+    };
+    const hoiXoa = (id, cau, huy, xoa) => {
+      const d = document.createElement('div');
+      d.setAttribute('role', 'alertdialog');
+      d.innerHTML = `<p>${cau}</p><button class="huy">${huy}</button><button class="ok">${xoa}</button>`;
+      document.body.appendChild(d);
+      d.querySelector('.huy').onclick = () => d.remove();
+      d.querySelector('.ok').onclick = async () => {
+        await fetch('/__flow-xoa-du-an', { method: 'POST', body: JSON.stringify({ id }) }).catch(() => {});
+        d.remove(); ve();
+      };
     };
     const moMenu = (id, b) => {
       document.querySelectorAll('[role="menu"]').forEach((m) => m.remove());
@@ -74,15 +103,7 @@
       b.parentElement.appendChild(m);
       m.querySelector('.xoa').addEventListener('click', () => {
         m.remove();
-        const d = document.createElement('div');
-        d.setAttribute('role', 'alertdialog');
-        d.innerHTML = '<p>Delete project?</p><button class="huy">Cancel</button><button class="ok">Delete</button>';
-        document.body.appendChild(d);
-        d.querySelector('.huy').onclick = () => d.remove();
-        d.querySelector('.ok').onclick = async () => {
-          await fetch('/__flow-xoa-du-an', { method: 'POST', body: JSON.stringify({ id }) }).catch(() => {});
-          d.remove(); ve();
-        };
+        hoiXoa(id, 'Delete project?', 'Cancel', 'Delete');
       });
     };
     ve();

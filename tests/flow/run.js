@@ -1524,10 +1524,32 @@ test('1.2.3 nhật ký 16/10 "Chờ 120s mà Google chưa xuất file" ×3: tab 
   const l = docGoc('src', 'flow', 'luong-flow.js');
   assert.ok(/this\._chupChanDoan\(`#\$\{j\.so\} tạo xong nhưng quá \$\{choTai\} chưa tải về được`, false\)/.test(l), 'tải về quá hạn chưa lưu tệp chẩn đoán (không mở bảng [+])');
   // Trang Google bật Trusted Types: tệp tiêm không được gán innerHTML (nhật ký: "Script failed to execute").
-  for (const f of ['flow-kho-anh.js', 'flow-tai-ve.js', 'flow-tai-anh.js', 'flow-mode.js', 'flow-model.js', 'flow-bam-tao.js', 'flow-anh-tham-chieu.js', 'flow-canh-bao.js']) {
+  for (const f of ['flow-kho-anh.js', 'flow-tai-ve.js', 'flow-tai-anh.js', 'flow-mode.js', 'flow-model.js', 'flow-bam-tao.js', 'flow-anh-tham-chieu.js', 'flow-canh-bao.js', 'flow-loc-the.js']) {
     const src = docGoc('src', 'flow', 'inject', f).replace(/\/\/.*$/gm, '');
     assert.ok(!/\.innerHTML\s*=|insertAdjacentHTML|document\.write/.test(src), `${f} gán HTML thô — trang Flow (Trusted Types) sẽ ném lỗi`);
   }
+});
+
+// ── 1.3.3: tải Flow bốc cả video cũ cùng prompt ─────────────────────────────
+test('1.3.3 nhật ký 18/10 "#362 bốc 11 thẻ": tab Flow tiêm trình lọc thẻ cũ; engine vẫn lọc bằng ô Tìm kiếm + đóng dấu lưới như trình lọc dựa vào', () => {
+  const t = docGoc('src', 'flow', 'tab-flow.js');
+  const iEngine = t.indexOf("['engine dò DOM'"), iLoc = t.indexOf("['trình lọc thẻ cũ khi tải', n.locThe]"), iChot = t.indexOf("['chốt hoàn tất'");
+  assert.ok(iEngine > 0 && iLoc > iEngine && iChot > iLoc, 'thiếu / sai chỗ giai đoạn "trình lọc thẻ cũ khi tải"');
+  const { docNguon: nguon } = require('../../src/flow/tab-flow');
+  assert.ok(/window\.__flowLocThe = \{/.test(nguon().locThe));
+  const e = nguon().engine;
+  // Trình lọc ẩn thẻ bằng display:none — engine chỉ bốc thẻ đang hiện; nhận lưới mới qua data-fe-grid-id="pid_<giờ>_<số prompt>".
+  assert.ok(e.includes("let visibleTiles = getOuterTiles().filter(t => t.offsetParent !== null || t.offsetWidth > 0);"), 'engine đổi cách bốc thẻ sau khi lọc — xem lại flow-loc-the.js');
+  assert.ok(e.includes('promptId: `pid_${Date.now()}_${item.index}`') && e.includes("newGrids[0].setAttribute('data-fe-grid-id', video.promptId);"), 'engine đổi cách đóng dấu lưới — xem lại flow-loc-the.js');
+  assert.ok(e.includes("return (state.settings.addIndex ? `${displayIndex}. ${head}` : head).trim();"), 'engine đổi chữ gõ vào ô Tìm kiếm — xem lại flow-loc-the.js');
+});
+
+test('1.3.3 nhật ký 18/10 10:29 "không thấy nút tuỳ chọn trong thẻ dự án" (thẻ "… edit delete"): tự xoá dự án Flow bấm được nút xoá trên thẻ, không bấm "edit"', () => {
+  const x = docGoc('src', 'flow', 'main', 'xoa-du-an.js');
+  assert.ok(/const LA_NUT_XOA = /.test(x) && /cach: 'nut-xoa-tren-the'/.test(x));
+  const re = new RegExp(x.match(/const LA_NUT_XOA = \/(.+)\/i;/)[1], 'i');
+  for (const c of ['delete', 'delete_forever', 'Xoá dự án', 'Delete project']) assert.ok(re.test(c), c);
+  for (const c of ['edit', 'Đổi tên', 'delete edit', 'more_vert']) assert.ok(!re.test(c), c);
 });
 
 // ── macOS ──────────────────────────────────────────────────────────────────

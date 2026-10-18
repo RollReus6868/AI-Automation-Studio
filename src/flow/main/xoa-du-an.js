@@ -12,6 +12,11 @@
 //  Thiếu bất kỳ bước nào → DỪNG, ghi nhật ký kèm những gì thấy trên trang,
 //  không bấm thử chỗ khác. Chưa từng thấy trang chủ flow.google.com thật — các
 //  bước dò theo vai trò (role) và chữ Anh/Việt; nhật ký là chỗ để sửa.
+//
+//  1.3.3 (nhật ký 18/10/2026 10:29, 5 tài khoản đều "không thấy nút tuỳ chọn trong thẻ dự án"):
+//  thẻ dự án trên trang chủ Flow mới không còn nút ⋮ — chữ thẻ là "Tháng 10 17 - 20:27 edit delete",
+//  tức hai nút biểu tượng ĐẶT THẲNG trên thẻ: "edit" (đổi tên) và "delete" (xoá). Thẻ có đúng MỘT nút
+//  xoá như vậy thì bấm thẳng nút đó (không bao giờ bấm "edit"), rồi tới hộp xác nhận như cũ.
 // ============================================================================
 
 const cho = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -52,19 +57,38 @@ const BUOC_MENU = (ma) => `(async () => {
   if (!dung.length) return { ok: false, buoc: 'tim-the', thay: lienKet.map(maCua).slice(0, 10) };
   // Thẻ = tổ tiên gần nhất có nút "tuỳ chọn", mà KHÔNG ôm liên kết tới dự án khác.
   const LA_NUT_MENU = /more_vert|more_horiz|more options|more actions|options|tuỳ chọn|tùy chọn|thêm thao tác|^⋮$|^…$/i;
-  let the = null, nut = [];
+  // Nút xoá đặt thẳng trên thẻ (Flow 10/2026): biểu tượng "delete" / nhãn "Xoá dự án"… — nút bấm chứa biểu tượng,
+  // hoặc chính biểu tượng khi nó không nằm trong nút nào. "edit" (đổi tên) không bao giờ khớp.
+  const LA_NUT_XOA = /^(delete|delete_forever|delete project|xoá|xóa|xoá dự án|xóa dự án|move to trash|chuyển vào thùng rác)$/i;
+  const nutXoa = (e) => {
+    const ds = new Set();
+    for (const b of e.querySelectorAll('button, [role="button"]')) {
+      if (LA_NUT_XOA.test(chu(b)) || LA_NUT_XOA.test(b.getAttribute('aria-label') || '') || LA_NUT_XOA.test(b.getAttribute('title') || '')) ds.add(b);
+    }
+    for (const i of e.querySelectorAll('i, mat-icon, .google-symbols, .material-symbols-outlined, .material-icons')) {
+      if (/^(delete|delete_forever)$/i.test(chu(i))) ds.add(i.closest('button, [role="button"]') || i);
+    }
+    return [...ds].filter((x) => ![...ds].some((y) => y !== x && y.contains(x)));
+  };
+  let the = null, nut = [], xoa = [];
   for (let e = dung[0]; e && e !== document.body; e = e.parentElement) {
     if (lienKet.some((a) => maCua(a) && maCua(a) !== ma && e.contains(a))) break;
     nut = [...e.querySelectorAll('button, [role="button"]')].filter((b) => LA_NUT_MENU.test(nhan(b)));
-    if (nut.length) { the = e; break; }
+    xoa = nutXoa(e);
+    if (nut.length || xoa.length) { the = e; break; }
   }
   if (!the) return { ok: false, buoc: 'nut-menu', lyDo: 'không thấy nút tuỳ chọn trong thẻ dự án',
     theDuAn: chu(dung[0].parentElement || dung[0]).slice(0, 80) };
-  if (nut.length !== 1) return { ok: false, buoc: 'nut-menu', lyDo: 'thấy nhiều nút tuỳ chọn', nut: nut.map((b) => nhan(b).slice(0, 40)) };
   // Nút chỉ hiện khi rê chuột vào thẻ.
   the.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
   the.dispatchEvent(new MouseEvent('mouseenter', { bubbles: false }));
   await new Promise((r) => setTimeout(r, 400));
+  if (xoa.length === 1) {
+    bam(xoa[0]);
+    return { ok: true, cach: 'nut-xoa-tren-the' };
+  }
+  if (xoa.length > 1) return { ok: false, buoc: 'nut-xoa', lyDo: 'thấy nhiều nút xoá trong thẻ dự án', nut: xoa.map((b) => nhan(b).slice(0, 40)) };
+  if (nut.length !== 1) return { ok: false, buoc: 'nut-menu', lyDo: 'thấy nhiều nút tuỳ chọn', nut: nut.map((b) => nhan(b).slice(0, 40)) };
   bam(nut[0]);
   let muc = null;
   for (let i = 0; i < 15 && !muc; i++) {

@@ -1,4 +1,11 @@
-# AI Automation Studio 1.3.2
+# AI Automation Studio 1.3.3
+
+- **Tải video Flow nhanh hơn: chỉ tải đúng video vừa tạo** (nhật ký 18/10/2026 10:31–11:24). Mỗi video càng về sau càng lâu: #355 tải 3 file, #357 tải 5 file, từ #362 tải 11 file cho một prompt, mỗi việc mất khoảng 4,5 phút trong khi Flow tạo chỉ khoảng 1 phút. Video làm từ ảnh dùng chung một prompt, nên khi engine lọc bằng ô Tìm kiếm của Flow để tìm video vừa tạo, Flow trả về cả mọi video cũ cùng prompt trong dự án, và engine tải lại hết từng cái rồi app mới bỏ file thừa. Giờ app nhớ thẻ của lần tạo này và ẩn các thẻ cũ trong lúc engine lọc, nên engine chỉ tải 1 file. Nhật ký ghi *"🎯 Ô Tìm kiếm của Flow bắt N thẻ cùng prompt — chỉ để lại 1 thẻ của lần tạo này, ẩn … thẻ cũ"*. Nếu app không nhận ra thẻ mới, nó không ẩn gì và vẫn bỏ file thừa như bản cũ.
+- **Sửa lỗi tự xoá dự án Flow** (nhật ký 10:29, cả 5 tài khoản: *"không thấy nút tuỳ chọn trong thẻ dự án"*). Thẻ dự án trên trang chủ Flow giờ không còn nút ⋮ mà có sẵn hai nút **edit** (đổi tên) và **delete** (xoá). App bấm thẳng nút xoá rồi xác nhận, không bao giờ bấm nút đổi tên.
+
+Lưu ý: đã kiểm trên trang Flow giả, chạy đúng hàm lọc thẻ của engine thật, chưa chạy trên Flow thật.
+
+## Bản 1.3.2
 
 - **Sửa lỗi Flow không nhận ảnh tải lên ở một số tài khoản** (nhật ký 17/10/2026 21:49: *"Không đưa được ảnh lên kho Flow"* ở Flow 2, 3, 4, 5). Bốn tệp chẩn đoán bạn gửi cho thấy: ở tài khoản chưa từng tải ảnh lên, Flow mở hộp **"Quyền sử dụng hình ảnh này"** (Huỷ / Tôi đồng ý), và ảnh chỉ vào kho khi bấm **Tôi đồng ý**. App không bấm nên ảnh không bao giờ vào kho. Theo lựa chọn của bạn, giờ app tự bấm **Tôi đồng ý** và nhật ký ghi lại mỗi lần bấm. Công tắc nằm ở *Cài đặt → Google Flow → Tự bấm "Tôi đồng ý"…* (bật sẵn). Nếu tắt công tắc, app báo ngay tài khoản nào cần bạn tự bấm một lần, không chờ 60 giây vô ích.
 - **Muse ⇄ Flow: luôn đủ số tài khoản chạy cùng lúc** (lần chạy 18/10/2026 00:17–00:42). Dự án chạy 5 tài khoản Flow cùng lúc, 3 dự phòng. 7 tài khoản Flow lần lượt hết credit hoặc bị *"hoạt động bất thường"*, nên suốt 7 phút chỉ còn đúng 1 tài khoản Flow chạy, Muse ngồi không. Bản cũ chỉ chuyển sang Muse khi **mọi** tài khoản Flow đều nghỉ, và lúc đó chuyển **cả hàng chờ** (321 video) sang Muse, Flow nghỉ xong cũng không lấy lại. Giờ:
