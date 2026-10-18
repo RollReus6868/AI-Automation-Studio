@@ -1544,6 +1544,44 @@ test('1.3.3 nhật ký 18/10 "#362 bốc 11 thẻ": tab Flow tiêm trình lọc 
   assert.ok(e.includes("return (state.settings.addIndex ? `${displayIndex}. ${head}` : head).trim();"), 'engine đổi chữ gõ vào ô Tìm kiếm — xem lại flow-loc-the.js');
 });
 
+// Nhật ký 18/10/2026 18:09 (bản 1.3.4): "[flow7] [1] 🔗 Đã bốc 11 thẻ từ bộ lọc Search" rồi tải v964_1 … v964_8.
+// Mỗi mẻ 1 prompt → số engine tự gắn luôn là "1." → ô Tìm kiếm "1. <prompt>" bắt mọi video cũ cùng prompt.
+test('1.3.5 số thứ tự gửi Flow = số VIỆC (#964.), engine tìm thẻ tải về theo đúng số đó', () => {
+  const { tienToSo } = require('../../src/flow/luong-flow');
+  const e = docNguon('src', 'inject', 'flow-engine.js');
+  const ham = (dau) => { const t = thanHam(e, dau); assert.ok(t, `engine không còn ${dau}`); return t + '\n}\n'; };
+  const eng = (settings) => new Function('state', 'const SEARCH_FILTER_MAX = 80;\n' + ham('function buildSearchFilterText') + ham('function getPromptIndexNumber') +
+    'return { buildSearchFilterText };')({ settings });
+  assert.ok(/^const SEARCH_FILTER_MAX = 80;$/m.test(e), 'engine đổi SEARCH_FILTER_MAX');
+  const P = 'Animate this cartoon image into a smooth, natural, cinematic animated video while strictly preserving the original composition';
+  const c = chuanHoaFlow({});
+  assert.strictEqual(c.addIndex, true, 'mặc định vẫn bật "Thêm số thứ tự"');
+  const s = caiDatEngine(c, { loai: 'video', ten: ['x'], coAnh: true });
+  assert.strictEqual(s.addIndex, false, 'engine không được tự gắn "1." nữa — app gắn số việc');
+  // Prompt app giao engine (như luong-flow) → chữ engine gõ vào ô Tìm kiếm khi tải.
+  const tim = (so) => eng(s).buildSearchFilterText({ promptIndex: 1, promptText: tienToSo({ so }, c) + P });
+  assert.strictEqual(tim(964), ('#964. ' + P).slice(0, 80).trim(), 'chữ tìm = "#964. " + đầu prompt (80 ký tự)');
+  assert.ok(tim(964).startsWith('#964. Animate'), tim(964));
+  // Chữ Flow hiện trên thẻ của từng việc (prompt đã gửi) — chữ tìm của việc này chỉ khớp thẻ của chính nó.
+  const the = [1, 64, 335, 336, 964, 965].map((so) => ({ so, chu: tienToSo({ so }, c) + P }));
+  for (const so of [64, 964, 336]) {
+    const khop = the.filter((t) => t.chu.toLowerCase().includes(tim(so).toLowerCase())).map((t) => t.so);
+    assert.deepStrictEqual(khop, [so], `tìm việc #${so} bắt nhầm: ${khop}`);
+  }
+  // Bản cũ (engine tự gắn số theo mẻ 1 prompt) — mọi việc đều "1. …" → tìm 1 việc bắt cả 6 thẻ: đúng lỗi người dùng gặp.
+  const cu = eng({ ...s, addIndex: true }).buildSearchFilterText({ promptIndex: 1, promptText: P });
+  assert.strictEqual(the.map(() => '1. ' + P).filter((chu) => chu.includes(cu)).length, the.length, 'chứng minh lỗi cũ: bắt cả 6 thẻ');
+  assert.ok(cu.startsWith('1. Animate'));
+  // Tắt công tắc → không gắn số; việc chưa có số → không gắn.
+  assert.strictEqual(tienToSo({ so: 964 }, { ...c, addIndex: false }), '');
+  assert.strictEqual(tienToSo({}, c), '');
+  // Dán bù dựng lại đúng chữ engine dán (engine không tự gắn số nữa → chữ = prompt app đã gắn số).
+  const { chuDanCua } = require('../../src/flow/main/dan-bu');
+  assert.strictEqual(chuDanCua([tienToSo({ so: 964 }, c) + P + ' @336_7d7e9a'], 1, s), '#964. ' + P);
+  // Trình lọc thẻ cũ nhận ra ô Tìm kiếm cả khi chữ bắt đầu bằng "#".
+  assert.ok(/\^#\?\\d\+\\\.\\s\\S/.test(docNguon('src', 'inject', 'flow-loc-the.js')));
+});
+
 test('1.3.3 nhật ký 18/10 10:29 "không thấy nút tuỳ chọn trong thẻ dự án" (thẻ "… edit delete"): tự xoá dự án Flow bấm được nút xoá trên thẻ, không bấm "edit"', () => {
   const x = docGoc('src', 'flow', 'main', 'xoa-du-an.js');
   assert.ok(/const LA_NUT_XOA = /.test(x) && /cach: 'nut-xoa-tren-the'/.test(x));

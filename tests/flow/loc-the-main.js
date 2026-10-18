@@ -36,7 +36,7 @@ const PROMPT = 'Animate this image with gentle camera motion, soft light, cinema
  * Nạp trang, tiêm như tab Flow, tạo lưới mới (đóng dấu như engine), rồi gọi isolateTilesViaSearch của engine.
  * moi: danh sách số prompt của mẻ (vd [1] hoặc [1, 2]); timSo: prompt engine đang tải.
  */
-async function chay(wc, query, { moi = [1], timSo = 1, dongDau = true, coLoc = !KHONG_LOC } = {}) {
+async function chay(wc, query, { moi = [1], timSo = 1, dongDau = true, coLoc = !KHONG_LOC, soViec = false } = {}) {
   const js = (c) => wc.executeJavaScript(c, true);
   await wc.loadFile(path.join(__dirname, '..', 'fixture-flow-loc.html'), { query });
   const boc = (src) => `(function(){\n${src}\n})();`;
@@ -63,8 +63,10 @@ async function chay(wc, query, { moi = [1], timSo = 1, dongDau = true, coLoc = !
   })()`);
   await wait(1600);  // video tạo xong, engine đổi tên… rồi mới vào pha tải
   return js(`(async () => {
-    window.__tState.settings.addIndex = true;
-    const video = { promptIndex: ${timSo}, promptText: ${JSON.stringify(PROMPT)}, trackedTileIds: [] };
+    // 1.3.5: soViec = app gắn "#<số việc>. " vào prompt, engine KHÔNG tự đánh số (addIndex false — caiDatEngine).
+    window.__tState.settings.addIndex = ${!soViec};
+    window.__tState.settings.renameMode = 'custom_list';
+    const video = { promptIndex: ${timSo}, promptText: ${soViec ? `'#' + (900 + ${timSo}) + '. ' + ` : ''}${JSON.stringify(PROMPT)}, trackedTileIds: [] };
     const o = await window.__tLoc(video, '');
     const bocMa = (video.cardElements || []).map((t) => t.dataset.ma);
     // Engine tải xong thì xoá chữ trong ô Tìm kiếm (tryDownloadStep → finally).
@@ -106,6 +108,18 @@ app.whenReady().then(async () => {
     ok('[mẻ 2 prompt, tải prompt 1] chỉ bốc thẻ của prompt 1', m1.tong === 1 && m1.bocMa[0] === uuid(901), JSON.stringify({ tong: m1.tong, bocMa: m1.bocMa.map((m) => m.slice(-3)) }));
     const m2 = await chay(wc, { kieu: 've-lai' }, { moi: [1, 2], timSo: 2 });
     ok('[mẻ 2 prompt, tải prompt 2] chỉ bốc thẻ của prompt 2', m2.tong === 1 && m2.bocMa[0] === uuid(902), JSON.stringify({ tong: m2.tong, bocMa: m2.bocMa.map((m) => m.slice(-3)) }));
+    // 1.3.5: prompt mang SỐ VIỆC — ô Tìm kiếm của Flow tự chỉ ra thẻ của việc này, KHÔNG cần trình lọc thẻ cũ,
+    // kể cả khi engine chưa đóng dấu lưới (trường hợp nhật ký 18/10 18:09 "bốc 11 thẻ" vẫn xảy ra ở 1.3.4).
+    for (const kieu of ['tai-cho', 've-lai']) {
+      const r = await chay(wc, { kieu, so: 'viec' }, { soViec: true, coLoc: false, dongDau: false });
+      ok(`[SỐ VIỆC "#901.", Flow lọc ${kieu === 'tai-cho' ? 'tại chỗ' : 'bằng cách vẽ lại'}, không trình lọc, không đóng dấu] 9 video cũ cùng prompt → engine chỉ bốc thẻ mới`,
+        r.tong === 1 && r.bocMa[0] === uuid(901), JSON.stringify({ tong: r.tong, bocMa: r.bocMa.map((m) => m.slice(-3)) }));
+    }
+    // Phá thử ngay trong bài: cùng trang đó mà engine tự đánh số theo mẻ ("1. …") như 1.3.4 → bốc cả thẻ cũ.
+    {
+      const r = await chay(wc, { kieu: 'tai-cho' }, { coLoc: false, dongDau: false });
+      ok('[đối chứng: số theo mẻ "1." như 1.3.4, không trình lọc] engine bốc cả 10 thẻ (lỗi cũ)', r.tong === 10, JSON.stringify({ tong: r.tong }));
+    }
     // Không nhận ra lưới mới (engine chưa đóng dấu) → không ẩn gì: engine bốc như cũ, app bỏ file thừa sau.
     if (!KHONG_LOC) {
       const k = await chay(wc, { kieu: 'tai-cho' }, { dongDau: false });

@@ -23,6 +23,14 @@ const fs = require('fs');
 const hd = require('../main/hang-doi');
 const { FLOW_URL, FLOW_HOST_RE, moPhongBi } = require('./tab-flow');
 const { caiDatEngine, chuanHoaFlow } = require('./cai-dat-flow');
+
+/**
+ * 1.3.5 — Số thứ tự gắn vào đầu prompt gửi Flow: "#<số việc>. ". Dấu # để số không lẫn vào số khác khi Flow tìm
+ * theo đoạn chữ ("#64. …" không nằm trong "#964. …"; "64. …" thì có). Tắt công tắc "Thêm số thứ tự" → không gắn.
+ */
+function tienToSo(j, c) {
+  return c && c.addIndex && j && j.so ? `#${j.so}. ` : '';
+}
 const { buildStartMessage } = require('./main/jobs');
 const nhipTT = require('./main/nhip-thao-tac');
 const taiAnhLenMd = require('./main/tai-anh-len');
@@ -455,10 +463,12 @@ class LuongFlow {
       if (!chay.length) return;
 
       // Tên file = mã việc; engine dùng dòng thứ (index − 1). Prompt kèm @mã ảnh ở cuối câu.
+      // 1.3.5: "Thêm số thứ tự" = số VIỆC của app ở đầu prompt (tienToSo) — engine tìm thẻ để tải bằng ô Tìm kiếm
+      // của Flow với đầu prompt, nên chỉ ra thẻ của đúng việc này, không bốc video cũ cùng prompt.
       const ten = chay.map((j) => ctx.tenFile(j));
       const prompts = chay.map((j) => {
         const ma = maCua.get(j) || [];
-        return [String(j.prompt || '').trim(), ...ma.map((m) => `@${m}`)].filter(Boolean).join(' ');
+        return [tienToSo(j, c) + String(j.prompt || '').trim(), ...ma.map((m) => `@${m}`)].filter(Boolean).join(' ');
       });
       const settings = caiDatEngine(c, { loai, tyLe: ds[0].tyLe, coAnh: chay.some((j) => (maCua.get(j) || []).length), ten });
 
@@ -621,4 +631,4 @@ class LuongFlow {
   }
 }
 
-module.exports = { LuongFlow, maAnh, CO_O_NHAP };
+module.exports = { LuongFlow, maAnh, CO_O_NHAP, tienToSo };

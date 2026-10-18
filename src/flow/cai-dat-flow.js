@@ -126,7 +126,10 @@ function caiDatEngine(f, me) {
     charSync: !!me.coAnh,
     // Xoá hẳn @tên khỏi câu gửi Flow: tên ảnh chỉ là mã tra kho, lọt vào prompt làm Flow hiểu sai.
     charSyncStripTag: true,
-    addIndex: c.addIndex,
+    // 1.3.5: engine luôn TẮT tự đánh số — mỗi mẻ 1 prompt nên số của engine luôn là "1.", ô Tìm kiếm của Flow
+    // bắt mọi video cũ cùng prompt. Bật "Thêm số thứ tự" thì app tự gắn số VIỆC ("#964. …") vào chính prompt
+    // (luong-flow.js), engine lọc / tìm / đối thẻ theo nguyên chữ đó nên chỉ ra đúng thẻ của việc này.
+    addIndex: false,
     randomScroll: c.randomScroll,
     autoShutdown: false,           // tắt máy do hàng đợi quyết (hết cả hàng chờ), không theo từng mẻ
     zoomLevel: '0.8',

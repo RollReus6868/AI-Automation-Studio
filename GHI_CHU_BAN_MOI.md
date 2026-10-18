@@ -1,4 +1,12 @@
-# AI Automation Studio 1.3.4
+# AI Automation Studio 1.3.5
+
+- **Tải video Flow chỉ tải đúng video của việc đó** (nhật ký 18/10/2026 18:09–18:11: *"[flow7] [1] 🔗 Đã bốc 11 thẻ từ bộ lọc Search"* rồi tải lần lượt `v964_1` … `v964_8`, mỗi file khoảng 10 giây). Công tắc *Thêm số thứ tự vào đầu câu lệnh gửi Flow* vẫn chạy, nhưng số đó là số thứ tự trong **mẻ**. App giao Flow mỗi mẻ 1 prompt, nên mọi prompt đều mang số **"1."**. Video làm từ ảnh lại dùng chung một prompt, nên khi tải, ô Tìm kiếm của Flow với chữ *"1. Animate this cartoon image…"* bắt cả mọi video cũ trong dự án. Giờ app gắn **số của việc** vào đầu prompt, ví dụ *"#964. Animate this cartoon image…"*, và khi tải, Flow chỉ tìm đúng *"#964. …"*, nên ra đúng thẻ của việc đó. Dấu **#** để số không lẫn nhau (*"#64."* không nằm trong *"#964."*). Số này cũng là số trong tên trên Flow (`…_v964`) và cột **#** trong hàng đợi của app.
+  - Công tắc nằm ở *Cài đặt → Google Flow → Thêm số thứ tự vào đầu câu lệnh gửi Flow* (bật sẵn). Tắt thì app không gắn số.
+  - Video cũ đã có trong dự án Flow vẫn mang *"1."*, nên không bị bốc nữa. Việc mới mang số riêng.
+
+Lưu ý: đã kiểm bằng hàm tìm thẻ thật của engine trên trang Flow giả: 9 video cũ cùng prompt + 1 video mới → chỉ bốc 1 thẻ, còn cách đánh số cũ bốc cả 10. Chưa chạy trên Flow thật.
+
+## Bản 1.3.4
 
 - **App hết phình RAM và giật khi hàng đợi có nhiều video** (ảnh Task Manager 18/10/2026: app 7,7 GB, một tiến trình 2,1 GB). Ở trang Tạo video và Thư viện, mỗi video đã xong là một trình phát video sống (200 video = 200 trình phát, mỗi cái giữ bộ giải mã và khung hình). Mỗi lần một việc đổi trạng thái (khi đang chạy là vài lần mỗi giây), cả danh sách bị vẽ lại và mọi trình phát bị tạo lại. Đo trên máy kiểm với 200 video: riêng giao diện tăng từ 1,8 GB lên 3,4 GB sau 10 giây đang chạy. Giờ:
   - Mỗi video chỉ được mở **một lần** để chụp một ảnh nhỏ, rồi đóng ngay. Danh sách và Thư viện hiện ảnh nhỏ đó. App chỉ chụp video đang hiện trên màn hình, lần lượt từng cái. Bấm đúp hoặc mở Chi tiết vẫn xem được video như cũ.
