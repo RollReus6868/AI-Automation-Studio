@@ -42,7 +42,8 @@ const FLOW_MAC_DINH = {
   // liền nhau (chưa prompt nào xong xen giữa) → đổi tài khoản; tài khoản lỗi nghỉ `nghiPhut` phút.
   anToan: { nguong: 2, nghiPhut: 15 },
   // Chất lượng tải về
-  chatLuongAnh: 'img_2k',
+  // 1.3.7: 1K = "Kích thước gốc" (tải ngay, không tốn tín dụng); 2K / 4K là Flow tăng độ phân giải — tốn tín dụng AI.
+  chatLuongAnh: 'img_1k',
   chatLuongVideo: '1080p',
   // Đổi tên trên Flow theo mã việc (để chuỗi ảnh → video Flow tìm lại được ảnh bằng @tên)
   doiTenTrenFlow: true,
@@ -88,7 +89,7 @@ function chuanHoaFlow(raw) {
   m.networkGuard = m.networkGuard === 'off' ? 'off' : 'auto';
   for (const k of ['randomDelay', 'voiceSync', 'addIndex', 'randomScroll', 'goAnhThamChieu', 'nghiThaoTacBat', 'doiTenTrenFlow', 'dongYQuyenAnh']) m[k] = !!m[k];
   delete m.sangMuseKhiHong;   // 1.2.1: thành công tắc chung caiDat.doiNenKhiLoi (dieu-phoi.js, mốc 4)
-  if (!['img_4k', 'img_2k', 'img_1k'].includes(m.chatLuongAnh)) m.chatLuongAnh = 'img_2k';
+  if (!['img_4k', 'img_2k', 'img_1k'].includes(m.chatLuongAnh)) m.chatLuongAnh = 'img_1k';
   if (!['4k', '1080p', '720p'].includes(m.chatLuongVideo)) m.chatLuongVideo = '1080p';
   return m;
 }

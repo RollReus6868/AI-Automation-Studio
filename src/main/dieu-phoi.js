@@ -38,6 +38,8 @@ const chuanNen = (n) => (n === 'flow' || n === 'suno' ? n : 'muse');
 const TEN_LOAI = { anh: 'ảnh', video: 'video', nhac: 'nhạc' };
 const SONG_TOI_DA = 50;
 /** {muse, flow, suno}: số tài khoản chạy cùng lúc mỗi nền tảng, 1–50 (1.3.0: chọn đích danh từng tài khoản "Chạy"). */
+/** 1.3.7: tài khoản dự án KHÔNG dùng cho từng loại việc: {anh: [id…], video: [id…]} (thiếu = dùng cho mọi loại). */
+const chuanBoLoai = (b) => Object.fromEntries(['anh', 'video'].map((l) => [l, [...new Set(((b && b[l]) || []).map(String).filter(Boolean))]]));
 const chuanSong = (c) => Object.fromEntries(['muse', 'flow', 'suno'].map((n) =>
   [n, Math.max(1, Math.min(SONG_TOI_DA, parseInt(c && c[n], 10) || 1))]));
 
@@ -159,6 +161,13 @@ class DieuPhoi {
       if (sangMuseCu === false) this.caiDat.doiNenKhiLoi = false;
       this.caiDat.moc = 4;
     }
+    // 1.3.7: ảnh Flow tải mặc định "1K · Kích thước gốc" thay cho 2K. 2K là Flow TĂNG độ phân giải (tốn tín dụng AI —
+    // tín dụng mà video cần); hết tín dụng thì Flow báo "Không tăng được độ phân giải!" và không ra file (nhật ký 19/10/2026).
+    const moc5 = this.caiDat.moc < 5;
+    if (moc5) {
+      if (this.caiDat.flow.chatLuongAnh === 'img_2k') this.caiDat.flow.chatLuongAnh = 'img_1k';
+      this.caiDat.moc = 5;
+    }
     // Việc đang chạy lúc app tắt → về hàng chờ, GIỮ thread để lấy lại kết quả.
     for (const j of this.viec) {
       if (j.trangThai === 'chay') { j.trangThai = 'cho'; j.buoc = ''; }
@@ -171,6 +180,7 @@ class DieuPhoi {
         d.soLoai = {};
         for (const l of LOAI) d.soLoai[l] = this.viec.filter((j) => j.duAn === d.id && j.loai === l).reduce((m, j) => Math.max(m, j.so || 0), 0);
       }
+      if (d.caiDat && moc5 && d.caiDat.flow && d.caiDat.flow.chatLuongAnh === 'img_2k') d.caiDat.flow.chatLuongAnh = 'img_1k';
       if (d.caiDat) d.caiDat = rieng(chuanCaiDat({ ...this.caiDat, ...d.caiDat }, this.caiDat.flow, d.caiDat.flow));
       if (!d.flowUrl || typeof d.flowUrl !== 'object') d.flowUrl = {};
     }
@@ -185,6 +195,7 @@ class DieuPhoi {
     this.nghiDen = {};        // taiKhoanId → tạm nghỉ tới lúc (lỗi liên tiếp / mất kết nối)
     this.lyDoNghi = {};       // taiKhoanId → lý do tạm nghỉ
     this.loiLienTiep = {};    // taiKhoanId → số việc lỗi liên tiếp
+    this.ketQuaTk = {};       // 1.3.7: taiKhoanId → { ok, luc, loi } của việc gần nhất (màu đỏ / xanh ở mục Tài khoản)
     this.nghiLoai = {};       // 'taiKhoanId:loai' → tài khoản bị chặn tạo loại này (vd Muse chặn video khu vực) tới lúc
     this.tkFlowDaChay = new Map();   // dự án → Set(tài khoản Flow đã chạy trong lượt này) — để tự xoá dự án Flow khi xong
     this.idMoi = this.viec.reduce((m, j) => Math.max(m, j.id || 0), 0) + 1;
@@ -257,6 +268,7 @@ class DieuPhoi {
       // 1.3.6: hẹn giờ từng chức năng + lần chạy tới + chức năng đang chạy theo hẹn (dừng lúc nào).
       henGio: Object.fromEntries(HG.LOAI_HEN.map((l) => [l, { ...this.henGio[l], lanToi: HG.lanChayToi(this.henGio[l], this.bayGio()) }])),
       henChay: Object.fromEntries([...this.loaiChay].map(([l, x]) => [l, { duAn: x.duAn, den: x.den }])),
+      sucKhoe: this.sucKhoeTk(),
       duKien: { anh: hd.thoiGianDuKien(this.viec, 'anh'), video: hd.thoiGianDuKien(this.viec, 'video'), nhac: hd.thoiGianDuKien(this.viec, 'nhac') }
     };
   }
@@ -266,7 +278,7 @@ class DieuPhoi {
    * @param tuDuAn  1.3.0: dự án đang mở — dự án mới chép cài đặt của nó (cài đặt riêng từ đầu), riêng thư mục
    *                kết quả là thư mục con mang tên dự án mới (file hai dự án chạy song song không đè / lẫn nhau).
    */
-  taoDuAn(ten, taiKhoan, chaySong, tuDuAn) {
+  taoDuAn(ten, taiKhoan, chaySong, tuDuAn, boLoai) {
     const t = String(ten || '').trim() || `Dự án ${this.duAn.length + 1}`;
     let id = hd.slugTen(t).toLowerCase(), n = 2;
     while (this.duAn.some((d) => d.id === id)) id = `${hd.slugTen(t).toLowerCase()}-${n++}`;
@@ -289,29 +301,41 @@ class DieuPhoi {
     }
     if (Array.isArray(taiKhoan)) d.taiKhoan = [...new Set(taiKhoan.filter((x) => this.o.taiKhoan.tim(x)))];
     if (chaySong) d.chaySong = chuanSong(chaySong);
+    if (boLoai) d.boLoai = chuanBoLoai(boLoai);
     this.duAn.push(d);
     this.luu();
     return d;
   }
   /** Tài khoản chạy dự án, theo thứ tự ưu tiên: [chính, dự phòng…]; chaySong = {muse, flow, suno}: mấy tài khoản chạy cùng lúc. */
-  datTaiKhoanDuAn(id, ds, chaySong) {
+  datTaiKhoanDuAn(id, ds, chaySong, boLoai) {
     const d = this.duAn.find((x) => x.id === id);
     if (!d) return false;
     d.taiKhoan = [...new Set((ds || []).filter((t) => this.o.taiKhoan.tim(t)))];
     if (chaySong) d.chaySong = chuanSong(chaySong);
+    if (boLoai) d.boLoai = chuanBoLoai(boLoai);
     this.luu();
     return true;
   }
   /** Dự án chạy mấy tài khoản của nền tảng này CÙNG LÚC (1 = chỉ tài khoản chính, các tài khoản khác là dự phòng). */
-  _soSong(duAnId, nen, goc = false) {
+  _soSong(duAnId, nen, goc = false, loai) {
     const d = this.duAn.find((x) => x.id === duAnId);
-    const n = (d && d.chaySong && d.chaySong[nen]) || 1;
+    let n = (d && d.chaySong && d.chaySong[nen]) || 1;
+    // 1.3.7: loại việc này bỏ bớt tài khoản "Chạy" (vd ảnh chỉ dùng Flow 1) → chỉ đếm tài khoản Chạy còn dùng cho loại đó;
+    // không còn tài khoản Chạy nào thì dự phòng đầu tiên của loại đó chạy.
+    const bo = this._boLoai(duAnId, loai);
+    if (bo.size) n = Math.max(1, this._dsTkGoc(duAnId, nen).slice(0, n).filter((id) => !bo.has(id)).length);
     // Bên kia thiếu tài khoản → bên này chạy thêm chừng ấy tài khoản cho việc mượn sang (_canBang).
     return goc ? n : n + ((this._muonTk && this._muonTk.get(`${duAnId}|${nen}`)) || 0);
   }
+  /** 1.3.7: tài khoản dự án không dùng cho loại việc này (Set). */
+  _boLoai(duAnId, loai) {
+    if (!loai) return new Set();
+    const d = this.duAn.find((x) => x.id === duAnId);
+    return new Set((d && d.boLoai && d.boLoai[loai]) || []);
+  }
   /** Tài khoản việc này được chạy ngay bây giờ (nhóm chạy cùng lúc của dự án, trừ tài khoản đã lỗi việc này). */
   _tkCho(j) {
-    return hd.taiKhoanChoViecDs(j, this._dsTk(j.duAn, j.nen), (id) => this._nghi(id) || this._nghiLoai(id, j.loai), this._soSong(j.duAn, j.nen));
+    return hd.taiKhoanChoViecDs(j, this._dsTk(j.duAn, j.nen, j.loai), (id) => this._nghi(id) || this._nghiLoai(id, j.loai), this._soSong(j.duAn, j.nen, false, j.loai));
   }
   _nghiLoai(id, loai) {
     if ((this.nghiLoai[`${id}:${loai}`] || 0) > Date.now()) return true;
@@ -323,16 +347,19 @@ class DieuPhoi {
   /**
    * Tài khoản của dự án trên một nền tảng, theo thứ tự ưu tiên [chính, dự phòng…].
    * Dự án chưa chọn tài khoản nào của nền tảng đó = mọi tài khoản của nền tảng đó.
+   * loai (1.3.7): bỏ tài khoản dự án chọn "không dùng cho loại này" (vd Flow 1 chỉ tạo ảnh, không tạo video).
    */
-  _dsTkGoc(duAnId, nen = 'muse') {
+  _dsTkGoc(duAnId, nen = 'muse', loai) {
     const d = this.duAn.find((x) => x.id === duAnId);
     const cuaNen = (id) => { const a = this.o.taiKhoan.tim(id); return a && (a.nen || 'muse') === nen; };
     const chon = d && d.taiKhoan ? d.taiKhoan.filter(cuaNen) : [];
-    return chon.length ? chon : this.o.taiKhoan.ds.filter((a) => (a.nen || 'muse') === nen).map((a) => a.id);
+    const ds = chon.length ? chon : this.o.taiKhoan.ds.filter((a) => (a.nen || 'muse') === nen).map((a) => a.id);
+    const bo = this._boLoai(duAnId, loai);
+    return bo.size ? ds.filter((id) => !bo.has(id)) : ds;
   }
   /** Như trên, bỏ tài khoản đã xoá / chưa đăng nhập. */
-  _dsTk(duAnId, nen = 'muse') {
-    return this._dsTkGoc(duAnId, nen).filter((id) => { const a = this.o.taiKhoan.tim(id); return a && a.trangThai !== 'can-dang-nhap'; });
+  _dsTk(duAnId, nen = 'muse', loai) {
+    return this._dsTkGoc(duAnId, nen, loai).filter((id) => { const a = this.o.taiKhoan.tim(id); return a && a.trangThai !== 'can-dang-nhap'; });
   }
   _nghi(id) {
     if ((this.nghiDen[id] || 0) > Date.now()) return true;
@@ -342,6 +369,38 @@ class DieuPhoi {
     return !!(a && (a.hetLuotDen || 0) > Date.now());
   }
   _tenTk(id) { const a = this.o.taiKhoan.tim(id); return a ? a.ten : id; }
+
+  /**
+   * 1.3.7 — tình trạng từng tài khoản cho giao diện: muc 'loi' (đỏ: chưa đăng nhập / đang nghỉ / hết lượt / bị chặn /
+   * việc gần nhất lỗi), 'tot' (xanh: việc gần nhất xong, đang chạy, hoặc đã đăng nhập mà chưa lỗi), 'cho' (xám: chưa kiểm).
+   * den = mốc hết nghỉ (giao diện tự ghi giờ); dang = số việc tài khoản này đang chạy.
+   */
+  sucKhoeTk() {
+    const bay = Date.now(), ra = {};
+    const nghiFlow = this.o.nghiFlow || (() => null);
+    for (const a of this.o.taiKhoan.ds || []) {
+      const id = a.id, kq = this.ketQuaTk[id];
+      const dang = this.viec.filter((j) => j.trangThai === 'chay' && j.taiKhoan === id).length;
+      const f = nghiFlow(id);
+      const chanLoai = Object.keys(this.nghiLoai).filter((k) => k.startsWith(`${id}:`) && this.nghiLoai[k] > bay);
+      let x;
+      if (a.trangThai === 'can-dang-nhap') x = { muc: 'loi', chu: 'Chưa đăng nhập — bấm Đăng nhập' };
+      else if ((a.hetLuotDen || 0) > bay) x = { muc: 'loi', chu: `Hết lượt${a.lyDoHetLuot ? ` (${a.lyDoHetLuot})` : ''}`, den: a.hetLuotDen };
+      else if ((this.nghiDen[id] || 0) > bay) x = { muc: 'loi', chu: `Đang nghỉ: ${this.lyDoNghi[id] || 'lỗi'}`, den: this.nghiDen[id] };
+      else if (f && f.den > bay) x = { muc: 'loi', chu: `Đang nghỉ: ${f.lyDo || 'Flow báo lỗi'}`, den: f.den };
+      else if ((a.chanVideoDen || 0) > bay) x = { muc: 'loi', chu: 'Muse chặn tạo video — tài khoản chỉ tạo ảnh', den: a.chanVideoDen };
+      else if (chanLoai.length) {
+        const den = Math.max(...chanLoai.map((k) => this.nghiLoai[k]));
+        x = { muc: 'loi', chu: `Bị chặn tạo ${chanLoai.map((k) => TEN_LOAI[k.split(':')[1]] || k.split(':')[1]).join(', ')}${this.lyDoNghi[id] ? `: ${this.lyDoNghi[id]}` : ''}`, den };
+      } else if (kq && !kq.ok && (this.loiLienTiep[id] || 0) > 0) x = { muc: 'loi', chu: `Việc gần nhất lỗi (${this.loiLienTiep[id]} lần liền): ${kq.loi || 'lỗi'}`, luc: kq.luc };
+      else if (kq && kq.ok) x = { muc: 'tot', chu: 'Chạy được — việc gần nhất xong', luc: kq.luc };
+      else if (dang) x = { muc: 'tot', chu: 'Đang chạy' };
+      else if (a.trangThai === 'da-dang-nhap') x = { muc: 'tot', chu: 'Đã đăng nhập — chưa chạy việc nào' };
+      else x = { muc: 'cho', chu: 'Chưa kiểm — bấm Kiểm tra' };
+      ra[id] = { ...x, dang };
+    }
+    return ra;
+  }
 
   /** 1.2.9: thư mục lưu video nối từ ảnh RIÊNG của dự án ('' = bỏ, dùng cài đặt chung). */
   datThuMucVideoDuAn(id, thuMuc) {
@@ -1017,7 +1076,7 @@ class DieuPhoi {
   }
 
   _baoTamDung(ds, ai) {
-    const ly = [...new Set(ds.flatMap((j) => this._dsTkGoc(j.duAn, j.nen)))]
+    const ly = [...new Set(ds.flatMap((j) => this._dsTkGoc(j.duAn, j.nen, j.loai)))]
       .map((id) => {
         const a = this.o.taiKhoan.tim(id);
         if (!a) return null;
@@ -1026,6 +1085,10 @@ class DieuPhoi {
       })
       .filter(Boolean);
     const coSuno = ds.some((j) => j.nen === 'suno');
+    // 1.3.7: loại việc bị bỏ ở MỌI tài khoản của nền tảng đó (ô Ảnh / Video trong hộp chọn tài khoản).
+    const boHet = [...new Set(ds.filter((j) => !this._dsTkGoc(j.duAn, j.nen, j.loai).length && this._dsTkGoc(j.duAn, j.nen).length)
+      .map((j) => `${TEN_LOAI[j.loai] || j.loai} ${TEN_NEN[j.nen] || j.nen}`))];
+    if (boHet.length) ly.push(`không tài khoản nào được bật ô ${boHet.join(', ')} — bấm nút tài khoản cạnh tên dự án để bật lại`);
     this.log('error', `⏸ Không còn tài khoản nào chạy được việc đang chờ (${ly.join(' · ') || 'chưa có tài khoản'}) — đã TẠM DỪNG ${ai} (không phí lượt). ` +
       'Kiểm tra Muse / Flow, đăng nhập lại rồi bấm Chạy — việc Muse đã gửi sẽ lấy tiếp kết quả từ chat cũ.' +
       (coSuno ? ' Suno hết lượt: thêm tài khoản Suno dự phòng, hoặc bấm Kiểm tra ở tài khoản đã có lượt lại.' : ''));
@@ -1093,7 +1156,7 @@ class DieuPhoi {
    *  việc chuyển được sang bên kia (Muse ⇄ Flow). */
   coDuPhong(tkId) {
     return this.viec.some((j) => j.taiKhoan === tkId && j.trangThai === 'chay' &&
-      (this._dsTk(j.duAn, j.nen).some((id) => id !== tkId && !this._nghi(id)) || this._coTheDoiNen(j)));
+      (this._dsTk(j.duAn, j.nen, j.loai).some((id) => id !== tkId && !this._nghi(id)) || this._coTheDoiNen(j)));
   }
 
   _nenKhac(nen) { return nen === 'muse' ? 'flow' : nen === 'flow' ? 'muse' : null; }
@@ -1124,8 +1187,8 @@ class DieuPhoi {
     for (const { duAn, tu, loai } of nhom.values()) {
       const den = this._nenKhac(tu);
       const c = this.cd(duAn);
-      const can = Math.max(1, Math.min(this._soSong(duAn, tu, true), this._dsTkGoc(duAn, tu).length));
-      const duoc = this._dsTk(duAn, tu).filter((id) => !this._nghi(id) && !this._nghiLoai(id, loai)).length;
+      const can = Math.max(1, Math.min(this._soSong(duAn, tu, true, loai), this._dsTkGoc(duAn, tu, loai).length));
+      const duoc = this._dsTk(duAn, tu, loai).filter((id) => !this._nghi(id) && !this._nghiLoai(id, loai)).length;
       const thieu = c.doiNenKhiLoi ? Math.max(0, can - duoc) : 0;
       const moiTk = den === 'muse' ? c.luongMoiTK : c.flow.tabMoiTK * c.flow.meToiDa;
       const han = thieu * moiTk;
@@ -1170,20 +1233,20 @@ class DieuPhoi {
   }
   /** Dự án còn tài khoản `nen` nào chạy được loại việc này (đăng nhập rồi, không nghỉ, không bị chặn loại). */
   _conDung(duAnId, nen, loai) {
-    return this._dsTk(duAnId, nen).some((id) => !this._nghi(id) && !this._nghiLoai(id, loai));
+    return this._dsTk(duAnId, nen, loai).some((id) => !this._nghi(id) && !this._nghiLoai(id, loai));
   }
   /** Việc chuyển được sang bên kia: bật công tắc, chưa từng ở bên đó, bên đó có tài khoản chạy được ngay. */
   _coTheDoiNen(j) {
     const k = this._nenKhac(j.nen);
     return !!(k && this.cd(j.duAn).doiNenKhiLoi && !(j.daQuaNen || []).includes(k) &&
-      this._tkDoiNen(j.duAn, k).some((id) => !this._nghi(id) && !this._nghiLoai(id, j.loai)));
+      this._tkDoiNen(j.duAn, k, j.loai).some((id) => !this._nghi(id) && !this._nghiLoai(id, j.loai)));
   }
   /** Tài khoản bên kia nhận được việc chuyển sang: dự án tự chọn, hoặc đã đăng nhập chắc chắn — tài khoản
    *  mặc định chưa ai đăng nhập (vd "Flow 1" của người chỉ dùng Muse) không được tính. */
-  _tkDoiNen(duAnId, nen) {
+  _tkDoiNen(duAnId, nen, loai) {
     const d = this.duAn.find((x) => x.id === duAnId);
     const chon = new Set((d && d.taiKhoan) || []);
-    return this._dsTk(duAnId, nen).filter((id) => { const a = this.o.taiKhoan.tim(id); return chon.has(id) || (a && a.trangThai === 'da-dang-nhap'); });
+    return this._dsTk(duAnId, nen, loai).filter((id) => { const a = this.o.taiKhoan.tim(id); return chon.has(id) || (a && a.trangThai === 'da-dang-nhap'); });
   }
 
   /**
@@ -1264,6 +1327,7 @@ class DieuPhoi {
         Object.assign(j, { trangThai: 'xong', buoc: '', xongLuc: Date.now(), loi: '', tam: !tai });
         if (r.flowTen) j.flowTen = { tk: j.taiKhoan, ten: r.flowTen };
         this.loiLienTiep[j.taiKhoan] = 0;
+        if (j.taiKhoan) this.ketQuaTk[j.taiKhoan] = { ok: true, luc: Date.now() };
         this.log('success', `✅ [HỆ THỐNG] Việc #${j.so} xong ${TEN_LOAI[j.loai] || 'ảnh'}${r.ghiChu ? ` (${r.ghiChu})` : ''}: ` +
           (tai ? j.files[0] : `${path.basename(j.files[0])} (không tải về — chỉ giữ trong app)`));
         this._noiVideo(j, d);
@@ -1312,7 +1376,7 @@ class DieuPhoi {
       Object.assign(j, { trangThai: 'cho', buoc: '', loi: r.loi, thread: '' });
       if (tk) this.o.taiKhoan.sua(tkId, { hetLuotDen: Date.now() + (r.nghiMs > 0 ? r.nghiMs : NGHI_HET_LUOT_MS), lyDoHetLuot: r.loi });
       this.lyDoNghi[tkId] = r.loi;
-      const sang = hd.taiKhoanChoViec({ tkLoi: [] }, this._dsTk(j.duAn, j.nen), (id) => this._nghi(id));
+      const sang = hd.taiKhoanChoViec({ tkLoi: [] }, this._dsTk(j.duAn, j.nen, j.loai), (id) => this._nghi(id));
       this.log('warning', `↪ #${j.so} ${r.loi} (ở "${this._tenTk(tkId)}")${sang ? ` — tạo lại ở "${this._tenTk(sang)}"` : ' — không còn tài khoản dự phòng nào còn lượt'}`);
     } else if (r.canDangNhap) {
       Object.assign(j, { trangThai: 'cho', buoc: '' });
@@ -1327,10 +1391,11 @@ class DieuPhoi {
       // nữa mới đánh Lỗi. Tài khoản lỗi liên tiếp thì tạm nghỉ; mọi tài khoản đều nghỉ → _vong tạm
       // dừng hàng chờ (lỗi liên tục ở tất cả tài khoản thì mới dừng).
       const tkId = j.taiKhoan;
-      const ds = this._dsTk(j.duAn, j.nen);
+      const ds = this._dsTk(j.duAn, j.nen, j.loai);
       j.tkLoi = [...new Set([...(j.tkLoi || []), tkId])];
       j.loiTruoc = r.loi;
       this.loiLienTiep[tkId] = (this.loiLienTiep[tkId] || 0) + 1;
+      if (tkId) this.ketQuaTk[tkId] = { ok: false, luc: Date.now(), loi: String(r.loi || '').slice(0, 160) };
       // Tài khoản lỗi liên tiếp → cả dự án sang tài khoản dự phòng một thời gian (chỉ khi có dự phòng).
       // Ảnh Flow chuyển được sang Muse thì Muse cũng tính là dự phòng.
       const coDuPhong = ds.some((id) => id !== tkId) || this._coTheDoiNen(j);
@@ -1340,7 +1405,7 @@ class DieuPhoi {
       if (!ds.some((id) => !j.tkLoi.includes(id))) { j.vongTk = (j.vongTk || 0) + 1; j.tkLoi = []; }
       const vong = j.vongTk || 0, soVong = c.tuThuLai + 1;
       if (vong < soVong) {
-        const sang = hd.taiKhoanChoViecDs({ tkLoi: j.tkLoi }, ds, (id) => this._nghi(id), this._soSong(j.duAn, j.nen))
+        const sang = hd.taiKhoanChoViecDs({ tkLoi: j.tkLoi }, ds, (id) => this._nghi(id), this._soSong(j.duAn, j.nen, false, j.loai))
           .find((id) => id !== tkId) || hd.taiKhoanChoViec({ tkLoi: j.tkLoi }, ds, (id) => this._nghi(id));
         const nhan = ds.length > 1 ? `vòng ${vong + 1}/${soVong}` : `${j.thu}/${soVong - 1}`;
         if (sang && sang !== tkId) {

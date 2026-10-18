@@ -271,6 +271,8 @@ module.exports = function e2eFlow({ win, app, LENH, dieuPhoi, taiKhoan }) {
       kiem(v10.every((j) => j.trangThai === 'xong' && j.taiKhoan === tk2.id && (j.tkLoi || []).includes('flow-1')), 'tải kẹt ở "Flow 1" → xong ở "Flow 2"');
       kiem(LENH.trangThai().nhatKy.slice(nk).some((d) => /chưa tải về được/.test(d.chu)), 'nhật ký nói rõ tải về bị kẹt');
       kiem(Date.now() - bd10 < 90000, `không chờ tải kẹt quá lâu (${Math.round((Date.now() - bd10) / 1000)} giây)`);
+      // 1.3.7: engine còn đứng chờ file của việc vừa bỏ → app nạp lại trang Flow để mẻ sau (mục 11, cùng "Flow 1") không phải chờ.
+      kiem(LENH.trangThai().nhatKy.slice(nk).some((d) => /🔄 .*Nạp lại trang Flow/.test(d.chu)), 'nạp lại trang Flow sau khi bỏ việc tải kẹt');
       await session.fromPartition('persist:flow-flow-1').cookies.remove(process.env.MUSE_URL, 'flow_khong_tai');
 
       // 11) 1.2.1 (ảnh chụp + nhật ký 16/10/2026): Muse trả "Mình không thể tạo video từ ảnh này." → CHỈ ảnh đó sang

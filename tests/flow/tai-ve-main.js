@@ -43,7 +43,7 @@ const PHASE4 = ENGINE.slice(dau, cuoi);
 
 async function chay(wc, khoa, coAn, them = {}) {
   const js = (c) => wc.executeJavaScript(c, true);
-  await wc.loadFile(path.join(__dirname, '..', 'fixture-flow-moi.html'), { query: { khoa, ...(them.anh ? { anh: '1' } : {}), ...(them.tre ? { tre: String(them.tre) } : {}), ...(them.cach ? { cach: '1' } : {}), ...(them.muon ? { muon: '1' } : {}) } });
+  await wc.loadFile(path.join(__dirname, '..', 'fixture-flow-moi.html'), { query: { khoa, ...(them.anh ? { anh: '1' } : {}), ...(them.tre ? { tre: String(them.tre) } : {}), ...(them.cach ? { cach: '1' } : {}), ...(them.muon ? { muon: '1' } : {}), ...(them.tangHong ? { tangHong: '1' } : {}) } });
   const boc = (src) => `(function(){\n${src}\n})();`;
   for (const [ten, src] of [
     ['cầu nối', CAU_NOI], ['đánh dấu tab', 'window.__FLOW_TAB_ID = "t1"; undefined;'],
@@ -71,6 +71,8 @@ async function chay(wc, khoa, coAn, them = {}) {
     await w(${them.cho || 0});   // engine nghỉ "trước khi chọn chất lượng tải về" giữa lúc lấy danh sách và lúc bấm
     const clicked = await window.__tChon(sub, 1);
     await w(200);
+    // 1.3.7: engine đứng chờ file 120 s — trong lúc đó trình tiêm có thể tự mở lại menu và tải Kích thước gốc.
+    for (let k = 0; k < ${them.choFile || 0} && !window.__taiVe.length; k += 250) await w(250);
     return { clicked, thay: sub.map((e) => e.dataset.q || e.textContent.trim()), taiVe: window.__taiVe, nk: window.__nk || [],
       menuCuoi: (window.__flowTaiVe && window.__flowTaiVe.menuCuoi) || '' };
   })()`);
@@ -124,6 +126,35 @@ app.whenReady().then(async () => {
     ok('[ảnh, menu sáng ngay] tải 1K', a2.clicked && JSON.stringify(a2.taiVe) === '["1K"]', JSON.stringify({ thay: a2.thay, taiVe: a2.taiVe }));
     const a3 = await chay(wc, 'khong', !KHONG_AN, { anh: true, tre: 1000 });
     ok('[ảnh, tài khoản không khoá, mục mờ 1 s] vẫn tải 2K', a3.clicked && JSON.stringify(a3.taiVe) === '["2K"]', JSON.stringify({ thay: a3.thay, taiVe: a3.taiVe }));
+
+    // 1.3.7 — tệp chẩn đoán 18/10/2026 19:16: menu ảnh 1K · 2K · 4K đều sáng, engine bấm 2K (cài đặt mặc định),
+    // Flow báo "Không tăng được độ phân giải!" và không ra file → engine chờ 120 s ×3, 5 phút, việc hỏng.
+    for (const anh of [true, false]) {
+      const t = await chay(wc, 'khong', !KHONG_AN, { anh, tangHong: true, choFile: 15000 });
+      const goc = anh ? '1K' : '720p';
+      ok(`[${anh ? 'ảnh' : 'video'}, Flow không tăng được độ phân giải] tự mở lại menu và tải ${goc} (Kích thước gốc)`,
+        JSON.stringify(t.taiVe) === JSON.stringify([goc]), JSON.stringify({ clicked: t.clicked, taiVe: t.taiVe, nk: t.nk.slice(-3) }));
+      ok(`[${anh ? 'ảnh' : 'video'}] ...nhật ký nói rõ lý do`, t.nk.some((x) => x.includes('Không tăng được độ phân giải!') && x.includes('Kích thước gốc')), t.nk.slice(-3).join(' | '));
+      // Cùng trang (không nạp lại): lần tải sau engine lại bấm mục đã tăng → bấm Kích thước gốc thay NGAY, không chờ thông báo.
+      const lan2 = await wc.executeJavaScript(`(async () => {
+        const w = (ms) => new Promise((r) => setTimeout(r, ms));
+        window.__taiVe = []; const bam0 = window.__bamTang;
+        const tile = document.getElementById('oTai'), r = tile.getBoundingClientRect();
+        tile.dispatchEvent(new MouseEvent('contextmenu', { view: window, bubbles: true, cancelable: true, clientX: r.left + 5, clientY: r.top + 5, button: 2, buttons: 2 }));
+        await w(1500);
+        const dl = window.__tMenu().find((el) => (el.querySelector('mat-icon') || {}).textContent === 'download');
+        window.__tMoCon(dl); await w(2000);
+        const sub = window.__tMenu().filter((el) => el !== dl && !el.contains(dl));
+        const clicked = await window.__tChon(sub, 1);
+        await w(400);
+        return { clicked, taiVe: window.__taiVe, bamTang: window.__bamTang - bam0, nk: (window.__nk || []).slice(-2) };
+      })()`, true);
+      ok(`[${anh ? 'ảnh' : 'video'}] ...lần tải sau trên tab đó: tải ${goc} ngay, không bấm mục đã tăng nữa`,
+        JSON.stringify(lan2.taiVe) === JSON.stringify([goc]) && lan2.bamTang === 0, JSON.stringify(lan2));
+    }
+    // Tài khoản tăng được độ phân giải (không có thông báo lỗi) → vẫn tải 2K như cũ (không đụng tới).
+    const t2 = await chay(wc, 'khong', !KHONG_AN, { anh: true, choFile: 3000 });
+    ok('[ảnh, Flow tăng được] vẫn tải 2K', JSON.stringify(t2.taiVe) === '["2K"]', JSON.stringify(t2.taiVe));
 
     // Tệp chẩn đoán trên trang bật Trusted Types (Google bật; gán innerHTML là ném lỗi).
     const tt = path.join(require('os').tmpdir(), `tt-${process.pid}.html`);

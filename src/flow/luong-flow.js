@@ -129,6 +129,17 @@ class LuongFlow {
     }
   }
 
+  /** Nạp lại trang của tab Flow (engine cũ còn kẹt chờ file — STOP không cắt được). */
+  _napLaiTab(t, lyDo) {
+    try {
+      const wc = t.view.webContents;
+      if (wc.isDestroyed()) return;
+      t.ready = false;
+      this.log('info', `🔄 [${this.id}] Nạp lại trang Flow (${lyDo}) — engine cũ còn đứng chờ file, mẻ sau chạy trên trang mới.`);
+      wc.reload();
+    } catch (_) {}
+  }
+
   dong() {
     this.dung();
     if (this.tab) { this.tabs.close(this.tab.id); this.tab = null; }
@@ -575,8 +586,9 @@ class LuongFlow {
         t.onLoiChatLuong = () => { this._chupChanDoan('engine không chọn được chất lượng tải xuống', false).catch(() => {}); };
         // Engine không thấy nút Tạo / ô tìm kiếm của bảng kho sau khi gắn ảnh → lưu khung ô nhập + lớp phủ để sửa tiếp.
         t.onLoiKhungNhap = (chu) => { this._chupChanDoan(`engine: ${chu}`, false).catch(() => {}); };
+        let napLai = false;
         const gac = setInterval(() => {
-          if (this.huy !== huyLuc) return;
+          if (this.huy !== huyLuc || napLai) return;
           if (hetViecLuc && Date.now() - hetViecLuc > 180000) {
             nhipTT.huy(t);
             this.tabs.dispatch(t.id, { action: 'STOP_AUTOMATION' }).catch(() => {});
@@ -591,12 +603,17 @@ class LuongFlow {
             this.log('error', `❌ [${this.id}] #${j.so}: Flow tạo xong nhưng ${choTai} chưa tải về được — bỏ, chạy lại ở tài khoản khác.`);
             xong(j, { ok: false, loi: `Flow tạo xong nhưng quá ${choTai} chưa tải về được` });
             // Giữ lại menu Tải xuống gần nhất (các mục chất lượng) để sửa tiếp nếu Flow lại đổi; không mở bảng nào.
-            this._chupChanDoan(`#${j.so} tạo xong nhưng quá ${choTai} chưa tải về được`, false).catch(() => {});
+            const chup = this._chupChanDoan(`#${j.so} tạo xong nhưng quá ${choTai} chưa tải về được`, false).catch(() => {});
             if (this.may.ghiLoiTai) this.may.ghiLoiTai(t, [...theoSo].find(([, v]) => v === j)[0]).catch(() => {});
             if (!conLai.size) {
               nhipTT.huy(t);
-              this.tabs.dispatch(t.id, { action: 'STOP_AUTOMATION' }).catch(() => {});
-              return ket('xong');
+              // 1.3.7 (nhật ký 19/10/2026 02:16–02:18): STOP không cắt được lần chờ "120 s Google xuất file" đang dở của
+              // engine → mẻ SAU trên tab này đứng thêm 2 phút rồi mới chạy. Nạp lại trang dự án: engine cũ chết hẳn,
+              // mẻ sau đợi engine mới bám trang (_damBaoTab) như lúc mở tab.
+              // Chụp chẩn đoán xong mới nạp lại; luồng còn bận tới lúc ket nên mẻ sau không chen vào giữa.
+              napLai = true;
+              chup.then(() => { this._napLaiTab(t, `#${j.so} bỏ vì quá ${choTai} chưa tải về`); ket('xong'); });
+              return;
             }
           }
           if (t.nghiAnToan) { lanCuoi = Date.now(); return; }   // đang nghỉ an toàn — không phải đứng im

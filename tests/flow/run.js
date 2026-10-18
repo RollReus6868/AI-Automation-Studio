@@ -1517,7 +1517,9 @@ test('1.2.3 nhật ký 16/10 "Chờ 120s mà Google chưa xuất file" ×3: tab 
   const iEngine = t.indexOf("['engine dò DOM'"), iTai = t.indexOf("['trình ẩn chất lượng bị khoá', n.taiVe]"), iChot = t.indexOf("['chốt hoàn tất'");
   assert.ok(iEngine > 0 && iTai > iEngine && iChot > iTai, 'thiếu / sai chỗ giai đoạn "trình ẩn chất lượng bị khoá"');
   const { docNguon: nguon } = require('../../src/flow/tab-flow');
-  assert.ok(/window\.__flowTaiVe = \{ anKhoa: anKhoa, menuCuoi: '', menuMo: '' \}/.test(nguon().taiVe));
+  assert.ok(/window\.__flowTaiVe = \{ anKhoa: anKhoa, menuCuoi: '', menuMo: '',/.test(nguon().taiVe));
+  // 1.3.7: Flow báo "Không tăng được độ phân giải!" → tải Kích thước gốc (bài DOM: tests/flow/tai-ve-main.js).
+  assert.ok(/Không tăng được|tăng \(được \)\?độ phân giải/.test(nguon().taiVe) && /function taiLaiGoc/.test(nguon().taiVe));
   // Engine chỉ hạ chất lượng khi KHÔNG thấy mục 1080p, và bỏ qua mục không hiện — hai điều trình ẩn dựa vào.
   const e = nguon().engine;
   assert.ok(e.includes("'1080p': ['720p', '270p', '4k']") && e.includes("return st.visibility !== 'hidden'"), 'engine đổi cách chọn chất lượng — xem lại flow-tai-ve.js');

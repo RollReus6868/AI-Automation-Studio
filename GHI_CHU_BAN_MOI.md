@@ -1,4 +1,24 @@
-# AI Automation Studio 1.3.6
+# AI Automation Studio 1.3.7
+
+- **Ảnh Flow tạo xong mà không tải về được ("Chờ 120s mà Google chưa xuất file").** Nguyên nhân (nhật ký 19/10/2026 02:04–02:21 và file chẩn đoán): app tải ảnh Flow ở chất lượng **2K**. 2K không phải file gốc, mà là Flow **tăng độ phân giải**, việc này tốn tín dụng AI của tài khoản. Khi Flow không tăng được (thường do hết tín dụng), nó hiện thông báo đỏ *"Không tăng được độ phân giải!"* và không xuất file nào. Engine vẫn chờ đủ 120 giây, rồi thử lại đúng mục 2K đó, nên sau 5 phút việc bị tính lỗi và tài khoản bị tính lỗi oan. Giờ:
+  - Ảnh Flow tải mặc định **1K (Kích thước gốc)**: file có ngay, không tốn tín dụng. Ai đang để 2K mặc định được chuyển sang 1K. Muốn 2K / 4K vẫn chọn được ở *Cài đặt → Google Flow → Chất lượng ảnh tải về*.
+  - Nếu vẫn chọn 2K / 4K (hoặc video 1080p / 4K) mà Flow báo *"Không tăng được độ phân giải!"*, app tự tải lại bản **Kích thước gốc** (1K cho ảnh, 720p cho video) ngay, không chờ 120 giây. Trong 30 phút sau đó, tab đó tải thẳng Kích thước gốc. Nhật ký ghi dòng 🔁.
+  - Việc bị bỏ vì quá 5 phút chưa tải về: app **nạp lại trang Flow** của tab đó, để mẻ sau không phải đứng chờ thêm 2 phút sau lần chờ cũ của engine (nhật ký ghi dòng 🔄).
+- **Tài khoản đỏ / xanh.** Ở mục *Tài khoản*, thẻ tài khoản có viền và chấm màu:
+  - **Xanh**: chạy được (việc gần nhất xong, đang chạy, hoặc đã đăng nhập mà chưa lỗi).
+  - **Đỏ**: việc gần nhất lỗi, đang nghỉ (ghi lý do và giờ chạy lại, vd *"Đang nghỉ: Google báo hoạt động bất thường · chạy lại lúc 03:15"*), hết lượt, bị Muse chặn video, hoặc chưa đăng nhập.
+  - **Xám**: chưa kiểm.
+  - Thẻ Muse / Flow / Suno ở đầu mục ghi thêm số tài khoản đang lỗi. Hộp chọn tài khoản của dự án cũng có chấm màu cạnh từng tài khoản.
+- **Tài khoản riêng cho ảnh và video.** Bấm nút tài khoản cạnh tên dự án: mỗi tài khoản Muse / Flow có thêm hai ô **Ảnh** và **Video** (bật sẵn). Bỏ dấu ô nào thì tài khoản đó không chạy loại việc đó. Ví dụ để Flow 1 chỉ tạo ảnh: bỏ dấu ô *Video* ở Flow 1. Video nối từ ảnh khi đó chạy ở tài khoản khác: app tự tải ảnh lên tài khoản đó. Vai *Chạy / Dự phòng / Không dùng* vẫn như cũ; số tài khoản chạy cùng lúc tính theo từng loại. Nếu bỏ hết mọi tài khoản của một loại, app nhắc ngay khi lưu.
+
+Không sửa được trong app, và app sẽ không lách:
+- Google báo *"hoạt động bất thường"* ở một số tài khoản Flow: tài khoản đó tự nghỉ rồi chạy lại.
+- Flow từ chối prompt có người nổi tiếng.
+- Muse hết lượt video trong ngày.
+
+Lưu ý: đã kiểm trên trang Flow giả, có thông báo *"Không tăng được độ phân giải!"* chép đúng cấu trúc từ file chẩn đoán của bạn. Chưa chạy trên Flow thật. Sau khi cài, nhật ký nên có dòng *"⬇️ Đã tải"* cho ảnh, hoặc dòng 🔁 nếu bạn vẫn để 2K.
+
+## Bản 1.3.6
 
 - **Hẹn giờ chạy, riêng cho từng chức năng.** Mục mới **Hẹn giờ** ở thanh bên trái có ba thẻ: **Tạo ảnh**, **Tạo video**, **Tạo nhạc**. Mỗi thẻ đặt riêng:
   - **Giờ bắt đầu**: tới giờ, app tự chạy mọi việc **đang chờ** của chức năng đó (giống bấm Chạy, nhưng chỉ chạy loại việc đó). Ví dụ hẹn Tạo ảnh 22:00 thì chỉ ảnh chạy; video và nhạc vẫn chờ hẹn của chúng.

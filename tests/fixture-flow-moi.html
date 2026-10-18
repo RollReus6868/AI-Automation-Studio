@@ -256,7 +256,22 @@
   // ?anh=1: thẻ ẢNH → menu 1K (Kích thước gốc) · 2K · 4K (2K / 4K khoá).
   // ?tre=<ms>: menu mở ra với MỌI mục mờ (aria-disabled — Flow đang chuẩn bị file) rồi mới sáng (nhật ký 17/10/2026:
   // 1.2.3 ẩn mục mờ vĩnh viễn → "Không chọn được chất lượng tải xuống").
-  const LA_ANH = q.get('anh') === '1', TRE = +q.get('tre') || 0;
+  const LA_ANH = q.get('anh') === '1', TRE = +q.get('tre') || 0, TANG_HONG = q.get('tangHong') === '1';
+  window.__bamTang = 0;
+  const hienTangHong = () => {
+    const w = document.createElement('div');
+    w.className = 'cdk-overlay-popover cdk-global-overlay-wrapper snack';
+    w.innerHTML = '<div class="cdk-overlay-pane"><mat-snack-bar-container class="mdc-snackbar mat-mdc-snack-bar-container flow-snackbar-panel">' +
+      '<div class="mdc-snackbar__surface mat-mdc-snackbar-surface"><div class="mat-mdc-snack-bar-label"><div aria-live="polite"><div>' +
+      '<flow-snackbar class="error"><div class="content"><div matsnackbarlabel="" class="mat-mdc-snack-bar-label mdc-snackbar__label label">' +
+      '<mat-icon role="img" class="mat-icon notranslate leading-icon google-symbols" aria-hidden="true">error</mat-icon> Không tăng được độ phân giải! </div>' +
+      '<div matsnackbaractions="" class="mat-mdc-snack-bar-actions mdc-snackbar__actions actions"><button class="mdc-button mat-mdc-snack-bar-action"><span class="mdc-button__label"> Đóng </span></button></div>' +
+      '</div></flow-snackbar></div></div></div></div></mat-snack-bar-container></div>';
+    w.style.cssText = 'position:fixed;left:40%;bottom:30px;z-index:2000';
+    document.body.appendChild(w);
+    w.querySelector('button').addEventListener('click', () => w.remove());
+    setTimeout(() => w.remove(), 8000);
+  };
   const moMenuTai = () => {
     if (oc.querySelector('.menu-con')) return;
     const p2 = document.createElement('div');
@@ -283,6 +298,14 @@
     }
     for (const b of p2.querySelectorAll('.q')) b.addEventListener('click', () => {
       const khoa = KHOA !== 'khong' && /1080p|2K|4K/.test(b.dataset.q);
+      if (!khoa && sang && TANG_HONG && /1080p|2K|4K/.test(b.dataset.q)) {
+        // ?tangHong=1 (tệp chẩn đoán 18/10/2026 19:16): mục đã tăng SÁNG, bấm vào thì Flow đóng menu, không có file,
+        // ~1 s sau hiện thông báo đỏ "Không tăng được độ phân giải!" (chép nguyên cấu trúc snackbar của Flow).
+        window.__bamTang = (window.__bamTang || 0) + 1;
+        dong();
+        setTimeout(hienTangHong, 1000);
+        return;
+      }
       if (!khoa && sang) { window.__taiVe.push(b.dataset.q); dong(); }       // mục khoá / chưa sáng: bấm không ra gì (như Flow thật)
     });
   };

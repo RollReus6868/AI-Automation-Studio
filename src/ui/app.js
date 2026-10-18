@@ -224,8 +224,11 @@
    * Gọn (16/10/2026, ảnh người dùng: hộp dài quá màn hình): các tài khoản xếp nhiều cột, hộp thoại tự cuộn.
    */
   const VAI_TK = [['chay', 'Chạy'], ['du', 'Dự phòng'], ['khong', 'Không dùng']];
+  // 1.3.7: mỗi tài khoản Muse / Flow chọn được dùng cho Ảnh, Video hay cả hai (vd Flow 1 chỉ tạo ảnh).
+  const LOAI_TK = [['anh', 'Ảnh'], ['video', 'Video']];
+  const boLoaiCua = (d, l, id) => !!(d && d.boLoai && (d.boLoai[l] || []).includes(id));
   function htmlChonTk(d) {
-    return `<p class="chon-tk-giai"><b>Chạy</b>: các tài khoản chạy cùng lúc (chọn bao nhiêu cũng được). <b>Dự phòng</b>: chỉ vào thay khi một tài khoản đang chạy lỗi / nghỉ, theo thứ tự từ trên xuống. <b>Không dùng</b>: dự án không đụng tới.</p>` +
+    return `<p class="chon-tk-giai"><b>Chạy</b>: các tài khoản chạy cùng lúc (chọn bao nhiêu cũng được). <b>Dự phòng</b>: chỉ vào thay khi một tài khoản đang chạy lỗi / nghỉ, theo thứ tự từ trên xuống. <b>Không dùng</b>: dự án không đụng tới. Ô <b>Ảnh</b> / <b>Video</b>: tài khoản đó tạo loại nào (bỏ chọn Video = tài khoản chỉ tạo ảnh).</p>` +
       DS_NEN.map((nen) => {
         const tk = S.taiKhoan.filter((a) => nenTk(a) === nen);
         if (!tk.length) return `<div class="chon-tk nhom-nen"><b>${TEN_NEN[nen]}</b><span>Chưa có tài khoản ${TEN_NEN[nen]} — thêm ở mục Tài khoản.</span></div>`;
@@ -235,8 +238,11 @@
         <div class="chon-tk-vai">${thuTu.map((id, i) => {
           const a = tk.find((x) => x.id === id);
           const vai = i < song ? 'chay' : ds.includes(id) ? 'du' : 'khong';
-          return `<label class="hang-vai" data-vai="${vai}"><span title="${esc(a.ten)}">${esc(a.ten)}${a.trangThai === 'can-dang-nhap' ? ' <small>(chưa đăng nhập)</small>' : ''}</span>` +
-            `<select name="vai_${esc(id)}" data-vai-tk>${VAI_TK.map(([k, t]) => `<option value="${k}" ${k === vai ? 'selected' : ''}>${t}</option>`).join('')}</select></label>`;
+          const loai = nen === 'suno' ? '' : `<span class="loai-tk">${LOAI_TK.map(([l, t]) =>
+            `<label title="Dùng tài khoản này để tạo ${t.toLowerCase()}"><input type="checkbox" name="loai_${l}_${esc(id)}" ${boLoaiCua(d, l, id) ? '' : 'checked'}>${t}</label>`).join('')}</span>`;
+          const sk = skTk(id);
+          return `<div class="hang-vai" data-vai="${vai}"><span title="${esc(`${a.ten} — ${sk.chu}`)}"><i class="cham-sk sk-${sk.muc}"></i>${esc(a.ten)}${a.trangThai === 'can-dang-nhap' ? ' <small>(chưa đăng nhập)</small>' : ''}</span>` +
+            loai + `<select name="vai_${esc(id)}" data-vai-tk>${VAI_TK.map(([k, t]) => `<option value="${k}" ${k === vai ? 'selected' : ''}>${t}</option>`).join('')}</select></div>`;
         }).join('')}</div><small class="mo">Để "Không dùng" hết = dự án dùng mọi tài khoản ${TEN_NEN[nen]}.</small></div>`;
       }).join('');
   }
@@ -251,6 +257,9 @@
   };
   const laySong = (v) => Object.fromEntries(DS_NEN.map((nen) => [nen, Math.max(1, vaiTk(v, nen).chay.length)]));
   const layTk = (v) => DS_NEN.flatMap((nen) => { const x = vaiTk(v, nen); return [...x.chay, ...x.du]; });
+  /** 1.3.7: {anh: [id…], video: [id…]} — tài khoản bỏ chọn ô Ảnh / Video (không dùng cho loại đó). */
+  const layBoLoai = (v) => Object.fromEntries(LOAI_TK.map(([l]) => [l,
+    Object.keys(v).filter((k) => k.startsWith(`loai_${l}_`) && v[k] === false).map((k) => k.slice(`loai_${l}_`.length))]));
   const viecTheoId = (id) => S && S.viec.find((j) => j.id === id);
   /** Khoá cài đặt Tải về / Tên file của từng trang Tạo (nhạc luôn tải về: không có khoá công tắc). */
   const khoaTai = (loai = loaiTrang()) => ({ video: { tai: 'taiVideo', ten: 'tenVideo' }, nhac: { tai: '', ten: 'tenNhac' } }[loai] || { tai: 'taiAnh', ten: 'tenAnh' });
@@ -749,7 +758,7 @@
     const dh = duAnHienTai();   // dự án mới chạy trên đúng tài khoản đã chọn cho dự án đang mở (chưa chọn thì thôi)
     const tkMoi = dh && dh.taiKhoan && dh.taiKhoan.length ? dh.taiKhoan : undefined;
     for (const f of dung) {
-      const d = await api.call('taoDuAn', { ten: f.ten, taiKhoan: tkMoi, chaySong: dh && dh.chaySong, tuDuAn: (dh && dh.id) || '' });
+      const d = await api.call('taoDuAn', { ten: f.ten, taiKhoan: tkMoi, chaySong: dh && dh.chaySong, tuDuAn: (dh && dh.id) || '', boLoai: dh && dh.boLoai });
       if (!d || !d.id) continue;
       dau = dau || d.id;
       moi.push(d.id);
@@ -835,7 +844,9 @@
     if (!DS_NEN.includes(U.nenTk)) U.nenTk = 'muse';
     for (const b of $$('#nenTk button')) b.classList.toggle('on', b.dataset.v === U.nenTk);
     for (const n of DS_NEN) {
-      $(`#nenTk [data-dem="${n}"]`).textContent = S.taiKhoan.filter((a) => nenTk(a) === n).length;
+      const cua = S.taiKhoan.filter((a) => nenTk(a) === n), soLoi = cua.filter((a) => skTk(a.id).muc === 'loi').length;
+      $(`#nenTk [data-dem="${n}"]`).textContent = cua.length + (soLoi ? ` · ${soLoi} lỗi` : '');
+      $(`#nenTk [data-dem="${n}"]`).classList.toggle('co-loi', !!soLoi);
       for (const el of $$(`.chi-${n}`)) el.hidden = n !== U.nenTk;
     }
     const ds = S.taiKhoan.filter((a) => nenTk(a) === U.nenTk);
@@ -843,9 +854,10 @@
       const [cls, nhan] = NHAN_TK[a.trangThai] || NHAN_TK['chua-kiem'];
       const dang = S.dangNhap && S.dangNhap.id === a.id;
       const nen = nenTk(a), flow = nen === 'flow';
-      return `<div class="the-tk tk-${nen}">
+      const sk = skTk(a.id);
+      return `<div class="the-tk tk-${nen} sk-${sk.muc}" title="${esc(sk.chu)}">
         <div class="av">${esc((a.ten || '?').trim().charAt(0).toUpperCase())}</div>
-        <div class="tt"><b>${esc(a.ten)}</b><span class="tag nen-${nen}">${TEN_NEN[nen].toUpperCase()}</span><span class="pill ${cls}">${nhan}</span>${nen === 'suno'
+        <div class="tt"><b>${esc(a.ten)}</b><span class="tag nen-${nen}">${TEN_NEN[nen].toUpperCase()}</span><span class="pill ${cls}">${nhan}</span>${veSucKhoe(sk)}${nen === 'suno'
           ? veHetLuot(a)
           : flow ? `<div class="han-muc mo du-an-flow" title="${esc(a.flowUrl || '')}">Dự án Flow: ${a.flowUrl ? esc(a.flowUrl.replace(/^https:\/\/labs\.google\/fx\/(\w+\/)?tools\/flow\//, '…/')) : 'chưa chọn — app tự mở dự án mới (hoặc Đăng nhập → mở một dự án → Xong)'}</div>`
           : veHanMuc(a.hanMuc) + veChanVideo(a)}
@@ -864,6 +876,13 @@
     $('#tieuDeDangNhap').textContent = tk ? `Đăng nhập ${TEN_NEN[nenTk(tk)]}: ${tk.ten}${nenTk(tk) === 'flow' ? ' — mở một dự án rồi bấm Xong' : ''}` : 'Đăng nhập';
     $('#nutXongDangNhap').hidden = !tk;
     U.dangNhapMo = !!tk;
+  }
+  /** 1.3.7: tình trạng chạy của tài khoản (điều phối tính): đỏ = đang lỗi / nghỉ, xanh = chạy được, xám = chưa kiểm. */
+  const skTk = (id) => (S && S.sucKhoe && S.sucKhoe[id]) || { muc: 'cho', chu: 'Chưa kiểm', dang: 0 };
+  function veSucKhoe(sk) {
+    const g = (t) => { const d = new Date(t), hai = (n) => String(n).padStart(2, '0'); return `${hai(d.getHours())}:${hai(d.getMinutes())}`; };
+    const them = [sk.den ? `tới ${g(sk.den)}` : '', sk.luc ? `lúc ${g(sk.luc)}` : '', sk.dang ? `đang chạy ${sk.dang} việc` : ''].filter(Boolean).join(' · ');
+    return `<div class="suc-khoe sk-${sk.muc}"><i></i><span>${esc(sk.chu)}${them ? ` <small>(${esc(them)})</small>` : ''}</span></div>`;
   }
   /** Tài khoản Suno: còn đang nghỉ vì hết lượt tạo / tải không (nhớ qua cả lần tắt app). */
   function veHetLuot(a) {
@@ -1082,7 +1101,7 @@
     const v = await hoi({ tieuDe: 'Dự án mới', html: '<label>Tên dự án (cũng là tên thư mục kết quả)<input name="ten" placeholder="vd: Truyện người que"></label>' +
       htmlChonTk(duAnHienTai()), ok: 'Tạo' });
     if (!v || !v.ten.trim()) return;
-    const d = await api.call('taoDuAn', { ten: v.ten, taiKhoan: layTk(v), chaySong: laySong(v), tuDuAn: (duAnHienTai() || {}).id || '' });
+    const d = await api.call('taoDuAn', { ten: v.ten, taiKhoan: layTk(v), chaySong: laySong(v), tuDuAn: (duAnHienTai() || {}).id || '', boLoai: layBoLoai(v) });
     if (d && d.id) { U.duAn = d.id; U.chiTiet = null; U.chon.clear(); luuUi(); }
   }
 
@@ -1090,7 +1109,17 @@
     const d = duAnHienTai();
     if (!d) return;
     const v = await hoi({ tieuDe: `Tài khoản chạy "${d.ten}"`, html: htmlChonTk(d), ok: 'Lưu' });
-    if (v) { await api.call('datTaiKhoanDuAn', { id: d.id, taiKhoan: layTk(v), chaySong: laySong(v) }); toast('Đã lưu tài khoản của dự án'); }
+    if (!v) return;
+    const bo = layBoLoai(v);
+    await api.call('datTaiKhoanDuAn', { id: d.id, taiKhoan: layTk(v), chaySong: laySong(v), boLoai: bo });
+    // Loại việc nào của Muse / Flow không còn tài khoản Chạy / Dự phòng nào → nhắc (việc loại đó sẽ đứng chờ hoặc sang bên kia).
+    const thieu = [];
+    for (const nen of ['muse', 'flow']) {
+      const ids = vaiTk(v, nen); const dung = [...ids.chay, ...ids.du];
+      if (!dung.length) continue;
+      for (const [l, t] of LOAI_TK) if (dung.every((id) => bo[l].includes(id))) thieu.push(`${t} ${TEN_NEN[nen]}`);
+    }
+    toast(thieu.length ? `Đã lưu — chưa có tài khoản nào cho: ${thieu.join(', ')}` : 'Đã lưu tài khoản của dự án', !!thieu.length);
   }
 
   // ── Gắn sự kiện ──────────────────────────────────────────────────────────
