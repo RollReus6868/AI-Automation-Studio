@@ -205,6 +205,8 @@
   /** Lưu cài đặt vào dự án đang mở. */
   const datCD = (c) => api.call('datCaiDat', { ...c, duAn: (duAnHienTai() || {}).id });
   const duAnDangChay = (id) => !!(S && (S.duAnChay || []).includes(id));
+  /** 1.3.6: việc đang chờ thuộc lượt hẹn giờ đang chạy (theo loại việc; video nối từ ảnh theo hẹn của ảnh). */
+  const theoHen = (j) => !!(S && [j.loai, j.henLoai].some((l) => { const x = l && (S.henChay || {})[l]; return x && (!x.duAn || x.duAn === j.duAn); }));
   /**
    * Tài khoản chạy dự án trên MỘT nơi chạy, theo thứ tự [chính, dự phòng…]; chưa chọn tài khoản nào
    * của nơi đó = mọi tài khoản của nơi đó (giống điều phối).
@@ -285,7 +287,7 @@
     hoi({ tieuDe, html: `<p>${chu}</p>`, ok, nguyHiem }).then((v) => !!v);
 
   // ── Điều hướng ──────────────────────────────────────────────────────────
-  const TEN_TRANG = { anh: 'Tạo ảnh', video: 'Tạo video', nhac: 'Tạo nhạc', nhanvat: 'Nhân vật', thuvien: 'Thư viện', taikhoan: 'Tài khoản', huongdan: 'Hướng dẫn', caidat: 'Cài đặt' };
+  const TEN_TRANG = { anh: 'Tạo ảnh', video: 'Tạo video', nhac: 'Tạo nhạc', hengio: 'Hẹn giờ', nhanvat: 'Nhân vật', thuvien: 'Thư viện', taikhoan: 'Tài khoản', huongdan: 'Hướng dẫn', caidat: 'Cài đặt' };
   function diToi(trang) {
     if (U.trang === 'taikhoan' && trang !== 'taikhoan' && U.dangNhapMo) dongDangNhap();
     const cu = U.trang;
@@ -295,7 +297,7 @@
     const tao = trang === 'anh' || trang === 'video' || trang === 'nhac';
     document.body.classList.toggle('trang-nhac', trang === 'nhac');
     $('#trang-tao').hidden = !tao;
-    for (const t of ['nhanvat', 'thuvien', 'taikhoan', 'huongdan', 'caidat']) $(`#trang-${t}`).hidden = t !== trang;
+    for (const t of ['hengio', 'nhanvat', 'thuvien', 'taikhoan', 'huongdan', 'caidat']) $(`#trang-${t}`).hidden = t !== trang;
     $('#khuDuAn').style.visibility = tao ? 'visible' : 'hidden';
     if (tao) {
       if (cu !== trang) { U.chon.clear(); U.chiTiet = null; }
@@ -314,6 +316,7 @@
       $('#nenVideoChuoi').value = U.chuoi.nen || '';
     }
     if (trang === 'caidat') veCaiDat();
+    if (trang === 'hengio') napHenGio();
     luuUi();
     ve();
   }
@@ -328,6 +331,7 @@
     if (U.trang === 'nhanvat') veNhanVat();
     if (U.trang === 'thuvien') veThuVien();
     if (U.trang === 'taikhoan') veTaiKhoan();
+    if (U.trang === 'hengio') veHenGio();
   }
 
   function veTopbar() {
@@ -355,6 +359,17 @@
     const n = $('#nutChayTatCa'), chayDa = !!d && duAnDangChay(d.id);
     n.classList.toggle('dung', chayDa);
     n.innerHTML = chayDa ? `${ic('pause')}<span>Dừng dự án</span>` : `${ic('play')}<span>Chạy dự án</span>`;
+    // 1.3.6: chip hẹn giờ — chức năng đang chạy theo hẹn, hoặc lần hẹn gần nhất sắp tới.
+    const hg = S.henGio || {}, hc = S.henChay || {};
+    const bat = ['anh', 'video', 'nhac'].filter((l) => hg[l] && hg[l].bat && hg[l].lanToi);
+    const chH = $('#chipHen');
+    chH.hidden = !bat.length && !Object.keys(hc).length;
+    chH.classList.toggle('chay', !!Object.keys(hc).length);
+    if (!chH.hidden) {
+      chH.lastElementChild.textContent = Object.keys(hc).length
+        ? `Đang chạy hẹn: ${Object.keys(hc).map((l) => TEN_LOAI[l]).join(', ')}`
+        : bat.sort((a, b) => hg[a].lanToi - hg[b].lanToi).slice(0, 2).map((l) => `${TEN_LOAI[l]} ${gioHen(hg[l].lanToi)}`).join(' · ');
+    }
     const cn = S.capNhat, c = $('#chipCapNhat');
     const coMoi = cn && ['co-ban-moi', 'dang-tai', 'da-tai'].includes(cn.trangThai) && cn.phienBanMoi;
     c.hidden = !coMoi;
@@ -420,7 +435,7 @@
       return ['chay', 'Đang chạy', b];
     }
     return ['cho', 'Đang chờ', j.thread ? 'Sẽ lấy tiếp kết quả' : j.sunoBai && j.loi ? `Tải lại bài đã tạo: ${j.loi}` : (j.loi ? `Thử lại: ${j.loi}` :
-      j.uuTienLuc || j.chayRieng ? 'Chạy ngay (lên đầu hàng)' : duAnDangChay(j.duAn) ? 'Trong hàng chờ' : 'Trong hàng chờ — dự án chưa chạy')];
+      j.uuTienLuc || j.chayRieng ? 'Chạy ngay (lên đầu hàng)' : duAnDangChay(j.duAn) ? 'Trong hàng chờ' : theoHen(j) ? 'Trong hàng chờ — chạy theo hẹn giờ' : 'Trong hàng chờ — dự án chưa chạy')];
   }
 
   function locViec() {
@@ -495,7 +510,7 @@
   }
   /** 1.3.0: nút Dừng (việc đang chạy / đang chờ) hoặc Chạy (việc đã dừng / lỗi / còn chờ khi dự án chưa chạy) của riêng một việc. */
   function nutDieuKhien(j) {
-    if (j.trangThai === 'chay' || (j.trangThai === 'cho' && (duAnDangChay(j.duAn) || j.chayRieng))) {
+    if (j.trangThai === 'chay' || (j.trangThai === 'cho' && (duAnDangChay(j.duAn) || j.chayRieng || theoHen(j)))) {
       return `<button class="nut-dk dung" data-dk="dungViec" title="Dừng riêng việc này — việc khác vẫn chạy">${ic('square')}</button>`;
     }
     if (j.trangThai === 'cho' || j.trangThai === 'dung' || j.trangThai === 'loi') {
@@ -907,6 +922,44 @@
   }
 
   // ── Cài đặt ──────────────────────────────────────────────────────────────
+  // ── 1.3.6: Hẹn giờ chạy (riêng từng chức năng) ────────────────────────────
+  const gioHen = (t) => { const d = new Date(t); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
+  function ngayHen(t) {
+    const d = new Date(t), hom = new Date(); hom.setHours(0, 0, 0, 0);
+    const lech = Math.round((new Date(d).setHours(0, 0, 0, 0) - hom.getTime()) / 86400000);
+    return `${gioHen(t)} ${lech === 0 ? 'hôm nay' : lech === 1 ? 'ngày mai' : d.toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit' })}`;
+  }
+  /** Điền ô của các thẻ hẹn giờ từ trạng thái (khi vào trang / sau khi lưu) — không điền lại lúc đang gõ. */
+  function napHenGio(chiLoai) {
+    if (!S) return;
+    for (const the of $$('#trang-hengio .the-hen')) {
+      const l = the.dataset.loai, h = (S.henGio || {})[l] || {};
+      if (chiLoai && chiLoai !== l) continue;
+      const o = (k) => $(`[data-hen="${k}"]`, the);
+      o('bat').checked = !!h.bat;
+      o('batDau').value = h.batDau || '22:00';
+      o('ketThuc').value = h.ketThuc || '';
+      o('lap').value = h.lap || 'ngay';
+      o('duAn').innerHTML = `<option value="">Mọi dự án</option>` + S.duAn.map((d) => `<option value="${esc(d.id)}">Dự án "${esc(d.ten)}"</option>`).join('');
+      o('duAn').value = S.duAn.some((d) => d.id === h.duAn) ? h.duAn : '';
+    }
+    veHenGio();
+  }
+  function veHenGio() {
+    for (const the of $$('#trang-hengio .the-hen')) {
+      const l = the.dataset.loai, h = (S.henGio || {})[l] || {}, chay = (S.henChay || {})[l];
+      const o = (k) => $(`[data-hen="${k}"]`, the);
+      const tr = o('trang');
+      tr.className = `trang-hen${chay ? ' chay' : h.bat ? ' bat' : ''}`;
+      tr.textContent = chay ? `Đang chạy theo hẹn${chay.den ? ` · dừng ${gioHen(chay.den)}` : ' · tới hết hàng chờ'}` : h.bat && h.lanToi ? `Lần tới: ${ngayHen(h.lanToi)}` : 'Đang tắt';
+      the.classList.toggle('tat', !o('bat').checked);
+      o('dung').hidden = !chay;
+      const cho = S.viec.filter((j) => j.loai === l && j.trangThai === 'cho' && (!o('duAn').value || j.duAn === o('duAn').value)).length;
+      o('ghi').textContent = `Hiện có ${cho} việc ${TEN_LOAI[l]} đang chờ${o('duAn').value ? ' trong dự án này' : ''}. ` +
+        (l === 'nhac' ? 'Chạy trên các tài khoản Suno.' : 'Chạy trên Muse / Google Flow theo nơi đã chọn của từng việc.');
+    }
+  }
+
   function veCaiDat() {
     if (!S) return;
     const c = S.caiDat;
@@ -1342,6 +1395,25 @@
     $('#cdMoThuMucVideoAnh').onclick = () => { const d = $('#cdThuMucVideoAnh').value; if (d) api.call('moThuMuc', { dir: d }); };
     $('#cdBoThuMucVideoAnh').onclick = async () => { await datCD({ thuMucVideoAnh: '' }); $('#cdThuMucVideoAnh').value = ''; };
     $('#cdVideoCanhAnh').addEventListener('change', (e) => $('#khoiThuMucVideoAnh').classList.toggle('mo-di', e.target.checked));
+    // Hẹn giờ
+    $('#chipHen').onclick = () => diToi('hengio');
+    for (const the of $$('#trang-hengio .the-hen')) {
+      const l = the.dataset.loai, o = (k) => $(`[data-hen="${k}"]`, the);
+      o('bat').onchange = () => veHenGio();
+      o('duAn').onchange = () => veHenGio();
+      o('boKetThuc').onclick = () => { o('ketThuc').value = ''; };
+      o('luu').onclick = async () => {
+        const hen = { bat: o('bat').checked, batDau: o('batDau').value, ketThuc: o('ketThuc').value, lap: o('lap').value, duAn: o('duAn').value };
+        if (!hen.batDau) { toast('Chọn giờ bắt đầu', true); return; }
+        const r = await api.call('datHenGio', { loai: l, hen });
+        if (!r || !r.ok) { toast((r && r.loi) || 'Không lưu được hẹn giờ', true); return; }
+        S.henGio = S.henGio || {};
+        S.henGio[l] = { ...r.henGio, lanToi: (S.henGio[l] || {}).lanToi };
+        napHenGio(l);
+        toast(hen.bat ? `Đã hẹn ${TEN_TRANG[l]} lúc ${r.henGio.batDau}${r.henGio.ketThuc ? `, dừng ${r.henGio.ketThuc}` : ''}` : `Đã tắt hẹn giờ ${TEN_TRANG[l]}`);
+      };
+      o('dung').onclick = () => api.call('dungHen', { loai: l });
+    }
     $('#cdKiemCapNhat').onclick = () => api.call('kiemCapNhat');
     $('#cdXemLuong').onchange = (e) => api.call('xemLuong', { bat: e.target.checked });
     $('#cdMauGoc').onclick = () => { $('#cdMauAnh').value = HD.MAU_MAC_DINH.anh; $('#cdMauVideo').value = HD.MAU_MAC_DINH.video; };
