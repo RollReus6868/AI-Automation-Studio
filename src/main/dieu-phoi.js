@@ -36,6 +36,8 @@ const TEN_NEN = { muse: 'Muse', flow: 'Flow', suno: 'Suno' };
 const NGHI_HET_LUOT_MS = 6 * 60 * 60 * 1000;
 const chuanNen = (n) => (n === 'flow' || n === 'suno' ? n : 'muse');
 const TEN_LOAI = { anh: 'ảnh', video: 'video', nhac: 'nhạc' };
+/** 1.3.8: lỗi của tài khoản để ghi lên thẻ / nhật ký — giữ nguyên chữ trang báo (một dòng, tối đa 200 ký tự). */
+const rutLoi = (s) => { const t = String(s || 'lỗi không rõ').replace(/\s+/g, ' ').trim(); return t.length > 200 ? `${t.slice(0, 199)}…` : t; };
 const SONG_TOI_DA = 50;
 /** {muse, flow, suno}: số tài khoản chạy cùng lúc mỗi nền tảng, 1–50 (1.3.0: chọn đích danh từng tài khoản "Chạy"). */
 /** 1.3.7: tài khoản dự án KHÔNG dùng cho từng loại việc: {anh: [id…], video: [id…]} (thiếu = dùng cho mọi loại). */
@@ -1081,7 +1083,8 @@ class DieuPhoi {
         const a = this.o.taiKhoan.tim(id);
         if (!a) return null;
         const hetLuot = (a.hetLuotDen || 0) > Date.now() ? `hết lượt, nghỉ đến ${new Date(a.hetLuotDen).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}` : '';
-        return `"${a.ten}": ${hetLuot || this.lyDoNghi[id] || (a.trangThai === 'can-dang-nhap' ? 'chưa đăng nhập' : 'đang lỗi')}`;
+        const kq = this.ketQuaTk[id];
+        return `"${a.ten}": ${hetLuot || this.lyDoNghi[id] || (a.trangThai === 'can-dang-nhap' ? 'chưa đăng nhập' : kq && !kq.ok ? `lỗi: ${kq.loi}` : 'đang lỗi')}`;
       })
       .filter(Boolean);
     const coSuno = ds.some((j) => j.nen === 'suno');
@@ -1395,11 +1398,11 @@ class DieuPhoi {
       j.tkLoi = [...new Set([...(j.tkLoi || []), tkId])];
       j.loiTruoc = r.loi;
       this.loiLienTiep[tkId] = (this.loiLienTiep[tkId] || 0) + 1;
-      if (tkId) this.ketQuaTk[tkId] = { ok: false, luc: Date.now(), loi: String(r.loi || '').slice(0, 160) };
+      if (tkId) this.ketQuaTk[tkId] = { ok: false, luc: Date.now(), loi: rutLoi(r.loi) };
       // Tài khoản lỗi liên tiếp → cả dự án sang tài khoản dự phòng một thời gian (chỉ khi có dự phòng).
       // Ảnh Flow chuyển được sang Muse thì Muse cũng tính là dự phòng.
       const coDuPhong = ds.some((id) => id !== tkId) || this._coTheDoiNen(j);
-      if (this.loiLienTiep[tkId] >= LOI_LIEN_TIEP_NGHI && coDuPhong) this._choNghi(tkId, `lỗi ${this.loiLienTiep[tkId]} việc liên tiếp`);
+      if (this.loiLienTiep[tkId] >= LOI_LIEN_TIEP_NGHI && coDuPhong) this._choNghi(tkId, `lỗi ${this.loiLienTiep[tkId]} việc liên tiếp, lần gần nhất: ${rutLoi(r.loi)}`);
       j.thu = (j.thu || 0) + 1;
       // Mọi tài khoản của dự án đều đã lỗi việc này → hết một vòng, vòng sau bắt đầu lại từ tài khoản chính.
       if (!ds.some((id) => !j.tkLoi.includes(id))) { j.vongTk = (j.vongTk || 0) + 1; j.tkLoi = []; }

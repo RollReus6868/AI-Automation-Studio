@@ -455,7 +455,7 @@ module.exports = function e2e({ win, app, LENH, dieuPhoi }) {
       kiem(tkl(v15[0]).includes('tk-1') && tkl(v15[1]).includes('tk-1') && !tkl(v15[2]).length, 'chính lỗi 2 việc liền → việc thứ 3 chạy thẳng dự phòng');
       kiem((await daGui()).length - gui15 === 5, `gửi đúng 5 lần (2 lỗi ở chính + 3 ở dự phòng): ${(await daGui()).length - gui15}`);
       kiem(LENH.trangThai().nhatKy.some((d) => /chuyển sang "TK ba"/.test(d.chu)) &&
-        LENH.trangThai().nhatKy.some((d) => /"Muse 1": lỗi 2 việc liên tiếp — tạm nghỉ/.test(d.chu)), 'nhật ký báo chuyển tài khoản + tạm nghỉ');
+        LENH.trangThai().nhatKy.some((d) => /"Muse 1": lỗi 2 việc liên tiếp, lần gần nhất: .+ — tạm nghỉ/.test(d.chu)), 'nhật ký báo chuyển tài khoản + tạm nghỉ');
       kiem(!viec().some((j) => j.duAn === d15.id && j.taiKhoan === tk2.id), 'tài khoản ngoài dự án không chạy việc nào');
       await tk1.cookies.remove(process.env.MUSE_URL, 'muse_hong');
 

@@ -937,7 +937,7 @@ app.whenReady().then(() => {
     // 1.3.7: Flow cho tài khoản nghỉ mà dự án không còn tài khoản Flow nào khác (máy Flow tự tạm dừng tab) → thẻ tài khoản đỏ.
     nghiFlow: (id) => {
       const so = mayFlow && mayFlow.soAnToanCua ? mayFlow.soAnToanCua(id) : null;
-      return so && so.dangNghi ? { den: so.nghiDen, lyDo: 'Flow báo lỗi, tự chạy lại khi hết giờ nghỉ' } : null;
+      return so && so.dangNghi ? { den: so.nghiDen, lyDo: so.lyDoNghi || 'Flow báo lỗi, tự chạy lại khi hết giờ nghỉ' } : null;
     },
     hetLuot: () => {
       if (dieuPhoi.caiDat.tatMayKhiXong) mayFlow.handleEngineMessage({ action: 'TRIGGER_SHUTDOWN', delay: 60 }, { id: -1 });

@@ -70,6 +70,8 @@ function taoMayFlow(o) {
     if (!soAnToan.has(khoa(accountId))) soAnToan.set(khoa(accountId), anToan.soMoi());
     return soAnToan.get(khoa(accountId));
   }
+  /** Câu Flow ghi, bỏ tiền tố "Không thành công ·", một dòng, tối đa 160 ký tự. */
+  const cauGon = (s) => { const t = String(s || '').replace(/^\s*(không thành công|failed)\s*[·:-]\s*/i, '').replace(/\s+/g, ' ').trim(); return t.length > 160 ? `${t.slice(0, 159)}…` : t; };
   const tabCungTaiKhoan = (accountId) => tabs.tabs.filter((t) => khoa(t.accountId) === khoa(accountId));
 
   function datCaiDatAnToan(raw) {
@@ -89,7 +91,7 @@ function taoMayFlow(o) {
     if (!r || !r.ok || !Array.isArray(r.lyDo)) return false;
     let chan = false;
     for (const cau of r.lyDo) {
-      if (anToan.laCanhBaoChan(cau) || anToan.laHetLuot(cau)) chan = true;
+      if (anToan.laCanhBaoChan(cau) || anToan.laHetLuot(cau)) { chan = true; soAnToanCua(tab.accountId).cauChan = cau; }
       if (tab._lyDoDaGhi.has(cau)) continue;
       tab._lyDoDaGhi.add(cau);
       log('error', `🧾 [${tab.id}] Flow ghi trên thẻ lỗi: "${cau}"`);
@@ -117,6 +119,7 @@ function taoMayFlow(o) {
         const doc = await doCanhBaoTrenTrang(tab);
         if (doc && doc.co) {
           so.coCauChan = true;
+          if (doc.viDu) so.cauChan = doc.viDu;
           log('error', `🚫 [${tab.id}] Flow đang báo: "${(doc.viDu || '').slice(0, 120)}"`);
         }
       }
@@ -162,18 +165,22 @@ function taoMayFlow(o) {
     if (!ds.length) { anToan.xoaDauLoi(so); return; }
     so.soLanBiChan += 1;
     const ten = ds[0].accountName || accountId || 'tài khoản';
+    // 1.3.8: ghi rõ Flow nói gì (thẻ lỗi / thông báo trên trang) — thẻ tài khoản đỏ hiện đúng câu này.
+    const lyDo = so.cauChan ? `${qd.lyDo} — Flow ghi: "${cauGon(so.cauChan)}"` : qd.lyDo;
+    so.cauChan = '';
 
     // Dự án còn tài khoản dự phòng (hoặc ảnh chuyển được sang Muse) → bộ điều phối cho tài khoản này
     // nghỉ, dừng các tab của nó, việc sang tài khoản khác NGAY.
-    if (o.nghiTaiKhoan && o.nghiTaiKhoan(accountId, ms, `Flow lỗi: ${qd.lyDo}`)) {
+    if (o.nghiTaiKhoan && o.nghiTaiKhoan(accountId, ms, `Flow lỗi: ${lyDo}`)) {
       anToan.xoaDauLoi(so);
-      log('error', `🛑 [${ten}] Tài khoản lỗi (${qd.lyDo}) — nghỉ ${anToan.doDai(ms)}, việc chuyển ngay sang tài khoản khác.`);
+      log('error', `🛑 [${ten}] Tài khoản lỗi (${lyDo}) — nghỉ ${anToan.doDai(ms)}, việc chuyển ngay sang tài khoản khác.`);
       return;
     }
 
     so.dangNghi = true;
     so.nghiDen = Date.now() + ms;
-    log('error', `🛑 [${ten}] Tài khoản lỗi (${qd.lyDo}) và dự án không còn tài khoản Flow nào khác — TẠM DỪNG tài khoản này, tự chạy lại sau ${anToan.doDai(ms)}.`);
+    so.lyDoNghi = lyDo;
+    log('error', `🛑 [${ten}] Tài khoản lỗi (${lyDo}) và dự án không còn tài khoản Flow nào khác — TẠM DỪNG tài khoản này, tự chạy lại sau ${anToan.doDai(ms)}.`);
     for (const t of ds) {
       t.nghiAnToan = true;
       nhipTT.huy(t);   // cắt ngang khoảng nghỉ giữa thao tác đang chờ

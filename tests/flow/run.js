@@ -2200,6 +2200,10 @@ testAsync('tài khoản lỗi (máy Flow): 2 prompt khác nhau hỏng → đổi
   assert.strictEqual(doi.length, 2, 'hết tín dụng ghi trên thẻ → đổi tài khoản ngay');
   assert.strictEqual(doi[1][1], 30 * 60000, 'bị lại → nghỉ gấp đôi');
   assert.ok(nhatKy.some((x) => /Not enough credits/.test(x)), 'chữ trên thẻ vẫn ghi vào nhật ký');
+  // 1.3.8: lý do nghỉ gửi điều phối (thẻ tài khoản đỏ) ghi nguyên câu Flow viết; prompt-hỏng-thường thì không có câu.
+  assert.ok(/— Flow ghi: "Not enough credits to generate"$/.test(doi[1][2]), doi[1][2]);
+  assert.ok(!/Flow ghi/.test(doi[0][2]), doi[0][2]);
+  assert.ok(nhatKy.some((x) => /🛑 \[Flow 1\] Tài khoản lỗi \(.*Flow ghi: "Not enough credits to generate"\)/.test(x)), 'dòng 🛑 cũng ghi rõ câu đó');
   // Lỗi đến khi tab đã thôi chạy (việc đã về điều phối) → bỏ dấu lỗi, mẻ SAU không bị đổi oan.
   theLoi = [];
   await bang([{ index: 6, status: 'ERROR', retries: 0 }, { index: 7, status: 'ERROR', retries: 0 }], false);
