@@ -14,6 +14,9 @@
 //  (d.flowUrl[tk]). Từng việc cũng dừng / chạy riêng được (trạng thái 'dung', chayRieng).
 //  Luồng Suno vẫn một luồng mỗi tài khoản, dùng chung cho mọi dự án (chia lượt đều).
 //
+//  1.3.6 — HẸN GIỜ CHẠY riêng cho từng chức năng (ảnh / video / nhạc, src/main/hen-gio.js): đến giờ thì
+//  chạy mọi việc đang chờ của loại đó (loaiChay), có giờ dừng thì tới giờ dừng — độc lập với nút Chạy dự án.
+//
 //  Không require('electron') — main.js đưa vào các hàm cần (tạo luồng, đọc/ghi
 //  file) nên tests/e2e-main.js dựng được với trang Muse giả.
 // ============================================================================
@@ -22,6 +25,7 @@ const path = require('path');
 const hd = require('./hang-doi');
 const { chuanHoaFlow, khoaMe } = require('../flow/cai-dat-flow');
 const { laUrlDuAnFlow } = require('../flow/tab-flow');
+const HG = require('./hen-gio');
 
 const NGHI_MS = 15 * 60 * 1000;   // tài khoản lỗi liên tiếp / mất kết nối → tạm nghỉ chừng này
 const LOI_LIEN_TIEP_NGHI = 2;
@@ -116,13 +120,14 @@ class DieuPhoi {
    */
   constructor(o) {
     this.o = o;
-    const s = o.store.get(['duAn', 'viec', 'nhanVat', 'caiDat', 'mauPrompt']);
+    const s = o.store.get(['duAn', 'viec', 'nhanVat', 'caiDat', 'mauPrompt', 'henGio']);
     this.duAn = Array.isArray(s.duAn) && s.duAn.length ? s.duAn
       : [{ id: 'mac-dinh', ten: 'Mặc định', so: 0, taoLuc: Date.now() }];
     this.viec = Array.isArray(s.viec) ? s.viec : [];
     this.nhanVat = Array.isArray(s.nhanVat) ? s.nhanVat : [];
     this.mauPrompt = Array.isArray(s.mauPrompt) ? s.mauPrompt : [];
     this.caiDat = { ...CAI_DAT_MAC_DINH, ...(s.caiDat || {}) };
+    this.henGio = HG.chuanBoHen(s.henGio);   // 1.3.6: hẹn giờ chạy của từng chức năng (chung cả app)
     this.caiDat.mau = { ...hd.MAU_MAC_DINH, ...(this.caiDat.mau || {}) };
     const sangMuseCu = (this.caiDat.flow || {}).sangMuseKhiHong;   // 1.2.0 — chuanHoaFlow bỏ khoá này, đọc trước (mốc 4)
     this.caiDat.flow = chuanHoaFlow(this.caiDat.flow);
@@ -171,6 +176,9 @@ class DieuPhoi {
     }
     this.luong = [];          // [{luong, taiKhoanId, duAn}] — duAn = null: luồng dùng chung mọi dự án (Suno)
     this.duAnChay = new Set();   // 1.3.0: dự án đang bấm Chạy (mỗi dự án chạy / dừng riêng)
+    // 1.3.6: chức năng đang chạy theo hẹn giờ: loai → { duAn ('' = mọi dự án), den (giờ dừng, 0 = tới hết),
+    // bo (dự án bị bấm Dừng trong lượt này), batDauLuc }
+    this.loaiChay = new Map();
     this._donCho = Promise.resolve();
     this._baoHet = true;          // đã báo "chạy hết hàng chờ" cho lượt hiện tại (lượt mới bắt đầu thì đặt lại)
     this.lanGui = {};         // taiKhoanId → thời điểm gửi gần nhất
@@ -185,9 +193,10 @@ class DieuPhoi {
   }
 
   log(m, c) { this.o.log(m, c); }
-  /** Đang chạy: có dự án đang bấm Chạy, hoặc có việc được bấm Chạy riêng còn dở. */
+  bayGio() { return this.o.bayGio ? this.o.bayGio() : Date.now(); }
+  /** Đang chạy: có dự án đang bấm Chạy, chức năng đang chạy theo hẹn giờ, hoặc việc được bấm Chạy riêng còn dở. */
   get dangChay() {
-    return this.duAnChay.size > 0 || this.viec.some((j) => j.chayRieng && (j.trangThai === 'cho' || j.trangThai === 'chay'));
+    return this.duAnChay.size > 0 || this.loaiChay.size > 0 || this.viec.some((j) => j.chayRieng && (j.trangThai === 'cho' || j.trangThai === 'chay'));
   }
   /** Cài đặt áp cho dự án (dự án chưa có bộ riêng → cài đặt chung). */
   cd(duAnId) {
@@ -198,7 +207,19 @@ class DieuPhoi {
     const c = this.cd(duAnId);
     return ({ video: c.thuMucVideo, nhac: c.thuMucNhac }[loai] ?? c.thuMucAnh) || this.o.thuMucRaMacDinh;
   }
-  _duocChay(j) { return this.duAnChay.has(j.duAn) || !!j.chayRieng; }
+  _duocChay(j) { return this.duAnChay.has(j.duAn) || !!j.chayRieng || !!this._theoHen(j); }
+  /** 1.3.6: việc này đang được chạy theo hẹn giờ của chức năng nào ('' = không). Video nối từ ảnh theo hẹn của ảnh. */
+  _theoHen(j) {
+    for (const l of [j.loai, j.henLoai]) {
+      const x = l && this.loaiChay.get(l);
+      if (x && (!x.duAn || x.duAn === j.duAn) && !x.bo.has(j.duAn)) return l;
+    }
+    return '';
+  }
+  /** Dự án có việc đang chạy / sẽ chạy (bấm Chạy dự án, hẹn giờ, chạy riêng). */
+  duAnDangChay(id) {
+    return this.duAnChay.has(id) || this.viec.some((j) => j.duAn === id && (j.trangThai === 'cho' || j.trangThai === 'chay') && this._duocChay(j));
+  }
   _tenDuAn(id) { const d = this.duAn.find((x) => x.id === id); return d ? d.ten : id; }
 
   // ── Dự án Flow riêng của từng dự án (1.3.0): mỗi dự án của app chạy trên dự án Flow MỚI của tài khoản ──
@@ -218,7 +239,7 @@ class DieuPhoi {
 
   luu() {
     this.o.store.set({ duAn: this.duAn, viec: this.viec, nhanVat: this.nhanVat,
-      caiDat: this.caiDat, mauPrompt: this.mauPrompt });
+      caiDat: this.caiDat, mauPrompt: this.mauPrompt, henGio: this.henGio });
     this.o.bao();
   }
 
@@ -233,6 +254,9 @@ class DieuPhoi {
       thuMucDuAn: Object.fromEntries(this.duAn.map((d) => [d.id, thuMuc(d.id)])),
       luong: this.luong.map((x) => ({ id: x.luong.id, taiKhoanId: x.taiKhoanId, nen: x.luong.nen || 'muse', duAn: x.duAn,
         viecId: x.luong.viec ? x.luong.viec.id : null })),
+      // 1.3.6: hẹn giờ từng chức năng + lần chạy tới + chức năng đang chạy theo hẹn (dừng lúc nào).
+      henGio: Object.fromEntries(HG.LOAI_HEN.map((l) => [l, { ...this.henGio[l], lanToi: HG.lanChayToi(this.henGio[l], this.bayGio()) }])),
+      henChay: Object.fromEntries([...this.loaiChay].map(([l, x]) => [l, { duAn: x.duAn, den: x.den }])),
       duKien: { anh: hd.thoiGianDuKien(this.viec, 'anh'), video: hd.thoiGianDuKien(this.viec, 'video'), nhac: hd.thoiGianDuKien(this.viec, 'nhac') }
     };
   }
@@ -339,6 +363,13 @@ class DieuPhoi {
     if (this.viec.some((j) => j.duAn === id && j.trangThai === 'chay')) return { ok: false, loi: 'Dự án đang có việc chạy' };
     this.duAn = this.duAn.filter((d) => d.id !== id);
     this.viec = this.viec.filter((j) => j.duAn !== id);
+    // 1.3.6: hẹn giờ chỉ cho dự án này → tắt hẹn (không tự chuyển sang chạy mọi dự án).
+    for (const l of HG.LOAI_HEN) {
+      if (this.henGio[l].duAn !== id) continue;
+      Object.assign(this.henGio[l], { bat: false, duAn: '' });
+      this.log('warning', `⏰ Đã tắt hẹn giờ ${HG.TEN_CHUC_NANG[l]} vì dự án của hẹn vừa bị xoá.`);
+    }
+    for (const [l, x] of this.loaiChay) if (x.duAn === id) this.loaiChay.delete(l);
     this.luu();
     return { ok: true };
   }
@@ -420,6 +451,7 @@ class DieuPhoi {
     // Ảnh do Flow tạo, video cũng chạy Flow cùng tài khoản → dùng luôn ảnh trong kho Flow (khỏi tải lên lại).
     if (j.flowTen) v.flowAnh = { ...j.flowTen, file: j.files[0] };
     if (j.chayRieng) v.chayRieng = true;   // ảnh được bấm Chạy riêng → video của nó cũng chạy luôn
+    v.henLoai = 'anh';   // 1.3.6: ảnh chạy theo hẹn giờ Tạo ảnh → video nối từ nó chạy tiếp trong cùng lượt hẹn
     this.viec.push(v);
     this.log('info', `🎬 Ảnh #${j.so} (${TEN_NEN[j.nen || 'muse']}) xong → thêm video #${v.so} chạy ở ${TEN_NEN[nen]} từ ảnh đó`);
   }
@@ -613,6 +645,7 @@ class DieuPhoi {
       this.tkFlowDaChay.set(id, new Set());   // tự xoá dự án Flow chỉ tính tài khoản chạy trong lượt NÀY
       this.duAnChay.add(id);
       for (const j of this.viec) if (j.duAn === id) delete j.chayRieng;
+      for (const x of this.loaiChay.values()) x.bo.delete(id);
       this.log('success', `▶ Bắt đầu chạy hàng chờ của dự án "${d.ten}"`);
     }
     this.o.bao();
@@ -641,6 +674,7 @@ class DieuPhoi {
     if (!d) return false;
     this.duAnChay.delete(id);
     for (const j of this.viec) if (j.duAn === id) delete j.chayRieng;
+    for (const x of this.loaiChay.values()) x.bo.add(id);   // 1.3.6: lượt hẹn giờ đang chạy cũng thôi chạy dự án này
     for (const x of this.luong) if (this._luongCuaDuAn(x, id)) x.luong.dung();
     this.log('warning', `⏸ Đã dừng dự án "${d.ten}" — việc đang chạy về hàng chờ, chạy lại thì việc Muse lấy tiếp kết quả từ chat cũ, mẻ Flow giao lại từ đầu.`);
     this.o.bao();
@@ -649,9 +683,96 @@ class DieuPhoi {
 
   dungTatCa() {
     this.duAnChay.clear();
+    this.loaiChay.clear();
     for (const j of this.viec) delete j.chayRieng;
     for (const x of this.luong) x.luong.dung();
     this.log('warning', '⏸ Đã dừng — việc đang chạy về hàng chờ, chạy lại thì việc Muse lấy tiếp kết quả từ chat cũ, mẻ Flow giao lại từ đầu.');
+    this.o.bao();
+  }
+
+  // ── 1.3.6: Hẹn giờ chạy (riêng từng chức năng) ─────────────────────────
+  /** Lưu hẹn giờ của một chức năng (loai = anh | video | nhac). */
+  datHenGio(loai, h) {
+    if (!HG.LOAI_HEN.includes(loai)) return { ok: false, loi: 'Chức năng không hợp lệ' };
+    const cu = this.henGio[loai];
+    const m = HG.chuanHen({ ...cu, ...(h || {}) });
+    if (m.duAn && !this.duAn.some((d) => d.id === m.duAn)) m.duAn = '';
+    if (h && h.batDau && !HG.chuanGio(h.batDau)) return { ok: false, loi: `Giờ bắt đầu "${h.batDau}" không hợp lệ (vd 22:00)` };
+    if (h && h.ketThuc && !HG.chuanGio(h.ketThuc)) return { ok: false, loi: `Giờ dừng "${h.ketThuc}" không hợp lệ (vd 06:00, để trống = chạy tới hết)` };
+    m.datLuc = this.bayGio();
+    // Đổi giờ / bật lại → tính lại từ đầu (lần hẹn mới), giữ "đã chạy" nếu chỉ đổi phần khác.
+    if (m.batDau !== cu.batDau || (m.bat && !cu.bat)) m.daChay = '';
+    this.henGio[loai] = m;
+    const ten = HG.TEN_CHUC_NANG[loai];
+    // Đang chạy theo hẹn mà đổi giờ dừng → áp ngay cho lượt đang chạy.
+    const dang = this.loaiChay.get(loai);
+    if (dang && m.ketThuc !== cu.ketThuc) dang.den = m.ketThuc ? HG.gioToiSau(m.ketThuc, this.bayGio()) : 0;
+    if (m.bat) {
+      this.log('info', `⏰ Hẹn giờ ${ten}: bắt đầu ${m.batDau}${m.ketThuc ? `, dừng ${m.ketThuc}` : ', chạy tới hết hàng chờ'}, ` +
+        `${m.lap === 'mot' ? 'một lần' : 'mỗi ngày'} — ${m.duAn ? `dự án "${this._tenDuAn(m.duAn)}"` : 'mọi dự án'}.`);
+    } else if (cu.bat) this.log('info', `⏰ Đã tắt hẹn giờ ${ten}.`);
+    this.luu();
+    this._xetHen();
+    return { ok: true, henGio: m };
+  }
+
+  /** Bấm Dừng lượt hẹn giờ đang chạy của một chức năng (hẹn ngày mai vẫn giữ). */
+  dungHen(loai) {
+    if (!this.loaiChay.has(loai)) return false;
+    this._dungHen(loai, `⏸ Đã dừng lượt hẹn giờ ${HG.TEN_CHUC_NANG[loai]}`);
+    return true;
+  }
+
+  /** Mỗi nhịp điều phối: tới giờ dừng thì dừng, tới giờ bắt đầu thì chạy. */
+  _xetHen() {
+    const bayGio = this.bayGio();
+    for (const [l, x] of [...this.loaiChay]) {
+      if (x.den && bayGio >= x.den) this._dungHen(l, `⏰ Hết giờ hẹn ${HG.TEN_CHUC_NANG[l]} (${HG.gioPhut(x.den)})`);
+    }
+    for (const l of HG.LOAI_HEN) {
+      const h = this.henGio[l];
+      const r = HG.denGioChay(h, bayGio);
+      if (!r) continue;
+      h.daChay = r.khoa;
+      if (h.lap === 'mot') h.bat = false;
+      this._batDauHen(l, h, r);
+      this.luu();
+    }
+  }
+
+  _batDauHen(loai, h, r) {
+    const ten = HG.TEN_CHUC_NANG[loai];
+    const pham = h.duAn ? `dự án "${this._tenDuAn(h.duAn)}"` : 'mọi dự án';
+    if (!this.o.taiKhoan.ds.length) {
+      this.log('error', `⏰ Hẹn giờ ${ten} (${h.batDau}): chưa có tài khoản nào — vào mục Tài khoản thêm và đăng nhập.`);
+      return false;
+    }
+    const cho = this.viec.filter((j) => j.loai === loai && j.trangThai === 'cho' && (!h.duAn || j.duAn === h.duAn));
+    if (!cho.length) {
+      this.log('warning', `⏰ Hẹn giờ ${ten} (${h.batDau}): không có việc ${TEN_LOAI[loai]} nào đang chờ (${pham}) — bỏ qua lần này.`);
+      return false;
+    }
+    if (!this.dangChay) this._choCoHoiMoi();
+    for (const id of new Set(cho.map((j) => j.duAn))) if (!this.duAnChay.has(id)) this.tkFlowDaChay.set(id, new Set());
+    this.loaiChay.set(loai, { duAn: h.duAn, den: r.den, bo: new Set(), batDauLuc: Date.now() });
+    this.log('success', `⏰ Đến giờ hẹn ${h.batDau}: bắt đầu ${ten} — ${cho.length} việc đang chờ, ${pham}` +
+      `${r.den ? `, dừng lúc ${HG.gioPhut(r.den)}` : ', chạy tới hết'}.`);
+    this.o.bao();
+    return true;
+  }
+
+  /** Thôi chạy theo hẹn: luồng đang làm việc CHỈ được chạy nhờ hẹn này thì dừng (việc về hàng chờ). */
+  _dungHen(loai, chu) {
+    const x = this.loaiChay.get(loai);
+    if (!x) return;
+    const nho = (j) => (j.loai === loai || j.henLoai === loai) && (!x.duAn || j.duAn === x.duAn);
+    this.loaiChay.delete(loai);
+    let dung = 0;
+    for (const y of this.luong) {
+      const ds = y.luong.dsViec || (y.luong.viec ? [y.luong.viec] : []);
+      if (ds.length && ds.some(nho) && !ds.some((j) => this._duocChay(j))) { y.luong.dung(); dung++; }
+    }
+    this.log('warning', `${chu} — ${dung ? `${dung} luồng đang chạy dừng lại, việc dở về hàng chờ` : 'không còn việc nào đang chạy'}.`);
     this.o.bao();
   }
 
@@ -729,6 +850,7 @@ class DieuPhoi {
   }
 
   _vong() {
+    this._xetHen();
     if (!this.dangChay) {
       if (this.luong.length && !this.coViecDangChay()) {
         for (const x of this.luong) this.o.huyLuong(x.luong);
@@ -784,7 +906,7 @@ class DieuPhoi {
         // Việc bấm Chạy riêng đi mẻ riêng (không kéo theo cả hàng chờ của dự án đang nghỉ).
         const k = khoaMe(j);
         const cungMe = this.viec.filter((v) => v !== j && v.trangThai === 'cho' && nham(v, x.taiKhoanId) && khoaMe(v) === k &&
-            (this.duAnChay.has(v.duAn) || !!v.chayRieng))
+            this._duocChay(v))
           .sort((a, b) => (a.uuTienLuc ? 0 : 1) - (b.uuTienLuc ? 0 : 1) || a.taoLuc - b.taoLuc || a.id - b.id);
         const nhom = nhamToi.get(j) || [];
         const tabRanh = this.luong.filter((y) => y.luong.ranh && y.luong.nen === 'flow' && nhom.includes(y.taiKhoanId) && y.duAn === x.duAn).length;
@@ -837,6 +959,42 @@ class DieuPhoi {
         if (cho.length && cho.every(([, ds]) => !ds.length) && !this.viec.some((j) => j.duAn === id && j.trangThai === 'chay')) {
           this.duAnChay.delete(id);
           this._baoTamDung(cho.map(([j]) => j), `dự án "${ten}"`);
+          tamDung = true;
+        }
+      }
+    }
+    // 1.3.6: chức năng chạy theo hẹn giờ: hết việc → xong lượt hẹn; còn việc mà không tài khoản nào chạy được → tạm dừng.
+    for (const [l, x] of [...this.loaiChay]) {
+      const nho = (j) => (j.loai === l || j.henLoai === l) && (!x.duAn || j.duAn === x.duAn) && !x.bo.has(j.duAn);
+      const conViec = this.viec.some((j) => nho(j) && (j.trangThai === 'cho' || j.trangThai === 'chay'));
+      const ban = this.luong.some((y) => !y.luong.ranh && (y.luong.dsViec || (y.luong.viec ? [y.luong.viec] : [])).some(nho));
+      const ten = HG.TEN_CHUC_NANG[l];
+      if (!conViec && !ban) {
+        const lai = this.viec.filter((j) => nho(j) && j.trangThai === 'loi' && (j.vongLai || 0) < this.cd(j.duAn).tuChayLaiLoi);
+        if (lai.length) {
+          for (const j of lai) {
+            Object.assign(j, { trangThai: 'cho', buoc: '', thread: '', taiKhoan: '', thu: 0, tkLoi: [], vongTk: 0, batDauLuc: 0, xongLuc: 0, vongLai: (j.vongLai || 0) + 1 });
+          }
+          this.log('warning', `↻ Hẹn giờ ${ten}: hết lượt — tự chạy lại ${lai.length} việc lỗi (lượt ${Math.max(...lai.map((j) => j.vongLai))})`);
+          this.luu();
+          continue;
+        }
+        this.loaiChay.delete(l);
+        this.log('success', `✅ Hẹn giờ ${ten}: đã chạy hết việc ${TEN_LOAI[l]} đang chờ.`);
+        // Dọn dẹp như khi dự án chạy hết hàng chờ — chỉ dự án vừa có việc chạy trong lượt hẹn này, không còn việc
+        // chờ / đang chạy, và không đang được bấm Chạy.
+        const daChay = new Set(this.viec.filter((j) => nho(j) && (j.xongLuc || 0) >= x.batDauLuc).map((j) => j.duAn));
+        for (const id of daChay) {
+          if (this.duAnDangChay(id) || this.viec.some((j) => j.duAn === id && (j.trangThai === 'cho' || j.trangThai === 'chay'))) continue;
+          const don = this._canDonDep(id);
+          if (don && this.o.donDep) this._donCho = this._donCho.then(() => this.o.donDep(don)).catch((err) => this.log('error', `❌ Dọn dẹp: ${err.message}`));
+        }
+        this.o.bao();
+      } else if (!ban) {
+        const cho = [...nhamToi].filter(([j]) => nho(j));
+        if (cho.length && cho.every(([, ds]) => !ds.length) && !this.viec.some((j) => nho(j) && j.trangThai === 'chay')) {
+          this.loaiChay.delete(l);
+          this._baoTamDung(cho.map(([j]) => j), `hẹn giờ ${ten}`);
           tamDung = true;
         }
       }

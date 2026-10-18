@@ -7,7 +7,7 @@
 //  + cập nhật. Phần "background" của engine Flow nằm ở src/flow/may-flow.js.
 // ============================================================================
 
-const { app, BrowserWindow, WebContentsView, ipcMain, session, dialog, shell, net } = require('electron');
+const { app, BrowserWindow, WebContentsView, ipcMain, session, dialog, shell, net, powerSaveBlocker } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { spawn, execFile } = require('child_process');
@@ -540,7 +540,7 @@ async function donDep({ muse, flow, duAn }) {
     // dự án sẽ nhớ lại đúng địa chỉ dự án vừa xoá.
     const cuaDuAn = (x) => x.taiKhoanId === tkId && (!duAn || x.duAn === duAn);
     for (let i = 0; i < 20 && dieuPhoi.luong.some(cuaDuAn); i++) await new Promise((r) => setTimeout(r, 500));
-    if (duAn ? dieuPhoi.duAnChay.has(duAn) || dieuPhoi.luong.some(cuaDuAn) : dieuPhoi.dangChay) {
+    if (duAn ? dieuPhoi.duAnDangChay(duAn) || dieuPhoi.luong.some(cuaDuAn) : dieuPhoi.dangChay) {
       log('warning', `⚠ "${tk.ten}": dự án đang chạy lại — bỏ qua tự xoá dự án Flow.`);
       continue;
     }
@@ -628,6 +628,8 @@ const LENH = {
   },
   luuMauPrompt: ({ ds }) => dieuPhoi.luuMauPrompt(ds),
   // 1.3.0: { duAn, ...cài đặt } → lưu vào cài đặt RIÊNG của dự án đó.
+  datHenGio: ({ loai, hen }) => dieuPhoi.datHenGio(loai, hen),
+  dungHen: ({ loai }) => dieuPhoi.dungHen(loai),
   datCaiDat: (c) => { const { duAn, ...m } = c || {}; return dieuPhoi.datCaiDat(m, duAn); },
 
   themTaiKhoan: ({ ten, nen }) => { const a = taiKhoan.them(ten, nen); baoTrangThai(); return a; },
@@ -951,6 +953,19 @@ app.whenReady().then(() => {
   // 1.3.4: RAM từng phần vào nhật ký mỗi 10 phút khi đang chạy (MUSE_RAM_MS đổi nhịp cho bài kiểm).
   setInterval(() => { try { if (dieuPhoi.dangChay || dieuPhoi.luong.length) baoRam(); } catch (_) {} },
     parseInt(process.env.MUSE_RAM_MS, 10) || 10 * 60 * 1000);
+
+  // 1.3.6: có hẹn giờ đang bật (hoặc đang chạy theo hẹn) → giữ máy không tự ngủ, để tới giờ app còn chạy được.
+  // Chỉ chặn máy NGỦ (màn hình vẫn tắt bình thường); tắt hết hẹn thì thôi chặn.
+  let chanNgu = -1;
+  const xetChanNgu = () => {
+    try {
+      const can = Object.values(dieuPhoi.henGio).some((h) => h.bat) || dieuPhoi.loaiChay.size > 0;
+      if (can && chanNgu < 0) { chanNgu = powerSaveBlocker.start('prevent-app-suspension'); log('info', '⏰ Có hẹn giờ chạy: giữ máy không tự ngủ để tới giờ app chạy được.'); }
+      else if (!can && chanNgu >= 0) { powerSaveBlocker.stop(chanNgu); chanNgu = -1; }
+    } catch (_) {}
+  };
+  xetChanNgu();
+  setInterval(xetChanNgu, 15000);
 
   if (!process.env.MUSE_NO_UPDATE_CHECK) {
     setTimeout(() => capNhat.kiemTra({ imLang: true }), 5000);

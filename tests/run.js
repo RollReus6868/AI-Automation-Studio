@@ -155,7 +155,7 @@ function dungDieuPhoi(o = {}) {
     taoLuong: o.taoLuong || (() => ({ ranh: true, dung() {} })), huyLuong: () => {},
     docFile: (p) => ({ ten: path.basename(p), mime: 'image/png', b64: 'AA==' }),
     ghiFile: o.ghiFile || (() => {}), chuyenFile: o.chuyenFile || (() => {}), thuMucRaMacDinh: '/ra', thuMucTam: '/tam',
-    tonTai: o.tonTai || (() => false), donDep: o.donDep, hetLuot: o.hetLuot
+    tonTai: o.tonTai || (() => false), donDep: o.donDep, hetLuot: o.hetLuot, bayGio: o.bayGio
   });
   clearInterval(dp.hen);
   return { dp, tk, store, nhatKy };
@@ -1823,6 +1823,185 @@ testAsync('1.3.4 Store ghi theo nhịp nhipMs (không ghi sớm hơn, vẫn ghi 
   assert.strictEqual(JSON.parse(fs.readFileSync(f, 'utf8')).a, 2, 'tới nhịp thì ghi bản mới nhất');
   fs.rmSync(dir, { recursive: true, force: true });
 });
+
+// ── 1.3.6: Hẹn giờ chạy riêng từng chức năng ────────────────────────────────
+{
+  const HG = require('../src/main/hen-gio');
+  const luc = (s) => new Date(s).getTime();   // giờ máy (không có Z)
+  test('1.3.6 hẹn giờ: chuẩn hoá giờ, khung 22:00→06:00 qua nửa đêm, mỗi lần hẹn chỉ chạy một lần', () => {
+    assert.deepStrictEqual(['7:05', '07h30', '22.00', '24:00', '9:60', 'x', ''].map(HG.chuanGio), ['07:05', '07:30', '22:00', '', '', '', '']);
+    const h = HG.chuanHen({ bat: true, batDau: '22:00', ketThuc: '06:00' });
+    assert.strictEqual(HG.denGioChay(h, luc('2026-10-18T21:59:59')), null, 'chưa tới giờ');
+    const r = HG.denGioChay(h, luc('2026-10-18T22:00:00'));
+    assert.deepStrictEqual([r.khoa, r.den], ['2026-10-18 22:00', luc('2026-10-19T06:00:00')], 'dừng 6 giờ sáng HÔM SAU');
+    assert.strictEqual(HG.denGioChay(h, luc('2026-10-19T03:00:00')).khoa, '2026-10-18 22:00', 'mở app lúc 3 giờ sáng (trong khung) vẫn chạy lần hẹn tối qua');
+    assert.strictEqual(HG.denGioChay(h, luc('2026-10-19T06:00:00')), null, 'hết khung');
+    assert.strictEqual(HG.denGioChay({ ...h, daChay: '2026-10-18 22:00' }, luc('2026-10-18T23:00:00')), null, 'đã chạy lần này thì thôi');
+    assert.strictEqual(HG.denGioChay({ ...h, daChay: '2026-10-18 22:00' }, luc('2026-10-19T22:00:00')).khoa, '2026-10-19 22:00', 'hôm sau chạy tiếp');
+    assert.strictEqual(HG.denGioChay({ ...h, bat: false }, luc('2026-10-18T22:00:00')), null, 'tắt thì không chạy');
+    assert.strictEqual(HG.lanChayToi(h, luc('2026-10-18T12:00:00')), luc('2026-10-18T22:00:00'));
+    assert.strictEqual(HG.lanChayToi({ ...h, daChay: '2026-10-18 22:00' }, luc('2026-10-18T23:00:00')), luc('2026-10-19T22:00:00'));
+    // Cùng ngày: 08:00 → 11:30
+    const s = HG.chuanHen({ bat: true, batDau: '08:00', ketThuc: '11:30' });
+    assert.strictEqual(HG.denGioChay(s, luc('2026-10-18T09:00:00')).den, luc('2026-10-18T11:30:00'));
+  });
+  test('1.3.6 hẹn giờ: không giờ dừng thì chỉ bắt đầu trong 10 phút sau giờ hẹn; "một lần" chỉ tính mốc sau lúc đặt', () => {
+    const h = HG.chuanHen({ bat: true, batDau: '02:00' });
+    assert.strictEqual(HG.denGioChay(h, luc('2026-10-18T02:09:00')).den, 0, 'trễ 9 phút (máy vừa thức) vẫn chạy, chạy tới hết');
+    assert.strictEqual(HG.denGioChay(h, luc('2026-10-18T02:10:00')), null, 'mở app buổi trưa không tự chạy hẹn 2 giờ sáng');
+    assert.strictEqual(HG.denGioChay(h, luc('2026-10-18T12:00:00')), null);
+    const mot = HG.chuanHen({ bat: true, batDau: '22:00', ketThuc: '23:00', lap: 'mot', datLuc: luc('2026-10-18T22:30:00') });
+    assert.strictEqual(HG.denGioChay(mot, luc('2026-10-18T22:31:00')), null, 'đặt "một lần" lúc 22:30 cho mốc 22:00 → không chạy bù mốc đã qua');
+    assert.strictEqual(HG.denGioChay(mot, luc('2026-10-19T22:00:00')).khoa, '2026-10-19 22:00', '→ chạy mốc 22:00 hôm sau');
+    assert.strictEqual(HG.chuanHen({ batDau: '22:00', ketThuc: '22:00' }).ketThuc, '', 'giờ dừng trùng giờ bắt đầu = không có giờ dừng');
+  });
+
+  /** Luồng giả: ghi [loai, duAn, so] mỗi việc chạy; `cham` ms mỗi việc. */
+  const luongHen = (daChay, cham = 8) => (a, stt, duAnId) => ({
+    id: `${a.id}-${stt}`, nen: a.nen, duAn: duAnId, ranh: true, viec: null, soDung: 0,
+    dung() { this.soDung++; this.biDung = true; },
+    async chay(j) {
+      this.ranh = false; this.viec = j; this.biDung = false; daChay.push([j.loai, j.duAn, j.so]);
+      await new Promise((r) => setTimeout(r, cham)); this.ranh = true; this.viec = null;
+      if (this.biDung) return { ok: false, dung: true };   // như luồng thật: bị dừng → việc về hàng chờ
+      return { ok: true, files: [{ mime: j.loai === 'nhac' ? 'audio/mpeg' : j.loai === 'video' ? 'video/mp4' : 'image/png', b64: 'AA==' }] };
+    }
+  });
+  const chayVong = async (dp, n = 120) => { for (let i = 0; i < n; i++) { dp._vong(); await new Promise((r) => setTimeout(r, 10)); } };
+
+  testAsync('1.3.6 hẹn giờ Tạo ảnh: tới giờ chỉ chạy việc ẢNH (mọi dự án) + video nối từ ảnh; video / nhạc khác giữ Chờ; chạy hết thì xong lượt', async () => {
+    const daChay = [];
+    let gio = luc('2026-10-18T21:59:00');
+    const { dp, nhatKy } = dungDieuPhoi({ taoLuong: luongHen(daChay), bayGio: () => gio });
+    dp.datCaiDat({ nghiGiuaLanGui: 0, luongMoiTK: 2 });
+    const b = dp.taoDuAn('B', null, null, 'mac-dinh');
+    dp.them({ loai: 'anh', prompts: ['a1', 'a2'], chuoiVideo: { prompt: 'zoom' } });
+    dp.them({ duAn: b.id, loai: 'anh', prompts: ['b1'] });
+    dp.them({ loai: 'video', prompts: ['v1'] });
+    dp.them({ loai: 'nhac', prompts: ['n1'] });
+    assert.strictEqual(dp.datHenGio('anh', { bat: true, batDau: '22:00' }).ok, true);
+    await chayVong(dp, 10);
+    assert.strictEqual(daChay.length, 0, 'chưa tới giờ thì chưa chạy gì');
+    assert.strictEqual(dp.dangChay, false);
+    gio = luc('2026-10-18T22:00:05');
+    await chayVong(dp);
+    assert.deepStrictEqual(daChay.filter((x) => x[0] === 'anh').map((x) => `${x[1]}#${x[2]}`).sort(), ['b#1', 'mac-dinh#1', 'mac-dinh#2'], 'ảnh của cả hai dự án');
+    assert.strictEqual(daChay.filter((x) => x[0] === 'video').length, 2, 'đúng 2 video nối từ 2 ảnh có "tự tạo video"');
+    assert.ok(daChay.every((x) => x[0] !== 'nhac'), 'nhạc không chạy');
+    const v1 = dp.viec.find((j) => j.loai === 'video' && j.prompt === 'v1');
+    assert.strictEqual(v1.trangThai, 'cho', 'video nhập tay (không nối từ ảnh) chờ hẹn của Tạo video');
+    assert.strictEqual(dp.viec.find((j) => j.loai === 'nhac').trangThai, 'cho');
+    assert.strictEqual(dp.loaiChay.size, 0, 'chạy hết thì xong lượt hẹn');
+    assert.strictEqual(dp.duAnChay.size, 0, 'không bật nút Chạy dự án');
+    assert.ok(nhatKy.some((x) => /⏰ Đến giờ hẹn 22:00: bắt đầu Tạo ảnh — 3 việc đang chờ, mọi dự án, chạy tới hết/.test(x)), nhatKy.join('\n'));
+    assert.ok(nhatKy.some((x) => /✅ Hẹn giờ Tạo ảnh: đã chạy hết việc ảnh đang chờ/.test(x)));
+    assert.ok(nhatKy.some((x) => /Đã chạy hết hàng chờ/.test(x)), 'hết mọi thứ → báo hết lượt như khi bấm Chạy (tắt máy khi xong dùng được)');
+    // Cùng ngày: thêm ảnh mới → không chạy lại; hôm sau đúng giờ → chạy.
+    dp.them({ loai: 'anh', prompts: ['moi'] });
+    gio = luc('2026-10-18T22:05:00');
+    await chayVong(dp, 10);
+    assert.strictEqual(dp.viec.find((j) => j.prompt === 'moi').trangThai, 'cho', 'mỗi lần hẹn chỉ chạy một lần');
+    gio = luc('2026-10-19T22:00:00');
+    await chayVong(dp, 40);
+    assert.strictEqual(dp.viec.find((j) => j.prompt === 'moi').trangThai, 'xong', 'hôm sau chạy tiếp');
+  });
+
+  testAsync('1.3.6 hẹn giờ độc lập: ảnh 22:00, nhạc 22:30 (chỉ dự án B) — mỗi chức năng chạy đúng giờ của nó', async () => {
+    const daChay = [];
+    let gio = luc('2026-10-18T22:00:00');
+    const { dp } = dungDieuPhoi({ taoLuong: luongHen(daChay), bayGio: () => gio });
+    dp.datCaiDat({ nghiGiuaLanGui: 0 });
+    const b = dp.taoDuAn('B', null, null, 'mac-dinh');
+    dp.them({ loai: 'anh', prompts: ['a1'] });
+    dp.them({ loai: 'nhac', prompts: ['n-macdinh'] });
+    dp.them({ duAn: b.id, loai: 'nhac', prompts: ['n-b'] });
+    dp.datHenGio('anh', { bat: true, batDau: '22:00' });
+    dp.datHenGio('nhac', { bat: true, batDau: '22:30', duAn: b.id });
+    await chayVong(dp, 40);
+    assert.deepStrictEqual(daChay.map((x) => x[0]), ['anh'], '22:00: chỉ ảnh');
+    gio = luc('2026-10-18T22:30:00');
+    await chayVong(dp, 40);
+    assert.deepStrictEqual(daChay.map((x) => `${x[0]}:${x[1]}`), ['anh:mac-dinh', 'nhac:b'], '22:30: nhạc của dự án B, nhạc dự án khác vẫn chờ');
+    assert.strictEqual(dp.viec.find((j) => j.prompt === 'n-macdinh').trangThai, 'cho');
+  });
+
+  testAsync('1.3.6 tới giờ dừng → luồng đang làm việc theo hẹn dừng, việc còn lại giữ Chờ; nút Dừng dự án bỏ dự án khỏi lượt hẹn', async () => {
+    const daChay = [];
+    let gio = luc('2026-10-18T22:00:00');
+    const tao = luongHen(daChay, 60);
+    const ds = [];
+    const { dp, nhatKy } = dungDieuPhoi({ taoLuong: (a, s, d) => { const l = tao(a, s, d); ds.push(l); return l; }, bayGio: () => gio });
+    dp.datCaiDat({ nghiGiuaLanGui: 0, luongMoiTK: 1 });
+    dp.them({ loai: 'video', prompts: ['1', '2', '3', '4', '5', '6'] });
+    dp.datHenGio('video', { bat: true, batDau: '22:00', ketThuc: '22:10' });
+    await chayVong(dp, 3);
+    assert.ok(dp.loaiChay.has('video') && dp.dangChay);
+    assert.strictEqual(dp.duAnDangChay('mac-dinh'), true);
+    dp.datHenGio('video', { ketThuc: '23:00' });
+    assert.strictEqual(dp.loaiChay.get('video').den, luc('2026-10-18T23:00:00'), 'đổi giờ dừng lúc đang chạy → áp ngay');
+    dp.datHenGio('video', { ketThuc: '22:10' });
+    gio = luc('2026-10-18T22:10:00');
+    dp._vong();
+    assert.strictEqual(dp.loaiChay.size, 0);
+    assert.ok(ds.some((l) => l.soDung === 1), 'luồng đang chạy được bảo dừng');
+    assert.ok(nhatKy.some((x) => /⏰ Hết giờ hẹn Tạo video \(22:10\) — 1 luồng đang chạy dừng lại/.test(x)), nhatKy.join('\n'));
+    await chayVong(dp, 20);
+    assert.ok(dp.viec.filter((j) => j.trangThai === 'cho').length >= 4, 'việc chưa chạy giữ Chờ');
+    // Dừng dự án giữa lượt hẹn → dự án đó thôi chạy trong lượt này.
+    const b = dp.taoDuAn('B', null, null, 'mac-dinh');
+    dp.them({ duAn: b.id, loai: 'anh', prompts: ['b1', 'b2'] });
+    dp.them({ loai: 'anh', prompts: ['m1'] });
+    dp.datHenGio('anh', { bat: true, batDau: '22:10' });
+    dp._vong();
+    dp.dungDuAn(b.id);
+    await chayVong(dp, 30);
+    assert.ok(dp.viec.filter((j) => j.duAn === b.id && j.loai === 'anh').every((j) => j.trangThai === 'cho'), 'dự án B bị Dừng thì không chạy theo hẹn');
+    assert.strictEqual(dp.viec.find((j) => j.prompt === 'm1').trangThai, 'xong');
+  });
+
+  testAsync('1.3.6 hẹn giờ với Flow: mẻ Flow chỉ gom việc ẢNH đang theo hẹn, video Flow cùng dự án không bị kéo theo', async () => {
+    const daChay = [];
+    let gio = luc('2026-10-18T22:00:00');
+    const { dp } = dungDieuPhoi({ taoLuong: luongGiaHaiNen(daChay), bayGio: () => gio, tonTai: () => false });
+    dp.datCaiDat({ nghiGiuaLanGui: 0, flow: { meToiDa: 5 } });
+    dp.them({ nen: 'flow', loai: 'anh', tyLe: '9:16', prompts: ['1', '2', '3'] });
+    dp.them({ nen: 'flow', loai: 'video', tyLe: '9:16', prompts: ['v'] });
+    dp.datHenGio('anh', { bat: true, batDau: '22:00' });
+    await chayVong(dp, 40);
+    assert.deepStrictEqual(daChay.map((x) => x.so), [[1, 2, 3]], 'một mẻ 3 ảnh');
+    assert.strictEqual(dp.viec.find((j) => j.loai === 'video').trangThai, 'cho');
+  });
+  test('1.3.6 hẹn "một lần" tự tắt sau khi chạy; không có việc chờ → bỏ qua có báo; giờ sai → báo lỗi; xoá dự án của hẹn → tắt hẹn', () => {
+    let gio = luc('2026-10-18T07:00:00');
+    const { dp, nhatKy, store } = dungDieuPhoi({ bayGio: () => gio });
+    assert.strictEqual(dp.datHenGio('anh', { bat: true, batDau: '25:00' }).ok, false);
+    assert.strictEqual(dp.datHenGio('anh', { bat: true, batDau: '07:00', ketThuc: 'abc' }).ok, false);
+    assert.strictEqual(dp.datHenGio('xyz', { bat: true }).ok, false);
+    dp.datHenGio('nhac', { bat: true, batDau: '07:00', lap: 'mot' });
+    assert.strictEqual(dp.henGio.nhac.bat, false, 'một lần → tắt sau khi tới giờ');
+    assert.ok(nhatKy.some((x) => /⏰ Hẹn giờ Tạo nhạc \(07:00\): không có việc nhạc nào đang chờ \(mọi dự án\) — bỏ qua lần này/.test(x)), nhatKy.join('\n'));
+    assert.strictEqual(dp.loaiChay.size, 0);
+    const b = dp.taoDuAn('B', null, null, 'mac-dinh');
+    dp.datHenGio('video', { bat: true, batDau: '23:00', duAn: b.id });
+    assert.strictEqual(store.get(['henGio']).henGio.video.duAn, b.id, 'hẹn giờ lưu xuống đĩa');
+    dp.xoaDuAn(b.id);
+    assert.deepStrictEqual([dp.henGio.video.bat, dp.henGio.video.duAn], [false, '']);
+    const st = dp.trangThai();
+    assert.ok(st.henGio.anh && 'lanToi' in st.henGio.anh && typeof st.henChay === 'object');
+    // Mở lại app: hẹn giữ nguyên.
+    const dp2 = dungDieuPhoi({ duLieu: store.get(['duAn', 'viec', 'caiDat', 'henGio']), bayGio: () => gio }).dp;
+    assert.strictEqual(dp2.henGio.nhac.daChay, '2026-10-18 07:00');
+  });
+
+  test('1.3.6 hẹn giờ: giao diện có trang Hẹn giờ 3 thẻ, lệnh có trong LENH, giữ máy không ngủ khi có hẹn', () => {
+    const html = docNguon('src/ui/index.html'), m = docNguon('main.js'), ui = docNguon('src/ui/app.js');
+    assert.ok(/data-trang="hengio"/.test(html) && /id="trang-hengio"/.test(html));
+    assert.deepStrictEqual([...html.matchAll(/class="the-cai the-hen" data-loai="(\w+)"/g)].map((x) => x[1]), ['anh', 'video', 'nhac']);
+    assert.ok(/datHenGio: \(\{ loai, hen \}\) => dieuPhoi\.datHenGio\(loai, hen\)/.test(m) && /dungHen: \(\{ loai \}\) => dieuPhoi\.dungHen\(loai\)/.test(m));
+    assert.ok(/powerSaveBlocker\.start\('prevent-app-suspension'\)/.test(m) && /powerSaveBlocker\.stop\(chanNgu\)/.test(m));
+    assert.ok(/'hengio', 'nhanvat'/.test(ui) && /api\.call\('datHenGio'/.test(ui));
+  });
+}
 
 Promise.all(choAsync).then(() => {
   console.log('\n──────────────────────────────────────────────');

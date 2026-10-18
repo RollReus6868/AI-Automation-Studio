@@ -1,4 +1,19 @@
-# AI Automation Studio 1.3.5
+# AI Automation Studio 1.3.6
+
+- **Hẹn giờ chạy, riêng cho từng chức năng.** Mục mới **Hẹn giờ** ở thanh bên trái có ba thẻ: **Tạo ảnh**, **Tạo video**, **Tạo nhạc**. Mỗi thẻ đặt riêng:
+  - **Giờ bắt đầu**: tới giờ, app tự chạy mọi việc **đang chờ** của chức năng đó (giống bấm Chạy, nhưng chỉ chạy loại việc đó). Ví dụ hẹn Tạo ảnh 22:00 thì chỉ ảnh chạy; video và nhạc vẫn chờ hẹn của chúng.
+  - **Giờ dừng** (tuỳ chọn): tới giờ thì app dừng, việc đang dở về hàng chờ. Để trống thì chạy tới hết hàng chờ. Khung giờ qua đêm được (vd 22:00 → 06:00).
+  - **Lặp lại**: mỗi ngày, hoặc chỉ một lần (chạy xong thì hẹn tự tắt).
+  - **Chạy việc của**: mọi dự án, hoặc một dự án.
+  - Ảnh có bật *Ảnh xong → tự tạo video* thì video nối từ ảnh chạy tiếp ngay trong lượt hẹn của Tạo ảnh.
+  - Thẻ hiện *Lần tới: 22:00 hôm nay* hoặc *Đang chạy theo hẹn · dừng 06:00*, có nút **Dừng lượt đang chạy**. Thanh trên cùng có chip ⏰ cho biết hẹn sắp tới; bấm vào để mở mục Hẹn giờ.
+  - Nhật ký ghi lúc bắt đầu / dừng / chạy hết theo hẹn (dòng ⏰).
+- Cách dùng: thêm việc bằng **Tạo & chạy → Chỉ thêm vào hàng đợi (chưa chạy)**, rồi đặt hẹn ở mục Hẹn giờ. App phải **đang mở** (thu nhỏ được) và máy **đang bật**. Khi có hẹn đang bật, app giữ máy không tự ngủ (màn hình vẫn tắt bình thường). Nếu máy ngủ / app mở lại trễ quá 10 phút sau giờ hẹn mà không đặt giờ dừng, lần đó được bỏ qua để app không tự chạy bất ngờ; có giờ dừng thì app mở lại trong khung giờ vẫn chạy.
+- Các phần khác giữ nguyên: nút Chạy / Dừng dự án, chạy từng việc, cài đặt từng dự án vẫn như cũ. Bấm *Dừng dự án* trong lúc đang chạy theo hẹn thì dự án đó thôi chạy ở lượt hẹn này.
+
+Lưu ý: đã kiểm bằng đồng hồ giả (ảnh / video / nhạc, Muse / Flow / Suno giả, hai dự án, giờ dừng, qua nửa đêm), chưa chạy hẹn giờ trên máy Windows thật.
+
+## Bản 1.3.5
 
 - **Tải video Flow chỉ tải đúng video của việc đó** (nhật ký 18/10/2026 18:09–18:11: *"[flow7] [1] 🔗 Đã bốc 11 thẻ từ bộ lọc Search"* rồi tải lần lượt `v964_1` … `v964_8`, mỗi file khoảng 10 giây). Công tắc *Thêm số thứ tự vào đầu câu lệnh gửi Flow* vẫn chạy, nhưng số đó là số thứ tự trong **mẻ**. App giao Flow mỗi mẻ 1 prompt, nên mọi prompt đều mang số **"1."**. Video làm từ ảnh lại dùng chung một prompt, nên khi tải, ô Tìm kiếm của Flow với chữ *"1. Animate this cartoon image…"* bắt cả mọi video cũ trong dự án. Giờ app gắn **số của việc** vào đầu prompt, ví dụ *"#964. Animate this cartoon image…"*, và khi tải, Flow chỉ tìm đúng *"#964. …"*, nên ra đúng thẻ của việc đó. Dấu **#** để số không lẫn nhau (*"#64."* không nằm trong *"#964."*). Số này cũng là số trong tên trên Flow (`…_v964`) và cột **#** trong hàng đợi của app.
   - Công tắc nằm ở *Cài đặt → Google Flow → Thêm số thứ tự vào đầu câu lệnh gửi Flow* (bật sẵn). Tắt thì app không gắn số.

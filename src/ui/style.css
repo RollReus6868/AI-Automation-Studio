@@ -141,7 +141,7 @@ code { background: var(--the-hover); padding: 1px 6px; border-radius: 6px; font-
 .phan-doan button { padding: 8px; border-radius: 9px; color: var(--chu-phu); font-weight: 600; border: 1px solid transparent; }
 .phan-doan button.on { color: #fff; background: var(--tim-nen); border-color: rgba(179, 140, 255, .45); }
 .o-prompt { position: relative; }
-textarea, input[type=text], input[type=number], input:not([type]), select {
+textarea, input[type=text], input[type=number], input:not([type]), input[type=time], select {
   width: 100%; background: rgba(0, 0, 0, .25); border: 1px solid var(--vien-dam); border-radius: var(--bo); padding: 9px 11px; outline: none; }
 textarea:focus, input:focus, select:focus { border-color: rgba(179, 140, 255, .6); box-shadow: 0 0 0 3px rgba(179, 140, 255, .12); }
 select option { background: var(--panel-dac); }
@@ -439,3 +439,17 @@ body.trang-nhac .khong-nhac { display: none !important; }
 #nenTk { grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 4px 0 10px; }
 #nenTk .dem-nen { display: inline-block; min-width: 18px; padding: 0 5px; margin-left: 4px; border-radius: 9px; background: rgba(255, 255, 255, .12); font-size: 11px; }
 #dsTaiKhoan > .trong { padding: 24px; text-align: center; color: var(--chu-phu); }
+
+/* 1.3.6 — Hẹn giờ chạy */
+.chip-hen { cursor: pointer; }
+.chip-hen:hover { color: var(--chu); }
+.chip-hen.chay { color: var(--xanh); border-color: rgba(52, 211, 153, .35); }
+.the-hen .trang-hen { margin-left: auto; font-size: 12px; font-weight: 600; color: var(--chu-mo); }
+.the-hen .trang-hen.bat { color: var(--vang); }
+.the-hen .trang-hen.chay { color: var(--xanh); }
+.the-hen input[type="time"] { color-scheme: dark; display: block; }
+.the-hen input[type="time"]::-webkit-calendar-picker-indicator { cursor: pointer; opacity: .7; }
+.the-hen .o-gio { display: flex; align-items: center; gap: 8px; margin-top: 5px; }
+.the-hen .o-gio input { margin-top: 0; flex: 1; min-width: 0; }
+.the-hen .dong-o { flex-wrap: wrap; }
+.the-hen.tat .luoi-3, .the-hen.tat > label { opacity: .55; }
