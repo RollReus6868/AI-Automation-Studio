@@ -17,6 +17,7 @@
                  link media đổi chữ ký) — kiểu khó nhất
   ?tre=ms      kết quả tìm hiện sau chừng ấy ms
   ?anh=1       ảnh thay vì video
+  ?so=viec     1.3.5: prompt mang số VIỆC "#<số>. " (app tự gắn) thay vì số mẻ "1. " của engine
   Mỗi thẻ có ảnh đại diện chung (avatar.png) — dấu chung, không được dùng để nhận thẻ.
 -->
 <div class="thanh"><form><i class="google-symbols">search</i><input type="text" id="tim" placeholder="Tìm kiếm"></form></div>
@@ -54,11 +55,14 @@
     ds.push({ chu, ma, g });
     return g;
   }
-  for (let i = 1; i <= CU; i++) themLuoi(`1. ${PROMPT}`, [uuid(i)]);
+  // ?so=viec (1.3.5): app gắn SỐ VIỆC "#<số>. " vào đầu prompt — video cũ mang #1…#CU, lần tạo mới mang #(900+so).
+  const SO_VIEC = q.get('so') === 'viec';
+  const chuLuoi = (soMe, soViec) => (SO_VIEC ? `#${soViec}. ${PROMPT}` : `${soMe}. ${PROMPT}`);
+  for (let i = 1; i <= CU; i++) themLuoi(chuLuoi(1, i), [uuid(i)]);
   // Lưới khác prompt — không bao giờ khớp ô tìm.
   themLuoi('1. A completely different prompt about mountains', [uuid(500)]);
   // Gọi từ bài kiểm thử: thêm lưới của lần tạo mới (như Flow sau khi bấm Tạo).
-  window.__taoMoi = (so = 1, ma = [uuid(900 + so)]) => themLuoi(`${so}. ${PROMPT}`, ma);
+  window.__taoMoi = (so = 1, ma = [uuid(900 + so)]) => themLuoi(chuLuoi(so, 900 + so), ma);
 
   let henTim = 0, dangTim = '';
   function locTheo(chu) {

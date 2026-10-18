@@ -1,7 +1,7 @@
 {
   "name": "ai-automation-studio",
   "productName": "AI Automation Studio",
-  "version": "1.3.4",
+  "version": "1.3.5",
   "description": "Tool desktop gop Muse Automation Studio va Flow Automation Studio: mot hang doi chung, tu dong qua lai giua Google Flow va muse.ai",
   "main": "main.js",
   "author": "RollReus6868",

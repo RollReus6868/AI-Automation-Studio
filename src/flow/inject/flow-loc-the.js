@@ -90,7 +90,7 @@
         var c = (ic.textContent || '').trim().toLowerCase(); return c === 'search' || c === 'arrow_back';
       })) return o;
     }
-    for (var j = ds.length - 1; j >= 0; j--) if (/^\d+\.\s\S/.test(ds[j].value || '')) return ds[j];
+    for (var j = ds.length - 1; j >= 0; j--) if (/^#?\d+\.\s\S/.test(ds[j].value || '')) return ds[j];
     return null;
   }
 

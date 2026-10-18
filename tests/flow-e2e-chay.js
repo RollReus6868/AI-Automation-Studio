@@ -102,7 +102,9 @@ module.exports = function e2eFlow({ win, app, LENH, dieuPhoi, taiKhoan }) {
       kiem(up2.length === 1 && up2[0].d.names.length === 1 && /^data:image\//.test(up2[0].d.dataUrl[0]), 'ảnh Muse được tải lên kho Flow (1 ảnh, dạng data URL)');
       const ma2 = up2[0] ? up2[0].d.names[0].replace(/\.[^.]+$/, '') : '?';
       const p2 = st2[0] ? st2[0].d.prompts[0] : '';
-      kiem(st2.length === 1 && p2 === `sóng vỗ @${ma2}`, `prompt video gửi Flow kèm @tên ảnh ("${p2}")`);
+      // 1.3.5: app gắn số VIỆC "#<số>. " vào đầu prompt (engine không tự đánh số theo mẻ nữa).
+      kiem(st2.length === 1 && vid2 && p2 === `#${vid2.so}. sóng vỗ @${ma2}`, `prompt video gửi Flow: số việc + @tên ảnh ("${p2}")`);
+      kiem(st2[0] && st2[0].d.settings.addIndex === false, 'engine không tự gắn số mẻ ("1.")');
       const s2 = st2[0] ? st2[0].d.settings : {};
       kiem(s2.runMode === 'video' && s2.charSync === true && s2.keyframeSync === false && s2.aspectRatio === '16:9',
         `mẻ video: chế độ video, Character Sync bật, khung hình tắt, tỷ lệ theo ảnh (${s2.aspectRatio})`);
@@ -121,7 +123,7 @@ module.exports = function e2eFlow({ win, app, LENH, dieuPhoi, taiKhoan }) {
       const st3 = g3.filter((x) => x.loai === 'start');
       kiem(vid3 && vid3.trangThai === 'xong' && vid3.nen === 'flow', 'video Flow xong');
       kiem(!g3.some((x) => x.loai === 'upload'), 'không tải ảnh lên lại (ảnh đã có trên Flow của tài khoản này)');
-      kiem(st3.length === 2 && st3[1].d.prompts[0] === `mây bay @${anh3.flowTen && anh3.flowTen.ten}`,
+      kiem(st3.length === 2 && vid3 && st3[1].d.prompts[0] === `#${vid3.so}. mây bay @${anh3.flowTen && anh3.flowTen.ten}`,
         `prompt video dùng đúng tên ảnh trên Flow (${st3[1] && st3[1].d.prompts[0]})`);
       if (anh3.nen !== 'flow' || st3.length !== 2) dongNhatKy(nk3);   // CI đỏ mục này → có nhật ký để truy
 
@@ -303,7 +305,7 @@ module.exports = function e2eFlow({ win, app, LENH, dieuPhoi, taiKhoan }) {
         `app bấm "Add media" → "Upload image", trang Flow nhận đúng 1 ảnh thật (${JSON.stringify(len11.map((x) => x.d.files))})`);
       kiem(nk11.some((c) => /Đã đưa 1 ảnh lên Flow \(bấm Add media → Upload image\)/.test(c)), 'nhật ký ghi cách đã tải ảnh lên');
       const st11 = g11.filter((x) => x.loai === 'start');
-      kiem(st11.length === 1 && st11[0].d.prompts[0] === `TU_CHOI sóng biển @${ma11}`, `prompt video gửi Flow kèm @tên ảnh vừa tải lên ("${st11[0] ? st11[0].d.prompts[0] : ''}")`);
+      kiem(st11.length === 1 && tc && st11[0].d.prompts[0] === `#${tc.so}. TU_CHOI sóng biển @${ma11}`, `prompt video gửi Flow kèm @tên ảnh vừa tải lên ("${st11[0] ? st11[0].d.prompts[0] : ''}")`);
       await session.fromPartition('persist:flow-flow-1').cookies.remove(process.env.MUSE_URL, 'flow_upload_moi');
     } catch (err) {
       ghi('LỖI KỊCH BẢN: ' + err.stack);
