@@ -37,6 +37,7 @@
         <button class="nut-icon" id="nutThemDuAn" title="Dự án mới"><i data-icon="plus"></i></button>
         <button class="nut-icon" id="nutMoThuMucDuAn" title="Mở thư mục kết quả của dự án"><i data-icon="folder"></i></button>
         <button class="nut-icon" id="nutMenuDuAn" title="Đổi tên / xoá dự án"><i data-icon="ellipsis-vertical"></i></button>
+        <span class="chip chip-dong-ho" id="chipDongHo" hidden><i data-icon="timer"></i><span></span></span>
         <div class="menu menu-phai" id="menuDuAnThem" hidden>
           <button data-lenh="taiKhoan"><i data-icon="users"></i>Tài khoản chạy dự án…</button>
           <button data-lenh="chayHet"><i data-icon="play"></i>Chạy tất cả dự án</button>
@@ -205,6 +206,10 @@
           <button class="nut-vien nho" id="chonChay" title="Chạy ngay các việc đã chọn (việc đã dừng / đang chờ / lỗi)"><i data-icon="play"></i>Chạy</button>
           <button class="nut-vien nho" id="chonDung" title="Dừng riêng các việc đã chọn — việc khác vẫn chạy"><i data-icon="square"></i>Dừng</button>
           <button class="nut-vien nho" id="chonChayLai"><i data-icon="rotate-ccw"></i>Tạo lại</button>
+          <button class="nut-vien nho" id="chonDoiPrompt" title="Đổi prompt của mọi việc đã chọn (thay hẳn, hoặc tìm và thay một đoạn chữ)"><i data-icon="pencil"></i>Đổi prompt</button>
+          <button class="nut-vien nho khong-nhac" id="chonSangMuse" title="Chuyển các việc đã chọn sang chạy ở Muse ngay"><i data-icon="arrow-left-right"></i>Sang Muse</button>
+          <button class="nut-vien nho khong-nhac" id="chonSangFlow" title="Chuyển các việc đã chọn sang chạy ở Google Flow ngay"><i data-icon="arrow-left-right"></i>Sang Flow</button>
+          <button class="nut-vien nho khong-nhac" id="chonDrive" title="Đưa kết quả của các việc đã xong lên Google Drive (Cài đặt → Google Drive)"><i data-icon="cloud-upload"></i>Lên Drive</button>
           <button class="nut-vien nho khong-nhac" id="chonXoaChat" title="Xoá đoạn chat trên muse.ai của các việc đã chọn"><i data-icon="message-square-x"></i>Xoá chat Muse</button>
           <button class="nut-vien nho do" id="chonXoa"><i data-icon="trash-2"></i>Xoá</button>
           <button class="nut-vien nho" id="chonBo"><i data-icon="x"></i>Bỏ chọn</button>
@@ -254,10 +259,12 @@
         <div class="panel-dau">
           <h2><i data-icon="contact"></i>Tài khoản</h2>
           <div class="hang-nut-dau">
+            <button class="nut-vien nho" id="nutChayLaiTk" title="Tài khoản đang nghỉ / đỏ vì lỗi mà bạn đã sửa xong: cho nhận việc lại ngay, khỏi chờ hết giờ nghỉ"><i data-icon="zap"></i>Chạy lại TK đang nghỉ</button>
             <button class="nut-vien nho chi-muse" id="nutCapNhatToken" title="Đọc lại mức dùng token của mọi tài khoản Muse"><i data-icon="refresh-cw"></i>Cập nhật token</button>
             <button class="nut-gradient nho chi-muse" id="nutThemTK"><i data-icon="plus"></i>Thêm Muse</button>
             <button class="nut-gradient nho chi-flow" id="nutThemTKFlow"><i data-icon="plus"></i>Thêm Flow</button>
             <button class="nut-gradient nho chi-suno" id="nutThemTKSuno"><i data-icon="plus"></i>Thêm Suno</button>
+            <button class="nut-gradient nho chi-drive" id="nutThemTKDrive"><i data-icon="plus"></i>Thêm Drive</button>
           </div>
         </div>
         <p class="mo">Mỗi tài khoản đăng nhập riêng một lần trong khung bên phải, app nhớ phiên (app không bao giờ hỏi hay lưu mật khẩu). Mỗi dự án chọn đích danh tài khoản nào <b>Chạy</b> (chạy cùng lúc), tài khoản nào <b>Dự phòng</b> và tài khoản nào <b>Không dùng</b> cho từng nơi chạy — bấm nút tài khoản cạnh tên dự án. Muse: <b id="soLuongTK">3</b> luồng mỗi tài khoản; Flow: <b id="soTabFlow">1</b> tab mỗi tài khoản; Suno: 1 luồng mỗi tài khoản. Việc lỗi ở tài khoản chính thì chuyển ngay sang dự phòng; tài khoản Suno hết lượt tạo / tải thì bài được tạo lại ở tài khoản Suno dự phòng. Viền <b style="color:#16a34a">xanh</b> = chạy được, viền <b style="color:#dc2626">đỏ</b> = đang lỗi / nghỉ (dòng dưới tên ghi lý do).</p>
@@ -265,6 +272,7 @@
           <button data-v="muse" class="on">Muse <span class="dem-nen" data-dem="muse"></span></button>
           <button data-v="flow">Flow <span class="dem-nen" data-dem="flow"></span></button>
           <button data-v="suno">Suno <span class="dem-nen" data-dem="suno"></span></button>
+          <button data-v="drive" title="Tài khoản Google chỉ để tải ảnh / video lên Google Drive (Cài đặt → Google Drive)">Drive <span class="dem-nen" data-dem="drive"></span></button>
         </div>
         <div class="cuon" id="dsTaiKhoan"></div>
       </section>
@@ -313,6 +321,12 @@
           <li><b>Muse ⇄ Flow:</b> Muse từ chối một ảnh ("Mình không thể tạo video từ ảnh này") → riêng ảnh đó sang Flow tạo video, ảnh khác vẫn ở Muse. Tài khoản lỗi thì Dự phòng cùng bên vào thay; hết dự phòng mà còn thiếu so với số tài khoản Chạy (vd chạy 5 Flow, chỉ còn 1 Flow chạy được) → Muse chạy thêm 4 tài khoản cho đủ 5, Flow có lại tài khoản thì việc chưa chạy quay về Flow. Bên kia cần có tài khoản đã đăng nhập. Tắt ở Cài đặt → Chạy.</li>
           <li><b>Tạo nhạc (Suno):</b> Tài khoản → <i>Thêm Suno</i> → <i>Đăng nhập</i> → đăng nhập suno.com → <i>Xong</i>. Trang <i>Tạo nhạc</i>: mỗi dòng một prompt mô tả phong cách (vd <code>lofi chill piano, mưa nhẹ, 80 bpm</code>). App mở Create ở chế độ Advanced, điền prompt vào ô <i>Styles</i>, để trống lời (nhạc không lời), bấm Create. Suno free ra 4 bài: app chỉ xét 2 bài đầu và tải bản MP3 của bài <b>dài hơn</b>, đặt tên theo mẫu (mặc định <code>{stt}</code> → <code>001.mp3</code>) vào thư mục chọn ở Cài đặt nâng cao của trang Tạo nhạc. Mỗi tài khoản Suno làm <b>từng prompt một</b>: chờ bài tạo xong → bấm <i>⋯</i> cạnh bài → <i>Download</i> → chọn MP3 → <i>Unlock &amp; Download</i> (trừ 1 lượt tải của tài khoản) → chờ Suno <i>Preparing…</i> rồi tự tải file, xong mới gửi prompt kế tiếp. Tải hỏng thì app tải lại đúng bài đó (tối đa 3 lần), <b>không gửi lại prompt</b>. Chạy song song với ảnh / video.</li>
           <li><b>Suno hết lượt:</b> tài khoản Suno báo hết credit (nút Create ghi <i>Create again in …</i>) / hết lượt tải thì bài đó được tạo lại và tải ở tài khoản Suno dự phòng; tài khoản hết lượt nghỉ 6 giờ (bấm <i>Kiểm tra</i> ở tài khoản đó để cho chạy lại sớm). Suno hỏi captcha thì cửa sổ Suno hiện lên để bạn tự giải — app không giải hộ. Đăng nhập Suno bằng Google mà Google báo <i>Couldn't sign you in</i>: bấm <i>Try again</i>; vẫn không được thì gửi ảnh chụp cho người phát triển.</li>
+          <li><b>Google Drive (1.4.0), cách 1 (chép vào thư mục Drive trên máy):</b> cài <i>Google Drive cho máy tính</i>, đăng nhập Drive. Cài đặt → <i>Google Drive</i> → <i>Cách đưa lên: Chép vào thư mục…</i> → <i>Tự tìm</i> (hoặc <i>Chọn…</i> ổ <code>G:\My Drive</code>) → bật <i>tự đưa lên Google Drive</i> → <i>Lưu cài đặt</i>.</li>
+          <li><b>Google Drive, cách 2 (tải thẳng lên drive.google.com):</b> Tài khoản → thẻ <i>Drive</i> → <i>Thêm Drive</i> → <i>Đăng nhập</i> Google trong khung bên phải → <i>Xong</i>. Cài đặt → <i>Google Drive</i> → <i>Cách đưa lên: Tải thẳng lên…</i> → chọn tài khoản → bật <i>tự đưa lên</i> → <i>Lưu cài đặt</i>. App mở Drive ở cửa sổ ẩn, tự tạo thư mục và tải từng file. Cả hai cách: ảnh vào <code>Tên dự án/images</code>, video vào <code>Tên dự án/Videos</code>; việc xong từ trước: chọn việc → <i>Lên Drive</i>. Tải lên hỏng thì app lưu trang Drive vào <code>Tài liệu/AI Automation Studio/chan-doan-drive</code> — gửi tệp đó kèm nhật ký.</li>
+          <li><b>Đổi prompt nhiều việc:</b> tick <i>Chọn hết</i> (hoặc chọn vài dòng) → <i>Đổi prompt</i>: thay hẳn bằng prompt mới, hoặc tìm và thay một đoạn chữ; trang Tạo ảnh đổi được cả prompt video sẽ tự tạo từ ảnh.</li>
+          <li><b>Đổi ngay sang Muse / Flow:</b> nút <i>⋮</i> ở mỗi dòng → <i>Đổi sang Flow / Muse &amp; chạy ngay</i>; chọn nhiều dòng → <i>Sang Muse</i> / <i>Sang Flow</i>. Việc đang chạy dừng ở bên cũ rồi chạy ở bên mới; việc đã xong thì được tạo lại ở bên mới.</li>
+          <li><b>Đồng hồ dự án:</b> cạnh tên dự án là thời gian dự án đã chạy (lượt này) và dự đoán còn bao lâu nữa (tính theo tốc độ thật của lượt đang chạy).</li>
+          <li><b>Chạy lại tài khoản đang nghỉ:</b> tài khoản đỏ vì lỗi mà bạn đã sửa được (đăng nhập lại, đổi mạng…) → bấm <i>Chạy lại ngay</i> ở thẻ tài khoản (hoặc <i>Chạy lại TK đang nghỉ</i> cho mọi tài khoản): tài khoản nhận việc lại luôn, dự án đã tự tạm dừng thì chạy tiếp.</li>
           <li><b>Lỗi lạ:</b> Cài đặt → bật <i>Hiện các luồng chạy ngầm</i> để nhìn thấy trang Muse / Flow của từng luồng; nhật ký đầy đủ ở thư mục dữ liệu (<code>nhat-ky.txt</code>).</li>
         </ol>
       </section>
@@ -381,6 +395,7 @@
           <div class="dong-cong-tac"><div><b>Hiện các luồng chạy ngầm</b><small>Để soi lỗi: trang Muse / Flow của các luồng sẽ hiện đè lên app.</small></div><label class="cong-tac"><input type="checkbox" id="cdXemLuong"><span></span></label></div>
           <small class="mo">Lỗi → chuyển lần lượt sang các tài khoản dự phòng → hết dự phòng thì quay về tài khoản chính thử lại, cứ thế theo vòng. Việc chỉ báo Lỗi khi đã hỏng ở mọi tài khoản thêm số vòng trên; tài khoản lỗi liên tiếp được cho nghỉ 15 phút, mọi tài khoản đều nghỉ thì hàng chờ tạm dừng.</small>
           <div class="dong-cong-tac"><div><b>Tắt máy khi chạy hết hàng chờ</b><small>Chung cho mọi dự án: tắt khi MỌI dự án đang chạy đều xong. Windows, macOS. Tắt sau 60 giây; Windows huỷ bằng lệnh <code>shutdown /a</code>.</small></div><label class="cong-tac"><input type="checkbox" id="cdTatMay"><span></span></label></div>
+          <div class="dong-cong-tac"><div><b>Máy mượt: ưu tiên máy của bạn hơn các trang chạy ngầm</b><small>Chung cho mọi dự án. Hạ ưu tiên CPU của các trang Muse / Flow / Suno chạy ngầm: máy rảnh thì vẫn chạy đủ nhanh, máy bận thì giao diện app và phần mềm bạn đang dùng không bị giật. Cách chạy không đổi.</small></div><label class="cong-tac"><input type="checkbox" id="cdNheMay"><span></span></label></div>
         </div>
         <div class="the-cai">
           <h3><i data-icon="download"></i>Tải về &amp; dọn dẹp</h3>
@@ -389,6 +404,22 @@
             <div class="dong-o"><input id="cdThuMucVideoAnh" readonly placeholder="Chưa chọn — theo thư mục của trang Tạo video"><button class="nut-vien nho" id="cdChonThuMucVideoAnh"><i data-icon="folder-open"></i>Chọn…</button><button class="nut-vien nho" id="cdMoThuMucVideoAnh">Mở</button><button class="nut-vien nho" id="cdBoThuMucVideoAnh" title="Bỏ thư mục riêng">Bỏ</button></div></div>
           <div class="dong-cong-tac"><div><b>Chạy xong thì tự xoá chat Muse</b><small>Chạy hết hàng chờ → xoá đoạn chat trên muse.ai của các việc đã xong (file đã tải vẫn giữ, không khôi phục được chat).</small></div><label class="cong-tac"><input type="checkbox" id="cdXoaChat"><span></span></label></div>
           <div class="dong-cong-tac"><div><b>Chạy xong thì tự xoá dự án Flow</b><small>Chạy hết hàng chờ → xoá dự án Google Flow mà các tài khoản Flow vừa dùng (không khôi phục được); lần chạy sau app tự mở dự án mới.</small></div><label class="cong-tac"><input type="checkbox" id="cdXoaDuAnFlow"><span></span></label></div>
+        </div>
+        <div class="the-cai" id="cdDriveThe">
+          <h3><i data-icon="cloud-upload"></i>Google Drive</h3>
+          <div class="dong-cong-tac"><div><b>Ảnh / video xong thì tự đưa lên Google Drive</b><small>Trên Drive tự có thư mục <code>&lt;Tên dự án&gt;/images</code> cho ảnh và <code>&lt;Tên dự án&gt;/Videos</code> cho video. File vẫn giữ ở máy như cũ.</small></div><label class="cong-tac"><input type="checkbox" id="cdDrive"><span></span></label></div>
+          <label class="o-drive-cach">Cách đưa lên<select id="cdDriveCach">
+            <option value="may">Chép vào thư mục Google Drive trên máy (Drive cho máy tính tự tải lên)</option>
+            <option value="web">Tải thẳng lên drive.google.com bằng trình duyệt trong app</option>
+          </select></label>
+          <div class="o-thu-muc-video" data-drive-cach="web" hidden><b>Tài khoản Google Drive</b>
+            <div class="dong-o"><select id="cdDriveTk"></select><button class="nut-vien nho" id="cdDriveTkMoi"><i data-icon="contact"></i>Tài khoản Drive…</button></div>
+            <small class="mo">Thêm và đăng nhập tài khoản ở mục Tài khoản → thẻ Drive (đăng nhập Google một lần trong app, app không giữ mật khẩu). App mở drive.google.com ở cửa sổ ẩn, tự tạo thư mục và tải từng file lên.</small>
+          </div>
+          <div class="o-thu-muc-video" data-drive-cach="may"><b>Thư mục Google Drive trên máy</b>
+            <div class="dong-o"><input id="cdThuMucDrive" readonly placeholder="Chưa chọn — vd G:\My Drive"><button class="nut-vien nho" id="cdTimDrive" title="Tự tìm thư mục Google Drive trên máy"><i data-icon="search"></i>Tự tìm</button><button class="nut-vien nho" id="cdChonDrive"><i data-icon="folder-open"></i>Chọn…</button><button class="nut-vien nho" id="cdMoDrive">Mở</button></div>
+          </div>
+          <small class="mo" data-drive-cach="may">Cần cài <b>Google Drive cho máy tính</b> (drive.google.com → Tải xuống Drive cho máy tính) và đăng nhập sẵn tài khoản Drive. Thư mục thường là ổ <code>G:\My Drive</code> (hoặc <code>G:\Drive của tôi</code>) trên Windows. App không đăng nhập Google, không cần mật khẩu. Việc đã xong từ trước: chọn việc → <b>Lên Drive</b>.</small>
         </div>
         <div class="the-cai" id="cdFlow">
           <h3><i data-icon="sparkles"></i>Google Flow</h3>

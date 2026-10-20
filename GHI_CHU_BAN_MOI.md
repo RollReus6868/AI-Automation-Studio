@@ -1,4 +1,19 @@
-# AI Automation Studio 1.3.8
+# AI Automation Studio 1.4.0
+
+- **Đưa ảnh / video lên Google Drive.** Ảnh xong vào thư mục `<Tên dự án>/images`, video vào `<Tên dự án>/Videos` trên Drive. App tự tạo thư mục, file vẫn giữ ở máy như cũ. Có hai cách, chọn ở *Cài đặt → Google Drive → Cách đưa lên*:
+  - **Chép vào thư mục Google Drive trên máy.** Cần cài *Google Drive cho máy tính* và đăng nhập sẵn. Bấm *Tự tìm* (thường là `G:\My Drive`) hoặc *Chọn…*. Drive tự tải lên, mất mạng thì tự tải tiếp.
+  - **Tải thẳng lên drive.google.com bằng trình duyệt trong app.** Vào *Tài khoản → thẻ Drive → Thêm Drive → Đăng nhập* (đăng nhập Google một lần; app không giữ mật khẩu). Rồi chọn tài khoản đó ở *Cài đặt → Google Drive*. App mở Drive ở cửa sổ ẩn, bấm *Mới → Thư mục mới* / *Tải tệp lên* như người dùng. Tạo lại một việc thì file trên Drive được **thay thế**; file trùng tên của việc khác thì **giữ cả hai**.
+  - Bật *Ảnh / video xong thì tự đưa lên Google Drive* để tự đưa sau mỗi việc. Việc đã xong từ trước: chọn việc → **Lên Drive**. Đưa lên hỏng thì việc vẫn *Xong*; nhật ký ghi dòng ☁ kèm lý do. Với cách 2, app lưu trang Drive vào `Tài liệu/AI Automation Studio/chan-doan-drive`.
+- **Đổi prompt hàng loạt.** Tick *Chọn hết* (hoặc chọn vài dòng) → **Đổi prompt**. Có thể thay hẳn bằng prompt mới, hoặc tìm và thay một đoạn chữ. Ở trang Tạo ảnh còn đổi được prompt của video sẽ tự tạo từ ảnh. Việc đang chạy giữ prompt cũ. Việc đã xong / lỗi chỉ tạo lại khi bạn tick ô *tạo lại và chạy ngay*.
+- **Đổi ngay sang Muse / Flow.** Nút ⋮ ở mỗi việc (hoặc cột chi tiết) → *Đổi sang Flow / Muse & chạy ngay*. Chọn nhiều việc thì dùng nút **Sang Muse** / **Sang Flow**. Việc đang chạy dừng ở bên cũ rồi chạy ở bên mới; việc đã xong được tạo lại ở bên mới. Bên mới phải có tài khoản đã đăng nhập trong dự án.
+- **Đồng hồ dự án.** Cạnh tên dự án có thời gian dự án đã chạy và dự đoán còn bao lâu. Lượt mới chạy thì dự đoán theo thời gian trung bình mỗi việc; chạy được hơn 1 phút thì theo tốc độ thật của lượt đó. Rê chuột lên đồng hồ để xem tổng thời gian, số việc còn lại và giờ dự kiến xong.
+- **Chạy lại tài khoản đang nghỉ vì lỗi.** Thẻ tài khoản đỏ có nút **Chạy lại ngay**; đầu mục Tài khoản có **Chạy lại TK đang nghỉ** cho mọi tài khoản đỏ. Dùng khi lỗi đã sửa được (đăng nhập lại, đổi mạng…): tài khoản nhận việc lại luôn, không chờ hết giờ nghỉ. Dự án đã tự tạm dừng vì hết tài khoản thì chạy tiếp.
+- **Nhẹ máy hơn.** Các trang Muse / Flow / Suno chạy ngầm được hạ ưu tiên CPU, nên máy còn mượt khi bạn làm việc khác (tắt ở *Cài đặt*, công tắc *Máy mượt*). Nhật ký ghi ra đĩa theo nhịp thay vì từng dòng. Hàng đợi dài thì giao diện cập nhật thưa hơn; cửa sổ thu nhỏ thì thôi vẽ lại. Khung nhật ký gom vẽ lại.
+- Mọi quy trình chạy cũ giữ nguyên. Các tính năng mới đều tắt sẵn hoặc chỉ chạy khi bạn bấm (riêng *Máy mượt* bật sẵn).
+
+Lưu ý: đã kiểm bằng bài kiểm tự động và trên các trang Muse / Flow / Suno / Google Drive giả, chưa chạy trên các trang thật. Với cách tải thẳng lên Drive, nhật ký nên có dòng *"☁ #… đã đưa lên Google Drive: Drive: <Tên dự án>/images/…"*. Nếu hỏng, gửi tệp trong `chan-doan-drive` kèm nhật ký.
+
+## Bản 1.3.8
 
 - **Tài khoản lỗi ghi rõ lỗi gì.** Thẻ tài khoản màu đỏ (mục *Tài khoản*) và hộp chọn tài khoản của dự án giờ ghi nguyên câu mà Muse / Flow báo, không còn ghi chung chung. Ví dụ theo nhật ký 19/10/2026 của bạn:
   - Muse 1: *"Đang nghỉ: lỗi 8 việc liên tiếp, lần gần nhất: Muse trả lời chữ, không có video: "Lượt tạo video hôm nay đã hết…""*. Trước đây chỉ ghi *"lỗi 8 việc liên tiếp"*.

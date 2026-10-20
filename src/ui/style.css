@@ -446,6 +446,7 @@ select.canh-bao { border-color: #e0a100; }
 body.trang-nhac .chi-nhac { display: inline; }
 body.trang-nhac .khong-nhac { display: none !important; }
 .tag.nen-suno { background: rgba(255, 170, 60, .16); color: #ffc98a; }
+.tag.nen-drive { background: rgba(66, 133, 244, .16); color: #9cc0ff; }
 .xem-truoc .nhac { display: grid; place-items: center; gap: 14px; padding: 28px 16px; width: 100%; color: var(--chu-mo); }
 .xem-truoc .nhac > i { width: 46px; height: 46px; }
 .xem-truoc audio, .xem-lon audio { width: min(100%, 420px); }
@@ -453,7 +454,8 @@ body.trang-nhac .khong-nhac { display: none !important; }
 .o-tv .nhac-tv i { width: 34px; height: 34px; }
 .het-luot { color: #ffc98a; }
 /* 1.2.0: mục Tài khoản tách thẻ Muse / Google Flow / Suno */
-#nenTk { grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 4px 0 10px; }
+#nenTk { grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 4px 0 10px; }
+#nenTk button { padding: 8px 4px; }
 #nenTk .dem-nen { display: inline-block; min-width: 18px; padding: 0 5px; margin-left: 4px; border-radius: 9px; background: rgba(255, 255, 255, .12); font-size: 11px; }
 #dsTaiKhoan > .trong { padding: 24px; text-align: center; color: var(--chu-phu); }
 
@@ -470,3 +472,17 @@ body.trang-nhac .khong-nhac { display: none !important; }
 .the-hen .o-gio input { margin-top: 0; flex: 1; min-width: 0; }
 .the-hen .dong-o { flex-wrap: wrap; }
 .the-hen.tat .luoi-3, .the-hen.tat > label { opacity: .55; }
+/* 1.4.0: đồng hồ dự án (đã chạy · còn ≈ …), nút Chạy lại ngay của tài khoản đang nghỉ */
+.chip-dong-ho { font-variant-numeric: tabular-nums; white-space: nowrap; cursor: default; min-width: 0; flex-shrink: 1; overflow: hidden; }
+.chip-dong-ho > span { overflow: hidden; text-overflow: ellipsis; }
+.chip-dong-ho i { flex-shrink: 0; }
+/* Cửa sổ hẹp: đồng hồ co lại (đủ chữ ở tooltip) thay vì đẩy nút Chạy / Dừng ra ngoài. */
+.topbar .duan { min-width: 0; }
+.chip-dong-ho i { color: var(--chu-phu); }
+.chip-dong-ho.chay i { color: var(--xanh); }
+.nut-chay-lai { color: var(--xanh); border-color: rgba(52, 211, 153, .4); }
+.ly-loi .lien-ket { font-size: inherit; padding: 0 2px; }
+
+/* 1.4.0: Cài đặt → Google Drive — chọn cách đưa lên */
+.o-drive-cach { display: grid; gap: 6px; margin: 10px 0 4px; }
+#cdDriveTk { flex: 1; min-width: 0; }

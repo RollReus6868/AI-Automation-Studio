@@ -171,18 +171,49 @@
   const loaiTrang = () => (U.trang === 'video' || U.trang === 'nhac' ? U.trang : 'anh');
   /** Nơi chạy đang chọn ở cột Tạo của trang hiện tại: 'muse' | 'flow' — trang nhạc luôn là 'suno'. */
   const nenTrang = () => (loaiTrang() === 'nhac' ? 'suno' : U.nen[loaiTrang()] === 'flow' ? 'flow' : 'muse');
-  const TEN_NEN = { muse: 'Muse', flow: 'Google Flow', suno: 'Suno' };
+  const TEN_NEN = { muse: 'Muse', flow: 'Google Flow', suno: 'Suno', drive: 'Google Drive' };
   const DS_NEN = ['muse', 'flow', 'suno'];
+  const DS_NEN_TK = [...DS_NEN, 'drive'];   // 1.4.0: thẻ Drive ở mục Tài khoản (không nhận việc tạo)
   const TEN_LOAI = { anh: 'ảnh', video: 'video', nhac: 'nhạc' };
   const ICON_LOAI = { anh: 'image', video: 'film', nhac: 'music' };
   const TY_LE_FLOW = ['16:9', '9:16'];
-  const nenTk = (a) => (a && (a.nen === 'flow' || a.nen === 'suno') ? a.nen : 'muse');
+  const nenTk = (a) => (a && (a.nen === 'flow' || a.nen === 'suno' || a.nen === 'drive') ? a.nen : 'muse');
   const so3 = (n) => String(n).padStart(3, '0');
   function gio(t) {
     if (!t) return '';
     const d = new Date(t), nay = new Date();
     const hm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
     return d.toDateString() === nay.toDateString() ? `Hôm nay, ${hm}` : `${d.getDate()}/${d.getMonth() + 1}, ${hm}`;
+  }
+  // 1.4.0: đồng hồ dự án — đã chạy (giờ:phút:giây) và còn bao lâu (≈ x giờ y phút).
+  const hai = (n) => String(n).padStart(2, '0');
+  const dongHoChu = (ms) => { const t = Math.max(0, Math.floor(ms / 1000)); return `${hai(Math.floor(t / 3600))}:${hai(Math.floor((t % 3600) / 60))}:${hai(t % 60)}`; };
+  function khoangChu(ms) {
+    const p = Math.round(ms / 60000);
+    if (p < 1) return 'dưới 1 phút';
+    if (p < 60) return `${p} phút`;
+    return p % 60 ? `${Math.floor(p / 60)} giờ ${p % 60} phút` : `${Math.floor(p / 60)} giờ`;
+  }
+  /** Số đo đồng hồ của dự án, đếm tiếp từ lúc tiến trình chính đo (S.luc) — chip tự chạy từng giây, không cần chờ trạng thái mới. */
+  function soDongHo(id) {
+    const g = S && S.dongHo && S.dongHo[id];
+    if (!g) return null;
+    const troi = g.dangChay ? Math.max(0, Date.now() - (S.nhanLuc || Date.now())) : 0;
+    return { ...g, daChay: g.daChay + troi, conLai: Math.max(0, (g.conLai || 0) - troi) };
+  }
+  function veDongHo() {
+    const chip = $('#chipDongHo');
+    const d = S && duAnHienTai(), g = d && soDongHo(d.id);
+    if (!g || (!g.dangChay && !g.soCon && !g.daChay)) { chip.hidden = true; return; }
+    chip.hidden = false;
+    chip.classList.toggle('chay', g.dangChay);
+    const xongLuc = g.soCon ? new Date(Date.now() + g.conLai) : null;
+    chip.lastElementChild.textContent = g.dangChay ? `${dongHoChu(g.daChay)}${g.soCon ? ` · còn ≈ ${khoangChu(g.conLai)}` : ''}`
+      : g.soCon ? `Dự kiến ≈ ${khoangChu(g.conLai)}` : `Lần trước ${dongHoChu(g.daChay)}`;
+    chip.title = (g.dangChay ? `Dự án đã chạy lượt này ${dongHoChu(g.daChay)}` : g.daChay ? `Lượt chạy gần nhất: ${dongHoChu(g.daChay)}` : 'Dự án chưa chạy') +
+      ` · tổng thời gian chạy ${dongHoChu(g.tong)}` +
+      (g.soCon ? ` · còn ${g.soCon} việc (tính cả video sẽ tạo từ ảnh) · dự đoán ${g.dangChay ? 'xong' : 'chạy hết trong'} ≈ ${khoangChu(g.conLai)}${g.dangChay ? `, khoảng ${hai(xongLuc.getHours())}:${hai(xongLuc.getMinutes())}` : ''}` : '') +
+      '. Dự đoán theo tốc độ thật của lượt đang chạy (lượt mới chạy thì theo thời gian trung bình mỗi việc).';
   }
   let henToast = null;
   function toast(chu, loi) {
@@ -244,7 +275,7 @@
           return `<div class="hang-vai" data-vai="${vai}"><span title="${esc(`${a.ten} — ${sk.chu}`)}"><i class="cham-sk sk-${sk.muc}"></i>${esc(a.ten)}${a.trangThai === 'can-dang-nhap' ? ' <small>(chưa đăng nhập)</small>' : ''}</span>` +
             loai + `<select name="vai_${esc(id)}" data-vai-tk>${VAI_TK.map(([k, t]) => `<option value="${k}" ${k === vai ? 'selected' : ''}>${t}</option>`).join('')}</select>` +
             // 1.3.8: tài khoản đang lỗi → ghi rõ lỗi ngay dưới tên (không phải rê chuột mới thấy).
-            (sk.muc === 'loi' ? `<small class="ly-loi">${esc(sk.chu)}</small>` : '') + '</div>';
+            (sk.muc === 'loi' ? `<small class="ly-loi">${esc(sk.chu)}${a.trangThai !== 'can-dang-nhap' ? ` <button type="button" class="lien-ket" data-chay-lai-tk="${esc(id)}" title="Lỗi đã sửa xong — cho tài khoản nhận việc lại ngay">Chạy lại ngay</button>` : ''}</small>` : '') + '</div>';
         }).join('')}</div><small class="mo">Để "Không dùng" hết = dự án dùng mọi tài khoản ${TEN_NEN[nen]}.</small></div>`;
       }).join('');
   }
@@ -367,6 +398,7 @@
     $('#chipHomNay').lastElementChild.textContent =
       `Hôm nay ${['anh', 'video', 'nhac'].map((l) => `${xongHN.filter((j) => j.loai === l).length} ${TEN_LOAI[l]}`).join(' · ')}`;
     // 1.3.0: nút Chạy / Dừng của DỰ ÁN ĐANG MỞ — dự án khác chạy riêng, không bị dừng theo.
+    veDongHo();
     const n = $('#nutChayTatCa'), chayDa = !!d && duAnDangChay(d.id);
     n.classList.toggle('dung', chayDa);
     n.innerHTML = chayDa ? `${ic('pause')}<span>Dừng dự án</span>` : `${ic('play')}<span>Chạy dự án</span>`;
@@ -426,13 +458,14 @@
     $('#tachPrompt').value = S.caiDat.tachPrompt;
     for (const b of $$('#cheDo button')) b.classList.toggle('on', b.dataset.v === U.cheDo);
     $('#khuNguoiMau').hidden = U.cheDo !== 'nguoimau';
-    $('#chonNhanVat').innerHTML = S.nhanVat.length ? S.nhanVat.map((n) =>
+    // 1.4.0: chỉ thay khi khác (trước: mỗi lần trạng thái đổi là dựng lại cả ảnh nhân vật / ảnh tham chiếu).
+    datHtml($('#chonNhanVat'), S.nhanVat.length ? S.nhanVat.map((n) =>
       `<button class="chip-nv${U.nvChon.has(n.id) ? ' on' : ''}" data-nv="${esc(n.id)}">${n.anh[0] ? `<img src="${esc(fileUrl(n.anh[0]))}">` : ic('user-round')}${esc(n.ten)}</button>`).join('')
-      : '<small>Chưa có nhân vật — thêm ở mục Nhân vật.</small>';
+      : '<small>Chưa có nhân vật — thêm ở mục Nhân vật.</small>');
     let html = TC().ds.map((p, i) =>
       `<div class="anh-nho" title="${esc(p)}"><img src="${esc(fileUrl(p))}"><button data-bo="${i}">${ic('x')}</button></div>`).join('');
     if (TC().thuMuc) html += `<div class="ghi-thu-muc">${ic('folder-open')}<span>Thư mục: <b>${TC().thuMuc.anh.length} ảnh</b> → gán lần lượt cho từng prompt</span><button class="lien-ket" data-bo-thu-muc>Bỏ</button></div>`;
-    $('#dsThamChieu').innerHTML = html;
+    if (datHtml($('#dsThamChieu'), html)) veIcon($('#dsThamChieu'));
   }
 
   const NHAN_BUOC = { 'mo-trang': 'Đang mở Muse', 'mo-lai': 'Mở lại chat cũ', gui: 'Đang gửi prompt', tai: 'Đang tải về' };
@@ -461,7 +494,7 @@
     for (const j of tatCa) dem[j.trangThai]++;
     const tabs = [['tat', 'Tất cả'], ['chay', 'Đang chạy'], ['cho', 'Đang chờ'], ['dung', 'Đã dừng'], ['xong', 'Hoàn tất'], ['loi', 'Lỗi']]
       .filter(([k]) => k === 'tat' || dem[k] > 0 || U.loc === k);
-    $('#tabsLoc').innerHTML = tabs.map(([k, t]) => `<button data-loc="${k}" class="${U.loc === k ? 'on' : ''}">${t} <b>${dem[k]}</b></button>`).join('');
+    datHtml($('#tabsLoc'), tabs.map(([k, t]) => `<button data-loc="${k}" class="${U.loc === k ? 'on' : ''}">${t} <b>${dem[k]}</b></button>`).join(''));
     $('#nutSapXep').lastElementChild.textContent = U.moiNhat ? 'Mới nhất' : 'Cũ nhất';
     $('#locNen').value = U.locNen || '';
 
@@ -579,7 +612,9 @@
         <button class="nut-vien" data-ct="taoLai" ${j.trangThai === 'chay' ? 'disabled' : ''}>${ic('rotate-ccw')}Tạo lại</button>
         <button class="nut-gradient" data-ct="sua" ${j.trangThai === 'chay' ? 'disabled' : ''}>${ic('wand-sparkles')}${j.loai === 'anh' ? 'Chỉnh sửa' : 'Sửa'}</button>
       </div>
-      ${f && j.loai === 'anh' ? `<div class="ct-nut" style="grid-template-columns:1fr"><button class="nut-vien" data-ct="video">${ic('film')}Tạo video từ ảnh này</button></div>` : ''}`);
+      ${f && j.loai === 'anh' ? `<div class="ct-nut" style="grid-template-columns:1fr"><button class="nut-vien" data-ct="video">${ic('film')}Tạo video từ ảnh này</button></div>` : ''}
+      ${j.loai !== 'nhac' ? `<div class="ct-nut" style="grid-template-columns:${f && j.trangThai === 'xong' ? '1fr 1fr' : '1fr'}"><button class="nut-vien" data-ct="doiNen">${ic('arrow-left-right')}Đổi sang ${nenTk(j) === 'flow' ? 'Muse' : 'Flow'} &amp; chạy ngay</button>${
+        f && j.trangThai === 'xong' ? `<button class="nut-vien" data-ct="lenDrive" title="${esc(j.drive && j.drive[0] ? `Đã có trên Drive: ${j.drive[0]}` : j.driveLoi || 'Chép file lên thư mục Google Drive (Cài đặt → Google Drive)')}">${ic('cloud-upload')}${j.drive && j.drive.length ? 'Đưa lại lên Drive' : 'Lên Drive'}</button>` : ''}</div>` : ''}`);
   }
 
   // ── Hành động trên việc ──────────────────────────────────────────────────
@@ -595,6 +630,10 @@
       toast(`Đã tạo lại #${so3(j.so)} và chạy ngay`);
     } else if (lenh === 'dungViec' || lenh === 'chayViec') {
       dieuKhienViec(lenh, [j.id]);
+    } else if (lenh === 'doiNen') {
+      doiNen([j.id], nenTk(j) === 'flow' ? 'muse' : 'flow');
+    } else if (lenh === 'lenDrive') {
+      lenDrive([j.id]);
     } else if (lenh === 'xoa') {
       if (!(await xacNhan('Xoá việc?', `Xoá #${so3(j.so)} khỏi hàng đợi. File đã tải về vẫn giữ trong thư mục.`, 'Xoá', true))) return;
       await api.call('xoaViec', { ids: [j.id] });
@@ -634,6 +673,48 @@
     else toast(n ? `Đang chạy ngay ${n} việc` : 'Không có việc nào chạy được (việc đã xong thì dùng Tạo lại)', !n);
   }
 
+  /** 1.4.0: đổi ngay các việc sang Muse / Flow rồi chạy luôn (việc đang chạy dừng ở bên cũ, việc đã xong tạo lại). */
+  async function doiNen(ids, nen) {
+    const ds = ids.map(viecTheoId).filter((j) => j && j.loai !== 'nhac');
+    const doi = ds.filter((j) => nenTk(j) !== nen);
+    if (!doi.length) { toast(ds.length ? `Các việc đã chọn đều đang chạy ở ${TEN_NEN[nen]}` : 'Việc nhạc chỉ chạy ở Suno', true); return; }
+    const xong = doi.filter((j) => j.trangThai === 'xong').length, chay = doi.filter((j) => j.trangThai === 'chay').length;
+    const tyLeKhac = nen === 'flow' && doi.some((j) => !TY_LE_FLOW.includes(j.tyLe));
+    if ((xong || chay || tyLeKhac || doi.length > 1) && !(await xacNhan(`Đổi ${doi.length} việc sang ${TEN_NEN[nen]}?`,
+      `Các việc này chạy ngay ở <b>${TEN_NEN[nen]}</b> (gửi prompt mới từ đầu, ảnh tham chiếu giữ nguyên).` +
+      (chay ? `<br>• ${chay} việc đang chạy sẽ dừng ở bên cũ.` : '') +
+      (xong ? `<br>• ${xong} việc đã xong sẽ được tạo lại ở ${TEN_NEN[nen]} — file mới ghi đè file cũ của chính việc đó.` : '') +
+      (tyLeKhac ? '<br>• Flow chỉ có 16:9 và 9:16 — tỷ lệ khác dùng tỷ lệ gần nhất.' : '') +
+      (ds.length > doi.length ? `<br>• ${ds.length - doi.length} việc đã ở ${TEN_NEN[nen]} giữ nguyên.` : ''), `Đổi sang ${TEN_NEN[nen]}`))) return;
+    const r = await api.call('doiNenViec', { ids: doi.map((j) => j.id), nen });
+    if (r && r.khongTk && r.khongTk.length && !r.doi) { toast(`Dự án chưa có tài khoản ${TEN_NEN[nen]} dùng được — bấm nút tài khoản cạnh tên dự án`, true); return; }
+    toast(r && r.doi ? `Đã đổi ${r.doi} việc sang ${TEN_NEN[nen]} và chạy ngay${r.khongTk && r.khongTk.length ? ` · dự án ${r.khongTk.join(', ')} chưa có tài khoản ${TEN_NEN[nen]}` : ''}` : 'Không đổi được việc nào', !(r && r.doi));
+  }
+  async function lenDrive(ids) {
+    const r = await api.call('lenDriveViec', { ids });
+    if (!r || !r.ok) { toast((r && r.loi) || 'Không đưa lên Drive được', true); return; }
+    toast(r.so ? `Đang đưa ${r.so} việc lên Google Drive… (xem Nhật ký)${r.boQua ? ` · bỏ qua ${r.boQua} việc chưa xong / không có file` : ''}` : 'Không có việc ảnh / video nào đã xong để đưa lên Drive', !r.so);
+  }
+  /** 1.4.0: đổi prompt của mọi việc đã chọn (Chọn hết → Đổi prompt). */
+  async function doiPromptNhieu(ids) {
+    const ds = ids.map(viecTheoId).filter(Boolean);
+    if (!ds.length) return;
+    const coChuoi = ds.some((j) => j.loai === 'anh' && j.chuoi && !j.daNoiVideo);
+    const giong = ds.every((j) => j.prompt === ds[0].prompt) ? ds[0].prompt : '';
+    const dangChay = ds.filter((j) => j.trangThai === 'chay').length;
+    const v = await hoi({ tieuDe: `Đổi prompt ${ds.length} việc đã chọn`, ok: 'Đổi prompt', html:
+      (coChuoi ? `<label>Đổi prompt nào<select name="dich"><option value="viec">Prompt của việc (ảnh)</option><option value="chuoi">Prompt video sẽ tự tạo từ ảnh (ảnh chưa tạo video)</option></select></label>` : '') +
+      `<label>Cách đổi<select name="cach" data-doi-cach><option value="thay">Thay cả prompt bằng prompt mới</option><option value="tim">Tìm và thay một đoạn chữ</option></select></label>
+      <div data-cach="thay"><label>Prompt mới (mọi việc đã chọn dùng chung)<textarea name="moi" rows="5" spellcheck="false">${esc(giong)}</textarea></label></div>
+      <div data-cach="tim" hidden><label>Tìm đoạn chữ<input name="tim" spellcheck="false"></label><label>Thay bằng<input name="thay" spellcheck="false" placeholder="trống = xoá đoạn chữ đó"></label><small>Phân biệt chữ hoa / thường.</small></div>
+      <label class="hang-tk"><input type="checkbox" name="taoLai">Việc đã xong / lỗi / đã dừng: tạo lại và chạy ngay với prompt mới</label>
+      <small>${dangChay ? `${dangChay} việc đang chạy giữ prompt cũ (bấm Dừng trước nếu muốn đổi). ` : ''}Việc đang chờ dùng prompt mới khi tới lượt.</small>` });
+    if (!v) return;
+    const r = await api.call('doiPrompt', { ids: ds.map((j) => j.id), cach: v.cach, dich: v.dich || 'viec', moi: v.moi, tim: v.tim, thay: v.thay, taoLai: v.taoLai });
+    if (!r || !r.ok) { toast((r && r.loi) || 'Không đổi được prompt', true); return; }
+    toast(r.doi ? `Đã đổi prompt ${r.doi} việc${r.taoLai ? `, tạo lại ${r.taoLai} việc` : ''}${r.dangChay ? ` · ${r.dangChay} việc đang chạy giữ nguyên` : ''}` : 'Không việc nào đổi (prompt giống cũ, hoặc không tìm thấy đoạn chữ)', !r.doi);
+  }
+
   function moMenuDong(nut, j) {
     dongMenu();
     const f = j.files && j.files[0];
@@ -645,6 +726,9 @@
       ['cho', 'dung', 'loi'].includes(j.trangThai) ? `<button data-l="chayViec">${ic('play')}Chạy ngay việc này</button>` : '',
       j.trangThai !== 'chay' ? `<button data-l="taoLai">${ic('rotate-ccw')}Tạo lại</button><button data-l="sua">${ic('pencil')}${f && j.loai === 'anh' ? 'Chỉnh sửa ảnh' : 'Sửa prompt'}</button>` : '',
       f && j.loai === 'anh' ? `<button data-l="video">${ic('film')}Tạo video từ ảnh này</button>` : '',
+      // 1.4.0: đổi ngay sang bên kia rồi chạy luôn; đưa kết quả lên Google Drive.
+      j.loai !== 'nhac' ? `<button data-l="doiNen">${ic('arrow-left-right')}Đổi sang ${nenTk(j) === 'flow' ? 'Muse' : 'Flow'} &amp; chạy ngay</button>` : '',
+      f && j.trangThai === 'xong' && j.loai !== 'nhac' ? `<button data-l="lenDrive">${ic('cloud-upload')}Đưa lên Google Drive</button>` : '',
       `<button data-l="chep">${ic('copy')}Sao chép prompt</button><div class="tach"></div><button data-l="xoa" class="do">${ic('trash-2')}Xoá</button>`
     ].join('');
     document.body.appendChild(m);
@@ -843,9 +927,9 @@
     $('#soLuongTK').textContent = S.caiDat.luongMoiTK;
     $('#soTabFlow').textContent = S.caiDat.flow.tabMoiTK;
     // Mỗi nơi chạy một thẻ riêng (Muse / Google Flow / Suno) cho khỏi lẫn tài khoản với nhau.
-    if (!DS_NEN.includes(U.nenTk)) U.nenTk = 'muse';
+    if (!DS_NEN_TK.includes(U.nenTk)) U.nenTk = 'muse';
     for (const b of $$('#nenTk button')) b.classList.toggle('on', b.dataset.v === U.nenTk);
-    for (const n of DS_NEN) {
+    for (const n of DS_NEN_TK) {
       const cua = S.taiKhoan.filter((a) => nenTk(a) === n), soLoi = cua.filter((a) => skTk(a.id).muc === 'loi').length;
       $(`#nenTk [data-dem="${n}"]`).textContent = cua.length + (soLoi ? ` · ${soLoi} lỗi` : '');
       $(`#nenTk [data-dem="${n}"]`).classList.toggle('co-loi', !!soLoi);
@@ -855,25 +939,27 @@
     datHtml($('#dsTaiKhoan'), ds.length ? ds.map((a) => {
       const [cls, nhan] = NHAN_TK[a.trangThai] || NHAN_TK['chua-kiem'];
       const dang = S.dangNhap && S.dangNhap.id === a.id;
-      const nen = nenTk(a), flow = nen === 'flow';
+      const nen = nenTk(a), flow = nen === 'flow', drive = nen === 'drive';
       const sk = skTk(a.id);
       return `<div class="the-tk tk-${nen} sk-${sk.muc}" title="${esc(sk.chu)}">
         <div class="av">${esc((a.ten || '?').trim().charAt(0).toUpperCase())}</div>
-        <div class="tt"><b>${esc(a.ten)}</b><span class="tag nen-${nen}">${TEN_NEN[nen].toUpperCase()}</span><span class="pill ${cls}">${nhan}</span>${veSucKhoe(sk)}${nen === 'suno'
-          ? veHetLuot(a)
+        <div class="tt"><b>${esc(a.ten)}</b><span class="tag nen-${nen}">${TEN_NEN[nen].toUpperCase()}</span><span class="pill ${cls}">${nhan}</span>${drive ? '' : veSucKhoe(sk)}${drive
+          ? '<div class="han-muc mo">Chỉ dùng để tải ảnh / video lên Google Drive — chọn tài khoản này ở Cài đặt → Google Drive → "Tải thẳng lên drive.google.com".</div>'
+          : nen === 'suno' ? veHetLuot(a)
           : flow ? `<div class="han-muc mo du-an-flow" title="${esc(a.flowUrl || '')}">Dự án Flow: ${a.flowUrl ? esc(a.flowUrl.replace(/^https:\/\/labs\.google\/fx\/(\w+\/)?tools\/flow\//, '…/')) : 'chưa chọn — app tự mở dự án mới (hoặc Đăng nhập → mở một dự án → Xong)'}</div>`
           : veHanMuc(a.hanMuc) + veChanVideo(a)}
           <div class="hang-nut">
             <button class="nut-vien nho" data-tk="dangNhap" data-id="${esc(a.id)}" ${dang ? 'disabled' : ''}>${ic('log-in')}Đăng nhập</button>
             <button class="nut-vien nho" data-tk="kiem" data-id="${esc(a.id)}">${ic('refresh-cw')}Kiểm tra</button>
-            ${nen === 'suno' ? '' : flow ? `<button class="nut-vien nho" data-tk="duAnFlow" data-id="${esc(a.id)}" title="Đổi trang dự án Flow mà tài khoản này chạy">${ic('folder')}Dự án</button>`
+            ${!drive && sk.muc === 'loi' && a.trangThai !== 'can-dang-nhap' ? `<button class="nut-vien nho nut-chay-lai" data-tk="chayLai" data-id="${esc(a.id)}" title="Lỗi đã sửa xong (đăng nhập lại, đổi mạng…) — cho tài khoản nhận việc lại ngay, khỏi chờ hết giờ nghỉ">${ic('zap')}Chạy lại ngay</button>` : ''}
+            ${nen === 'suno' || drive ? '' : flow ? `<button class="nut-vien nho" data-tk="duAnFlow" data-id="${esc(a.id)}" title="Đổi trang dự án Flow mà tài khoản này chạy">${ic('folder')}Dự án</button>`
               : `<button class="nut-vien nho" data-tk="xoaChat" data-id="${esc(a.id)}" title="Xoá toàn bộ đoạn chat của tài khoản này trên Muse">${ic('message-square-x')}Xoá chat</button>`}
             <button class="nut-vien nho" data-tk="doiTen" data-id="${esc(a.id)}">${ic('pencil')}</button>
             <button class="nut-vien nho" data-tk="dangXuat" data-id="${esc(a.id)}" title="Đăng xuất">${ic('log-out')}</button>
             <button class="nut-vien nho do" data-tk="xoa" data-id="${esc(a.id)}" title="Xoá">${ic('trash-2')}</button>
           </div></div>
       </div>`;
-    }).join('') : `<div class="trong">Chưa có tài khoản ${TEN_NEN[U.nenTk]} — bấm <b>Thêm ${U.nenTk === 'flow' ? 'Flow' : TEN_NEN[U.nenTk]}</b> ở trên.</div>`);
+    }).join('') : `<div class="trong">Chưa có tài khoản ${TEN_NEN[U.nenTk]} — bấm <b>Thêm ${{ flow: 'Flow', drive: 'Drive' }[U.nenTk] || TEN_NEN[U.nenTk]}</b> ở trên.</div>`);
     const tk = S.dangNhap && S.taiKhoan.find((a) => a.id === S.dangNhap.id);
     $('#tieuDeDangNhap').textContent = tk ? `Đăng nhập ${TEN_NEN[nenTk(tk)]}: ${tk.ten}${nenTk(tk) === 'flow' ? ' — mở một dự án rồi bấm Xong' : ''}` : 'Đăng nhập';
     $('#nutXongDangNhap').hidden = !tk;
@@ -915,7 +1001,10 @@
     const a = S.taiKhoan.find((x) => x.id === id);
     if (!a) return;
     if (lenh === 'dangNhap') { U.dangNhapMo = true; await api.call('moDangNhap', { id, khung: khungTrinhDuyet() }); }
-    else if (lenh === 'kiem') { toast(`Đang kiểm "${a.ten}"…`); const r = await api.call('kiemTaiKhoan', { id }); toast(r === 'da-dang-nhap' ? `"${a.ten}" đã đăng nhập` : `"${a.ten}" chưa đăng nhập`, r !== 'da-dang-nhap'); }
+    else if (lenh === 'chayLai') {
+      const r = await api.call('chayLaiTaiKhoan', { id });
+      toast(r && r.ok ? `"${a.ten}" nhận việc lại ngay${r.tiep ? ` · chạy tiếp ${r.tiep} dự án đã tạm dừng` : ''}` : (r && r.loi) || 'Không được', !(r && r.ok));
+    } else if (lenh === 'kiem') { toast(`Đang kiểm "${a.ten}"…`); const r = await api.call('kiemTaiKhoan', { id }); toast(r === 'da-dang-nhap' ? `"${a.ten}" đã đăng nhập` : `"${a.ten}" chưa đăng nhập`, r !== 'da-dang-nhap'); }
     else if (lenh === 'duAnFlow') {
       const v = await hoi({ tieuDe: `Dự án Flow của "${a.ten}"`, ok: 'Lưu', html: `<p>Dán địa chỉ trang dự án Flow (dạng <code>https://flow.google.com/project/…</code>). Để trống: app tự bấm "Dự án mới" khi chạy.</p>
         <label>Địa chỉ dự án<input name="url" value="${esc(a.flowUrl || '')}" placeholder="https://flow.google.com/project/…"></label>` });
@@ -933,7 +1022,7 @@
       const v = await hoi({ tieuDe: 'Đổi tên tài khoản', html: `<label>Tên<input name="ten" value="${esc(a.ten)}"></label>`, ok: 'Lưu' });
       if (v && v.ten.trim()) api.call('suaTaiKhoan', { id, thay: { ten: v.ten } });
     } else if (lenh === 'dangXuat') {
-      if (await xacNhan('Đăng xuất?', `Xoá phiên đăng nhập ${{ flow: 'Google', suno: 'Suno', muse: 'Muse' }[nenTk(a)]} của "${esc(a.ten)}" trong app.`, 'Đăng xuất', true)) api.call('dangXuat', { id });
+      if (await xacNhan('Đăng xuất?', `Xoá phiên đăng nhập ${{ flow: 'Google', drive: 'Google', suno: 'Suno', muse: 'Muse' }[nenTk(a)]} của "${esc(a.ten)}" trong app.`, 'Đăng xuất', true)) api.call('dangXuat', { id });
     } else if (lenh === 'xoa') {
       if (await xacNhan('Xoá tài khoản?', `Xoá "${esc(a.ten)}" và phiên đăng nhập của nó khỏi app.`, 'Xoá', true)) {
         const r = await api.call('xoaTaiKhoan', { id });
@@ -981,6 +1070,11 @@
     }
   }
 
+  /** 1.4.0: Cài đặt → Google Drive — hiện ô của cách đang chọn (thư mục trên máy / tài khoản Drive). */
+  function veDriveCach() {
+    const c = $('#cdDriveCach').value;
+    for (const el of $$('[data-drive-cach]')) el.hidden = el.dataset.driveCach !== c;
+  }
   function veCaiDat() {
     if (!S) return;
     const c = S.caiDat;
@@ -996,6 +1090,17 @@
     $('#khoiThuMucVideoAnh').classList.toggle('mo-di', c.videoCanhAnh !== false);
     $('#cdXoaChat').checked = !!c.xoaChatKhiXong;
     $('#cdXoaDuAnFlow').checked = !!c.xoaDuAnFlowKhiXong;
+    $('#cdDrive').checked = !!c.driveBat;
+    $('#cdThuMucDrive').value = c.thuMucDrive || '';
+    $('#cdDriveCach').value = c.driveCach === 'web' ? 'web' : 'may';
+    { // 1.4.0: tài khoản Drive (nền 'drive') để tải thẳng lên drive.google.com
+      const ds = S.taiKhoan.filter((a) => nenTk(a) === 'drive');
+      datHtml($('#cdDriveTk'), ds.length ? `<option value="">— chọn tài khoản —</option>` + ds.map((a) => `<option value="${esc(a.id)}">${esc(a.ten)}${a.trangThai === 'can-dang-nhap' ? ' (chưa đăng nhập)' : ''}</option>`).join('')
+        : '<option value="">Chưa có tài khoản Drive — bấm "Tài khoản Drive…"</option>');
+      $('#cdDriveTk').value = ds.some((a) => a.id === c.driveTk) ? c.driveTk : (ds.length === 1 ? ds[0].id : '');
+      veDriveCach();
+    }
+    $('#cdNheMay').checked = (S.caiDatChung || c).nheMay !== false;   // chung cả app
     $('#cdMauAnh').value = c.mau.anh; $('#cdMauVideo').value = c.mau.video;
     const f = c.flow;
     datChonModel('fModelAnh', f.modelAnh);
@@ -1076,7 +1181,8 @@
     if (U.log.length > 600) U.log.splice(0, U.log.length - 600);
     $('#dongCuoi').textContent = d.chu;
     $('#dongCuoi').title = d.chu;
-    if (!$('#nganLog').hidden) veLog();
+    // 1.4.0: nhật ký đang mở thì vẽ lại tối đa ~3 lần mỗi giây (trước: mỗi dòng mới dựng lại 400 dòng).
+    if (!$('#nganLog').hidden) { if (!U.henVeLog) U.henVeLog = setTimeout(() => { U.henVeLog = null; veLog(); }, 300); }
     else if (d.muc === 'error') { U.loiChuaXem = (U.loiChuaXem || 0) + 1; veDemLoi(); }
   }
   /** Số lỗi mới từ lần mở nhật ký trước, hiện ngay trên nút Nhật ký. */
@@ -1096,7 +1202,8 @@
     const m = $('#menuDuAn');
     m.innerHTML = S.duAn.map((d) => {
       const n = S.viec.filter((j) => j.duAn === d.id).length;
-      return `<button data-du-an="${esc(d.id)}" class="${d.id === U.duAn ? 'on' : ''}">${ic(duAnDangChay(d.id) ? 'play' : 'folder')}${esc(d.ten)} - ${n}${duAnDangChay(d.id) ? ' <small class="dang-chay">đang chạy</small>' : ''}</button>`;
+      const g = soDongHo(d.id);
+      return `<button data-du-an="${esc(d.id)}" class="${d.id === U.duAn ? 'on' : ''}">${ic(duAnDangChay(d.id) ? 'play' : 'folder')}${esc(d.ten)} - ${n}${duAnDangChay(d.id) ? ` <small class="dang-chay">đang chạy${g && g.dangChay ? ` ${dongHoChu(g.daChay)}${g.soCon ? ` · còn ≈ ${khoangChu(g.conLai)}` : ''}` : ''}</small>` : ''}</button>`;
     }).join('') + `<div class="tach"></div><button data-du-an-moi>${ic('plus')}Dự án mới…</button>`;
   }
   async function duAnMoi() {
@@ -1158,6 +1265,19 @@
     // Hộp chọn tài khoản: tô màu theo vai vừa chọn (Chạy / Dự phòng / Không dùng).
     $('#hopNoiDung').addEventListener('change', (e) => {
       if (e.target.matches && e.target.matches('[data-vai-tk]')) e.target.closest('.hang-vai').dataset.vai = e.target.value;
+      // Hộp Đổi prompt: hiện ô của cách đổi đang chọn.
+      if (e.target.matches && e.target.matches('[data-doi-cach]')) for (const k of $$('#hopNoiDung [data-cach]')) k.hidden = k.dataset.cach !== e.target.value;
+    });
+    // 1.4.0: "Chạy lại ngay" ngay trong hộp chọn tài khoản của dự án (hàng đỏ).
+    $('#hopNoiDung').addEventListener('click', async (e) => {
+      const b = e.target.closest && e.target.closest('[data-chay-lai-tk]');
+      if (!b) return;
+      b.disabled = true;
+      const r = await api.call('chayLaiTaiKhoan', { id: b.dataset.chayLaiTk });
+      const o = b.closest('.ly-loi');
+      if (o) o.textContent = r && r.ok ? 'Đã cho chạy lại — tài khoản nhận việc ngay' : (r && r.loi) || 'Không được';
+      const cham = b.closest('.hang-vai') && $('.cham-sk', b.closest('.hang-vai'));
+      if (cham && r && r.ok) cham.className = 'cham-sk sk-tot';
     });
     $('#nutMoThuMucDuAn').onclick = () => api.call('moThuMuc', { dir: S.thuMuc[loaiTrang()] });
     $('#nutNhapPrompt').onclick = async () => {
@@ -1357,6 +1477,11 @@
       toast(`Đã tạo lại ${n} việc và chạy ngay`);
     };
     $('#chonChay').onclick = () => { dieuKhienViec('chayViec', [...U.chon]); U.chon.clear(); };
+    // 1.4.0
+    $('#chonDoiPrompt').onclick = () => doiPromptNhieu([...U.chon]);
+    $('#chonSangMuse').onclick = () => doiNen([...U.chon], 'muse');
+    $('#chonSangFlow').onclick = () => doiNen([...U.chon], 'flow');
+    $('#chonDrive').onclick = () => lenDrive([...U.chon]);
     $('#chonDung').onclick = () => { dieuKhienViec('dungViec', [...U.chon]); U.chon.clear(); };
 
     // Chi tiết
@@ -1386,6 +1511,10 @@
     $('#dsThuVien').onclick = (e) => { const o = e.target.closest('[data-tv]'); const j = o && viecTheoId(+o.dataset.tv); if (j) moXemLon(j.files[0], j.loai); };
 
     // Tài khoản
+    $('#nutChayLaiTk').onclick = async () => {
+      const r = await api.call('chayLaiMoiTaiKhoan');
+      toast(r && r.so ? `${r.so} tài khoản đang nghỉ / lỗi được cho nhận việc lại ngay` : 'Không có tài khoản nào đang nghỉ vì lỗi', !(r && r.so));
+    };
     $('#nutCapNhatToken').onclick = async () => {
       const b = $('#nutCapNhatToken'); b.disabled = true;
       toast('Đang đọc mức token của các tài khoản đang bật…');
@@ -1398,12 +1527,13 @@
       if (a && a.id) { U.nenTk = nen; luuUi(); veTaiKhoan(); }
       if (a && a.id && await xacNhan('Đăng nhập luôn?', nen === 'flow'
         ? `Mở Google Flow để đăng nhập "${esc(a.ten)}"? Đăng nhập xong, mở (hoặc tạo) một dự án Flow rồi bấm <b>Xong</b>.`
-        : `Mở ${nen === 'suno' ? 'suno.com' : 'muse.ai'} để đăng nhập "${esc(a.ten)}"?`, 'Đăng nhập')) lenhTaiKhoan('dangNhap', a.id);
+        : `Mở ${{ suno: 'suno.com', drive: 'Google Drive' }[nen] || 'muse.ai'} để đăng nhập "${esc(a.ten)}"?`, 'Đăng nhập')) lenhTaiKhoan('dangNhap', a.id);
     };
     $('#nenTk').onclick = (e) => { const b = e.target.closest('[data-v]'); if (b) { U.nenTk = b.dataset.v; luuUi(); veTaiKhoan(); } };
     $('#nutThemTK').onclick = () => themTk('muse');
     $('#nutThemTKFlow').onclick = () => themTk('flow');
     $('#nutThemTKSuno').onclick = () => themTk('suno');
+    $('#nutThemTKDrive').onclick = () => themTk('drive');
     $('#dsTaiKhoan').addEventListener('click', (e) => { const b = e.target.closest('[data-tk]'); if (b) lenhTaiKhoan(b.dataset.tk, b.dataset.id); });
     $('#nutXongDangNhap').onclick = () => dongDangNhap();
     const baoKhung = () => { if (U.dangNhapMo && U.trang === 'taikhoan') api.call('khungDangNhap', { khung: khungTrinhDuyet() }); };
@@ -1426,6 +1556,25 @@
     $('#cdMoThuMucVideoAnh').onclick = () => { const d = $('#cdThuMucVideoAnh').value; if (d) api.call('moThuMuc', { dir: d }); };
     $('#cdBoThuMucVideoAnh').onclick = async () => { await datCD({ thuMucVideoAnh: '' }); $('#cdThuMucVideoAnh').value = ''; };
     $('#cdVideoCanhAnh').addEventListener('change', (e) => $('#khoiThuMucVideoAnh').classList.toggle('mo-di', e.target.checked));
+    // 1.4.0: Google Drive — thư mục Drive trên máy của dự án đang mở (lưu ngay).
+    const idDa = () => (duAnHienTai() || {}).id;
+    $('#cdDriveCach').onchange = () => veDriveCach();
+    $('#cdDriveTkMoi').onclick = () => { U.nenTk = 'drive'; luuUi(); diToi('taikhoan'); };
+    $('#cdChonDrive').onclick = async () => { const d = await api.call('chonThuMucDrive', { duAn: idDa() }); if (d) { $('#cdThuMucDrive').value = d; toast(`Thư mục Google Drive: ${d}`); } };
+    $('#cdMoDrive').onclick = () => { const d = $('#cdThuMucDrive').value; if (d) api.call('moThuMuc', { dir: d }); else toast('Chưa chọn thư mục Google Drive', true); };
+    $('#cdTimDrive').onclick = async () => {
+      const ds = (await api.call('timDrive')) || [];
+      if (!ds.length) { toast('Không thấy thư mục Google Drive trên máy — cài Google Drive cho máy tính, đăng nhập rồi bấm lại (hoặc bấm Chọn…)', true); return; }
+      let chon = ds[0];
+      if (ds.length > 1) {
+        const v = await hoi({ tieuDe: 'Chọn thư mục Google Drive', ok: 'Dùng thư mục này', html: `<label>Thấy ${ds.length} thư mục Drive trên máy<select name="d">${ds.map((x) => `<option>${esc(x)}</option>`).join('')}</select></label>` });
+        if (!v) return;
+        chon = v.d;
+      }
+      await api.call('datThuMucDrive', { duAn: idDa(), thuMuc: chon });
+      $('#cdThuMucDrive').value = chon;
+      toast(`Thư mục Google Drive: ${chon}`);
+    };
     // Hẹn giờ
     $('#chipHen').onclick = () => diToi('hengio');
     for (const the of $$('#trang-hengio .the-hen')) {
@@ -1454,10 +1603,13 @@
         choAnhGiay: $('#cdChoAnh').value, choVideoGiay: $('#cdChoVideo').value, choChuGiay: $('#cdChoChu').value, choNhacGiay: $('#cdChoNhac').value,
         png: $('#cdPng').checked, doiNenKhiLoi: $('#cdDoiNen').checked, tatMayKhiXong: $('#cdTatMay').checked,
         videoCanhAnh: $('#cdVideoCanhAnh').checked, xoaChatKhiXong: $('#cdXoaChat').checked, xoaDuAnFlowKhiXong: $('#cdXoaDuAnFlow').checked,
+        driveBat: $('#cdDrive').checked, driveCach: $('#cdDriveCach').value, driveTk: $('#cdDriveTk').value, nheMay: $('#cdNheMay').checked,
         mau: { anh: $('#cdMauAnh').value, video: $('#cdMauVideo').value },
         flow: docCaiDatFlow()
       });
       veCaiDat();
+      if ($('#cdDrive').checked && $('#cdDriveCach').value === 'may' && !$('#cdThuMucDrive').value) { toast('Đã lưu — nhưng chưa chọn thư mục Google Drive (bấm Tự tìm hoặc Chọn…)', true); return; }
+      if ($('#cdDrive').checked && $('#cdDriveCach').value === 'web' && !$('#cdDriveTk').value) { toast('Đã lưu — nhưng chưa chọn tài khoản Google Drive (Tài khoản → Drive)', true); return; }
       toast(`Đã lưu cài đặt của dự án "${(duAnHienTai() || {}).ten || ''}"`);
     };
 
@@ -1481,6 +1633,7 @@
   ganSuKien();
   api.onState((s) => {
     S = s;
+    S.nhanLuc = s.luc || Date.now();
     apDuAn();
     ve();
     if (U.trang === 'caidat') veCapNhat();
@@ -1488,9 +1641,10 @@
   api.onLog(themLog);
   api.call('trangThai').then((s) => {
     S = s;
+    S.nhanLuc = s.luc || Date.now();
     apDuAn();
     for (const d of s.nhatKy || []) themLog(d);
     diToi(TEN_TRANG[U.trang] ? U.trang : 'anh');
   });
-  setInterval(capNhatTienDo, 1000);
+  setInterval(() => { capNhatTienDo(); if (S) veDongHo(); }, 1000);
 })();

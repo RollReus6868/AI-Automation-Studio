@@ -10,6 +10,7 @@
 const { app, BrowserWindow, WebContentsView, ipcMain, session, dialog, shell, net, powerSaveBlocker } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 const { spawn, execFile } = require('child_process');
 
 const pkg = require('./package.json');
@@ -27,6 +28,9 @@ const { DownloadManager } = require('./src/flow/main/downloads');
 const { locVeoSettings } = require('./src/flow/main/kiem-truoc');
 const { xoaDuAnFlow } = require('./src/flow/main/xoa-du-an');
 const { xoaChatChuotThat, nenThuChuotThat } = require('./src/main/xoa-chat-muse');
+const { chepLenDrive, timThuMucDrive } = require('./src/main/drive');
+const { DriveWeb } = require('./src/main/drive-web');
+const { ensureDebugger } = require('./src/flow/main/paste');
 
 // Thư mục dữ liệu riêng (phiên đăng nhập, cài đặt, hàng đợi) — PHẢI trước whenReady.
 app.setPath('userData', process.env.MUSE_DATA_DIR ||
@@ -36,6 +40,8 @@ const GOC_MUSE = (process.env.MUSE_URL || 'https://muse.ai').replace(/\/$/, '');
 const NGUON_TRANG = fs.readFileSync(path.join(__dirname, 'src/inject/muse-trang.js'), 'utf8');
 // Suno (mục Tạo nhạc, 1.1.0): luồng mở thẳng trang Create.
 const SUNO_URL = process.env.SUNO_URL || 'https://suno.com/create';
+// 1.4.0: Google Drive (tài khoản nền 'drive' — chỉ để tải kết quả lên Drive). Bài kiểm: trang Drive giả.
+const DRIVE_GOC = (process.env.DRIVE_URL || 'https://drive.google.com').replace(/\/$/, '');
 const NGUON_SUNO = fs.readFileSync(path.join(__dirname, 'src/inject/suno-trang.js'), 'utf8');
 const DUOI_ANH = /\.(png|jpe?g|webp|gif|bmp)$/i;
 const MIME = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif', bmp: 'image/bmp' };
@@ -47,26 +53,60 @@ let henBao = null;
 let soDongGhi = 0;
 
 // ── Nhật ký + đẩy trạng thái cho giao diện ─────────────────────────────────
+// 1.4.0: dòng nhật ký gom lại, ghi file mỗi 0,5 s (bất đồng bộ) — trước đây MỖI dòng là một lần ghi đĩa đồng bộ, chặn
+// tiến trình chính (engine Flow ghi hàng chục dòng mỗi phút mỗi tab). Thoát app thì ghi nốt (ghiNhatKyNgay).
+let choGhiLog = [];
+let henGhiLog = null;
+let dangGhiLog = Promise.resolve();
+const tepNhatKy = () => path.join(app.getPath('userData'), 'nhat-ky.txt');
+function ghiNhatKy() {
+  henGhiLog = null;
+  if (!choGhiLog.length) return;
+  const chu = choGhiLog.join('');
+  const soDong = choGhiLog.length;
+  choGhiLog = [];
+  dangGhiLog = dangGhiLog.then(async () => {
+    try {
+      const tep = tepNhatKy();
+      // 1.3.4: file nhật ký không phình mãi — quá 20 MB thì đổi thành nhat-ky-cu.txt (giữ 1 bản cũ) rồi ghi file mới.
+      if (Math.floor((soDongGhi - soDong) / 500) !== Math.floor(soDongGhi / 500) && (await fs.promises.stat(tep).catch(() => ({ size: 0 }))).size > 20 * 1024 * 1024) {
+        await fs.promises.rename(tep, path.join(app.getPath('userData'), 'nhat-ky-cu.txt'));
+      }
+      await fs.promises.appendFile(tep, chu);
+    } catch (_) {}
+  });
+}
+function ghiNhatKyNgay() {
+  clearTimeout(henGhiLog); henGhiLog = null;
+  if (!choGhiLog.length) return;
+  try { fs.appendFileSync(tepNhatKy(), choGhiLog.join('')); } catch (_) {}
+  choGhiLog = [];
+}
 function log(muc, chu) {
   const dong = { t: Date.now(), muc, chu: String(chu) };
   nhatKy.push(dong);
   if (nhatKy.length > 800) nhatKy.splice(0, nhatKy.length - 800);
-  try {
-    const tep = path.join(app.getPath('userData'), 'nhat-ky.txt');
-    // 1.3.4: file nhật ký không phình mãi — quá 20 MB thì đổi thành nhat-ky-cu.txt (giữ 1 bản cũ) rồi ghi file mới.
-    if (++soDongGhi % 500 === 0 && fs.statSync(tep).size > 20 * 1024 * 1024) fs.renameSync(tep, path.join(app.getPath('userData'), 'nhat-ky-cu.txt'));
-    fs.appendFileSync(tep, `${new Date(dong.t).toISOString()} [${muc}] ${dong.chu}\n`);
-  } catch (_) {}
+  soDongGhi++;
+  choGhiLog.push(`${new Date(dong.t).toISOString()} [${muc}] ${dong.chu}\n`);
+  if (!henGhiLog) henGhiLog = setTimeout(ghiNhatKy, 500);
   if (win && !win.isDestroyed()) win.webContents.send('log', dong);
 }
 
+/**
+ * Báo trạng thái cho giao diện, gom 250 ms. 1.4.0: hàng đợi lớn thì gom thưa hơn (mỗi lần báo là gửi cả hàng đợi và
+ * giao diện vẽ lại — 2.000 việc ≈ 0,75 s, tối đa 1 s); cửa sổ đang thu nhỏ thì thôi báo, mở lại thì báo ngay.
+ */
+let boLoBao = false;
+const nhipBao = () => Math.min(1000, 250 + Math.floor(((dieuPhoi && dieuPhoi.viec.length) || 0) / 4));
 function baoTrangThai() {
   if (henBao) return;
   henBao = setTimeout(() => {
     henBao = null;
     if (!win || win.isDestroyed() || !dieuPhoi) return;
+    if (win.isMinimized()) { boLoBao = true; return; }
+    boLoBao = false;
     win.webContents.send('state', trangThai());
-  }, 250);
+  }, nhipBao());
 }
 
 /**
@@ -116,7 +156,10 @@ function phien(tk) {
   const ses = session.fromPartition(tk.partition);
   if (!daCauHinh.has(tk.partition)) {
     daCauHinh.add(tk.partition);
-    if (tk.nen === 'flow') {
+    if (tk.nen === 'drive') {
+      // 1.4.0 Google Drive: đăng nhập Google như phiên Flow — giữ nguyên user agent thật của app (bỏ chữ "Electron"
+      // thì Google báo "trình duyệt không an toàn", xem Suno 15/10/2026). Không tải gì về qua phiên này.
+    } else if (tk.nen === 'flow') {
       // Google Flow: giữ nguyên phiên như Flow Automation Studio (đã chạy thật). Tải về theo TỪNG
       // tab: Electron đưa webContents vào will-download nên biết chắc file nào của tab nào.
       taiVeFlow.attach(ses);
@@ -204,6 +247,8 @@ function taoCuaSoAn(tk, tieuDe) {
     autoHideMenuBar: true, webPreferences: WEB_PREFS(tk)
   });
   ganWc(w.webContents);
+  // 1.4.0: trang chạy ngầm nhận ưu tiên CPU thấp hơn (đổi trang có thể sang tiến trình mới → áp lại mỗi lần nạp xong).
+  w.webContents.on('dom-ready', () => datUuTien(w.webContents));
   // Người dùng bấm X khi đang xem luồng → chỉ ẩn, luồng vẫn chạy.
   w.on('close', (e) => { if (!appDangThoat && !w.__huy) { e.preventDefault(); w.hide(); } });
   return w;
@@ -229,6 +274,28 @@ function donKhoFlow() {
       storeFlow.set({ veoProjects: Object.fromEntries(giu.map((k) => [k, veoProjects[k]])) });
     }
   }
+}
+
+// ── 1.4.0: máy mượt — hạ ưu tiên CPU các trang chạy ngầm ─────────────────────
+// Mỗi luồng Muse / Suno / tab Flow là một trang web thật (tiến trình riêng). Chạy nhiều luồng thì các trang này giành
+// CPU với giao diện app và các phần mềm khác → máy giật. Hạ chúng xuống "dưới bình thường": máy rảnh thì vẫn chạy đủ
+// nhanh, máy bận thì giao diện / phần mềm người dùng đang dùng được ưu tiên trước. Tắt ở Cài đặt → Chạy.
+const daHaUuTien = new Set();
+function datUuTien(wc) {
+  try {
+    if (!wc || wc.isDestroyed()) return;
+    const pid = wc.getOSProcessId();
+    if (!pid) return;
+    const nhe = !dieuPhoi || dieuPhoi.caiDat.nheMay !== false;
+    if (nhe === daHaUuTien.has(pid)) return;
+    os.setPriority(pid, nhe ? os.constants.priority.PRIORITY_BELOW_NORMAL : os.constants.priority.PRIORITY_NORMAL);
+    if (nhe) daHaUuTien.add(pid); else daHaUuTien.delete(pid);
+  } catch (_) {}
+}
+function datUuTienMoiLuong() {
+  for (const w of viewCuaLuong.values()) if (w && !w.isDestroyed()) datUuTien(w.webContents);
+  for (const t of (tabsFlow && tabsFlow.tabs) || []) { try { datUuTien(t.view.webContents); } catch (_) {} }
+  if (daHaUuTien.size > 500) daHaUuTien.clear();
 }
 
 // ── Luồng chạy ngầm ───────────────────────────────────────────────────────
@@ -304,7 +371,7 @@ function moDangNhap(id, khung) {
   win.contentView.addChildView(v);
   dangNhap = { id, view: v };
   datKhungDangNhap(khung);
-  v.webContents.loadURL(tk.nen === 'flow' ? (tk.flowUrl || FLOW_URL) : tk.nen === 'suno' ? SUNO_URL : GOC_MUSE).catch(() => {});
+  v.webContents.loadURL(tk.nen === 'flow' ? (tk.flowUrl || FLOW_URL) : tk.nen === 'suno' ? SUNO_URL : tk.nen === 'drive' ? `${DRIVE_GOC}/drive/my-drive` : GOC_MUSE).catch(() => {});
   baoTrangThai();
   return { ok: true };
 }
@@ -356,6 +423,7 @@ async function docTrangThai(wc, ms) {
 /** Kiểm đăng nhập (và đọc mức dùng token) mà không mở gì lên màn hình. */
 /** Google Flow: đăng nhập = phiên có cookie SID / __Secure-1PSID của google.com (cách của Flow Automation Studio). */
 async function daDangNhapFlow(tk) {
+  if (process.env.DRIVE_URL && tk.nen === 'drive') return true;   // bài kiểm: trang Drive giả tự báo cần đăng nhập
   try {
     const cookies = await phien(tk).cookies.get({ domain: '.google.com' });
     return cookies.some((c) => c.name === 'SID' || c.name === '__Secure-1PSID');
@@ -373,6 +441,13 @@ async function kiemTaiKhoan(id, nguoiBam = false) {
   }
   // 1.3.7: bấm Kiểm tra = xem lại tài khoản từ đầu — bỏ màu đỏ "việc gần nhất lỗi" (đang nghỉ / hết lượt vẫn đỏ tới giờ).
   if (nguoiBam && dieuPhoi && dieuPhoi.ketQuaTk) delete dieuPhoi.ketQuaTk[id];
+  if (tk.nen === 'drive') {
+    const co = await daDangNhapFlow(tk);
+    taiKhoan.sua(id, { trangThai: co ? 'da-dang-nhap' : 'can-dang-nhap' });
+    log(co ? 'success' : 'warning', `👤 "${tk.ten}": ${co ? 'đã đăng nhập Google — dùng để tải ảnh / video lên Google Drive' : 'CHƯA đăng nhập Google'}`);
+    baoTrangThai();
+    return co ? 'da-dang-nhap' : 'can-dang-nhap';
+  }
   if (tk.nen === 'flow') {
     const co = await daDangNhapFlow(tk);
     taiKhoan.sua(id, { trangThai: co ? 'da-dang-nhap' : 'can-dang-nhap' });
@@ -432,6 +507,34 @@ function capNhatToken() {
  * @param threads  [url…] chỉ xoá các chat đó; bỏ trống → xoá MỌI chat phụ ("Main chat" Muse không cho xoá).
  */
 let dangXoaChat = false;
+// ── 1.4.0: tải thẳng lên drive.google.com bằng phiên tài khoản Drive (src/main/drive-web.js) ──
+let driveWeb = null;
+function thuMucChanDoan(ten) {
+  return process.env.MUSE_DATA_DIR ? path.join(app.getPath('userData'), ten) : path.join(app.getPath('documents'), 'AI Automation Studio', ten);
+}
+async function lenDriveWeb(x) {
+  if (!driveWeb) {
+    driveWeb = new DriveWeb({
+      goc: DRIVE_GOC, timTk: (id) => taiKhoan.tim(id), store, ganDebugger: ensureDebugger,
+      taoCuaSo: (tk) => { const w = taoCuaSoAn(tk, `Google Drive · ${tk.ten}`); if (xemLuong) w.showInactive(); return w; },
+      dongCuaSo: (w) => dongCuaSoAn(w),
+      luuChanDoan: (ten, html) => {
+        try {
+          const d = thuMucChanDoan('chan-doan-drive');
+          fs.mkdirSync(d, { recursive: true });
+          const t = new Date(), so = (n) => String(n).padStart(2, '0');
+          const p = path.join(d, `${ten}-${t.getFullYear()}${so(t.getMonth() + 1)}${so(t.getDate())}-${so(t.getHours())}${so(t.getMinutes())}${so(t.getSeconds())}.html`);
+          fs.writeFileSync(p, html, 'utf8');
+          return p;
+        } catch (_) { return ''; }
+      }
+    });
+  }
+  const r = await driveWeb.len(x);
+  if (r.canDangNhap && taiKhoan.tim(x.tkId)) { taiKhoan.sua(x.tkId, { trangThai: 'can-dang-nhap' }); baoTrangThai(); }
+  return r;
+}
+
 let dangTaiNhieu = false;
 /** 1.3.0: xoá chat Muse không được → lưu HTML khung danh sách chat + menu để người dùng gửi lại (Muse đổi giao diện). */
 function luuChanDoanMuse(tk, r) {
@@ -614,6 +717,26 @@ const LENH = {
   chayViec: ({ ids }) => dieuPhoi.chayViec(ids),
   xoaViec: ({ ids }) => dieuPhoi.xoaViec(ids),
   suaViec: ({ id, thay }) => dieuPhoi.suaViec(id, thay),
+  // 1.4.0: đổi prompt nhiều việc, đổi ngay sang Muse / Flow, đưa lên Google Drive, chạy lại tài khoản đang nghỉ.
+  doiPrompt: ({ ids, ...p }) => dieuPhoi.doiPrompt(ids || [], p),
+  doiNenViec: ({ ids, nen, chay = true }) => dieuPhoi.doiNenViec(ids || [], nen, chay),
+  lenDriveViec: ({ ids }) => dieuPhoi.lenDriveViec(ids || []),
+  chayLaiTaiKhoan: ({ id }) => dieuPhoi.chayLaiTaiKhoan(id),
+  chayLaiMoiTaiKhoan: () => {
+    const ds = taiKhoan.list().filter((a) => { const sk = dieuPhoi.sucKhoeTk()[a.id]; return sk && sk.muc === 'loi' && a.trangThai !== 'can-dang-nhap'; });
+    for (const a of ds) dieuPhoi.chayLaiTaiKhoan(a.id);
+    return { ok: true, so: ds.length };
+  },
+  /** Thư mục Google Drive trên máy (Google Drive cho máy tính) của dự án: hộp chọn thư mục. */
+  chonThuMucDrive: async ({ duAn } = {}) => {
+    const goiY = timThuMucDrive()[0];
+    const r = await dialog.showOpenDialog(win, { title: 'Thư mục Google Drive trên máy (vd G:\\My Drive)', defaultPath: goiY || undefined, properties: ['openDirectory', 'createDirectory'] });
+    if (r.canceled || !r.filePaths[0]) return null;
+    dieuPhoi.datCaiDat({ thuMucDrive: r.filePaths[0] }, duAn);
+    return r.filePaths[0];
+  },
+  timDrive: () => timThuMucDrive(),
+  datThuMucDrive: ({ duAn, thuMuc }) => { dieuPhoi.datCaiDat({ thuMucDrive: String(thuMuc || '') }, duAn); return true; },
   taoDuAn: ({ ten, taiKhoan: ds, chaySong, tuDuAn, boLoai }) => dieuPhoi.taoDuAn(ten, ds, chaySong, tuDuAn, boLoai),
   datTaiKhoanDuAn: ({ id, taiKhoan: ds, chaySong, boLoai }) => dieuPhoi.datTaiKhoanDuAn(id, ds, chaySong, boLoai),
   doiTenDuAn: ({ id, ten }) => dieuPhoi.doiTenDuAn(id, ten),
@@ -632,7 +755,7 @@ const LENH = {
   // 1.3.0: { duAn, ...cài đặt } → lưu vào cài đặt RIÊNG của dự án đó.
   datHenGio: ({ loai, hen }) => dieuPhoi.datHenGio(loai, hen),
   dungHen: ({ loai }) => dieuPhoi.dungHen(loai),
-  datCaiDat: (c) => { const { duAn, ...m } = c || {}; return dieuPhoi.datCaiDat(m, duAn); },
+  datCaiDat: (c) => { const { duAn, ...m } = c || {}; const r = dieuPhoi.datCaiDat(m, duAn); if ('nheMay' in m) datUuTienMoiLuong(); return r; },
 
   themTaiKhoan: ({ ten, nen }) => { const a = taiKhoan.them(ten, nen); baoTrangThai(); return a; },
   suaTaiKhoan: ({ id, thay }) => { taiKhoan.sua(id, thay); baoTrangThai(); },
@@ -880,6 +1003,8 @@ function taoCuaSo() {
   });
   win.loadFile(path.join(__dirname, 'src/ui/index.html'));
   win.webContents.on('did-finish-load', () => baoTrangThai());
+  // 1.4.0: thu nhỏ thì thôi báo trạng thái (giao diện không ai xem) — mở lại thì báo ngay.
+  win.on('restore', () => { if (boLoBao) baoTrangThai(); });
   // Đóng cửa sổ chính = thoát app (các cửa sổ luồng ẩn không được giữ app sống).
   win.on('closed', () => { win = null; app.quit(); });
 }
@@ -934,6 +1059,9 @@ app.whenReady().then(() => {
     thuMucTam: path.join(app.getPath('userData'), 'ket-qua-tam'),
     tonTai: (p) => fs.existsSync(p),
     donDep: (don) => donDep(don),
+    lenDrive: (x) => chepLenDrive(x),                                   // 1.4.0
+    lenDriveWeb: (x) => lenDriveWeb(x),
+    chayLaiFlow: (id) => mayFlow && mayFlow.chayLaiNgay && mayFlow.chayLaiNgay(id),
     // 1.3.7: Flow cho tài khoản nghỉ mà dự án không còn tài khoản Flow nào khác (máy Flow tự tạm dừng tab) → thẻ tài khoản đỏ.
     nghiFlow: (id) => {
       const so = mayFlow && mayFlow.soAnToanCua ? mayFlow.soAnToanCua(id) : null;
@@ -957,6 +1085,8 @@ app.whenReady().then(() => {
 
   taoCuaSo();
   log('info', `AI Automation Studio ${pkg.version} đã mở. Dữ liệu: ${app.getPath('userData')}`);
+  // 1.4.0: rà ưu tiên CPU của các trang chạy ngầm (trang mới / bật tắt "máy mượt").
+  setInterval(datUuTienMoiLuong, 15000);
   // 1.3.4: RAM từng phần vào nhật ký mỗi 10 phút khi đang chạy (MUSE_RAM_MS đổi nhịp cho bài kiểm).
   setInterval(() => { try { if (dieuPhoi.dangChay || dieuPhoi.luong.length) baoRam(); } catch (_) {} },
     parseInt(process.env.MUSE_RAM_MS, 10) || 10 * 60 * 1000);
@@ -997,6 +1127,7 @@ app.on('before-quit', (e) => {
   try { tabsFlow && tabsFlow.closeAll(); } catch (_) {}
   try { store && store.close(); } catch (_) {}
   try { storeFlow && storeFlow.close(); } catch (_) {}
+  ghiNhatKyNgay();
 });
 
 app.on('window-all-closed', () => app.quit());

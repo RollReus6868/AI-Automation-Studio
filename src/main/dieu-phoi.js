@@ -75,11 +75,20 @@ const CAI_DAT_MAC_DINH = {
   // tài khoản, hay Muse từ chối tạo video từ một ảnh. Mỗi việc chỉ đổi bên một lần (không đá qua đá lại).
   doiNenKhiLoi: true,
   tachPrompt: 'dong',     // 'dong' | 'doan'
+  // 1.4.0: ảnh / video xong → đưa lên Google Drive (<Drive>/<Tên dự án>/images | Videos), hai cách:
+  //   'may' = chép vào thư mục Google Drive trên máy (Drive cho máy tính tự tải lên) — thuMucDrive;
+  //   'web' = tải thẳng lên drive.google.com bằng trình duyệt trong app, tài khoản Drive driveTk.
+  driveBat: false,
+  driveCach: 'may',
+  thuMucDrive: '',
+  driveTk: '',
+  // 1.4.0: máy mượt — hạ ưu tiên CPU của các trang Muse / Flow / Suno chạy ngầm (chung cả app, main.js áp).
+  nheMay: true,
   mau: { ...hd.MAU_MAC_DINH },
   flow: chuanHoaFlow({})  // cài đặt Google Flow (src/flow/cai-dat-flow.js)
 };
 // 1.3.0: cài đặt của CẢ APP (không theo dự án) — còn lại mỗi dự án một bộ riêng (d.caiDat).
-const KHOA_CHUNG = ['tatMayKhiXong', 'moc'];
+const KHOA_CHUNG = ['tatMayKhiXong', 'moc', 'nheMay'];
 const TRANG_XONG = new Set(['xong', 'loi', 'dung']);
 const LOAI = ['anh', 'video', 'nhac'];
 
@@ -97,6 +106,8 @@ function chuanCaiDat(c, flowGoc, flowMoi) {
   m.thuMucVideo = String(m.thuMucVideo || '').trim();
   m.thuMucVideoAnh = String(m.thuMucVideoAnh || '').trim();
   m.thuMucNhac = String(m.thuMucNhac || '').trim();
+  m.driveBat = !!m.driveBat; m.thuMucDrive = String(m.thuMucDrive || '').trim();
+  m.driveCach = m.driveCach === 'web' ? 'web' : 'may'; m.driveTk = String(m.driveTk || ''); m.nheMay = m.nheMay !== false;
   m.tenNhac = String(m.tenNhac || '').trim() || hd.MAU_TEN_ANH_MAC_DINH;
   m.choNhacGiay = so(m.choNhacGiay, 120, 3600, 600);
   m.nghiGiuaLanGui = so(m.nghiGiuaLanGui, 0, 120, 3);
@@ -185,6 +196,7 @@ class DieuPhoi {
       if (d.caiDat && moc5 && d.caiDat.flow && d.caiDat.flow.chatLuongAnh === 'img_2k') d.caiDat.flow.chatLuongAnh = 'img_1k';
       if (d.caiDat) d.caiDat = rieng(chuanCaiDat({ ...this.caiDat, ...d.caiDat }, this.caiDat.flow, d.caiDat.flow));
       if (!d.flowUrl || typeof d.flowUrl !== 'object') d.flowUrl = {};
+      if (d.dongHo) d.dongHo.dangChay = false;   // 1.4.0: đồng hồ dự án — app vừa mở thì chưa dự án nào chạy
     }
     this.luong = [];          // [{luong, taiKhoanId, duAn}] — duAn = null: luồng dùng chung mọi dự án (Suno)
     this.duAnChay = new Set();   // 1.3.0: dự án đang bấm Chạy (mỗi dự án chạy / dừng riêng)
@@ -200,6 +212,9 @@ class DieuPhoi {
     this.ketQuaTk = {};       // 1.3.7: taiKhoanId → { ok, luc, loi } của việc gần nhất (màu đỏ / xanh ở mục Tài khoản)
     this.nghiLoai = {};       // 'taiKhoanId:loai' → tài khoản bị chặn tạo loại này (vd Muse chặn video khu vực) tới lúc
     this.tkFlowDaChay = new Map();   // dự án → Set(tài khoản Flow đã chạy trong lượt này) — để tự xoá dự án Flow khi xong
+    this.duAnTamDung = new Set();    // 1.4.0: dự án app tự TẠM DỪNG vì không còn tài khoản chạy được (bấm "Chạy lại" tài khoản → chạy tiếp)
+    this._driveCho = Promise.resolve();   // 1.4.0: chép lên Google Drive lần lượt, không chặn điều phối
+    this._driveLoiCuoi = { chu: '', luc: 0 };
     this.idMoi = this.viec.reduce((m, j) => Math.max(m, j.id || 0), 0) + 1;
     this.luu();
     this.hen = setInterval(() => this._vong(), 1000);
@@ -271,6 +286,8 @@ class DieuPhoi {
       henGio: Object.fromEntries(HG.LOAI_HEN.map((l) => [l, { ...this.henGio[l], lanToi: HG.lanChayToi(this.henGio[l], this.bayGio()) }])),
       henChay: Object.fromEntries([...this.loaiChay].map(([l, x]) => [l, { duAn: x.duAn, den: x.den }])),
       sucKhoe: this.sucKhoeTk(),
+      // 1.4.0: đồng hồ từng dự án (đã chạy lượt này / tổng) + dự đoán còn bao lâu; luc = mốc đo (giao diện tự đếm tiếp).
+      dongHo: this.dongHo(), luc: this.bayGio(),
       duKien: { anh: hd.thoiGianDuKien(this.viec, 'anh'), video: hd.thoiGianDuKien(this.viec, 'video'), nhac: hd.thoiGianDuKien(this.viec, 'nhac') }
     };
   }
@@ -380,9 +397,11 @@ class DieuPhoi {
   sucKhoeTk() {
     const bay = Date.now(), ra = {};
     const nghiFlow = this.o.nghiFlow || (() => null);
+    const demChay = {};   // 1.4.0: đếm một lượt cho mọi tài khoản (trước: lọc cả hàng đợi cho từng tài khoản, mỗi lần báo giao diện)
+    for (const j of this.viec) if (j.trangThai === 'chay' && j.taiKhoan) demChay[j.taiKhoan] = (demChay[j.taiKhoan] || 0) + 1;
     for (const a of this.o.taiKhoan.ds || []) {
       const id = a.id, kq = this.ketQuaTk[id];
-      const dang = this.viec.filter((j) => j.trangThai === 'chay' && j.taiKhoan === id).length;
+      const dang = demChay[id] || 0;
       const f = nghiFlow(id);
       const chanLoai = Object.keys(this.nghiLoai).filter((k) => k.startsWith(`${id}:`) && this.nghiLoai[k] > bay);
       let x;
@@ -423,6 +442,7 @@ class DieuPhoi {
     if (this.duAn.length <= 1) return { ok: false, loi: 'Phải giữ lại ít nhất một dự án' };
     if (this.viec.some((j) => j.duAn === id && j.trangThai === 'chay')) return { ok: false, loi: 'Dự án đang có việc chạy' };
     this.duAn = this.duAn.filter((d) => d.id !== id);
+    this.duAnTamDung.delete(id);
     this.viec = this.viec.filter((j) => j.duAn !== id);
     // 1.3.6: hẹn giờ chỉ cho dự án này → tắt hẹn (không tự chuyển sang chạy mọi dự án).
     for (const l of HG.LOAI_HEN) {
@@ -660,6 +680,206 @@ class DieuPhoi {
     return true;
   }
 
+  // ── 1.4.0: đổi prompt hàng loạt, đổi nơi chạy bằng tay, Google Drive ─────────
+  /**
+   * Đổi prompt của nhiều việc một lần (chọn hết → Đổi prompt).
+   * @param p.cach  'thay' = thay cả prompt bằng p.moi · 'tim' = thay chữ p.tim bằng p.thay
+   * @param p.dich  'viec' = prompt của việc · 'chuoi' = prompt video sẽ tự tạo từ ảnh (ảnh chưa nối video)
+   * @param p.taoLai  việc đã xong / lỗi / đã dừng: đưa về hàng chờ và chạy ngay với prompt mới
+   */
+  doiPrompt(ids, p = {}) {
+    const cach = p.cach === 'tim' ? 'tim' : 'thay', dich = p.dich === 'chuoi' ? 'chuoi' : 'viec';
+    const moi = String(p.moi || '').trim(), tim = String(p.tim || ''), thay = String(p.thay || '');
+    if (cach === 'thay' && !moi) return { ok: false, loi: 'Chưa nhập prompt mới' };
+    if (cach === 'tim' && !tim) return { ok: false, loi: 'Chưa nhập chữ cần tìm' };
+    let doi = 0, dangChay = 0, khongDoi = 0;
+    const lai = [];
+    for (const j of this.viec) {
+      if (!ids.includes(j.id)) continue;
+      if (dich === 'chuoi' ? j.loai !== 'anh' || !j.chuoi || j.daNoiVideo : false) { khongDoi++; continue; }
+      if (dich === 'viec' && j.trangThai === 'chay') { dangChay++; continue; }
+      const cu = dich === 'chuoi' ? j.chuoi.prompt : j.prompt;
+      const sau = (cach === 'thay' ? moi : String(cu).split(tim).join(thay)).trim();
+      if (!sau || sau === cu) { khongDoi++; continue; }
+      // Mọi ảnh thêm cùng lượt dùng CHUNG một đối tượng chuoi trong bộ nhớ → thay bản sao, không sửa tại chỗ.
+      if (dich === 'chuoi') j.chuoi = { ...j.chuoi, prompt: sau };
+      else j.prompt = sau;
+      doi++;
+      if (dich === 'viec' && p.taoLai && TRANG_XONG.has(j.trangThai)) lai.push(j.id);
+    }
+    if (doi) this.log('info', `✏ Đã đổi ${dich === 'chuoi' ? 'prompt video nối từ ảnh của' : 'prompt'} ${doi} việc` +
+      `${cach === 'tim' ? ` (thay "${tim}" → "${thay}")` : ''}${dangChay ? ` · bỏ qua ${dangChay} việc đang chạy` : ''}.`);
+    const taoLai = lai.length ? this.taoLai(lai, true) : 0;
+    this.luu();
+    return { ok: true, doi, dangChay, khongDoi, taoLai };
+  }
+
+  /**
+   * Đổi NGAY nơi chạy của việc sang Muse / Flow (bấm tay ở dòng việc hoặc chọn nhiều), rồi chạy ngay.
+   * Việc đang chạy: dừng ở bên cũ trước (Muse: đợi luồng dừng hẳn; Flow: tách khỏi mẻ, kết quả sau của mẻ cũ bị bỏ).
+   * Việc đã xong: tạo lại ở bên mới (file mới ghi đè file cũ của chính việc đó). Bên mới phải có tài khoản dự án dùng được.
+   * Đổi tay xong thì việc không tự đổi ngược về bên cũ (Muse ⇄ Flow tự động bỏ qua việc này).
+   */
+  doiNenViec(ids, nen, chay = true) {
+    nen = nen === 'flow' ? 'flow' : 'muse';
+    let daO = 0, nhac = 0;
+    const khongTk = new Set(), lai = [], soDoi = [];
+    for (const j of this.viec) {
+      if (!ids.includes(j.id)) continue;
+      if (j.loai === 'nhac' || j.nen === 'suno') { nhac++; continue; }
+      if ((j.nen || 'muse') === nen) { daO++; continue; }
+      if (!this._dsTk(j.duAn, nen, j.loai).length) { khongTk.add(this._tenDuAn(j.duAn)); continue; }
+      soDoi.push(j.so);
+      if (j.trangThai === 'chay') {
+        const x = this.luong.find((y) => y.luong.nen === 'flow' ? (y.luong.dsViec || []).includes(j) : y.luong.viec === j);
+        if (x && x.luong.nen !== 'flow') {
+          // Muse: dừng luồng, _ketThuc nhận kết quả dừng rồi mới chuyển (không để hai bên cùng chạy một việc).
+          j.chuyenNen = { nen, chay };
+          x.luong.dung();
+          continue;
+        }
+        this._apNen(j, nen);
+        if (x && (x.luong.dsViec || []).every((v) => v.trangThai !== 'chay')) x.luong.dung();
+      } else this._apNen(j, nen);
+      lai.push(j);
+    }
+    if (soDoi.length) this.log('warning', `🔀 Đổi tay ${soDoi.length} việc sang ${TEN_NEN[nen]}${chay ? ' và chạy ngay' : ''}: #${soDoi.join(', #')}.`);
+    if (khongTk.size) this.log('error', `⛔ Không đổi được sang ${TEN_NEN[nen]}: dự án ${[...khongTk].map((t) => `"${t}"`).join(', ')} chưa có tài khoản ${TEN_NEN[nen]} dùng được (bấm nút tài khoản cạnh tên dự án).`);
+    if (chay && lai.length) this._chayRieng(lai);
+    this.luu();
+    if (chay && lai.length) this._vong();
+    return { ok: true, doi: soDoi.length, daO, nhac, khongTk: [...khongTk] };
+  }
+
+  /** Đặt việc sang nền tảng `nen`, về hàng chờ, gửi mới từ đầu (ảnh nguồn / tham chiếu giữ nguyên). */
+  _apNen(j, nen) {
+    j.daQuaNen = [...new Set([...(j.daQuaNen || []), j.nen || 'muse', nen])];
+    delete j.muon; delete j.flowAnh; delete j.chuyenNen;
+    Object.assign(j, { nen, trangThai: 'cho', buoc: '', thread: '', taiKhoan: '', tkLoi: [], vongTk: 0, thu: 0, loi: '',
+      batDauLuc: 0, xongLuc: 0, vongLai: 0, sunoBai: null, uuTienLuc: 0 });
+    if (nen === 'muse') j.tuFlow = true; else delete j.tuFlow;
+  }
+
+  /** Đưa (lại) kết quả của các việc đã xong lên Google Drive — dùng thư mục Drive của dự án, kể cả khi tắt "tự đưa". */
+  lenDriveViec(ids) {
+    const ds = this.viec.filter((j) => ids.includes(j.id) && j.trangThai === 'xong' && (j.loai === 'anh' || j.loai === 'video') && (j.files || []).length);
+    const chep = ds.filter((j) => !this._driveThieu(this.cd(j.duAn)));
+    if (ds.length && !chep.length) return { ok: false, loi: `${this._driveThieu(this.cd(ds[0].duAn))} — vào Cài đặt → Google Drive` };
+    for (const j of chep) this._lenDrive(j, true);
+    return { ok: true, so: chep.length, boQua: ids.length - chep.length };
+  }
+
+  /** Chép file của việc vừa xong lên thư mục Drive (lần lượt, chạy nền — lỗi chỉ ghi nhật ký, việc vẫn Xong). */
+  _lenDrive(j, tay = false) {
+    if (!this.o.lenDrive && !this.o.lenDriveWeb) return;
+    const c = this.cd(j.duAn);
+    if (!(tay || c.driveBat) || (j.loai !== 'anh' && j.loai !== 'video')) return;
+    const thieu = this._driveThieu(c);
+    if (thieu) {
+      if (!tay) this._baoLoiDrive(j, thieu);
+      return;
+    }
+    const web = c.driveCach === 'web';
+    const files = [...(j.files || [])];
+    this._driveCho = this._driveCho.then(async () => {
+      const d = this.duAn.find((x) => x.id === j.duAn);
+      if (!d || !this.viec.includes(j)) return;
+      const r = web
+        ? await this.o.lenDriveWeb({ tkId: c.driveTk, tenDuAn: d.ten, loai: j.loai, files, cu: j.drive || [] })
+        : await this.o.lenDrive({ goc: c.thuMucDrive, tenDuAn: d.ten, loai: j.loai, files, cu: j.drive || [] });
+      if (r.ok) {
+        j.drive = r.files; delete j.driveLoi;
+        this.log('success', `☁ #${j.so} đã đưa lên Google Drive: ${r.files[0]}${r.files.length > 1 ? ` (+${r.files.length - 1} file)` : ''}`);
+      } else this._baoLoiDrive(j, r.loi);
+      this.luu();
+    }).catch((err) => this.log('warning', `☁ #${j.so} chưa đưa lên Google Drive: ${err.message}`));
+  }
+
+  /** Cài đặt Drive còn thiếu gì ('' = đủ). */
+  _driveThieu(c) {
+    if (c.driveCach === 'web') {
+      if (!this.o.lenDriveWeb) return 'Bản này chưa tải thẳng lên Drive được';
+      const a = c.driveTk && this.o.taiKhoan.tim(c.driveTk);
+      return a && a.nen === 'drive' ? '' : 'Chưa chọn tài khoản Google Drive để tải lên';
+    }
+    if (!this.o.lenDrive) return 'Bản này chưa chép vào thư mục Drive được';
+    return c.thuMucDrive ? '' : 'Chưa chọn thư mục Google Drive trên máy';
+  }
+
+  _baoLoiDrive(j, loi) {
+    j.driveLoi = loi;
+    // Thư mục Drive mất / Drive chưa đăng nhập…: cùng một lỗi mỗi phút báo một lần, khỏi tràn nhật ký.
+    const bay = Date.now();
+    if (loi !== this._driveLoiCuoi.chu || bay - this._driveLoiCuoi.luc > 60000) {
+      this._driveLoiCuoi = { chu: loi, luc: bay };
+      this.log('warning', `☁ #${j.so} chưa đưa lên Google Drive: ${loi}. File vẫn ở máy — chọn việc rồi bấm "Lên Drive" để đưa lại.`);
+    }
+  }
+
+  /**
+   * 1.4.0 — "Chạy lại ngay" tài khoản đang nghỉ / đỏ vì lỗi (lỗi đã sửa xong, khỏi chờ hết giờ nghỉ): bỏ mốc nghỉ, chặn loại,
+   * chặn video, hết lượt, đếm lỗi; Flow đang tạm dừng thì chạy tiếp; việc đang chờ được giao lại cho tài khoản này. Dự án
+   * app đã tự TẠM DỪNG vì hết tài khoản (có dùng tài khoản này) → chạy tiếp luôn.
+   */
+  chayLaiTaiKhoan(id) {
+    const a = this.o.taiKhoan.tim(id);
+    if (!a) return { ok: false, loi: 'Không tìm thấy tài khoản' };
+    delete this.nghiDen[id]; delete this.lyDoNghi[id]; delete this.ketQuaTk[id];
+    this.loiLienTiep[id] = 0;
+    for (const k of Object.keys(this.nghiLoai)) if (k.startsWith(`${id}:`)) delete this.nghiLoai[k];
+    if ((a.chanVideoDen || 0) || (a.hetLuotDen || 0)) this.o.taiKhoan.sua(id, { chanVideoDen: 0, hetLuotDen: 0 });
+    if (this.o.chayLaiFlow) this.o.chayLaiFlow(id);
+    for (const j of this.viec) if (j.trangThai === 'cho' && (j.tkLoi || []).includes(id)) j.tkLoi = j.tkLoi.filter((x) => x !== id);
+    const tiep = [];
+    for (const dId of [...this.duAnTamDung]) {
+      if (!this.duAn.some((d) => d.id === dId)) { this.duAnTamDung.delete(dId); continue; }
+      if (!this._dsTkGoc(dId, a.nen || 'muse').includes(id) || !this.viec.some((j) => j.duAn === dId && j.trangThai === 'cho')) continue;
+      this.duAnTamDung.delete(dId);
+      if (!this.duAnChay.has(dId)) { this.chayDuAn(dId, true); tiep.push(this._tenDuAn(dId)); }
+    }
+    this.log('success', `▶ "${a.ten}": đã bỏ trạng thái nghỉ / lỗi — tài khoản nhận việc lại ngay` +
+      `${tiep.length ? `; chạy tiếp dự án ${tiep.map((t) => `"${t}"`).join(', ')}` : ''}.`);
+    this.luu();
+    this._vong();
+    return { ok: true, tiep: tiep.length };
+  }
+
+  // ── 1.4.0: đồng hồ dự án ─────────────────────────────────────────────────
+  /** Mỗi nhịp: dự án đang chạy (bấm Chạy / hẹn giờ / chạy riêng / còn việc đang chạy) thì cộng giờ. Lượt mới = đếm lại từ 0. */
+  _demGio() {
+    const bay = this.bayGio();
+    const buoc = Math.max(0, Math.min(5000, bay - (this._gioTruoc || bay)));   // máy ngủ / treo lâu: không cộng cả quãng đó
+    this._gioTruoc = bay;
+    const chay = new Set(this.duAnChay);
+    for (const j of this.viec) if (j.trangThai === 'chay' || (j.trangThai === 'cho' && this._duocChay(j))) chay.add(j.duAn);
+    for (const d of this.duAn) {
+      const g = d.dongHo || (d.dongHo = { luot: 0, tong: 0, batDau: 0, xongLuc: 0, dangChay: false });
+      if (chay.has(d.id)) {
+        if (!g.dangChay) Object.assign(g, { dangChay: true, luot: 0, batDau: bay, xongLuc: 0 });
+        else { g.luot += buoc; g.tong = (g.tong || 0) + buoc; }
+      } else if (g.dangChay) Object.assign(g, { dangChay: false, xongLuc: bay });
+    }
+  }
+
+  /** {id: {dangChay, daChay (lượt này), tong, batDau, xongLuc, conLai (ms, dự đoán), soCon}} cho giao diện. */
+  dongHo() {
+    const bay = this.bayGio(), theo = new Map(), ra = {};
+    for (const j of this.viec) { if (!theo.has(j.duAn)) theo.set(j.duAn, []); theo.get(j.duAn).push(j); }
+    for (const d of this.duAn) {
+      const g = d.dongHo || {}, cua = theo.get(d.id) || [];
+      const conViec = cua.some((j) => j.trangThai === 'cho' || j.trangThai === 'chay');
+      let du = { conLai: 0, soCon: 0 };
+      if (conViec) {
+        // Chưa có việc nào xong trong lượt này: ước số việc chạy cùng lúc = tài khoản Chạy × luồng (Muse) / tab (Flow).
+        const c = this.cd(d.id), nen = new Set(cua.filter((j) => j.trangThai === 'cho' || j.trangThai === 'chay').map((j) => j.nen || 'muse'));
+        const songSong = [...nen].reduce((s, n) => s + this._soSong(d.id, n, true) * (n === 'muse' ? c.luongMoiTK : n === 'flow' ? c.flow.tabMoiTK : 1), 0);
+        du = hd.duDoanConLai(cua, bay, { batDauLuot: g.dangChay ? g.batDau : 0, daChayMs: g.dangChay ? g.luot : 0, songSong });
+      }
+      ra[d.id] = { dangChay: !!g.dangChay, daChay: g.luot || 0, tong: g.tong || 0, batDau: g.batDau || 0, xongLuc: g.xongLuc || 0, ...du };
+    }
+    return ra;
+  }
+
   // ── Nhân vật / mẫu prompt / cài đặt ──────────────────────────────────────
   luuNhanVat(nv) {
     const i = this.nhanVat.findIndex((x) => x.id === nv.id);
@@ -701,6 +921,7 @@ class DieuPhoi {
       if (!imLang) this.log('warning', `Dự án "${d.ten}" không còn việc nào đang chờ${this.viec.some((j) => j.duAn === id && j.trangThai === 'dung') ? ' (việc đã dừng: bấm Chạy ở từng việc)' : ''}.`);
       return false;
     }
+    this.duAnTamDung.delete(id);
     if (!this.duAnChay.has(id)) {
       if (!this.dangChay) this._choCoHoiMoi();
       this.tkFlowDaChay.set(id, new Set());   // tự xoá dự án Flow chỉ tính tài khoản chạy trong lượt NÀY
@@ -734,6 +955,7 @@ class DieuPhoi {
     const d = this.duAn.find((x) => x.id === id);
     if (!d) return false;
     this.duAnChay.delete(id);
+    this.duAnTamDung.delete(id);
     for (const j of this.viec) if (j.duAn === id) delete j.chayRieng;
     for (const x of this.loaiChay.values()) x.bo.add(id);   // 1.3.6: lượt hẹn giờ đang chạy cũng thôi chạy dự án này
     for (const x of this.luong) if (this._luongCuaDuAn(x, id)) x.luong.dung();
@@ -744,6 +966,7 @@ class DieuPhoi {
 
   dungTatCa() {
     this.duAnChay.clear();
+    this.duAnTamDung.clear();
     this.loaiChay.clear();
     for (const j of this.viec) delete j.chayRieng;
     for (const x of this.luong) x.luong.dung();
@@ -911,6 +1134,7 @@ class DieuPhoi {
   }
 
   _vong() {
+    this._demGio();
     this._xetHen();
     if (!this.dangChay) {
       if (this.luong.length && !this.coViecDangChay()) {
@@ -1019,6 +1243,7 @@ class DieuPhoi {
         const cho = [...nhamToi].filter(([j]) => j.duAn === id);
         if (cho.length && cho.every(([, ds]) => !ds.length) && !this.viec.some((j) => j.duAn === id && j.trangThai === 'chay')) {
           this.duAnChay.delete(id);
+          this.duAnTamDung.add(id);
           this._baoTamDung(cho.map(([j]) => j), `dự án "${ten}"`);
           tamDung = true;
         }
@@ -1100,6 +1325,7 @@ class DieuPhoi {
 
   async _giao(x, j) {
     const tk = this.o.taiKhoan.tim(x.taiKhoanId);
+    const lan = j.lanGiao = (j.lanGiao || 0) + 1;   // 1.4.0: lần giao này — kết quả của lần giao cũ (việc đã đổi bên) bị bỏ
     Object.assign(j, { trangThai: 'chay', taiKhoan: x.taiKhoanId, batDauLuc: j.thread ? (j.batDauLuc || Date.now()) : Date.now(), loi: '' });
     this.luu();
     const nv = j.nhanVat.map((id) => this.nhanVat.find((n) => n.id === id)).filter(Boolean);
@@ -1121,8 +1347,9 @@ class DieuPhoi {
       choToiDaGiay: j.loai === 'nhac' ? cd.choNhacGiay : j.loai === 'video' ? cd.choVideoGiay : cd.choAnhGiay,
       choChuGiay: j.loai === 'video' ? cd.choChuGiay * 2 : cd.choChuGiay,
       choGui: () => this.choGui(x.taiKhoanId, cd.nghiGiuaLanGui),
-      capNhat: (thay) => { Object.assign(j, thay); this.luu(); }
+      capNhat: (thay) => { if (j.lanGiao === lan) { Object.assign(j, thay); this.luu(); } }
     });
+    if (j.lanGiao !== lan) { this.o.bao(); return; }
     this._ketThuc(j, r, tk);
   }
 
@@ -1130,6 +1357,9 @@ class DieuPhoi {
   async _giaoMe(x, ds) {
     const tk = this.o.taiKhoan.tim(x.taiKhoanId);
     for (const j of ds) Object.assign(j, { trangThai: 'chay', taiKhoan: x.taiKhoanId, batDauLuc: Date.now(), loi: '', buoc: 'Chờ Flow' });
+    // 1.4.0: việc tách khỏi mẻ (đổi sang Muse, dừng rồi chạy lại ở mẻ khác…) → kết quả về sau của mẻ NÀY không ghi vào nó nữa.
+    const lan = new Map(ds.map((j) => [j, (j.lanGiao = (j.lanGiao || 0) + 1)]));
+    const cuaMe = (j) => lan.get(j) === j.lanGiao;
     this.luu();
     const d = this.duAn.find((v) => v.id === ds[0].duAn) || { ten: 'Du_an' };
     try {
@@ -1145,12 +1375,12 @@ class DieuPhoi {
         // Kết quả đã có của các việc khác cùng loại — để luồng Flow nhận ra file engine tải nhầm (video cũ cùng prompt).
         fileCu: (j) => this.viec.filter((v) => v !== j && v.loai === j.loai).flatMap((v) => v.files || [])
           .filter((p) => this.o.tonTai(p)),
-        capNhat: (j, thay) => { if (this.viec.includes(j) && j.trangThai === 'chay') { Object.assign(j, thay); this.luu(); } },
-        xong: (j, r) => this._ketThuc(j, r, tk)
+        capNhat: (j, thay) => { if (cuaMe(j) && this.viec.includes(j) && j.trangThai === 'chay') { Object.assign(j, thay); this.luu(); } },
+        xong: (j, r) => { if (cuaMe(j)) this._ketThuc(j, r, tk); else this.o.bao(); }
       });
     } catch (err) {
       this.log('error', `❌ [${x.luong.id}] ${err.message}`);
-      for (const j of ds) if (j.trangThai === 'chay' && j.taiKhoan === x.taiKhoanId) this._ketThuc(j, { ok: false, loi: err.message }, tk);
+      for (const j of ds) if (cuaMe(j) && j.trangThai === 'chay' && j.taiKhoan === x.taiKhoanId) this._ketThuc(j, { ok: false, loi: err.message }, tk);
     }
     this.o.bao();
   }
@@ -1278,9 +1508,19 @@ class DieuPhoi {
     if (!this.viec.includes(j)) { this.o.bao(); return; }    // đã bị xoá giữa chừng
     // 1.3.0: việc đã bị DỪNG RIÊNG (trong mẻ Flow đang chạy) → bỏ kết quả về sau của nó.
     if (j.trangThai === 'dung') { this.o.bao(); return; }
+    // 1.4.0: người dùng bấm đổi sang bên kia lúc việc đang chạy ở Muse → luồng Muse đã dừng (hoặc lỗi): chuyển, chạy ngay.
+    if (j.chuyenNen && !r.ok) {
+      const { nen, chay } = j.chuyenNen;
+      this._apNen(j, nen);
+      delete j.chayRieng;
+      if (chay) this._chayRieng([j]);
+      this.log('warning', `🔀 #${j.so} đã dừng ở Muse — chạy lại ở ${TEN_NEN[nen]}.`);
+      this.luu();
+      return;
+    }
     this._ketThucViec(j, r, tk);
     // Việc chạy riêng đã tới trạng thái cuối → thôi cờ chạy riêng.
-    if (TRANG_XONG.has(j.trangThai)) { delete j.chayRieng; delete j.uuTienLuc; }
+    if (TRANG_XONG.has(j.trangThai)) { delete j.chayRieng; delete j.uuTienLuc; delete j.chuyenNen; }
     if (j.trangThai !== 'chay') delete j.dungTay;
     this.luu();
   }
@@ -1333,6 +1573,7 @@ class DieuPhoi {
         if (j.taiKhoan) this.ketQuaTk[j.taiKhoan] = { ok: true, luc: Date.now() };
         this.log('success', `✅ [HỆ THỐNG] Việc #${j.so} xong ${TEN_LOAI[j.loai] || 'ảnh'}${r.ghiChu ? ` (${r.ghiChu})` : ''}: ` +
           (tai ? j.files[0] : `${path.basename(j.files[0])} (không tải về — chỉ giữ trong app)`));
+        this._lenDrive(j);   // 1.4.0: bật "tự đưa lên Google Drive" thì chép sang thư mục Drive (chạy nền)
         this._noiVideo(j, d);
       } catch (err) {
         Object.assign(j, { trangThai: 'loi', buoc: '', loi: `Không ghi được file: ${err.message}` });

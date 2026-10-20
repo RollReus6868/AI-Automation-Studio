@@ -218,6 +218,33 @@ function thoiGianDuKien(jobs, loai) {
   return Math.max(10, Math.round(tb));
 }
 
+/**
+ * 1.4.0 — Dự đoán dự án còn chạy bao lâu (ms), từ các việc CỦA DỰ ÁN (`cua`).
+ *   Việc còn lại = việc chờ + việc đang chạy (phần còn thiếu) + video sẽ nối từ ảnh chưa xong; mỗi việc "nặng"
+ *   bằng thời gian trung bình của loại đó (thoiGianDuKien, 10 việc xong gần nhất).
+ *   Lượt này đã chạy ≥ 1 phút và đã xong việc → theo TỐC ĐỘ THẬT của lượt này (đã chạy / khối việc đã xong);
+ *   chưa có thì chia cho số việc chạy cùng lúc (đang chạy, hoặc ước lượng `songSong`).
+ * @param o.batDauLuot  mốc bắt đầu lượt chạy hiện tại (0 = chưa chạy)   o.daChayMs  lượt này đã chạy bao lâu
+ * @returns {conLai, soCon}
+ */
+function duDoanConLai(cua, bayGio, o = {}) {
+  const tb = {};
+  for (const l of ['anh', 'video', 'nhac']) tb[l] = thoiGianDuKien(cua, l) * 1000;
+  const nang = (j) => tb[j.loai] || tb.anh;
+  let con = 0, soCon = 0, dangChay = 0;
+  for (const j of cua) {
+    if (j.trangThai === 'cho') con += nang(j);
+    else if (j.trangThai === 'chay') { con += Math.max(nang(j) * 0.15, nang(j) - (bayGio - (j.batDauLuc || bayGio))); dangChay++; }
+    else continue;
+    soCon++;
+    if (j.loai === 'anh' && j.chuoi && !j.daNoiVideo) { con += tb.video; soCon++; }
+  }
+  if (!soCon) return { conLai: 0, soCon: 0 };
+  const daLam = o.batDauLuot ? cua.filter((j) => j.trangThai === 'xong' && (j.xongLuc || 0) >= o.batDauLuot).reduce((s, j) => s + nang(j), 0) : 0;
+  const conLai = daLam > 0 && (o.daChayMs || 0) >= 60000 ? con * (o.daChayMs / daLam) : con / Math.max(1, dangChay, o.songSong || 1);
+  return { conLai: Math.round(conLai), soCon };
+}
+
 /** Tiến độ ước lượng 0–99 khi đang chạy (100 chỉ khi xong thật). */
 function tienDoUoc(job, bayGio, duKienGiay) {
   if (job.trangThai === 'xong') return 100;
@@ -332,7 +359,7 @@ function keHoachTai(viec, tonTai) {
 const HD = {
   TY_LE, MAU_MAC_DINH, MAU_TEN_MAC_DINH, MAU_TEN_ANH_MAC_DINH, PROMPT_VIDEO_MAC_DINH, slugTen, tachPrompt, timNhanVat, taoTinNhan, tenFile, mimeTuDuoi, chonKhoang,
   docSoChay, chonTheoSo, gonSo,
-  viecKeTiep, taiKhoanChoViec, taiKhoanChoViecDs, thoiGianDuKien, tienDoUoc, daXong, laTraLoiChu, laChanKhuVuc, laTuChoi, soSanhTuNhien, keHoachTai
+  viecKeTiep, taiKhoanChoViec, taiKhoanChoViecDs, thoiGianDuKien, duDoanConLai, tienDoUoc, daXong, laTraLoiChu, laChanKhuVuc, laTuChoi, soSanhTuNhien, keHoachTai
 };
 // Dùng chung cho tiến trình chính (require) và giao diện (<script> → window.HD).
 if (typeof module !== 'undefined' && module.exports) module.exports = HD;

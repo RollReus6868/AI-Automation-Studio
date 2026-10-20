@@ -11,9 +11,10 @@ const { laUrlDuAnFlow } = require('../flow/tab-flow');
 
 const KHOA = 'taiKhoan';
 // 1.1.0: thêm Suno (mục Tạo nhạc) — phiên 'persist:suno-<id>'.
-const NEN = ['muse', 'flow', 'suno'];
-const TEN_NEN = { muse: 'Muse', flow: 'Flow', suno: 'Suno' };
-const TEN_DAY_DU = { muse: 'Muse', flow: 'Google Flow', suno: 'Suno' };
+// 1.4.0: thêm Drive — tài khoản Google chỉ dùng để tải kết quả lên drive.google.com (không nhận việc tạo).
+const NEN = ['muse', 'flow', 'suno', 'drive'];
+const TEN_NEN = { muse: 'Muse', flow: 'Flow', suno: 'Suno', drive: 'Drive' };
+const TEN_DAY_DU = { muse: 'Muse', flow: 'Google Flow', suno: 'Suno', drive: 'Google Drive' };
 const chuanNen = (n) => (NEN.includes(n) ? n : 'muse');
 
 function slugId(raw) {
