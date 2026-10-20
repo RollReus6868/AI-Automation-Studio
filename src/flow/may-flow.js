@@ -204,6 +204,17 @@ function taoMayFlow(o) {
     }
   }
 
+  /** 1.4.0: người dùng bấm "Chạy lại ngay" ở tài khoản đang nghỉ → bỏ dấu lỗi, đang tạm dừng thì chạy tiếp ngay (khỏi chờ hết giờ). */
+  function chayLaiNgay(accountId) {
+    const so = soAnToan.get(khoa(accountId));
+    if (!so) return false;
+    anToan.xoaDauLoi(so);
+    so.cauChan = '';
+    if (!so.dangNghi) return false;
+    ketThucNghi(accountId).catch(() => {});
+    return true;
+  }
+
   /** Bỏ mọi lịch nghỉ của một tài khoản (người dùng bấm Dừng). */
   function huyNghi(accountId) {
     const t = henChayLai.get(khoa(accountId));
@@ -797,7 +808,7 @@ function taoMayFlow(o) {
   }
 
   return {
-    handleEngineMessage, theoDoiAnToan, ghiLoiTai, datCaiDatAnToan, huyNghi, chuanBiMe, chuanBiModel, datCheDo,
+    handleEngineMessage, theoDoiAnToan, ghiLoiTai, datCaiDatAnToan, huyNghi, chayLaiNgay, chuanBiMe, chuanBiModel, datCheDo,
     datModelAnh, docModel, soAnToanCua, lpChan, selectorNguoiDung, tabCungTaiKhoan, theoDoiAnhThamChieu,
     _anToan: () => caiDatAnToan
   };

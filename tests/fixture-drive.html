@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="vi"><head><meta charset="utf-8"><title>Drive của tôi - Google Drive (giả)</title>
+<style>
+  body { font: 14px sans-serif; margin: 0; display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
+  nav { padding: 12px; border-right: 1px solid #ddd; }
+  [role="main"] { padding: 12px; min-height: 400px; }
+  [role="row"] { padding: 8px; border-bottom: 1px solid #eee; cursor: default; }
+  [role="menu"], [role="dialog"] { position: fixed; background: #fff; border: 1px solid #999; padding: 10px; box-shadow: 0 2px 8px #0003; }
+  [role="menu"] { top: 60px; left: 20px; }
+  [role="menuitem"] { padding: 6px 10px; cursor: pointer; }
+  [role="dialog"] { top: 120px; left: 300px; width: 380px; }
+  #tienDo { position: fixed; right: 10px; bottom: 10px; background: #fff; border: 1px solid #999; padding: 8px; }
+</style></head>
+<body>
+<nav>
+  <button aria-label="Mới" id="nutMoi">+ Mới</button>
+  <div><a href="/drive/my-drive">Drive của tôi</a></div>
+  <div><a href="#">Thùng rác</a></div>
+</nav>
+<div role="main" id="dsTep"><h2 id="tieuDe">Drive của tôi</h2></div>
+<script>
+// Trang Google Drive GIẢ cho bài kiểm của app (tests/e2e.js drive) — chỉ mô phỏng các chỗ app dùng:
+// nút Mới → Thư mục mới / Tải tệp lên, hộp "Tùy chọn tải lên" khi trùng tên, khung tiến độ, kéo-thả vào danh sách.
+const cha = (location.pathname.match(/\/drive\/folders\/([^/?#]+)/) || [])[1] || 'root';
+const tao = (tag, thuocTinh, ...con) => {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(thuocTinh || {})) if (k === 'on') for (const [s, f] of Object.entries(v)) e.addEventListener(s, f); else e.setAttribute(k, v);
+  for (const c of con) e.append(c);
+  return e;
+};
+let muc = [];
+async function ve() {
+  const r = await (await fetch(`/__drive-ds?cha=${encodeURIComponent(cha)}`)).json();
+  muc = r.muc;
+  const g = document.getElementById('dsTep');
+  for (const x of [...g.querySelectorAll('[role="row"]')]) x.remove();
+  document.getElementById('tieuDe').textContent = r.ten || 'Drive của tôi';
+  for (const m of muc) {
+    g.append(tao('div', { role: 'row', 'data-id': m.id, 'aria-label': `${m.ten} ${m.laThuMuc ? 'Thư mục Google Drive' : 'Tệp'}` },
+      tao('span', {}, m.laThuMuc ? '📁 ' : '📄 '), tao('span', { 'data-tooltip': m.ten }, m.ten)));
+  }
+}
+const dongMenu = () => { for (const m of document.querySelectorAll('[role="menu"]')) m.remove(); };
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') dongMenu(); });
+document.getElementById('nutMoi').addEventListener('click', () => {
+  dongMenu();
+  document.body.append(tao('div', { role: 'menu' },
+    tao('div', { role: 'menuitem', on: { click: hopThuMucMoi } }, 'Thư mục mới', tao('small', {}, '  Alt+C rồi F')),
+    tao('div', { role: 'menuitem', on: { click: chonTep } }, 'Tải tệp lên', tao('small', {}, '  Alt+C rồi U')),
+    tao('div', { role: 'menuitem' }, 'Tải thư mục lên')));
+});
+function hopThuMucMoi() {
+  dongMenu();
+  const o = tao('input', { type: 'text', value: 'Thư mục không có tiêu đề' });
+  const h = tao('div', { role: 'dialog', 'aria-modal': 'true' }, tao('h3', {}, 'Thư mục mới'), o,
+    tao('div', {}, tao('button', { on: { click: () => h.remove() } }, 'Huỷ'),
+      tao('button', { on: { click: async () => {
+        await fetch('/__drive-thu-muc', { method: 'POST', body: JSON.stringify({ cha, ten: o.value }) });
+        h.remove();
+        setTimeout(ve, 400);
+      } } }, 'Tạo')));
+  document.body.append(h);
+  o.focus(); o.select();
+}
+function chonTep() {
+  dongMenu();
+  const i = tao('input', { type: 'file', multiple: '', style: 'display:none' });
+  i.addEventListener('change', () => nhanTep([...i.files], 'hop'));
+  document.body.append(i);
+  i.click();
+}
+const dg = document.getElementById('dsTep');
+dg.addEventListener('dragover', (e) => e.preventDefault());
+dg.addEventListener('drop', (e) => { e.preventDefault(); nhanTep([...e.dataTransfer.files], 'tha'); });
+const hoiTrung = (ten) => new Promise((xong) => {
+  const r1 = tao('input', { type: 'radio', name: 'cach', id: 'rThay', checked: '' }), r2 = tao('input', { type: 'radio', name: 'cach', id: 'rGiu' });
+  const h = tao('div', { role: 'dialog' }, tao('h3', {}, 'Tùy chọn tải lên'),
+    tao('p', {}, `${ten} đã tồn tại ở vị trí này. Bạn có muốn thay thế tệp hiện có bằng phiên bản mới hay giữ cả hai tệp?`),
+    tao('div', {}, r1, tao('label', { for: 'rThay' }, 'Thay thế tệp hiện có')),
+    tao('div', {}, r2, tao('label', { for: 'rGiu' }, 'Giữ cả hai tệp')),
+    tao('div', {}, tao('button', { on: { click: () => { h.remove(); xong(''); } } }, 'Huỷ'),
+      tao('button', { on: { click: () => { h.remove(); xong(r2.checked ? 'giu' : 'thay'); } } }, 'Tải lên')));
+  document.body.append(h);
+});
+async function nhanTep(ds, qua) {
+  for (const f of ds) {
+    let cach = '';
+    if (muc.some((m) => m.ten === f.name && !m.laThuMuc)) { cach = await hoiTrung(f.name); if (!cach) continue; }
+    let td = document.getElementById('tienDo');
+    if (!td) { td = tao('div', { id: 'tienDo', role: 'region', 'aria-label': 'Tiến trình tải lên' }); document.body.append(td); }
+    td.textContent = 'Đang tải lên 1 mục';
+    const b64 = await new Promise((r) => { const fr = new FileReader(); fr.onload = () => r(String(fr.result).split(',')[1] || ''); fr.readAsDataURL(f); });
+    await new Promise((r) => setTimeout(r, 600));
+    const kq = await (await fetch('/__drive-tai', { method: 'POST', body: JSON.stringify({ cha, ten: f.name, b64, cach, qua }) })).json();
+    td.textContent = kq.ok ? 'Đã tải lên 1 mục' : 'Tải lên không thành công';
+    await ve();
+  }
+}
+ve();
+</script>
+</body></html>

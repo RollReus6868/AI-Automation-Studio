@@ -155,7 +155,8 @@ function dungDieuPhoi(o = {}) {
     taoLuong: o.taoLuong || (() => ({ ranh: true, dung() {} })), huyLuong: () => {},
     docFile: (p) => ({ ten: path.basename(p), mime: 'image/png', b64: 'AA==' }),
     ghiFile: o.ghiFile || (() => {}), chuyenFile: o.chuyenFile || (() => {}), thuMucRaMacDinh: '/ra', thuMucTam: '/tam',
-    tonTai: o.tonTai || (() => false), donDep: o.donDep, hetLuot: o.hetLuot, bayGio: o.bayGio
+    tonTai: o.tonTai || (() => false), donDep: o.donDep, hetLuot: o.hetLuot, bayGio: o.bayGio,
+    lenDrive: o.lenDrive, lenDriveWeb: o.lenDriveWeb, chayLaiFlow: o.chayLaiFlow
   });
   clearInterval(dp.hen);
   return { dp, tk, store, nhatKy };
@@ -1137,7 +1138,7 @@ test('1.3.8 tài khoản lỗi ghi RÕ lỗi: nghỉ vì lỗi liên tiếp kèm
 });
 test('1.3.8 hộp chọn tài khoản: tài khoản đỏ ghi lý do ngay dưới tên; máy Flow nghỉ thì thẻ đỏ lấy lý do thật', () => {
   const a = fs.readFileSync(path.join(__dirname, '..', 'src', 'ui', 'app.js'), 'utf8');
-  assert.ok(/sk\.muc === 'loi' \? `<small class="ly-loi">\$\{esc\(sk\.chu\)\}<\/small>`/.test(a));
+  assert.ok(/sk\.muc === 'loi' \? `<small class="ly-loi">\$\{esc\(sk\.chu\)\}/.test(a));
   const m = fs.readFileSync(path.join(__dirname, '..', 'main.js'), 'utf8');
   assert.ok(/lyDo: so\.lyDoNghi \|\| /.test(m));
 });
@@ -1937,7 +1938,8 @@ test('1.3.4 tiến trình chính: gom ghi du-lieu.json 1,5 s, báo giao diện 2
   const m = docNguon('main.js'), l = docNguon('src/main/luong.js'), st = docNguon('src/main/store.js');
   assert.ok(/new Store\(path\.join\(app\.getPath\('userData'\), 'du-lieu\.json'\), \(m\) => log\('warning', m\), \{ nhipMs: 1500 \}\)/.test(m));
   assert.ok(/this\.nhipMs = o\.nhipMs \|\| 250/.test(st) && /\}, this\.nhipMs\);/.test(st));
-  assert.ok(/win\.webContents\.send\('state', trangThai\(\)\);\n  \}, 250\);/.test(m));
+  // 1.4.0: nhịp 250 ms, hàng đợi lớn thì thưa dần (tối đa 1 s); thu nhỏ thì thôi báo.
+  assert.ok(/win\.webContents\.send\('state', trangThai\(\)\);\n  \}, nhipBao\(\)\);/.test(m) && /Math\.min\(1000, 250 \+/.test(m) && /if \(win\.isMinimized\(\)\) \{ boLoBao = true; return; \}/.test(m));
   assert.ok(/function baoRam\(\)/.test(m) && /if \(dieuPhoi\.dangChay \|\| dieuPhoi\.luong\.length\) baoRam\(\)/.test(m) && /app\.getAppMetrics\(\)/.test(m));
   assert.ok(/nhat-ky-cu\.txt/.test(m) && /20 \* 1024 \* 1024/.test(m));
   assert.ok(/spellcheck: false/.test(m));
@@ -2135,6 +2137,325 @@ testAsync('1.3.4 Store ghi theo nhịp nhipMs (không ghi sớm hơn, vẫn ghi 
     assert.ok(/datHenGio: \(\{ loai, hen \}\) => dieuPhoi\.datHenGio\(loai, hen\)/.test(m) && /dungHen: \(\{ loai \}\) => dieuPhoi\.dungHen\(loai\)/.test(m));
     assert.ok(/powerSaveBlocker\.start\('prevent-app-suspension'\)/.test(m) && /powerSaveBlocker\.stop\(chanNgu\)/.test(m));
     assert.ok(/'hengio', 'nhanvat'/.test(ui) && /api\.call\('datHenGio'/.test(ui));
+  });
+}
+
+console.log('\n── 1.4.0 ──────────────────────────────────────');
+{
+  const os = require('os');
+  const DR = require('../src/main/drive');
+  /** Dự án có 1 tài khoản Muse + 1 tài khoản Flow đã đăng nhập. */
+  const haiBen = (o = {}) => {
+    const b = dungDieuPhoi(o);
+    b.tk.sua('tk-1', { trangThai: 'da-dang-nhap' }); b.tk.sua('flow-1', { trangThai: 'da-dang-nhap' });
+    b.dp.datCaiDat({ luongMoiTK: 1, nghiGiuaLanGui: 0, tuThuLai: 0, tuChayLaiLoi: 0, flow: { meToiDa: 1, tabMoiTK: 1 } });
+    const d = b.dp.taoDuAn('Hai ben', o.tk || ['tk-1', 'flow-1']);
+    return { ...b, d };
+  };
+
+  test('1.4.0 đổi tay sang Flow: việc chờ / đã xong về hàng chờ ở Flow; nhạc và việc đã ở Flow bỏ qua; dự án thiếu tài khoản Flow → báo', () => {
+    const { dp, d, tk, nhatKy } = haiBen();
+    dp.them({ duAn: d.id, prompts: ['a', 'b'] });
+    dp.them({ duAn: d.id, nen: 'flow', prompts: ['c'] });
+    const [a, b, c] = dp.viec;
+    Object.assign(b, { trangThai: 'xong', taiKhoan: 'tk-1', thread: 't/1', xongLuc: 5 });
+    const r = dp.doiNenViec([a.id, b.id, c.id], 'flow', false);
+    assert.deepStrictEqual([r.doi, r.daO, r.khongTk.length], [2, 1, 0]);
+    for (const j of [a, b]) {
+      assert.deepStrictEqual([j.nen, j.trangThai, j.thread, j.taiKhoan, j.xongLuc], ['flow', 'cho', '', '', 0]);
+      assert.deepStrictEqual(j.daQuaNen, ['muse', 'flow'], 'đổi tay rồi: Muse ⇄ Flow tự động không đổi ngược');
+    }
+    assert.ok(nhatKy.some((x) => /🔀 Đổi tay 2 việc sang Flow: #1, #2/.test(x)), nhatKy.join('\n'));
+    // Đổi ngược về Muse: đánh dấu tuFlow như khi Flow tự chuyển sang Muse.
+    dp.doiNenViec([a.id], 'muse', false);
+    assert.deepStrictEqual([a.nen, a.tuFlow], ['muse', true]);
+    // Không có tài khoản Flow dùng được (tài khoản Flow duy nhất chưa đăng nhập).
+    tk.sua('flow-1', { trangThai: 'can-dang-nhap' });
+    const d2 = dp.taoDuAn('Chi Muse', ['tk-1']);
+    dp.them({ duAn: d2.id, prompts: ['x'] });
+    const x = dp.viec[dp.viec.length - 1];
+    const r2 = dp.doiNenViec([x.id], 'flow', false);
+    assert.deepStrictEqual([r2.doi, r2.khongTk, x.nen], [0, ['Chi Muse'], 'muse']);
+    assert.ok(nhatKy.some((l) => /⛔ Không đổi được sang Flow: dự án "Chi Muse" chưa có tài khoản Flow/.test(l)));
+    // Nhạc không đổi.
+    dp.them({ duAn: d.id, loai: 'nhac', nen: 'suno', prompts: ['lofi'] });
+    assert.strictEqual(dp.doiNenViec([dp.viec[dp.viec.length - 1].id], 'flow', false).nhac, 1);
+  });
+
+  testAsync('1.4.0 đổi sang Flow việc ĐANG chạy ở Muse: luồng Muse dừng trước, rồi chạy ngay ở Flow (không hai bên cùng chạy)', async () => {
+    const daChay = [];
+    let dungMuse = 0;
+    const flowGia = luongGiaHaiNen(daChay);
+    const taoLuong = (a, stt) => a.nen === 'flow' ? flowGia(a, stt) : {
+      id: `${a.id}-${stt}`, ranh: true, viec: null,
+      dung() { dungMuse++; if (this._xong) this._xong({ ok: false, dung: true, loi: 'Đã dừng' }); },
+      chay(j) { this.ranh = false; this.viec = j; daChay.push({ tk: a.id, so: [j.so] }); return new Promise((r) => { this._xong = (k) => { this.ranh = true; this.viec = null; r(k); }; }); }
+    };
+    const { dp, d } = haiBen({ taoLuong });
+    dp.them({ duAn: d.id, prompts: ['a'] });
+    const j = dp.viec[0];
+    dp.chayDuAn(d.id);
+    for (let i = 0; i < 20 && j.trangThai !== 'chay'; i++) { dp._vong(); await new Promise((r) => setTimeout(r, 10)); }
+    assert.strictEqual(j.trangThai, 'chay');
+    assert.strictEqual(j.taiKhoan, 'tk-1');
+    const r = dp.doiNenViec([j.id], 'flow');
+    assert.strictEqual(r.doi, 1);
+    await chayHet(dp);
+    assert.strictEqual(dungMuse >= 1, true, 'đã dừng luồng Muse');
+    assert.deepStrictEqual([j.trangThai, j.nen, j.taiKhoan], ['xong', 'flow', 'flow-1']);
+    assert.deepStrictEqual(daChay.map((x) => x.tk), ['tk-1', 'flow-1']);
+    assert.strictEqual(j.chuyenNen, undefined);
+  });
+
+  testAsync('1.4.0 đổi sang Muse việc đang chạy trong mẻ Flow: kết quả Flow về sau bị BỎ, việc xong ở Muse', async () => {
+    const daChay = [];
+    let dungFlow = 0;
+    const museGia = luongGia(daChay, new Set());
+    const taoLuong = (a, stt) => a.nen !== 'flow' ? museGia(a, stt) : {
+      id: `${a.id}-${stt}`, nen: 'flow', ranh: true, viec: null, dsViec: [], dung() { dungFlow++; },
+      async chayMe(ds, ctx) {
+        this.ranh = false; this.dsViec = ds; daChay.push([a.id, ds[0].so]);
+        await new Promise((r) => setTimeout(r, 80));
+        for (const x of ds) ctx.xong(x, { ok: true, files: [{ duongDan: '/tam/flow.png' }], flowTen: 'f' });
+        this.ranh = true; this.dsViec = [];
+      }
+    };
+    const { dp, d } = haiBen({ taoLuong });
+    dp.them({ duAn: d.id, nen: 'flow', prompts: ['a'] });
+    const j = dp.viec[0];
+    dp.chayDuAn(d.id);
+    for (let i = 0; i < 20 && j.trangThai !== 'chay'; i++) { dp._vong(); await new Promise((r) => setTimeout(r, 10)); }
+    assert.deepStrictEqual([j.trangThai, j.taiKhoan], ['chay', 'flow-1']);
+    dp.doiNenViec([j.id], 'muse');
+    assert.strictEqual(dungFlow, 1, 'mẻ chỉ có việc này → dừng tab');
+    await chayHet(dp);
+    await new Promise((r) => setTimeout(r, 120));   // mẻ Flow cũ trả kết quả muộn
+    assert.deepStrictEqual([j.trangThai, j.nen, j.taiKhoan], ['xong', 'muse', 'tk-1']);
+    assert.ok(!(j.files || []).some((f) => /flow\.png/.test(f)), 'không lấy file của mẻ Flow cũ');
+  });
+
+  test('1.4.0 đổi prompt hàng loạt: thay cả prompt / tìm-thay chữ, bỏ qua việc đang chạy, việc đã xong tạo lại; prompt video nối từ ảnh đổi riêng từng ảnh', () => {
+    const { dp, nhatKy } = dungDieuPhoi({ taoLuong: luongGia([], new Set()) });
+    dp.them({ prompts: ['mèo ở biển', 'chó ở biển', 'gà ở biển'], chuoiVideo: { prompt: 'zoom chậm' } });
+    const [a, b, c] = dp.viec;
+    c.trangThai = 'chay';
+    Object.assign(b, { trangThai: 'xong', xongLuc: 9 });
+    let r = dp.doiPrompt([a.id, b.id, c.id], { cach: 'tim', tim: 'biển', thay: 'núi' });
+    assert.deepStrictEqual([r.doi, r.dangChay, a.prompt, b.prompt, c.prompt, b.trangThai], [2, 1, 'mèo ở núi', 'chó ở núi', 'gà ở biển', 'xong']);
+    assert.ok(nhatKy.some((x) => /✏ Đã đổi prompt 2 việc \(thay "biển" → "núi"\) · bỏ qua 1 việc đang chạy/.test(x)), nhatKy.join('\n'));
+    r = dp.doiPrompt([b.id], { cach: 'thay', moi: '  chó trên tàu ', taoLai: true });
+    assert.deepStrictEqual([r.doi, r.taoLai, b.prompt, b.trangThai, b.xongLuc], [1, 1, 'chó trên tàu', 'cho', 0]);
+    dp.dungTatCa();
+    assert.strictEqual(dp.doiPrompt([a.id], { cach: 'thay', moi: ' ' }).ok, false);
+    assert.strictEqual(dp.doiPrompt([a.id], { cach: 'tim', tim: '' }).ok, false);
+    // Prompt video nối từ ảnh: các ảnh thêm cùng lượt dùng chung một đối tượng chuoi — đổi ảnh a không đổi ảnh b.
+    assert.strictEqual(a.chuoi, b.chuoi);
+    r = dp.doiPrompt([a.id], { cach: 'thay', dich: 'chuoi', moi: 'xoay quanh' });
+    assert.deepStrictEqual([r.doi, a.chuoi.prompt, b.chuoi.prompt, a.prompt], [1, 'xoay quanh', 'zoom chậm', 'mèo ở núi']);
+    dp.them({ loai: 'video', prompts: ['v'] });
+    assert.strictEqual(dp.doiPrompt([dp.viec[3].id], { dich: 'chuoi', moi: 'x' }).khongDoi, 1, 'video không có prompt nối');
+  });
+
+  test('1.4.0 "Chạy lại ngay" tài khoản đang nghỉ vì lỗi: xoá mốc nghỉ / chặn video / đếm lỗi, máy Flow chạy lại, dự án tự tạm dừng chạy tiếp', () => {
+    const goiFlow = [];
+    const { dp, tk, d, nhatKy } = haiBen({ taoLuong: luongGia([], new Set()), chayLaiFlow: (id) => goiFlow.push(id) });
+    dp.them({ duAn: d.id, prompts: ['a'] });
+    const j = dp.viec[0];
+    j.tkLoi = ['tk-1', 'x'];
+    const muon = Date.now() + 3600e3;
+    Object.assign(dp, { nghiDen: { 'tk-1': muon }, lyDoNghi: { 'tk-1': 'lỗi 2 việc liên tiếp' }, loiLienTiep: { 'tk-1': 2 }, nghiLoai: { 'tk-1:video': muon, 'tk-2:video': muon } });
+    dp.ketQuaTk['tk-1'] = { ok: false, loi: 'hỏng', luc: 1 };
+    tk.sua('tk-1', { chanVideoDen: muon });
+    assert.strictEqual(dp.sucKhoeTk()['tk-1'].muc, 'loi');
+    const r = dp.chayLaiTaiKhoan('tk-1');
+    assert.deepStrictEqual(r, { ok: true, tiep: 0 });
+    assert.deepStrictEqual([dp.nghiDen['tk-1'], dp.lyDoNghi['tk-1'], !!dp.loiLienTiep['tk-1'], dp.ketQuaTk['tk-1']], [undefined, undefined, false, undefined]);
+    assert.deepStrictEqual(Object.keys(dp.nghiLoai), ['tk-2:video'], 'chỉ xoá chặn của đúng tài khoản');
+    assert.strictEqual(tk.tim('tk-1').chanVideoDen, 0);
+    assert.deepStrictEqual(j.tkLoi, ['x']);
+    assert.deepStrictEqual(goiFlow, ['tk-1']);
+    assert.strictEqual(dp.sucKhoeTk()['tk-1'].muc !== 'loi', true);
+    // Dự án đã tự tạm dừng vì hết tài khoản → bấm Chạy lại tài khoản thì dự án chạy tiếp.
+    dp.duAnTamDung.add(d.id);
+    assert.deepStrictEqual(dp.chayLaiTaiKhoan('tk-1'), { ok: true, tiep: 1 });
+    assert.ok(dp.duAnChay.has(d.id) && !dp.duAnTamDung.has(d.id));
+    assert.ok(nhatKy.some((x) => /▶ "Muse 1": đã bỏ trạng thái nghỉ \/ lỗi .*chạy tiếp dự án "Hai ben"/.test(x)), nhatKy.join('\n'));
+    dp.dungTatCa();
+    assert.strictEqual(dp.chayLaiTaiKhoan('khong-co').ok, false);
+  });
+
+  test('1.4.0 đồng hồ dự án: đếm giờ khi chạy, máy treo không cộng cả quãng, dừng giữ tổng; lượt mới đếm lại từ 0', () => {
+    let gio = 1_000_000;
+    const { dp } = dungDieuPhoi({ bayGio: () => gio });
+    dp.them({ prompts: ['a', 'b'] });
+    dp.duAnChay.add('mac-dinh');
+    dp._demGio();
+    let g = dp.dongHo()['mac-dinh'];
+    assert.deepStrictEqual([g.dangChay, g.daChay, g.batDau], [true, 0, gio]);
+    gio += 1000; dp._demGio();
+    gio += 1000; dp._demGio();
+    gio += 600000; dp._demGio();     // máy ngủ 10 phút: chỉ cộng tối đa 5 s
+    g = dp.dongHo()['mac-dinh'];
+    assert.deepStrictEqual([g.daChay, g.tong], [7000, 7000]);
+    assert.ok(g.conLai > 0 && g.soCon === 2);
+    dp.duAnChay.delete('mac-dinh');
+    gio += 1000; dp._demGio();
+    g = dp.dongHo()['mac-dinh'];
+    assert.deepStrictEqual([g.dangChay, g.daChay, g.xongLuc], [false, 7000, gio]);
+    dp.duAnChay.add('mac-dinh');
+    gio += 1000; dp._demGio();
+    gio += 1000; dp._demGio();
+    g = dp.dongHo()['mac-dinh'];
+    assert.deepStrictEqual([g.dangChay, g.daChay, g.tong], [true, 1000, 8000], 'lượt mới từ 0, tổng cộng dồn');
+    assert.ok(dp.trangThai().dongHo['mac-dinh'] && typeof dp.trangThai().luc === 'number');
+  });
+
+  test('1.4.0 dự đoán thời gian còn lại: chưa có việc xong → theo trung bình mặc định ÷ số chạy cùng lúc; đã chạy ≥1 phút → theo tốc độ thật', () => {
+    const t = 10_000_000;
+    const cho = (n, x = {}) => Array.from({ length: n }, () => ({ loai: 'anh', trangThai: 'cho', ...x }));
+    assert.deepStrictEqual(HD.duDoanConLai(cho(3), t), { conLai: 105000, soCon: 3 });
+    assert.deepStrictEqual(HD.duDoanConLai(cho(3), t, { songSong: 3 }), { conLai: 35000, soCon: 3 });
+    assert.deepStrictEqual(HD.duDoanConLai(cho(1, { chuoi: { prompt: 'v' } }), t), { conLai: 35000 + 80000, soCon: 2 }, 'ảnh còn nối video');
+    assert.deepStrictEqual(HD.duDoanConLai([{ loai: 'anh', trangThai: 'xong' }], t), { conLai: 0, soCon: 0 });
+    // Lượt này: 2 ảnh xong, mỗi ảnh 20 s, nhưng đã chạy 80 s → tốc độ thật chậm gấp đôi.
+    const xong = [0, 1].map((i) => ({ loai: 'anh', trangThai: 'xong', batDauLuc: t - 50000 - i, xongLuc: t - 30000 - i }));
+    assert.deepStrictEqual(HD.duDoanConLai([...xong, ...cho(3)], t, { batDauLuot: t - 80000, daChayMs: 80000, songSong: 1 }), { conLai: 120000, soCon: 3 });
+    // Việc đang chạy: phần còn thiếu.
+    assert.deepStrictEqual(HD.duDoanConLai([{ loai: 'anh', trangThai: 'chay', batDauLuc: t - 20000 }], t), { conLai: 15000, soCon: 1 });
+  });
+
+  testAsync('1.4.0 Google Drive: chép vào <Drive>/<Tên dự án>/images|Videos, trùng tên thêm (2), đưa lại thì ghi đè đúng file của việc, thiếu thư mục Drive → báo', async () => {
+    const goc = fs.mkdtempSync(path.join(os.tmpdir(), 'drive-'));
+    const nguon = fs.mkdtempSync(path.join(os.tmpdir(), 'nguon-'));
+    try {
+      const f = path.join(nguon, '001.png'); fs.writeFileSync(f, 'anh1');
+      const v = path.join(nguon, '001.mp4'); fs.writeFileSync(v, 'video');
+      assert.strictEqual(DR.tenThuMucDuAn('Tập 1: Biển?'), 'Tập 1 Biển');
+      assert.strictEqual(DR.tenThuMucDuAn('con'), 'con_');
+      let r = await DR.chepLenDrive({ goc, tenDuAn: 'Tập 1: Biển?', loai: 'anh', files: [f] });
+      const d1 = path.join(goc, 'Tập 1 Biển', 'images', '001.png');
+      assert.deepStrictEqual([r.ok, r.files], [true, [d1]]);
+      assert.strictEqual(fs.readFileSync(d1, 'utf8'), 'anh1');
+      r = await DR.chepLenDrive({ goc, tenDuAn: 'Tập 1: Biển?', loai: 'anh', files: [f] });
+      assert.deepStrictEqual(r.files, [path.join(goc, 'Tập 1 Biển', 'images', '001 (2).png')], 'việc khác cùng tên: không ghi đè');
+      fs.writeFileSync(f, 'anh1 tao lai');
+      r = await DR.chepLenDrive({ goc, tenDuAn: 'Tập 1: Biển?', loai: 'anh', files: [f], cu: [d1] });
+      assert.deepStrictEqual(r.files, [d1]);
+      assert.strictEqual(fs.readFileSync(d1, 'utf8'), 'anh1 tao lai', 'Tạo lại: ghi đè file Drive của chính việc đó');
+      r = await DR.chepLenDrive({ goc, tenDuAn: 'Tập 1: Biển?', loai: 'video', files: [v] });
+      assert.deepStrictEqual(r.files, [path.join(goc, 'Tập 1 Biển', 'Videos', '001.mp4')]);
+      assert.strictEqual((await DR.chepLenDrive({ goc: path.join(goc, 'khong-co'), tenDuAn: 'x', loai: 'anh', files: [f] })).ok, false);
+      assert.match((await DR.chepLenDrive({ goc: '', tenDuAn: 'x', loai: 'anh', files: [f] })).loi, /Chưa chọn thư mục Google Drive/);
+      assert.strictEqual((await DR.chepLenDrive({ goc, tenDuAn: 'x', loai: 'nhac', files: [f] })).ok, false);
+    } finally { fs.rmSync(goc, { recursive: true, force: true }); fs.rmSync(nguon, { recursive: true, force: true }); }
+    // Tìm thư mục Drive (Google Drive cho máy tính).
+    const fsx = (co) => ({ statSync: (p) => { if (!co.includes(p)) throw new Error('ENOENT'); return { isDirectory: () => true }; }, readdirSync: () => ['GoogleDrive-a@b'] });
+    assert.deepStrictEqual(DR.timThuMucDrive({ platform: 'win32', home: 'C:\\Users\\A', fsx: fsx(['G:\\My Drive', 'G:\\Drive của tôi']) }), ['G:\\My Drive', 'G:\\Drive của tôi']);
+    const mac = path.join('/Users/a', 'Library', 'CloudStorage', 'GoogleDrive-a@b', 'My Drive');
+    assert.deepStrictEqual(DR.timThuMucDrive({ platform: 'darwin', home: '/Users/a', fsx: fsx([mac]) }), [mac]);
+  });
+
+  testAsync('1.4.0 việc xong → tự đưa lên Drive (khi bật); tắt thì không; nhạc không; lỗi Drive chỉ ghi nhật ký, việc vẫn Xong; "Lên Drive" tay', async () => {
+    const goi = [];
+    let traLoi = { ok: true };
+    const lenDrive = async (x) => { goi.push(x); return traLoi.ok ? { ok: true, files: x.files.map((f) => `/G/${x.tenDuAn}/${DR.THU_MUC_LOAI[x.loai]}/${path.basename(f)}`) } : traLoi; };
+    const { dp, nhatKy } = dungDieuPhoi({ lenDrive });
+    dp.them({ prompts: ['a', 'b'] });
+    dp.them({ loai: 'video', prompts: ['v'] });
+    const [a, b, v] = dp.viec;
+    dp._ketThuc(a, { ok: true, files: [{ mime: 'image/png', b64: 'AA==' }] }, null);
+    await dp._driveCho;
+    assert.strictEqual(goi.length, 0, 'mặc định tắt');
+    dp.datCaiDat({ driveBat: true, thuMucDrive: '/G' });
+    dp._ketThuc(b, { ok: true, files: [{ mime: 'image/png', b64: 'AA==' }] }, null);
+    dp._ketThuc(v, { ok: true, files: [{ mime: 'video/mp4', b64: 'AA==' }] }, null);
+    await dp._driveCho;
+    assert.deepStrictEqual(goi.map((x) => [x.goc, x.tenDuAn, x.loai]), [['/G', 'Mặc định', 'anh'], ['/G', 'Mặc định', 'video']]);
+    assert.deepStrictEqual(b.drive, ['/G/Mặc định/images/002.png']);
+    assert.ok(nhatKy.some((x) => /☁ #2 đã đưa lên Google Drive/.test(x)));
+    // Lỗi: việc vẫn Xong, báo một lần.
+    traLoi = { ok: false, loi: 'Không thấy thư mục Google Drive' };
+    assert.deepStrictEqual(dp.lenDriveViec([a.id, b.id]), { ok: true, so: 2, boQua: 0 });
+    await dp._driveCho;
+    assert.deepStrictEqual([a.trangThai, a.driveLoi], ['xong', 'Không thấy thư mục Google Drive']);
+    assert.strictEqual(nhatKy.filter((x) => /chưa đưa lên Google Drive: Không thấy/.test(x)).length, 1, 'cùng lỗi không tràn nhật ký');
+    assert.deepStrictEqual(goi[goi.length - 1].cu, ['/G/Mặc định/images/002.png'], 'đưa lại: báo file cũ để ghi đè');
+    dp.datCaiDat({ thuMucDrive: '' });
+    assert.strictEqual(dp.lenDriveViec([a.id]).ok, false);
+    dp.datCaiDat({ thuMucDrive: '/G' });
+    dp.them({ loai: 'nhac', nen: 'suno', prompts: ['lofi'] });
+    const n = dp.viec[dp.viec.length - 1];
+    const truoc = goi.length;
+    dp._ketThuc(n, { ok: true, files: [{ mime: 'audio/mpeg', b64: 'AA==' }] }, null);
+    await dp._driveCho;
+    assert.strictEqual(goi.length, truoc, 'nhạc không lên Drive');
+  });
+
+  testAsync('1.4.0 Drive cách 2 "tải thẳng lên drive.google.com": dùng tài khoản nền Drive; thiếu / sai tài khoản → báo, không tải', async () => {
+    const goiWeb = [], goiMay = [];
+    const { dp, tk, nhatKy } = dungDieuPhoi({ lenDrive: async (x) => { goiMay.push(x); return { ok: true, files: ['/G/x'] }; },
+      lenDriveWeb: async (x) => { goiWeb.push(x); return { ok: true, files: x.files.map((f) => `Drive: ${x.tenDuAn}/${DR.THU_MUC_LOAI[x.loai]}/${path.basename(f)}`) }; } });
+    const dr = tk.them('Drive chính', 'drive');
+    assert.deepStrictEqual([dr.nen, dr.partition], ['drive', `persist:drive-${dr.id}`]);
+    dp.datCaiDat({ driveBat: true, driveCach: 'web', driveTk: '' });
+    dp.them({ prompts: ['a', 'b'] });
+    const [a, b] = dp.viec;
+    dp._ketThuc(a, { ok: true, files: [{ mime: 'image/png', b64: 'AA==' }] }, null);
+    await dp._driveCho;
+    assert.strictEqual(goiWeb.length, 0);
+    assert.match(a.driveLoi, /Chưa chọn tài khoản Google Drive/);
+    assert.ok(nhatKy.some((x) => /☁ #1 chưa đưa lên Google Drive: Chưa chọn tài khoản Google Drive/.test(x)));
+    dp.datCaiDat({ driveTk: 'tk-1' });     // tài khoản Muse không dùng để tải lên Drive
+    assert.match(dp.lenDriveViec([a.id]).loi, /Chưa chọn tài khoản Google Drive/);
+    dp.datCaiDat({ driveTk: dr.id });
+    dp._ketThuc(b, { ok: true, files: [{ mime: 'image/png', b64: 'AA==' }] }, null);
+    await dp._driveCho;
+    assert.deepStrictEqual(goiWeb.map((x) => [x.tkId, x.tenDuAn, x.loai]), [[dr.id, 'Mặc định', 'anh']]);
+    assert.deepStrictEqual(b.drive, ['Drive: Mặc định/images/002.png']);
+    assert.strictEqual(goiMay.length, 0, 'cách web không chép vào thư mục máy');
+    assert.deepStrictEqual(dp.lenDriveViec([a.id, b.id]), { ok: true, so: 2, boQua: 0 });
+    await dp._driveCho;
+    assert.deepStrictEqual(goiWeb[goiWeb.length - 1].cu, ['Drive: Mặc định/images/002.png'], 'đưa lại: báo bản cũ để Thay thế');
+    // Tài khoản Drive không bao giờ nhận việc tạo.
+    assert.ok(!dp._dsTkGoc('mac-dinh', 'muse').includes(dr.id) && !dp._dsTkGoc('mac-dinh', 'flow').includes(dr.id));
+    assert.deepStrictEqual([dp.caiDat.driveCach, chuanCach(dp, 'xyz')], ['web', 'may']);
+  });
+  const chuanCach = (dp, v) => { dp.datCaiDat({ driveCach: v }); return dp.caiDat.driveCach; };
+
+  test('1.4.0 Drive cách 2: trang Drive (drive-trang.js) không gán innerHTML; giao diện có ô chọn cách + tài khoản, thẻ Drive ở mục Tài khoản', () => {
+    const dt = docNguon('src/inject/drive-trang.js'), dw = docNguon('src/main/drive-web.js'), html = docNguon('src/ui/index.html'), ui = docNguon('src/ui/app.js'), m = docNguon('main.js');
+    assert.ok(!/\.innerHTML\s*=|insertAdjacentHTML|document\.write/.test(dt), 'Trusted Types');
+    assert.ok(/Page\.setInterceptFileChooserDialog/.test(dw) && /DOM\.setFileInputFiles/.test(dw) && /Input\.dispatchDragEvent/.test(dw));
+    for (const id of ['cdDriveCach', 'cdDriveTk', 'cdDriveTkMoi', 'nutThemTKDrive']) assert.ok(new RegExp(`id="${id}"`).test(html), id);
+    assert.ok(/<button data-v="drive"/.test(html) && /chi-drive/.test(html));
+    assert.ok(/a\.nen === 'drive'\) \? a\.nen : 'muse'/.test(ui), 'tài khoản Drive không bị coi là Muse ở hộp tài khoản dự án');
+    assert.ok(/const DS_NEN = \['muse', 'flow', 'suno'\];/.test(ui), 'hộp tài khoản dự án chỉ Muse / Flow / Suno');
+    assert.ok(/driveCach: \$\('#cdDriveCach'\)\.value, driveTk: \$\('#cdDriveTk'\)\.value/.test(ui));
+    assert.ok(/lenDriveWeb: \(x\) => lenDriveWeb\(x\)/.test(m) && /tk\.nen === 'drive'/.test(m));
+  });
+
+  test('1.4.0 giao diện + lệnh: đổi prompt, đổi Muse/Flow, Lên Drive, Chạy lại tài khoản, đồng hồ, thẻ Google Drive, chế độ nhẹ máy', () => {
+    const html = docNguon('src/ui/index.html'), m = docNguon('main.js'), ui = docNguon('src/ui/app.js');
+    for (const id of ['chipDongHo', 'chonDoiPrompt', 'chonSangMuse', 'chonSangFlow', 'chonDrive', 'nutChayLaiTk', 'cdNheMay', 'cdDrive', 'cdThuMucDrive', 'cdTimDrive', 'cdChonDrive']) {
+      assert.ok(new RegExp(`id="${id}"`).test(html), id);
+    }
+    for (const l of ['doiPrompt', 'doiNenViec', 'lenDriveViec', 'chayLaiTaiKhoan', 'chayLaiMoiTaiKhoan', 'chonThuMucDrive', 'timDrive', 'datThuMucDrive']) {
+      assert.ok(new RegExp(`\\n  ${l}: `).test(m), `LENH.${l}`);
+      assert.ok(new RegExp(`api\\.call\\('${l}'`).test(ui), `giao diện gọi ${l}`);
+    }
+    assert.ok(/lenDrive: \(x\) => chepLenDrive\(x\)/.test(m) && /chayLaiFlow: \(id\) => .*mayFlow\.chayLaiNgay\(id\)/.test(m));
+    assert.ok(/PRIORITY_BELOW_NORMAL/.test(m) && /nheMay !== false/.test(m), 'chế độ nhẹ máy hạ ưu tiên trang chạy nền');
+    assert.ok(/chayLaiNgay/.test(docNguon('src/flow/may-flow.js')));
+  });
+
+  test('1.4.0 cài đặt mới: Drive theo dự án, nhẹ máy là cài đặt chung (mặc định bật); mở app không giữ đồng hồ đang chạy', () => {
+    const { dp } = dungDieuPhoi({ duLieu: { duAn: [{ id: 'mac-dinh', ten: 'Mặc định', taiKhoan: ['tk-1'], dongHo: { luot: 5, tong: 9, dangChay: true } }] } });
+    assert.deepStrictEqual([dp.caiDat.driveBat, dp.caiDat.thuMucDrive, dp.caiDat.nheMay], [false, '', true]);
+    assert.strictEqual(dp.duAn[0].dongHo.dangChay, false);
+    const d = dp.taoDuAn('B');
+    dp.datCaiDat({ driveBat: true, thuMucDrive: 'G:\\My Drive', nheMay: false }, d.id);
+    assert.deepStrictEqual([dp.cd(d.id).driveBat, dp.cd(d.id).thuMucDrive, dp.cd('mac-dinh').driveBat], [true, 'G:\\My Drive', false]);
+    assert.strictEqual(dp.caiDat.nheMay, false, 'nhẹ máy lưu vào cài đặt chung');
   });
 }
 

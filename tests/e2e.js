@@ -5,6 +5,8 @@
 //                             (tests/flow-gia/); kịch bản: tests/flow-e2e-chay.js (Flow + nối Flow ⇄ Muse).
 // node tests/e2e.js suno   — thêm trang Suno Create giả (/suno/create, tests/fixture-suno.html);
 //                             kịch bản: tests/suno-e2e-chay.js (tạo nhạc, chọn bài dài hơn, hết lượt → tài khoản phụ).
+// node tests/e2e.js drive  — 1.4.0: thêm trang Google Drive giả (/drive/…, tests/fixture-drive.html); kịch bản:
+//                             tests/drive-e2e-chay.js (ảnh / video xong → tải thẳng lên Drive: thư mục dự án, images, Videos).
 const http = require('http');
 const fs = require('fs');
 const os = require('os');
@@ -13,9 +15,43 @@ const { spawn } = require('child_process');
 
 const FLOW = process.argv[2] === 'flow';
 const SUNO = process.argv[2] === 'suno';
+const DRIVE = process.argv[2] === 'drive';
 const fixture = fs.readFileSync(path.join(__dirname, 'fixture-muse.html'));
 const trangFlow = fs.readFileSync(path.join(__dirname, 'flow-gia', 'trang-flow.html'));
 const trangSuno = fs.readFileSync(path.join(__dirname, 'fixture-suno.html'));
+const trangDrive = fs.readFileSync(path.join(__dirname, 'fixture-drive.html'));
+// Drive giả: thư mục + tệp (theo mã thư mục cha, 'root' = Drive của tôi).
+const drive = { thuMuc: {}, tep: [], n: 0, canDangNhap: false, taoThuMuc: [], tai: [] };
+function driveApi(req, res) {
+  const json = (o) => { res.setHeader('content-type', 'application/json'); res.end(JSON.stringify(o)); };
+  const body = (fn) => { let b = ''; req.setEncoding('utf8'); req.on('data', (d) => { b += d; }); req.on('end', () => { let o = {}; try { o = JSON.parse(b); } catch (_) {} fn(o); }); };
+  const u = new URL(req.url, 'http://x');
+  if (u.pathname === '/__drive-ds') {
+    const cha = u.searchParams.get('cha');
+    return json({ ten: cha === 'root' ? 'Drive của tôi' : (drive.thuMuc[cha] || {}).ten,
+      muc: [...Object.entries(drive.thuMuc).filter(([, f]) => f.cha === cha).map(([id, f]) => ({ id, ten: f.ten, laThuMuc: true })),
+        ...drive.tep.filter((t) => t.cha === cha).map((t) => ({ id: t.id, ten: t.ten, laThuMuc: false }))] });
+  }
+  if (u.pathname === '/__drive-thu-muc') return body((o) => { const id = `f${++drive.n}`; drive.thuMuc[id] = { ten: o.ten, cha: o.cha }; drive.taoThuMuc.push(o); json({ ok: true, id }); });
+  if (u.pathname === '/__drive-tai') {
+    return body((o) => {
+      drive.tai.push({ cha: o.cha, ten: o.ten, cach: o.cach, qua: o.qua });
+      const cu = drive.tep.find((t) => t.cha === o.cha && t.ten === o.ten);
+      if (o.cach === 'thay' && cu) cu.b64 = o.b64;
+      else drive.tep.push({ id: `t${++drive.n}`, cha: o.cha, ten: o.ten, b64: o.b64 });
+      json({ ok: true });
+    });
+  }
+  if (u.pathname === '/__drive-trang-thai') return json(drive);
+  if (u.pathname === '/__drive-cau-hinh') {
+    return body((o) => {
+      if ('canDangNhap' in o) drive.canDangNhap = !!o.canDangNhap;
+      if (o.xoaThuMuc) { delete drive.thuMuc[o.xoaThuMuc]; drive.tep = drive.tep.filter((t) => t.cha !== o.xoaThuMuc); }
+      json({ ok: true });
+    });
+  }
+  json({ loi: 'khong-co' });
+}
 const daGui = [];
 const flowGhi = [];   // mọi thứ engine Flow giả nhận được (mẻ, kho ảnh, chế độ…)
 let duAnFlow = ['gia-khac'];
@@ -89,6 +125,14 @@ const sv = http.createServer((req, res) => {
     return;
   }
   if (req.url.startsWith('/__suno-')) { sunoApi(req, res); return; }
+  if (req.url.startsWith('/__drive-')) { driveApi(req, res); return; }
+  if (req.url.startsWith('/drive/')) {
+    res.setHeader('content-type', 'text/html; charset=utf-8');
+    const id = (req.url.match(/^\/drive\/folders\/([^/?#]+)/) || [])[1];
+    if (drive.canDangNhap) return res.end('<!doctype html><meta charset="utf-8"><title>Google Drive</title><h1>Google Drive</h1><a href="#">Đăng nhập</a>');
+    if (id && !drive.thuMuc[id]) return res.end('<!doctype html><meta charset="utf-8"><title>Google Drive</title><p>Rất tiếc, không tìm thấy tệp. Bạn cần có quyền truy cập.</p>');
+    return res.end(trangDrive);
+  }
   if (req.url.startsWith('/suno/')) {
     // treoKiem: trang Suno nạp chậm (bài kiểm khung đăng nhập không được chờ bước kiểm tài khoản).
     setTimeout(() => { res.setHeader('content-type', 'text/html; charset=utf-8'); res.end(trangSuno); }, suno.treoKiem);
@@ -134,16 +178,16 @@ const sv = http.createServer((req, res) => {
 
 sv.listen(0, '127.0.0.1', () => {
   const url = `http://127.0.0.1:${sv.address().port}`;
-  const tam = fs.mkdtempSync(path.join(os.tmpdir(), FLOW ? 'flow-e2e-' : SUNO ? 'suno-e2e-' : 'muse-e2e-'));
+  const tam = fs.mkdtempSync(path.join(os.tmpdir(), FLOW ? 'flow-e2e-' : SUNO ? 'suno-e2e-' : DRIVE ? 'drive-e2e-' : 'muse-e2e-'));
   const electron = require('electron');
   const args = ['.'];
   if (process.platform === 'linux') args.push('--no-sandbox');
   const p = spawn(electron, args, {
     cwd: path.join(__dirname, '..'),
-    env: { ...process.env, MUSE_URL: url, MUSE_TEST: FLOW ? 'tests/flow-e2e-chay.js' : SUNO ? 'tests/suno-e2e-chay.js' : 'tests/e2e-chay.js', SUNO_URL: `${url}/suno/create`, MUSE_DATA_DIR: path.join(tam, 'data'),
+    env: { ...process.env, MUSE_URL: url, MUSE_TEST: FLOW ? 'tests/flow-e2e-chay.js' : SUNO ? 'tests/suno-e2e-chay.js' : DRIVE ? 'tests/drive-e2e-chay.js' : 'tests/e2e-chay.js', DRIVE_URL: url, SUNO_URL: `${url}/suno/create`, MUSE_DATA_DIR: path.join(tam, 'data'),
       MUSE_E2E_TAM: tam, MUSE_NO_UPDATE_CHECK: '1', MUSE_CHO_KET_NOI_MS: '4000',
       ...(FLOW ? { FLOW_TEST_URL: `${url}/fx/vi/tools/flow`, FLOW_TEST_HOST: '^http://127\\.0\\.0\\.1:\\d+/fx/',
-        FLOW_TEST_NGUON: 'tests/flow-gia/nguon.js', FLOW_CHO_SAN_SANG_MS: '30000', FLOW_CHO_TAI_MS: '20000' } : {}) },
+        FLOW_TEST_NGUON: 'tests/flow-gia/nguon.js', FLOW_CHO_SAN_SANG_MS: '30000', FLOW_CHO_TAI_MS: '45000' } : {}) },
     stdio: ['ignore', 'pipe', 'pipe']
   });
   let raChu = '';
@@ -158,7 +202,7 @@ sv.listen(0, '127.0.0.1', () => {
       // Log của job không tải được từ phiên Claude → đưa các dòng đáng chú ý lên thành annotation.
       const quanTrong = raChu.split('\n').filter((l) => /✘|⏱|kẹt|LỖI|KẾT QUẢ|^--/.test(l)).join('\n').slice(-5000);
       const esc = (x) => x.replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
-      console.log(`::error title=E2E ${FLOW ? 'Flow ' : SUNO ? 'Suno ' : ''}${process.platform}::${esc(quanTrong || raChu.slice(-5000))}`);
+      console.log(`::error title=E2E ${FLOW ? 'Flow ' : SUNO ? 'Suno ' : DRIVE ? 'Drive ' : ''}${process.platform}::${esc(quanTrong || raChu.slice(-5000))}`);
     }
     process.exit(code === 0 ? 0 : 1);
   });

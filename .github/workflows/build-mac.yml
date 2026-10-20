@@ -43,6 +43,11 @@ jobs:
         timeout-minutes: 10
         run: node tests/e2e.js suno
 
+      # 1.4.0: anh / video xong -> tai thang len Google Drive (trang Drive gia: thu muc du an, images, Videos)
+      - name: Kiem thu dau-cuoi (trang Drive gia)
+        timeout-minutes: 10
+        run: node tests/e2e.js drive
+
       # 1.3.4: giao dien voi 200 video xong khong phinh RAM (anh nho thay <video>, ve theo tung dong)
       - name: Kiem thu RAM giao dien
         timeout-minutes: 6

@@ -35,6 +35,8 @@ Chạy thẳng từ mã nguồn (Windows): bấm đúp `CHAY_TU_NGUON.bat` (tự
 - **Video từ ảnh nằm cạnh ảnh, cùng tên** (`325.jpg` → `325.mp4`). Tên ảnh mặc định `{stt}`.
 - **Tải về hàng loạt** (tick nhiều việc → Tải về: đặt tên mới, chọn thư mục, file đã mất thì lấy lại từ chat Muse cũ không tốn lượt), **xuất Nhật ký ra .txt**, tuỳ chọn **tự xoá chat Muse / dự án Flow** khi chạy xong hàng chờ.
 - **Tạo nhạc (Suno)**: prompt vào ô Styles (Advanced, không lời); mỗi lần Create Suno ra 4 bài, app tải MP3 của bài **dài hơn** trong 2 bài đầu. Mỗi tài khoản Suno làm từng prompt một (chờ bài xong → ⋯ → Download → MP3 → *Unlock & Download*); tải hỏng thì tải lại đúng bài đó, không gửi lại prompt. Tài khoản Suno hết lượt tải / hết credit → bài tạo lại ở tài khoản Suno dự phòng; tài khoản đó nghỉ 6 giờ (bấm Kiểm tra để dùng lại sớm). Captcha: cửa sổ Suno hiện lên để bạn tự giải.
+- **Google Drive (1.4.0)**: ảnh / video xong tự đưa lên Drive vào `Tên dự án/images` và `Tên dự án/Videos`, theo một trong hai cách: chép vào thư mục Google Drive trên máy (Google Drive cho máy tính tự tải lên), hoặc tải thẳng lên drive.google.com bằng trình duyệt trong app (tài khoản ở thẻ **Drive** của mục Tài khoản). Việc xong từ trước: chọn → *Lên Drive*.
+- **1.4.0**: chọn hết → **Đổi prompt** (thay hẳn / tìm và thay chữ); **đổi ngay sang Muse / Flow** ở từng việc hoặc nhiều việc; **đồng hồ dự án** (đã chạy + dự đoán còn bao lâu); **Chạy lại ngay** tài khoản đang nghỉ vì lỗi; chế độ **nhẹ máy** (trang chạy ngầm ưu tiên CPU thấp, giao diện báo thưa hơn khi nhiều việc).
 - Mẫu tên file, thư mục riêng cho ảnh/video/nhạc, nhập nhiều file .txt (mỗi file một dự án), tạo video từ thư mục ảnh có sẵn, tự thử lại, tắt máy khi chạy xong.
 
 ## Giới hạn cần biết
@@ -42,7 +44,7 @@ Chạy thẳng từ mã nguồn (Windows): bấm đúp `CHAY_TU_NGUON.bat` (tự
 - Google Flow chỉ có tỷ lệ **16:9** và **9:16** (tỷ lệ khác tự đổi về gần nhất).
 - Nhận diện tài khoản lỗi **không qua mặt** được kiểm tra của Google: nó chỉ đổi sang tài khoản khác / cho tài khoản nghỉ khi bị nhắc.
 - Suno: chỉ tải bằng nút Download của chính Suno (không lách giới hạn tải), không giải captcha hộ.
-- Các bài kiểm thử tự động chạy trên **trang Muse giả, trang Google Flow giả và trang Suno giả**; giao diện thật của hai trang có thể đổi bất cứ lúc nào. Lần đầu nên chạy thử vài prompt và xem **Nhật ký**.
+- Các bài kiểm thử tự động chạy trên **trang Muse giả, trang Google Flow giả, trang Suno giả và trang Google Drive giả**; giao diện thật của hai trang có thể đổi bất cứ lúc nào. Lần đầu nên chạy thử vài prompt và xem **Nhật ký**.
 
 ## Nhật ký và dữ liệu
 
@@ -58,6 +60,7 @@ node tests/flow/run.js                     # logic Flow (engine, model, an toàn
 xvfb-run -a node tests/e2e.js              # đầu-cuối Muse (trang Muse giả)
 xvfb-run -a node tests/e2e.js flow         # đầu-cuối Flow + nối Flow ⇄ Muse (trang + engine Flow giả)
 xvfb-run -a node tests/e2e.js suno         # đầu-cuối Tạo nhạc (trang Suno Create giả)
+xvfb-run -a node tests/e2e.js drive        # đầu-cuối Google Drive tải thẳng lên (trang Drive giả)
 xvfb-run -a npx electron --no-sandbox tests/flow/<bài>-main.js   # bài DOM Flow: paste, mode, model, bam-tao, bam-tao-that, kiem-truoc, tham-chieu
 ```
 
