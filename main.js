@@ -710,6 +710,7 @@ function chepAnhNhanVat(nvId, ds) {
 const LENH = {
   trangThai: () => ({ ...trangThai(), nhatKy }),
   them: (p) => dieuPhoi.them(p),
+  quetDaCo: (p) => dieuPhoi.quetDaCo(p),   // 1.4.2
   // 1.3.0: Chạy / Dừng theo dự án (có duAn) — không có duAn = mọi dự án như bản cũ.
   chay: ({ duAn } = {}) => (duAn ? dieuPhoi.chayDuAn(duAn) : dieuPhoi.chayTatCa()),
   dung: ({ duAn } = {}) => (duAn ? dieuPhoi.dungDuAn(duAn) : dieuPhoi.dungTatCa()),
@@ -1059,6 +1060,21 @@ app.whenReady().then(() => {
     thuMucRaMacDinh: path.join(app.getPath('documents'), 'AI Automation Studio'),
     thuMucTam: path.join(app.getPath('userData'), 'ket-qua-tam'),
     tonTai: (p) => fs.existsSync(p),
+    // 1.4.2: quét thư mục lưu (tìm số đã có file) — đường dẫn tương đối "/", sâu tối đa 3 cấp thư mục con.
+    dsFile: (goc) => {
+      const ra = [];
+      const di = (thuMuc, tien, sau) => {
+        let ds = [];
+        try { ds = fs.readdirSync(thuMuc, { withFileTypes: true }); } catch (_) { return; }
+        for (const e of ds) {
+          if (ra.length >= 200000) return;
+          if (e.isFile()) ra.push(tien + e.name);
+          else if (e.isDirectory() && sau > 0) di(path.join(thuMuc, e.name), `${tien}${e.name}/`, sau - 1);
+        }
+      };
+      if (goc) di(goc, '', 3);
+      return ra;
+    },
     donDep: (don) => donDep(don),
     lenDrive: (x) => chepLenDrive(x),                                   // 1.4.0
     lenDriveWeb: (x) => lenDriveWeb(x),

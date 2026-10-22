@@ -127,6 +127,23 @@ function tenFile(duAn, job, mime, thuTu, mau) {
   return doan.join('/');
 }
 
+/** Đuôi file kết quả theo loại việc (1.4.2: quét thư mục tìm số đã có). */
+const DUOI_LOAI = { anh: ['png', 'jpg', 'jpeg', 'webp', 'gif'], video: ['mp4', 'webm', 'mov'], nhac: ['mp3', 'wav', 'm4a'] };
+
+/**
+ * 1.4.2 — Biểu thức khớp tên file (đường dẫn tương đối trong thư mục lưu, ngăn cách "/") mà việc `job` được lưu theo
+ * mẫu `mau`. {ngay} khớp mọi ngày; chấp nhận đuôi " (2)" (trùng tên) và "_2" (nhiều file một việc), mọi đuôi file
+ * cùng loại (Muse png/webp, Flow jpg…).
+ */
+function mauKhopFile(duAn, job, loai, mau) {
+  const MOC = 'QQNGAYQQ';
+  const mime = { video: 'video/mp4', nhac: 'audio/mpeg' }[loai] || 'image/png';
+  const rel = tenFile(duAn, job, mime, 0, String(mau || '').trim().replace(/\{ngay\}/g, MOC));
+  const goc = rel.replace(/\.[^./]+$/, '');
+  const thoat = goc.split(MOC).map((x) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('\\d{4}-\\d{2}-\\d{2}');
+  return new RegExp(`^${thoat}( \\(\\d+\\))?(_\\d+)?\\.(${(DUOI_LOAI[loai] || DUOI_LOAI.anh).join('|')})$`, 'i');
+}
+
 /** Kiểu tệp theo đuôi (file Flow tải về đĩa). */
 function mimeTuDuoi(p) {
   const d = String(p || '').split('.').pop().toLowerCase();
@@ -357,7 +374,7 @@ function keHoachTai(viec, tonTai) {
 }
 
 const HD = {
-  TY_LE, MAU_MAC_DINH, MAU_TEN_MAC_DINH, MAU_TEN_ANH_MAC_DINH, PROMPT_VIDEO_MAC_DINH, slugTen, tachPrompt, timNhanVat, taoTinNhan, tenFile, mimeTuDuoi, chonKhoang,
+  TY_LE, MAU_MAC_DINH, MAU_TEN_MAC_DINH, MAU_TEN_ANH_MAC_DINH, PROMPT_VIDEO_MAC_DINH, slugTen, tachPrompt, timNhanVat, taoTinNhan, tenFile, mimeTuDuoi, chonKhoang, DUOI_LOAI, mauKhopFile,
   docSoChay, chonTheoSo, gonSo,
   viecKeTiep, taiKhoanChoViec, taiKhoanChoViecDs, thoiGianDuKien, duDoanConLai, tienDoUoc, daXong, laTraLoiChu, laChanKhuVuc, laTuChoi, soSanhTuNhien, keHoachTai
 };

@@ -7,6 +7,7 @@
 //                             kịch bản: tests/suno-e2e-chay.js (tạo nhạc, chọn bài dài hơn, hết lượt → tài khoản phụ).
 // node tests/e2e.js drive  — 1.4.0: thêm trang Google Drive giả (/drive/…, tests/fixture-drive.html); kịch bản:
 //                             tests/drive-e2e-chay.js (ảnh / video xong → tải thẳng lên Drive: thư mục dự án, images, Videos).
+// node tests/e2e.js quet   — 1.4.2: trang Muse giả; kịch bản tests/quet-e2e-chay.js (quét thư mục, chỉ làm số còn thiếu).
 const http = require('http');
 const fs = require('fs');
 const os = require('os');
@@ -16,6 +17,7 @@ const { spawn } = require('child_process');
 const FLOW = process.argv[2] === 'flow';
 const SUNO = process.argv[2] === 'suno';
 const DRIVE = process.argv[2] === 'drive';
+const QUET = process.argv[2] === 'quet';
 const fixture = fs.readFileSync(path.join(__dirname, 'fixture-muse.html'));
 const trangFlow = fs.readFileSync(path.join(__dirname, 'flow-gia', 'trang-flow.html'));
 const trangSuno = fs.readFileSync(path.join(__dirname, 'fixture-suno.html'));
@@ -178,13 +180,13 @@ const sv = http.createServer((req, res) => {
 
 sv.listen(0, '127.0.0.1', () => {
   const url = `http://127.0.0.1:${sv.address().port}`;
-  const tam = fs.mkdtempSync(path.join(os.tmpdir(), FLOW ? 'flow-e2e-' : SUNO ? 'suno-e2e-' : DRIVE ? 'drive-e2e-' : 'muse-e2e-'));
+  const tam = fs.mkdtempSync(path.join(os.tmpdir(), FLOW ? 'flow-e2e-' : SUNO ? 'suno-e2e-' : DRIVE ? 'drive-e2e-' : QUET ? 'quet-e2e-' : 'muse-e2e-'));
   const electron = require('electron');
   const args = ['.'];
   if (process.platform === 'linux') args.push('--no-sandbox');
   const p = spawn(electron, args, {
     cwd: path.join(__dirname, '..'),
-    env: { ...process.env, MUSE_URL: url, MUSE_TEST: FLOW ? 'tests/flow-e2e-chay.js' : SUNO ? 'tests/suno-e2e-chay.js' : DRIVE ? 'tests/drive-e2e-chay.js' : 'tests/e2e-chay.js', DRIVE_URL: url, SUNO_URL: `${url}/suno/create`, MUSE_DATA_DIR: path.join(tam, 'data'),
+    env: { ...process.env, MUSE_URL: url, MUSE_TEST: FLOW ? 'tests/flow-e2e-chay.js' : SUNO ? 'tests/suno-e2e-chay.js' : DRIVE ? 'tests/drive-e2e-chay.js' : QUET ? 'tests/quet-e2e-chay.js' : 'tests/e2e-chay.js', DRIVE_URL: url, SUNO_URL: `${url}/suno/create`, MUSE_DATA_DIR: path.join(tam, 'data'),
       MUSE_E2E_TAM: tam, MUSE_NO_UPDATE_CHECK: '1', MUSE_CHO_KET_NOI_MS: '4000',
       ...(FLOW ? { FLOW_TEST_URL: `${url}/fx/vi/tools/flow`, FLOW_TEST_HOST: '^http://127\\.0\\.0\\.1:\\d+/fx/',
         FLOW_TEST_NGUON: 'tests/flow-gia/nguon.js', FLOW_CHO_SAN_SANG_MS: '30000', FLOW_CHO_TAI_MS: '45000' } : {}) },
@@ -202,7 +204,7 @@ sv.listen(0, '127.0.0.1', () => {
       // Log của job không tải được từ phiên Claude → đưa các dòng đáng chú ý lên thành annotation.
       const quanTrong = raChu.split('\n').filter((l) => /✘|⏱|kẹt|LỖI|KẾT QUẢ|^--/.test(l)).join('\n').slice(-5000);
       const esc = (x) => x.replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
-      console.log(`::error title=E2E ${FLOW ? 'Flow ' : SUNO ? 'Suno ' : DRIVE ? 'Drive ' : ''}${process.platform}::${esc(quanTrong || raChu.slice(-5000))}`);
+      console.log(`::error title=E2E ${FLOW ? 'Flow ' : SUNO ? 'Suno ' : DRIVE ? 'Drive ' : QUET ? 'Quet ' : ''}${process.platform}::${esc(quanTrong || raChu.slice(-5000))}`);
     }
     process.exit(code === 0 ? 0 : 1);
   });

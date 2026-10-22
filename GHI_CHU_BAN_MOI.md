@@ -1,4 +1,18 @@
-# AI Automation Studio 1.4.1
+# AI Automation Studio 1.4.2
+
+- **Làm tiếp số còn thiếu, không làm lại file đã có.** Dùng khi một lần chạy bị lỗi hoặc mất lịch sử dự án, thư mục đã có ảnh / video nhưng còn sót số (vd đã tới 261 mà thiếu 253, 254).
+  - Ở trang *Tạo ảnh* / *Tạo video* / *Tạo nhạc*, bật công tắc **Bỏ qua số đã có file trong thư mục** (ngay trên *Cài đặt nâng cao*), dán lại toàn bộ prompt rồi bấm **Tạo** như thường.
+  - App xem thư mục lưu của dự án: số nào đã có file theo đúng mẫu tên (vd `253.jpg`, cả `253 (2).jpg`, `253_2.jpg`) hoặc đang chờ trong hàng đợi thì bỏ qua. Các số bị sót được làm trước, rồi làm tiếp những prompt chưa làm. Số thứ tự vẫn giữ đúng như prompt.
+  - Đang bật *Ảnh xong → tự tạo video*: ảnh có rồi mà thiếu video thì chỉ tạo video từ ảnh đó, không tạo lại ảnh. Video lưu cạnh ảnh đúng tên như trước.
+  - Nút **Quét thư mục** cho xem trước: bao nhiêu số đã có, số nào còn thiếu, chưa thêm việc nào. Nhật ký ghi một dòng 🔎 nói rõ số bỏ qua, số bị sót và số làm tiếp.
+  - Công tắc tắt sẵn; tắt thì bấm Tạo y như 1.4.1. Khi *Tải về* đang tắt (chỉ đưa lên Drive), app xem thư mục tạm của dự án, không xem Drive.
+- **Cài đặt ghi rõ áp dụng cho gì.** Cạnh mỗi mục trong *Cài đặt* có nhãn màu: *Chỉ ảnh*, *Chỉ video*, *Ảnh · Video*, *Chỉ nhạc*, *Ảnh · Video · Nhạc*, *Cả app*. Thẻ mới **Lưu ảnh & video** chia hai cột: cột trái cho việc Tạo ảnh, cột phải cho việc Tạo video (tải về, thư mục, mẫu tên file, ví dụ tên). Sửa ở đây hay ở *Cài đặt nâng cao* của trang Tạo là một. Thẻ cũ đổi tên thành *Video tạo từ ảnh & dọn dẹp*.
+- **Giật lag:** đã đo với hàng đợi 3.600 việc. Cập nhật trạng thái khoảng 17 ms, vòng điều phối dưới 2 ms, RAM giao diện vẫn trong ngưỡng, nên không đổi gì. Riêng phần quét mới được làm nhanh: 2.000 prompt so với 20.000 file mất khoảng 0,1 giây.
+- Mọi thứ khác giữ nguyên như 1.4.1.
+
+Lưu ý: đã kiểm bằng bài kiểm tự động và trên trang Muse giả (thư mục thiếu số 3, 5 và thiếu video số 1, 4), chưa chạy trên trang thật.
+
+## Bản 1.4.1
 
 - **Chạy nhiều dự án cùng lúc thì ảnh / video lên Google Drive không còn sai tên.**
   - Nguyên nhân: khi tắt *Tải ảnh về* / *Tải video về*, mọi dự án giữ file trong **một** thư mục tạm chung của app. Dự án sau gặp `001.jpg` của dự án trước nên phải lưu thành `001 (2).jpg`, và Drive nhận đúng cái tên sai đó.
