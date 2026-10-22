@@ -457,6 +457,11 @@
     veTaiVe();
     $('#boQuaDaCo').checked = !!S.caiDat.boQuaDaCo;
     $('#quetGhiAnh').hidden = loaiTrang() !== 'anh' || !U.chuoi.bat;
+    // 1.4.3: thư mục đã chọn để quét (của loại đang xem, dự án đang mở).
+    const tmQuet = (dTm && dTm.thuMucQuet && dTm.thuMucQuet[loaiTrang()]) || '';
+    $('#quetDang').textContent = tmQuet ? `Đang quét: ${tmQuet}` : 'Chưa chọn — quét thư mục lưu của dự án';
+    $('#quetDang').title = tmQuet;
+    $('#boQuet').hidden = !tmQuet;
     $('#tachPrompt').value = S.caiDat.tachPrompt;
     for (const b of $$('#cheDo button')) b.classList.toggle('on', b.dataset.v === U.cheDo);
     $('#khuNguoiMau').hidden = U.cheDo !== 'nguoimau';
@@ -802,21 +807,36 @@
   }
 
   /** 1.4.2: xem trước số nào đã có file trong thư mục lưu, số nào còn thiếu. */
+  /** 1.4.3: bấm "Quét thư mục…" → chọn thư mục đang có file đánh số làm dở → quét đúng thư mục đó (file mới cũng lưu vào
+   *  đó, công tắc "Bỏ qua số đã có file" tự bật). Có prompt thì nói luôn số nào sẽ làm; chưa có thì tóm tắt thư mục. */
   async function quetThuMuc() {
+    const loai = loaiTrang(), ten = TEN_LOAI[loai];
+    const ch = await api.call('chonThuMucQuet', { duAn: U.duAn, loai });
+    if (!ch) return;
     const prompts = promptCotTao();
-    if (!prompts.length) { toast('Chưa có prompt nào — dán prompt rồi bấm Quét', true); $('#oPrompt').focus(); return; }
-    const ts = await thamSoTao(prompts, false);
+    const ts = prompts.length ? await thamSoTao(prompts, false) : { loai };
     if (!ts) return;
     $('#ghiQuet').textContent = 'Đang quét…';
-    const q = await api.call('quetDaCo', { ...ts, duAn: U.duAn, prompts });
+    const q = await api.call('quetDaCo', { ...ts, loai: ts.loai || loai, duAn: U.duAn, prompts });
     if (!q || !q.ok) { $('#ghiQuet').textContent = (q && q.loi) || 'Không quét được'; return; }
-    const ds = (a) => (a.length ? ` (${HD.gonSo(a)})` : '');
-    const xem = (a) => HD.gonSo(a).split(', ').slice(0, 12).join(', ') + (HD.gonSo(a).split(', ').length > 12 ? '…' : '');
-    const v = q.chiVideo.map((x) => x.stt);
-    $('#ghiQuet').textContent = `Đã có ${q.coSan.length}` + (q.dangCho.length ? ` · đang chờ ${q.dangCho.length}` : '') +
-      ` · còn thiếu ${q.thieu.length}${q.thieu.length ? ` (${xem(q.thieu)})` : ''}` + (v.length ? ` · thiếu video ${v.length} (${xem(v)})` : '') +
-      ($('#boQuaDaCo').checked ? '' : ' — bật công tắc trên để chỉ làm số còn thiếu');
-    $('#ghiQuet').title = `Thư mục: ${q.thuMuc}\nĐã có${ds(q.coSan)}\nĐang chờ${ds(q.dangCho)}\nCòn thiếu${ds(q.thieu)}\nThiếu video${ds(v)}`;
+    const xem = (a) => { const g = HD.gonSo(a).split(', '); return g.slice(0, 15).join(', ') + (g.length > 15 ? '…' : ''); };
+    const cao = q.soCo.length ? q.soCo[q.soCo.length - 1] : 0;
+    const dong = [q.soCo.length
+      ? `Thư mục có ${q.soCo.length} ${ten} đánh số (số ${q.soCo[0]}–${cao})` + (q.lo.length ? `, bị sót ${q.lo.length} số: ${xem(q.lo)}.` : ', không sót số nào.')
+      : `Thư mục chưa có ${ten} nào đánh số.`];
+    if (prompts.length) {
+      const sot = q.thieu.filter((n) => n < cao), moi = q.thieu.filter((n) => n > cao), v = q.chiVideo.map((x) => x.stt);
+      const lam = q.thieu.length + v.length;
+      dong.push(lam
+        ? `Bấm Tạo sẽ làm ${lam} số` + (sot.length ? ` — bị sót ${sot.length} (${xem(sot)})` : '') + (moi.length ? `${sot.length ? ', rồi' : ' —'} làm tiếp ${moi.length} prompt chưa làm (${xem(moi)})` : '') +
+          (v.length ? ` + ${v.length} video từ ảnh có sẵn (${xem(v)})` : '') + `; bỏ qua ${q.coSan.length + q.dangCho.length} số đã có${q.dangCho.length ? ' / đang chờ' : ''}.`
+        : `Mọi prompt đã có ${ten} trong thư mục${q.dangCho.length ? ' hoặc đang chờ' : ''} — không còn số nào cần làm.`);
+    } else dong.push(`Dán đủ prompt (cả số đã làm) rồi bấm Tạo: app chỉ làm số còn thiếu, rồi làm tiếp prompt chưa làm.`);
+    dong.push(q.tai ? `File mới lưu: ${q.viDu}` : `"Tải ${ten} về" đang tắt: file mới không lưu vào thư mục này (bật lại ở Cài đặt nâng cao nếu cần).`);
+    if (ch.doiMau) dong.push(ch.doiMau);
+    $('#ghiQuet').textContent = dong.join(' ');
+    $('#ghiQuet').title = `Thư mục: ${q.thuMuc}\nSố có file: ${HD.gonSo(q.soCo) || '—'}\nBị sót: ${HD.gonSo(q.lo) || '—'}` +
+      (prompts.length ? `\nSẽ làm: ${HD.gonSo(q.thieu) || '—'}\nĐang chờ: ${HD.gonSo(q.dangCho) || '—'}` : '');
   }
 
   async function taoViec(chay) {
@@ -1596,6 +1616,7 @@
       $(`#lvMo_${l}`).onclick = () => api.call('moThuMuc', { dir: S.thuMuc[l] });
     }
     $('#nutQuet').onclick = () => quetThuMuc();
+    $('#boQuet').onclick = async () => { await api.call('boThuMucQuet', { duAn: U.duAn, loai: loaiTrang() }); $('#ghiQuet').textContent = 'Đã bỏ chọn — quét thư mục lưu của dự án.'; };
     $('#ncTen').addEventListener('input', viDuTen);
     $('#ncTen').onchange = (e) => { datCD({ [khoaTai().ten]: e.target.value }); toast('Đã lưu mẫu tên file'); };
     $('#ncChonThuMuc').onclick = async () => { const d = await api.call('chonThuMucRa', { loai: loaiTrang(), duAn: (duAnHienTai() || {}).id }); if (d) $('#ncThuMuc').value = d; };

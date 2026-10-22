@@ -1,4 +1,16 @@
-# AI Automation Studio 1.4.2
+# AI Automation Studio 1.4.3
+
+- **Nút *Quét thư mục…* giờ cho chọn thư mục.** Bấm nút, chọn thư mục đang có ảnh / video đánh số làm dở, app quét đúng thư mục đó. Bản 1.4.2 chỉ quét thư mục lưu của dự án, nên khi file làm dở nằm ở chỗ khác thì kết quả sai.
+  - App đọc số ngay trong tên file, không cần khớp mẫu tên: `253.jpg`, `0253.png`, `253 (2).jpg`, `anh_253.jpg` đều là số 253. Chỉ xét file nằm ngay trong thư mục, đúng loại (trang Tạo ảnh chỉ xét ảnh, trang Tạo video chỉ xét video).
+  - Quét xong hiện: thư mục có bao nhiêu file đánh số, số nào bị sót. Nếu ô prompt đã có prompt thì nói luôn bấm Tạo sẽ làm số nào (bị sót trước, rồi prompt chưa làm), bỏ qua bao nhiêu số, và file mới sẽ lưu ở đâu.
+  - Chọn thư mục xong thì file mới **lưu vào cùng thư mục đó** và công tắc *Bỏ qua số đã có file trong thư mục* tự bật. Nếu file có sẵn đặt tên chỉ bằng số (`253.jpg`) mà mẫu tên của dự án đang khác (vd `{duAn}/anh_{stt}`), mẫu tên tự đổi thành `{stt}` để file mới cùng kiểu tên.
+  - Dưới nút ghi thư mục đang quét; nút *Bỏ chọn* để quay về quét thư mục lưu của dự án. Đổi thư mục lưu ở Cài đặt cũng tự bỏ chọn.
+  - Việc đã xong trong hàng đợi chỉ được tính là "đã có" khi file của nó nằm trong thư mục đang quét.
+- Mọi thứ khác giữ nguyên như 1.4.2.
+
+Lưu ý: đã kiểm bằng bài kiểm tự động và trên trang Muse giả (thư mục `001.png, 002.png, 0004.png` → chỉ làm 3 và 5, file mới nằm cùng thư mục), chưa chạy trên trang thật.
+
+## Bản 1.4.2
 
 - **Làm tiếp số còn thiếu, không làm lại file đã có.** Dùng khi một lần chạy bị lỗi hoặc mất lịch sử dự án, thư mục đã có ảnh / video nhưng còn sót số (vd đã tới 261 mà thiếu 253, 254).
   - Ở trang *Tạo ảnh* / *Tạo video* / *Tạo nhạc*, bật công tắc **Bỏ qua số đã có file trong thư mục** (ngay trên *Cài đặt nâng cao*), dán lại toàn bộ prompt rồi bấm **Tạo** như thường.

@@ -2499,7 +2499,8 @@ console.log('\n── 1.4.0 ─────────────────�
     assert.match(r.loi, /đã có ảnh trong thư mục hoặc đang chờ/);
     assert.strictEqual(dp.viec.length, 2);
     // "Chỉ chạy prompt số" vẫn áp trước khi quét.
-    assert.deepStrictEqual(dp.quetDaCo({ duAn: 'mac-dinh', loai: 'anh', prompts, chonSo: '4-5' }), { ok: true, thuMuc: ra, coSan: [4], dangCho: [5], thieu: [], chiVideo: [] });
+    const q45 = dp.quetDaCo({ duAn: 'mac-dinh', loai: 'anh', prompts, chonSo: '4-5' });
+    assert.deepStrictEqual([q45.ok, q45.thuMuc, q45.coSan, q45.dangCho, q45.thieu, q45.chiVideo], [true, ra, [4], [5], [], []]);
     // Tắt (mặc định) → thêm đủ như cũ.
     r = dp.them({ duAn: 'mac-dinh', loai: 'anh', prompts });
     assert.deepStrictEqual([r.so, r.boQua], [5, 0]);
@@ -2511,22 +2512,59 @@ console.log('\n── 1.4.0 ─────────────────�
   });
 
   test('1.4.2 quét thư mục: video (mẫu mặc định), việc đã xong còn file, tắt tải về → quét thư mục tạm của dự án', () => {
-    const coFile = new Set(['/khac/x.mp4']);
+    const coFile = new Set([path.join('/vid', 'khac', 'x.mp4'), '/ngoai/y.mp4']);
     const { dp } = dungDieuPhoi({ tonTai: (p) => coFile.has(p),
       dsFile: (g) => ({ '/vid': ['Mac_dinh/Mac_dinh_001.mp4'], [path.join('/tam', 'mac-dinh')]: ['002.png'] }[g] || []) });
     dp.datCaiDat({ thuMucVideo: '/vid' }, 'mac-dinh');
     let q = dp.quetDaCo({ duAn: 'mac-dinh', loai: 'video', prompts: ['a', 'b', 'c'] });
     assert.deepStrictEqual([q.coSan, q.thieu], [[1], [2, 3]]);
-    // Việc video #3 đã xong, file còn (ở chỗ khác — mẫu tên đã đổi) → coi là đã có.
+    // Việc video #3 đã xong, file còn trong thư mục quét (tên khác — mẫu tên đã đổi) → coi là đã có.
     dp.them({ duAn: 'mac-dinh', loai: 'video', prompts: ['a', 'b', 'c'], chonSo: '3' });
-    Object.assign(dp.viec[0], { trangThai: 'xong', files: ['/khac/x.mp4'] });
+    Object.assign(dp.viec[0], { trangThai: 'xong', files: [path.join('/vid', 'khac', 'x.mp4')] });
     q = dp.quetDaCo({ duAn: 'mac-dinh', loai: 'video', prompts: ['a', 'b', 'c'] });
     assert.deepStrictEqual([q.coSan, q.thieu], [[1, 3], [2]]);
+    // 1.4.3: file của việc đã xong nằm NGOÀI thư mục quét → không tính (thư mục quét là chuẩn).
+    dp.viec[0].files = ['/ngoai/y.mp4'];
+    assert.deepStrictEqual(dp.quetDaCo({ duAn: 'mac-dinh', loai: 'video', prompts: ['a', 'b', 'c'] }).thieu, [2, 3]);
+    dp.viec[0].files = [path.join('/vid', 'khac', 'x.mp4')];
     coFile.clear();   // file đã bị xoá → làm lại
     assert.deepStrictEqual(dp.quetDaCo({ duAn: 'mac-dinh', loai: 'video', prompts: ['a', 'b', 'c'] }).thieu, [2, 3]);
     dp.datCaiDat({ taiAnh: false }, 'mac-dinh');
     q = dp.quetDaCo({ duAn: 'mac-dinh', loai: 'anh', prompts: ['a', 'b'] });
     assert.deepStrictEqual([q.thuMuc, q.coSan, q.thieu], [path.join('/tam', 'mac-dinh'), [2], [1]]);
+  });
+
+  test('1.4.3 "Quét thư mục" chọn thư mục: quét đúng thư mục đó theo SỐ trong tên file (không cần khớp mẫu), file mới lưu vào đó', () => {
+    const chon = path.join('/may', 'lam-do');
+    const { dp, nhatKy } = dungDieuPhoi({ dsFile: (g) => (path.resolve(g) === path.resolve(chon)
+      ? ['1.jpg', '0002.png', 'anh_4.jpg', '6 (2).jpg', '7_2.webp', 'ghi-chu.txt', '8.mp4', 'con/3.jpg'] : []) });
+    dp.datCaiDat({ thuMucAnh: '/ra', tenAnh: '{duAn}/{stt}' }, 'mac-dinh');
+    // Chưa chọn: quét thư mục lưu (/ra, trống).
+    const prompts = ['p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7', 'p8', 'p9'];
+    assert.deepStrictEqual(dp.quetDaCo({ duAn: 'mac-dinh', loai: 'anh', prompts }).thieu, [1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    assert.ok(dp.datThuMucQuet('mac-dinh', 'anh', chon).ok);
+    const d = dp.duAn.find((x) => x.id === 'mac-dinh');
+    assert.deepStrictEqual([d.thuMucQuet, dp.cd('mac-dinh').thuMucAnh, dp.cd('mac-dinh').boQuaDaCo], [{ anh: chon }, chon, true]);
+    // File có sẵn tên chỉ là số → mẫu "{duAn}/{stt}" đổi thành "{stt}": file mới nằm cùng chỗ, cùng kiểu tên.
+    assert.strictEqual(dp.cd('mac-dinh').tenAnh, '{stt}');
+    assert.ok(nhatKy.some((x) => /Mẫu tên ảnh đổi từ "\{duAn\}\/\{stt\}" thành "\{stt\}"/.test(x)), nhatKy.join('\n'));
+    assert.ok(nhatKy.some((x) => /🔎 .*quét ảnh ở thư mục/.test(x)));
+    // Không có prompt → tóm tắt thư mục: số có file (chỉ file ảnh, không xét thư mục con), số bị sót.
+    let q = dp.quetDaCo({ duAn: 'mac-dinh', loai: 'anh', prompts: [] });
+    assert.deepStrictEqual([q.ok, q.thuMuc, q.chon, q.soCo, q.lo, q.coSan], [true, chon, true, [1, 2, 4, 6, 7], [3, 5], []]);
+    assert.strictEqual(q.viDu, path.join(chon, '008.png'));
+    q = dp.quetDaCo({ duAn: 'mac-dinh', loai: 'anh', prompts });
+    assert.deepStrictEqual([q.coSan, q.thieu], [[1, 2, 4, 6, 7], [3, 5, 8, 9]]);
+    const r = dp.them({ duAn: 'mac-dinh', loai: 'anh', prompts });
+    assert.deepStrictEqual([r.so, r.boQua, dp.viec.map((j) => j.stt)], [4, 5, [3, 5, 8, 9]]);
+    // Video: thư mục video chưa chọn → quét thư mục video, không lẫn file ảnh.
+    assert.deepStrictEqual(dp.quetDaCo({ duAn: 'mac-dinh', loai: 'video', prompts: [] }).thuMuc, dp.thuMucRa('video', 'mac-dinh'));
+    // Đổi thư mục lưu ảnh ở chỗ khác → thôi quét thư mục đã chọn.
+    dp.datCaiDat({ thuMucAnh: '/khac' }, 'mac-dinh');
+    assert.strictEqual(d.thuMucQuet, undefined);
+    assert.strictEqual(dp.quetDaCo({ duAn: 'mac-dinh', loai: 'anh', prompts: [] }).thuMuc, '/khac');
+    // Số trong tên file.
+    assert.deepStrictEqual(['253', '0253', '253 (2)', '253_2', 'anh_253', 'Tap_1_253', 'abc'].map(HD.soTuTen), [253, 253, 253, 253, 253, 253, 0]);
   });
 
   test('1.4.2 quét thư mục + "Ảnh xong → tự tạo video": ảnh có mà thiếu video → chỉ tạo video từ ảnh đó, video lưu cạnh ảnh', () => {
@@ -2552,6 +2590,10 @@ console.log('\n── 1.4.0 ─────────────────�
     }
     assert.ok(/quetDaCo: \(p\) => dieuPhoi\.quetDaCo\(p\)/.test(m) && /dsFile: \(goc\) =>/.test(m));
     assert.ok(/boQuaDaCo: \$\('#boQuaDaCo'\)\.checked/.test(ui) && /api\.call\('quetDaCo'/.test(ui));
+    // 1.4.3: nút Quét thư mục mở hộp chọn thư mục rồi quét đúng thư mục đó; hiện thư mục đang quét + Bỏ chọn.
+    assert.ok(/id="quetDang"/.test(html) && /id="boQuet"/.test(html));
+    assert.ok(/api\.call\('chonThuMucQuet'/.test(ui) && /api\.call\('boThuMucQuet'/.test(ui));
+    assert.ok(/chonThuMucQuet: async/.test(m) && /showOpenDialog\(win, \{ title: `Chọn thư mục đang có/.test(m) && /dieuPhoi\.datThuMucQuet\(/.test(m));
     // Mọi ô của trang Cài đặt (trừ Drive / Flow nâng cao chỉ chọn cách) có nhãn ảnh / video / nhạc / cả app ngay cạnh.
     const caiDat = html.slice(html.indexOf('id="trang-caidat"'));
     for (const id of ['cdLuong', 'cdChoAnh', 'cdChoVideo', 'cdPng', 'cdVideoCanhAnh', 'fChatAnh', 'fChatVideo', 'fModelAnh', 'fModelChinh', 'cdMauAnh', 'cdMauVideo', 'cdTatMay']) {

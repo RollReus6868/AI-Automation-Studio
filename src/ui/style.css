@@ -506,3 +506,7 @@ label > .ap { margin-left: 6px; }
 .cot-luu h4 .ap { margin: 0; }
 .cot-luu .dong-o input { min-width: 0; }
 .nho-chu { font-size: 12px; margin: -4px 0 10px; }
+/* 1.4.3: kết quả "Quét thư mục…" */
+#khuQuet .dong-o { flex-wrap: wrap; }
+#quetDang { min-width: 0; overflow-wrap: anywhere; flex: 1 1 160px; font-size: 12.5px; }
+.ket-qua-quet { margin: 6px 0 0; font-size: 12.5px; line-height: 1.5; overflow-wrap: anywhere; }

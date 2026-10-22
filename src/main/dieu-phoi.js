@@ -36,6 +36,7 @@ const TEN_NEN = { muse: 'Muse', flow: 'Flow', suno: 'Suno' };
 const NGHI_HET_LUOT_MS = 6 * 60 * 60 * 1000;
 const chuanNen = (n) => (n === 'flow' || n === 'suno' ? n : 'muse');
 const TEN_LOAI = { anh: 'ảnh', video: 'video', nhac: 'nhạc' };
+const KHOA_THU_MUC = { anh: 'thuMucAnh', video: 'thuMucVideo', nhac: 'thuMucNhac' };
 /** 1.3.8: lỗi của tài khoản để ghi lên thẻ / nhật ký — giữ nguyên chữ trang báo (một dòng, tối đa 200 ký tự). */
 const rutLoi = (s) => { const t = String(s || 'lỗi không rõ').replace(/\s+/g, ' ').trim(); return t.length > 200 ? `${t.slice(0, 199)}…` : t; };
 const SONG_TOI_DA = 50;
@@ -490,50 +491,74 @@ class DieuPhoi {
   }
 
   /**
-   * 1.4.2 — Quét thư mục lưu của dự án: prompt nào ĐÃ CÓ kết quả thì khỏi làm lại (lần chạy trước bị dừng / mất lịch sử,
-   * thư mục còn 001…261 nhưng thiếu 253, 254…). Một số được coi là đã có khi: thư mục lưu có file khớp mẫu tên của số
-   * đó; hoặc dự án có việc cùng loại, cùng số đang chờ / đang chạy / đã xong mà file còn. Trang Tạo ảnh có "Ảnh xong →
-   * tự tạo video": ảnh đã có mà video chưa có → chỉ tạo video từ ảnh có sẵn.
-   * → {ok, thuMuc, coSan:[stt], dangCho:[stt], thieu:[stt], chiVideo:[{stt, anh}]}
+   * 1.4.2 — Quét thư mục: prompt nào ĐÃ CÓ kết quả thì khỏi làm lại (lần chạy trước bị dừng / mất lịch sử, thư mục còn
+   * 001…261 nhưng thiếu 253, 254…). 1.4.3: thư mục quét là thư mục người dùng CHỌN khi bấm "Quét thư mục"
+   * (d.thuMucQuet[loai]); chưa chọn thì là thư mục lưu của dự án. Một số được coi là đã có khi thư mục đó có file khớp
+   * mẫu tên của số đó, hoặc file cùng loại mang số đó ("253.jpg", "0253.png", "anh_253.jpg", "253 (2).jpg"…); hoặc dự án
+   * có việc cùng loại, cùng số đang chờ / đang chạy, hay đã xong mà file còn nằm trong thư mục đó. Trang Tạo ảnh có
+   * "Ảnh xong → tự tạo video": ảnh đã có mà video chưa có → chỉ tạo video từ ảnh có sẵn.
+   * Không có prompt → chỉ tóm tắt thư mục (số đã có, số bị sót).
+   * → {ok, thuMuc, chon, tai, coSan, dangCho, thieu, chiVideo:[{stt, anh}], soCo:[số có file], lo:[số bị sót], viDu}
    */
   quetDaCo(p) {
-    const r = this._docThem(p);
-    if (r.loi) return { ok: false, loi: r.loi };
+    let r;
+    if ((p.prompts || []).some((x) => String(x).trim())) {
+      r = this._docThem(p);
+      if (r.loi) return { ok: false, loi: r.loi };
+    } else {
+      const d = this.duAn.find((x) => x.id === p.duAn) || this.duAn[0];
+      r = { d, chon: [], loai: p.loai === 'nhac' ? 'nhac' : p.loai === 'video' ? 'video' : 'anh', cv: null };
+    }
     const { d, chon, loai, cv } = r;
     const c = this.cd(d.id);
-    // Danh sách file mỗi thư mục (đọc một lần) + chỉ mục theo tên bỏ đuôi / " (2)" / "_2" để thư mục hàng chục nghìn
-    // file vẫn quét nhanh (không thử biểu thức với từng file cho từng prompt).
+    // Danh sách file mỗi thư mục (đọc một lần) + chỉ mục theo tên bỏ đuôi / " (2)" / "_2" và theo số trong tên, để thư
+    // mục hàng chục nghìn file vẫn quét nhanh (không thử biểu thức với từng file cho từng prompt).
     const ds = new Map();
     const dsFile = (thuMuc) => {
       if (!ds.has(thuMuc)) {
         const tep = (this.o.dsFile && this.o.dsFile(thuMuc)) || [];
-        const chiMuc = new Map();
+        const chiMuc = new Map(), theoSoFile = {};
         for (const f of tep) {
           const b = f.replace(/\.[^./]+$/, '').toLowerCase(), b1 = b.replace(/_\d+$/, '');
           for (const k of new Set([b, b1, b.replace(/ \(\d+\)$/, ''), b1.replace(/ \(\d+\)$/, '')])) {
             if (!chiMuc.has(k)) chiMuc.set(k, []);
             chiMuc.get(k).push(f);
           }
+          // Số trong tên: chỉ file nằm ngay trong thư mục (không xét thư mục con), đúng đuôi của loại.
+          if (f.includes('/')) continue;
+          const duoi = (/\.([^.]+)$/.exec(f) || [])[1];
+          const l = duoi && Object.keys(hd.DUOI_LOAI).find((x) => hd.DUOI_LOAI[x].includes(duoi.toLowerCase()));
+          const so = l && hd.soTuTen(f.replace(/\.[^.]+$/, ''));
+          if (!so) continue;
+          const m = theoSoFile[l] || (theoSoFile[l] = new Map());
+          if (!m.has(so)) m.set(so, []);
+          m.get(so).push(f);
         }
-        ds.set(thuMuc, { tep, chiMuc });
+        ds.set(thuMuc, { tep, chiMuc, theoSoFile });
       }
       return ds.get(thuMuc);
     };
     const tai = (l) => l === 'nhac' || (l === 'video' ? c.taiVideo : c.taiAnh);
     const noiLuu = (l) => (tai(l) ? this.thuMucRa(l, d.id) : this.thuMucTamDuAn(d.id));
     const mauCua = (l) => (l === 'nhac' ? c.tenNhac : l === 'video' ? c.tenVideo : c.tenAnh);
-    /** File đã có của (loại, số) trong thư mục `goc` theo `mau` ('' = chưa có). */
-    const timFile = (l, viec, goc, mau) => {
+    const daChon = d.thuMucQuet && d.thuMucQuet[loai];
+    const goc = daChon || noiLuu(loai);
+    const trong = (f, thuMuc) => {
+      const rel = path.relative(thuMuc, f);
+      return !!rel && !rel.startsWith('..') && !path.isAbsolute(rel);
+    };
+    /** File đã có của (loại, số) trong thư mục `thuMuc` theo `mau`, hoặc theo số trong tên ('' = chưa có). */
+    const timFile = (l, viec, thuMuc, mau) => {
       const job = { loai: l, so: viec.stt, ...viec };
       const re = hd.mauKhopFile(d, job, l, mau);
-      const { tep, chiMuc } = dsFile(goc);
+      const { tep, chiMuc, theoSoFile } = dsFile(thuMuc);
       // Mẫu có {ngay} → không biết trước tên, thử từng file; còn lại tra chỉ mục theo đúng tên mong đợi.
       const ung = /\{ngay\}/.test(String(mau || '')) ? tep
         : chiMuc.get(hd.tenFile(d, job, 'image/png', 0, mau).replace(/\.[^./]+$/, '').toLowerCase()) || [];
-      const f = ung.find((x) => re.test(x));
-      return f ? path.join(goc, ...f.split('/')) : '';
+      const f = ung.find((x) => re.test(x)) || ((theoSoFile[l] && theoSoFile[l].get(viec.stt)) || [])[0];
+      return f ? path.join(thuMuc, ...f.split('/')) : '';
     };
-    /** Việc cùng loại, cùng số trong dự án: 'cho' (đang chờ / chạy / dừng), file còn của việc đã xong, hoặc ''. */
+    /** Việc cùng loại, cùng số trong dự án: 'cho' (đang chờ / chạy / dừng), file còn (trong `thuMuc`) của việc đã xong. */
     const theoSo = new Map();
     for (const j of this.viec) {
       if (j.duAn !== d.id) continue;
@@ -541,11 +566,12 @@ class DieuPhoi {
       if (!theoSo.has(k)) theoSo.set(k, []);
       theoSo.get(k).push(j);
     }
-    const viecCo = (l, stt) => {
+    const viecCo = (l, stt, thuMuc) => {
       let f = '';
       for (const j of theoSo.get(`${l}#${stt}`) || []) {
         if (j.trangThai === 'cho' || j.trangThai === 'chay' || j.trangThai === 'dung') return { cho: true };
-        if (j.trangThai === 'xong' && j.files && j.files[0] && this.o.tonTai(j.files[0])) f = f || j.files[0];
+        const x = j.trangThai === 'xong' && j.files && j.files[0];
+        if (x && trong(x, thuMuc) && this.o.tonTai(x)) f = f || x;
       }
       return { file: f };
     };
@@ -557,17 +583,22 @@ class DieuPhoi {
       if (c.thuMucVideoAnh) return { goc: c.thuMucVideoAnh, mau: '{tenAnh}' };
       return { goc: this.thuMucRa('video', d.id), mau: c.tenVideo };
     };
-    const kq = { ok: true, thuMuc: noiLuu(loai), coSan: [], dangCho: [], thieu: [], chiVideo: [] };
+    const soCo = [...((dsFile(goc).theoSoFile[loai] || new Map()).keys())].sort((x, y) => x - y);
+    const coSet = new Set(soCo), lo = [];
+    for (let n = 1; n < (soCo[soCo.length - 1] || 0) && lo.length < 5000; n++) if (!coSet.has(n)) lo.push(n);
+    const sau = (soCo[soCo.length - 1] || 0) + 1;
+    const kq = { ok: true, thuMuc: goc, chon: !!daChon, tai: tai(loai), coSan: [], dangCho: [], thieu: [], chiVideo: [], soCo, lo,
+      viDu: path.join(noiLuu(loai), ...hd.tenFile(d, { loai, so: sau, stt: sau }, { video: 'video/mp4', nhac: 'audio/mpeg' }[loai] || 'image/png', 0, mauCua(loai)).split('/')) };
     for (const { prompt, stt } of chon) {
       const tham = [...(p.thamChieu || []), ...((p.thamChieuTheoDong && p.thamChieuTheoDong[stt - 1]) || [])];
-      const v = viecCo(loai, stt);
+      const v = viecCo(loai, stt, goc);
       if (v.cho) { kq.dangCho.push(stt); continue; }
-      const f = v.file || timFile(loai, { stt, prompt, thamChieu: tham }, noiLuu(loai), mauCua(loai));
+      const f = v.file || timFile(loai, { stt, prompt, thamChieu: tham }, goc, mauCua(loai));
       if (!f) { kq.thieu.push(stt); continue; }
       if (cv) {
-        const vv = viecCo('video', stt);
-        if (vv.cho) { kq.dangCho.push(stt); continue; }
         const nv = noiVideoTuAnh(f);
+        const vv = viecCo('video', stt, nv.goc);
+        if (vv.cho) { kq.dangCho.push(stt); continue; }
         if (!vv.file && !timFile('video', { stt, prompt: cv.prompt, thamChieu: [f] }, nv.goc, nv.mau)) {
           kq.chiVideo.push({ stt, anh: f });
           continue;
@@ -576,6 +607,38 @@ class DieuPhoi {
       kq.coSan.push(stt);
     }
     return kq;
+  }
+
+  /** 1.4.3: thư mục người dùng chọn để quét (nút "Quét thư mục") cho một loại của dự án — file mới cũng lưu vào đó và
+   *  công tắc "Bỏ qua số đã có file" tự bật. thuMuc rỗng = bỏ chọn, quét lại thư mục lưu. */
+  datThuMucQuet(id, loai, thuMuc) {
+    const d = this.duAn.find((x) => x.id === id);
+    if (!d) return { ok: false, loi: 'Không tìm thấy dự án' };
+    const l = loai === 'video' || loai === 'nhac' ? loai : 'anh';
+    const t = String(thuMuc || '').trim();
+    d.thuMucQuet = { ...(d.thuMucQuet || {}) };
+    if (t) d.thuMucQuet[l] = t;
+    else delete d.thuMucQuet[l];
+    if (!Object.keys(d.thuMucQuet).length) delete d.thuMucQuet;
+    let doiMau = '';
+    if (t) {
+      const doi = { [KHOA_THU_MUC[l]]: t, boQuaDaCo: true };
+      // File có sẵn đặt tên chỉ bằng số ("253.jpg") mà mẫu tên đang tạo thư mục con / tên khác ("{duAn}/{duAn}_{so}")
+      // → đổi mẫu thành {stt} để file mới nằm cùng chỗ, cùng kiểu tên với file làm dở.
+      const KHOA_MAU = { anh: 'tenAnh', video: 'tenVideo', nhac: 'tenNhac' };
+      const so = ((this.o.dsFile && this.o.dsFile(t)) || []).filter((f) => !f.includes('/') && hd.DUOI_LOAI[l].includes((/\.([^.]+)$/.exec(f) || [])[1]?.toLowerCase()));
+      const chiSo = so.filter((f) => /^\d+( \(\d+\))?(_\d+)?\.[^.]+$/.test(f)).length;
+      const mau = this.cd(d.id)[KHOA_MAU[l]];
+      if (chiSo && chiSo * 2 >= so.length && !/^\d+$/.test(hd.tenFile(d, { loai: l, so: 7, stt: 7 }, 'image/png', 0, mau).replace(/\.[^.]+$/, ''))) {
+        doi[KHOA_MAU[l]] = '{stt}';
+        doiMau = ` Mẫu tên ${TEN_LOAI[l]} đổi từ "${mau}" thành "{stt}" cho giống file có sẵn (vd 254.${(/\.([^.]+)$/.exec(so[0]) || [])[1] || 'png'}).`;
+      }
+      this.datCaiDat(doi, d.id);
+    }
+    this.log('info', t ? `🔎 "${d.ten}": quét ${TEN_LOAI[l]} ở thư mục "${t}" — file ${TEN_LOAI[l]} mới cũng lưu vào đây.${doiMau}` : `🔎 "${d.ten}": bỏ thư mục quét ${TEN_LOAI[l]}, quét lại thư mục lưu.`);
+    this.luu();
+    this.o.bao();
+    return { ok: true, thuMuc: t, doiMau: doiMau.trim() };
   }
 
   them(p) {
@@ -1043,6 +1106,11 @@ class DieuPhoi {
         c = { ...c, taiAnh: false, taiVideo: false };
         this.log('info', `☁ Bật đưa lên Google Drive${d ? ` (dự án "${d.ten}")` : ''} → đã tự tắt "Tải ảnh về" và "Tải video về": ảnh / video giữ trong app (thư mục tạm riêng của dự án) rồi đưa lên Drive.`);
       }
+    }
+    // 1.4.3: đổi thư mục lưu ở chỗ khác → thôi quét thư mục đã chọn trước đó (quét lại thư mục lưu mới).
+    if (d && d.thuMucQuet) {
+      for (const [l, k] of Object.entries(KHOA_THU_MUC)) if (k in c && d.thuMucQuet[l] && c[k] !== d.thuMucQuet[l]) delete d.thuMucQuet[l];
+      if (!Object.keys(d.thuMucQuet).length) delete d.thuMucQuet;
     }
     if (!d) {
       this.caiDat = chuanCaiDat({ ...this.caiDat, ...c }, this.caiDat.flow, c.flow);

@@ -834,6 +834,16 @@ const LENH = {
     dieuPhoi.datCaiDat({ [{ video: 'thuMucVideo', nhac: 'thuMucNhac' }[loai] || 'thuMucAnh']: r.filePaths[0] }, duAn);
     return r.filePaths[0];
   },
+  // 1.4.3: nút "Quét thư mục…" — chọn thư mục đang có file đánh số làm dở để quét (file mới cũng lưu vào đó).
+  chonThuMucQuet: async ({ duAn, loai }) => {
+    const d = dieuPhoi.duAn.find((x) => x.id === duAn);
+    const truoc = (d && d.thuMucQuet && d.thuMucQuet[loai]) || dieuPhoi.thuMucRa(loai, duAn);
+    const ten = { video: 'video', nhac: 'nhạc' }[loai] || 'ảnh';
+    const r = await dialog.showOpenDialog(win, { title: `Chọn thư mục đang có ${ten} đánh số làm dở để quét`, defaultPath: truoc || undefined, properties: ['openDirectory', 'createDirectory'] });
+    if (r.canceled || !r.filePaths[0]) return null;
+    return dieuPhoi.datThuMucQuet(duAn, loai, r.filePaths[0]);
+  },
+  boThuMucQuet: ({ duAn, loai }) => dieuPhoi.datThuMucQuet(duAn, loai, ''),
   nhapPrompt: async () => {
     const r = await dialog.showOpenDialog(win, { properties: ['openFile'], filters: [{ name: 'Văn bản', extensions: ['txt', 'csv', 'md'] }] });
     return r.canceled ? null : fs.readFileSync(r.filePaths[0], 'utf8').replace(/^\uFEFF/, '');

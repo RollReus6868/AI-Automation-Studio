@@ -158,11 +158,12 @@
             <div class="dong-cong-tac">
               <div>
                 <b>Bỏ qua số đã có file trong thư mục</b>
-                <small>Khi bấm Tạo: số đã có file trong thư mục lưu (vd <code>253.jpg</code>) hoặc đang chờ thì bỏ qua; làm số còn thiếu trước, rồi làm tiếp prompt chưa làm.<span id="quetGhiAnh"> Đang bật "Ảnh xong → tự tạo video": ảnh có rồi mà thiếu video thì chỉ tạo video từ ảnh đó.</span></small>
+                <small>Bấm <b>Quét thư mục…</b> chọn thư mục đang có file đánh số làm dở (vd <code>253.jpg</code>). Bật công tắc: bấm Tạo thì bỏ qua số đã có, làm số bị sót trước rồi làm tiếp prompt chưa làm; file mới lưu cùng thư mục.<span id="quetGhiAnh"> Đang bật "Ảnh xong → tự tạo video": ảnh có rồi mà thiếu video thì chỉ tạo video từ ảnh đó.</span></small>
               </div>
               <label class="cong-tac"><input type="checkbox" id="boQuaDaCo"><span></span></label>
             </div>
-            <div class="dong-o"><button class="nut-vien nho" id="nutQuet"><i data-icon="search"></i>Quét thư mục</button><span class="mo" id="ghiQuet">Xem trước số đã có / còn thiếu.</span></div>
+            <div class="dong-o"><button class="nut-vien nho" id="nutQuet"><i data-icon="folder-open"></i>Quét thư mục…</button><span class="mo" id="quetDang"></span><button class="nut-vien nho" id="boQuet" hidden title="Thôi dùng thư mục này, quét thư mục lưu của dự án">Bỏ chọn</button></div>
+            <p class="mo ket-qua-quet" id="ghiQuet">Chọn thư mục để xem số đã có / bị sót.</p>
           </div>
 
           <details class="nang-cao" id="nangCao">
