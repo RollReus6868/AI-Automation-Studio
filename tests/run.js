@@ -1939,7 +1939,7 @@ test('1.3.4 tiến trình chính: gom ghi du-lieu.json 1,5 s, báo giao diện 2
   assert.ok(/new Store\(path\.join\(app\.getPath\('userData'\), 'du-lieu\.json'\), \(m\) => log\('warning', m\), \{ nhipMs: 1500 \}\)/.test(m));
   assert.ok(/this\.nhipMs = o\.nhipMs \|\| 250/.test(st) && /\}, this\.nhipMs\);/.test(st));
   // 1.4.0: nhịp 250 ms, hàng đợi lớn thì thưa dần (tối đa 1 s); thu nhỏ thì thôi báo.
-  assert.ok(/win\.webContents\.send\('state', trangThai\(\)\);\n  \}, nhipBao\(\)\);/.test(m) && /Math\.min\(1000, 250 \+/.test(m) && /if \(win\.isMinimized\(\)\) \{ boLoBao = true; return; \}/.test(m));
+  assert.ok(/win\.webContents\.send\('state', trangThai\(\)\);\n  \}, [^\n]*nhipBao\(\)\);/.test(m) && /Math\.min\(1000, 250 \+/.test(m) && /if \(win\.isMinimized\(\)\) \{ boLoBao = true; return; \}/.test(m));
   assert.ok(/function baoRam\(\)/.test(m) && /if \(dieuPhoi\.dangChay \|\| dieuPhoi\.luong\.length\) baoRam\(\)/.test(m) && /app\.getAppMetrics\(\)/.test(m));
   assert.ok(/nhat-ky-cu\.txt/.test(m) && /20 \* 1024 \* 1024/.test(m));
   assert.ok(/spellcheck: false/.test(m));
@@ -2655,6 +2655,20 @@ console.log('\n── 1.4.0 ─────────────────�
     assert.ok(/lenDrive: \(x\) => chepLenDrive\(x\)/.test(m) && /chayLaiFlow: \(id\) => .*mayFlow\.chayLaiNgay\(id\)/.test(m));
     assert.ok(/PRIORITY_BELOW_NORMAL/.test(m) && /nheMay !== false/.test(m), 'chế độ nhẹ máy hạ ưu tiên trang chạy nền');
     assert.ok(/chayLaiNgay/.test(docNguon('src/flow/may-flow.js')));
+  });
+
+  test('1.4.4 bớt CPU: trang chạy ngầm tắt hiệu ứng CSS động (theo "Máy mượt"), giao diện báo thưa khi không dùng app, nhật ký ghi CPU từng phần', () => {
+    const m = docNguon('main.js'), html = docNguon('src/ui/index.html');
+    // CSS lớp người dùng, chỉ animation (không transition), chèn lại mỗi lần trang nạp tài liệu mới, gỡ khi tắt Máy mượt.
+    const css = (/const CSS_TAT_DONG = '([^']+)'/.exec(m) || [])[1] || '';
+    assert.ok(/animation-duration:\.01ms!important/.test(css) && /animation-iteration-count:1!important/.test(css) && !/transition/.test(css), css);
+    assert.ok(/insertCSS\(CSS_TAT_DONG, \{ cssOrigin: 'user' \}\)/.test(m) && /removeInsertedCSS\(k\)/.test(m));
+    assert.ok(/on\('dom-ready', \(\) => \{ datUuTien\(w\.webContents\); cssDong\.delete\(w\.webContents\); datHieuUng\(w\.webContents\); \}\)/.test(m));
+    assert.ok(/datUuTien\(w\.webContents\); datHieuUng\(w\.webContents\);/.test(m), 'bật / tắt Máy mượt áp cho trang đang mở');
+    // Không ở trong app → báo 2 giây một lần; quay lại → báo ngay.
+    assert.ok(/!win\.isFocused\(\) \? Math\.max\(2000, nhipBao\(\)\) : nhipBao\(\)/.test(m) && /win\.on\('focus', \(\) => baoNgay\(\)\)/.test(m));
+    assert.ok(/⚙ CPU app: /.test(m) && /percentCPUUsage/.test(m) && /os\.cpus\(\)\.length/.test(m));
+    assert.ok(/tắt hiệu ứng động trên các trang đó/.test(html));
   });
 
   test('1.4.0 cài đặt mới: Drive theo dự án, nhẹ máy là cài đặt chung (mặc định bật); mở app không giữ đồng hồ đang chạy', () => {
