@@ -203,7 +203,7 @@ test('thư mục + mẫu tên riêng cho ảnh/video; tắt tải về → ghi v
   dp.them({ loai: 'video', prompts: ['y'] });
   dp._ketThuc(dp.viec[0], { ok: true, files: [{ mime: 'image/png', b64: 'AA==' }] }, null);
   dp._ketThuc(dp.viec[1], { ok: true, files: [{ mime: 'video/mp4', b64: 'AA==' }] }, null);
-  assert.deepStrictEqual(ghi, ['/A/anh_001.png', '/tam/Mac_dinh/vid_001.mp4']);
+  assert.deepStrictEqual(ghi, ['/A/anh_001.png', '/tam/mac-dinh/Mac_dinh/vid_001.mp4']);   // 1.4.1: thư mục tạm riêng từng dự án
   assert.strictEqual(dp.viec[1].tam, true);
   assert.strictEqual(dp.viec[0].tam, false);
 });
@@ -2421,6 +2421,72 @@ console.log('\n── 1.4.0 ─────────────────�
     assert.deepStrictEqual([dp.caiDat.driveCach, chuanCach(dp, 'xyz')], ['web', 'may']);
   });
   const chuanCach = (dp, v) => { dp.datCaiDat({ driveCach: v }); return dp.caiDat.driveCach; };
+
+  testAsync('1.4.1 nhiều dự án: tắt tải về → thư mục tạm RIÊNG từng dự án (không " (2)"); thư mục máy trùng tên → Drive vẫn đúng tên theo mẫu', async () => {
+    const coSan = new Set(), goi = [];
+    const { dp } = dungDieuPhoi({
+      tonTai: (p) => coSan.has(p), ghiFile: (p) => coSan.add(p), chuyenFile: (a, p) => coSan.add(p),
+      lenDrive: async (x) => { goi.push(x); return { ok: true, files: x.ten.map((t) => `/G/${x.tenDuAn}/${DR.THU_MUC_LOAI[x.loai]}/${t}`) }; }
+    });
+    const A = dp.taoDuAn('Tập A'), B = dp.taoDuAn('Tập B');
+    for (const d of [A, B]) dp.datCaiDat({ taiAnh: false, taiVideo: false, driveBat: true, thuMucDrive: '/G' }, d.id);
+    dp.them({ duAn: A.id, prompts: ['a1'] });
+    dp.them({ duAn: B.id, prompts: ['b1'] });
+    const [a, b] = dp.viec.filter((j) => j.duAn === A.id || j.duAn === B.id);
+    dp._ketThuc(a, { ok: true, files: [{ mime: 'image/jpeg', b64: 'AA==' }] }, null);
+    dp._ketThuc(b, { ok: true, files: [{ mime: 'image/jpeg', b64: 'AA==' }] }, null);
+    await dp._driveCho;
+    assert.deepStrictEqual([a.files[0], b.files[0]], [path.join('/tam', A.id, '001.jpg'), path.join('/tam', B.id, '001.jpg')], 'mỗi dự án một thư mục tạm');
+    assert.deepStrictEqual(goi.map((x) => [x.tenDuAn, x.ten]), [['Tập A', ['001.jpg']], ['Tập B', ['001.jpg']]]);
+    // Bật tải về, HAI dự án dùng CHUNG một thư mục máy → trên máy thành "001 (2).jpg", Drive vẫn "001.jpg".
+    for (const d of [A, B]) dp.datCaiDat({ taiAnh: true, taiVideo: true, thuMucAnh: '/chung', thuMucVideo: '/chung', videoCanhAnh: true }, d.id);
+    dp.them({ duAn: A.id, prompts: ['a2'] });
+    dp.them({ duAn: B.id, prompts: ['b2'] });
+    const [a2, b2] = dp.viec.filter((j) => (j.duAn === A.id || j.duAn === B.id) && j.trangThai === 'cho');
+    dp._ketThuc(a2, { ok: true, files: [{ mime: 'image/jpeg', b64: 'AA==' }] }, null);
+    dp._ketThuc(b2, { ok: true, files: [{ mime: 'image/jpeg', b64: 'AA==' }] }, null);
+    await dp._driveCho;
+    assert.deepStrictEqual([a2.files[0], b2.files[0]], [path.join('/chung', '001.jpg'), path.join('/chung', '001 (2).jpg')], 'máy: không ghi đè, thêm (2) như cũ');
+    assert.deepStrictEqual(b2.tenDrive, ['001.jpg']);
+    assert.deepStrictEqual(goi[goi.length - 1].ten, ['001.jpg'], 'Drive: tên đúng theo mẫu, không mang (2)');
+    // Video nối từ ảnh "001 (2).jpg" (mẫu {tenAnh}) → trên Drive "001.mp4" theo tên Drive của ảnh.
+    dp.them({ duAn: B.id, loai: 'video', prompts: ['v'], thamChieu: [b2.files[0]] });
+    const v = dp.viec[dp.viec.length - 1];
+    v.tuAnh = b2.id;
+    dp._ketThuc(v, { ok: true, files: [{ mime: 'video/mp4', b64: 'AA==' }] }, null);
+    await dp._driveCho;
+    assert.deepStrictEqual([v.files[0], v.tenDrive], [path.join('/chung', '001 (2).mp4'), ['001.mp4']]);
+    assert.deepStrictEqual(goi[goi.length - 1].ten, ['001.mp4']);
+    // Việc cũ (bản 1.4.0, chưa có tenDrive) → tên file như trước.
+    delete a.tenDrive;
+    dp.lenDriveViec([a.id]);
+    await dp._driveCho;
+    assert.deepStrictEqual(goi[goi.length - 1].ten, ['001.jpg']);
+    // drive.js chép theo tên đưa vào.
+    const goc = fs.mkdtempSync(path.join(os.tmpdir(), 'drive-ten-'));
+    try {
+      const f = path.join(goc, '001 (2).jpg');
+      fs.writeFileSync(f, 'x');
+      const r = await DR.chepLenDrive({ goc, tenDuAn: 'Tập B', loai: 'anh', files: [f], ten: ['001.jpg'] });
+      assert.deepStrictEqual(r.files, [path.join(goc, 'Tập B', 'images', '001.jpg')]);
+    } finally { fs.rmSync(goc, { recursive: true, force: true }); }
+  });
+
+  test('1.4.1 bật "tự đưa lên Google Drive" → tự tắt "Tải ảnh về" + "Tải video về"; bật lại tay thì giữ; cài đặt khác giữ nguyên', () => {
+    const { dp, nhatKy } = dungDieuPhoi();
+    const d = dp.taoDuAn('Tập C');
+    dp.datCaiDat({ thuMucAnh: '/anh' }, d.id);
+    assert.deepStrictEqual([dp.cd(d.id).taiAnh, dp.cd(d.id).taiVideo], [true, true]);
+    dp.datCaiDat({ driveBat: true, thuMucDrive: '/G' }, d.id);
+    assert.deepStrictEqual([dp.cd(d.id).taiAnh, dp.cd(d.id).taiVideo, dp.cd(d.id).thuMucAnh], [false, false, '/anh']);
+    assert.ok(nhatKy.some((x) => /đã tự tắt "Tải ảnh về" và "Tải video về"/.test(x)));
+    assert.deepStrictEqual([dp.caiDat.taiAnh, dp.caiDat.driveBat], [true, false], 'dự án khác / cài đặt chung không đổi');
+    dp.datCaiDat({ taiAnh: true }, d.id);
+    dp.datCaiDat({ driveBat: true, luongMoiTK: 3 }, d.id);   // lưu lại khi Drive vẫn bật → không tắt nữa
+    assert.deepStrictEqual([dp.cd(d.id).taiAnh, dp.cd(d.id).taiVideo], [true, false]);
+    dp.datCaiDat({ driveBat: true });                          // cài đặt chung cũng vậy
+    assert.deepStrictEqual([dp.caiDat.taiAnh, dp.caiDat.taiVideo], [false, false]);
+  });
 
   test('1.4.0 Drive cách 2: trang Drive (drive-trang.js) không gán innerHTML; giao diện có ô chọn cách + tài khoản, thẻ Drive ở mục Tài khoản', () => {
     const dt = docNguon('src/inject/drive-trang.js'), dw = docNguon('src/main/drive-web.js'), html = docNguon('src/ui/index.html'), ui = docNguon('src/ui/app.js'), m = docNguon('main.js');

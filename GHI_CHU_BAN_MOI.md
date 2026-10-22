@@ -1,4 +1,16 @@
-# AI Automation Studio 1.4.0
+# AI Automation Studio 1.4.1
+
+- **Chạy nhiều dự án cùng lúc thì ảnh / video lên Google Drive không còn sai tên.**
+  - Nguyên nhân: khi tắt *Tải ảnh về* / *Tải video về*, mọi dự án giữ file trong **một** thư mục tạm chung của app. Dự án sau gặp `001.jpg` của dự án trước nên phải lưu thành `001 (2).jpg`, và Drive nhận đúng cái tên sai đó.
+  - Giờ mỗi dự án có thư mục tạm **riêng**.
+  - Tên đưa lên Drive luôn theo mẫu tên của việc (`001.jpg`). Kể cả khi thư mục trên máy đã có file cùng tên và máy phải lưu thành `001 (2).jpg`, Drive vẫn nhận `001.jpg`. Video tạo từ ảnh trên Drive mang đúng tên ảnh (`001.mp4`). Áp cho cả hai cách đưa lên Drive.
+  - File trên máy vẫn không bao giờ bị ghi đè.
+- **Bật *Ảnh / video xong thì tự đưa lên Google Drive* thì app tự tắt *Tải ảnh về* và *Tải video về*** của dự án đó, để file không bị lưu lẫn vào thư mục trên máy. Muốn giữ thêm bản trên máy thì bật lại tay; app không tắt lại nữa trừ khi bạn tắt rồi bật lại Drive.
+- Mọi thứ khác giữ nguyên như 1.4.0.
+
+Lưu ý: đã kiểm bằng bài kiểm tự động và trên trang Google Drive giả (hai dự án cùng tên file), chưa chạy trên Drive thật.
+
+## Bản 1.4.0
 
 - **Đưa ảnh / video lên Google Drive.** Ảnh xong vào thư mục `<Tên dự án>/images`, video vào `<Tên dự án>/Videos` trên Drive. App tự tạo thư mục, file vẫn giữ ở máy như cũ. Có hai cách, chọn ở *Cài đặt → Google Drive → Cách đưa lên*:
   - **Chép vào thư mục Google Drive trên máy.** Cần cài *Google Drive cho máy tính* và đăng nhập sẵn. Bấm *Tự tìm* (thường là `G:\My Drive`) hoặc *Chọn…*. Drive tự tải lên, mất mạng thì tự tải tiếp.

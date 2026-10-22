@@ -42,6 +42,7 @@ module.exports = function e2eDrive({ win, app, LENH, dieuPhoi, taiKhoan }) {
         driveBat: true, driveCach: 'web', driveTk: tkDrive.id };
       LENH.datCaiDat({ duAn: d.id, ...c });
       kiem(dieuPhoi.cd(d.id).driveCach === 'web' && dieuPhoi.cd(d.id).driveTk === tkDrive.id, 'cài đặt dự án: cách "tải thẳng lên", tài khoản Drive');
+      kiem(dieuPhoi.cd(d.id).taiAnh === false && dieuPhoi.cd(d.id).taiVideo === false, '1.4.1: bật Drive → tự tắt "Tải ảnh về" / "Tải video về"');
 
       ghi('-- 1. Ảnh xong → tự tải lên Drive/<Tên dự án>/images');
       let tu = LENH.trangThai().nhatKy.length;
@@ -61,6 +62,7 @@ module.exports = function e2eDrive({ win, app, LENH, dieuPhoi, taiKhoan }) {
         return j && fs.readFileSync(j.files[0]).toString('base64') === t.b64;
       }), 'nội dung file trên Drive đúng file ảnh trên máy');
       kiem(anh.every((j) => j.drive && j.drive[0] === `Drive: Tập 1 Biển/images/${path.basename(j.files[0])}`), `việc nhớ chỗ trên Drive — ${anh.map((j) => j.drive || j.driveLoi)}`);
+      kiem(anh.every((j) => path.dirname(j.files[0]) === path.join(app.getPath('userData'), 'ket-qua-tam', d.id)), `file giữ ở thư mục tạm RIÊNG của dự án — ${anh.map((j) => j.files[0])}`);
       kiem(tt.tai.every((x) => !x.cach), 'không hỏi trùng tên ở lần đầu');
       kiem(tt.tai.every((x) => x.qua === 'hop'), `file vào trang qua Mới → Tải tệp lên (hộp chọn file bị app chặn) — ${tt.tai.map((x) => x.qua)}`);
       dongNhatKy(tu);
@@ -120,6 +122,30 @@ module.exports = function e2eDrive({ win, app, LENH, dieuPhoi, taiKhoan }) {
       ghi('-- 6. Tài khoản Drive không nhận việc tạo ảnh / video, không hiện ở hộp tài khoản dự án');
       kiem(!dieuPhoi.viec.some((j) => j.taiKhoan === tkDrive.id), 'không việc nào chạy ở tài khoản Drive');
       kiem(!dieuPhoi._dsTkGoc(d.id, 'muse').includes(tkDrive.id) && !dieuPhoi._dsTkGoc(d.id, 'flow').includes(tkDrive.id), 'tài khoản Drive không thuộc danh sách Muse / Flow');
+
+      ghi('-- 7. 1.4.1: dự án thứ hai, thư mục máy đã có 001.png → máy "001 (2).png" nhưng Drive vẫn "001.png"');
+      tu = LENH.trangThai().nhatKy.length;
+      const raChung = path.join(tam, 'ra-chung');
+      fs.mkdirSync(raChung, { recursive: true });
+      fs.writeFileSync(path.join(raChung, '001.png'), 'cua du an khac');
+      const d2 = LENH.taoDuAn({ ten: 'Tập 2', taiKhoan: ['tk-1'] });
+      LENH.datCaiDat({ duAn: d2.id, ...c, thuMucAnh: raChung, thuMucVideo: raChung });
+      LENH.datCaiDat({ duAn: d2.id, taiAnh: true });   // người dùng bật lại tải về tay
+      LENH.them({ duAn: d2.id, loai: 'anh', tyLe: '1:1', prompts: ['mèo xám'], chay: true });
+      const a7 = dieuPhoi.viec.find((j) => j.duAn === d2.id);
+      await cho(() => a7.trangThai === 'xong', 60000, 'ảnh dự án 2 xong');
+      await cho(() => (a7.drive || []).length || a7.driveLoi, 90000, 'ảnh dự án 2 lên Drive');
+      const t7 = await ttDrive();
+      const [idDa2] = thuMuc(t7, 'Tập 2', 'root');
+      const [idAnh2] = idDa2 ? thuMuc(t7, 'images', idDa2) : [];
+      kiem(a7.files[0] === path.join(raChung, '001 (2).png'), `máy: không ghi đè file sẵn có (${a7.files[0]})`);
+      kiem(idAnh2 && tepTrong(t7, idAnh2).map((t) => t.ten).join() === '001.png', `Drive "Tập 2/images" có đúng 001.png — ${idAnh2 && tepTrong(t7, idAnh2).map((t) => t.ten)}`);
+      kiem(a7.drive && a7.drive[0] === 'Drive: Tập 2/images/001.png', `việc nhớ tên Drive đúng — ${a7.drive || a7.driveLoi}`);
+      const tep7 = idAnh2 && tepTrong(t7, idAnh2)[0];
+      kiem(tep7 && tep7.b64 === fs.readFileSync(a7.files[0]).toString('base64'), 'nội dung trên Drive là ảnh của dự án 2');
+      const dem = path.join(app.getPath('userData'), 'drive-tam');
+      kiem(!fs.existsSync(dem) || fs.readdirSync(dem).length === 0, 'bản chép tạm để đổi tên đã được xoá');
+      dongNhatKy(tu);
     } catch (err) {
       ghi(`LỖI: ${err.stack}`);
       loi.push(err.message);
