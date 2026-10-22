@@ -144,6 +144,18 @@ function mauKhopFile(duAn, job, loai, mau) {
   return new RegExp(`^${thoat}( \\(\\d+\\))?(_\\d+)?\\.(${(DUOI_LOAI[loai] || DUOI_LOAI.anh).join('|')})$`, 'i');
 }
 
+/**
+ * 1.4.3 — Số thứ tự đọc từ tên file (không đuôi) trong thư mục người dùng chọn để quét, không cần khớp mẫu tên:
+ * "253" / "0253" / "253 (2)" / "253_2" → 253; "anh_253", "Tap_1_253", "canh 10" → số CUỐI (253, 253, 10). Không có số → 0.
+ */
+function soTuTen(ten) {
+  const b = String(ten || '').trim().replace(/ \(\d+\)$/, '');
+  const m = /^0*(\d+)(?:_\d+)?$/.exec(b);
+  if (m) return parseInt(m[1], 10) || 0;
+  const ds = b.match(/\d+/g);
+  return ds ? parseInt(ds[ds.length - 1], 10) || 0 : 0;
+}
+
 /** Kiểu tệp theo đuôi (file Flow tải về đĩa). */
 function mimeTuDuoi(p) {
   const d = String(p || '').split('.').pop().toLowerCase();
@@ -374,7 +386,7 @@ function keHoachTai(viec, tonTai) {
 }
 
 const HD = {
-  TY_LE, MAU_MAC_DINH, MAU_TEN_MAC_DINH, MAU_TEN_ANH_MAC_DINH, PROMPT_VIDEO_MAC_DINH, slugTen, tachPrompt, timNhanVat, taoTinNhan, tenFile, mimeTuDuoi, chonKhoang, DUOI_LOAI, mauKhopFile,
+  TY_LE, MAU_MAC_DINH, MAU_TEN_MAC_DINH, MAU_TEN_ANH_MAC_DINH, PROMPT_VIDEO_MAC_DINH, slugTen, tachPrompt, timNhanVat, taoTinNhan, tenFile, mimeTuDuoi, chonKhoang, DUOI_LOAI, mauKhopFile, soTuTen,
   docSoChay, chonTheoSo, gonSo,
   viecKeTiep, taiKhoanChoViec, taiKhoanChoViecDs, thoiGianDuKien, duDoanConLai, tienDoUoc, daXong, laTraLoiChu, laChanKhuVuc, laTuChoi, soSanhTuNhien, keHoachTai
 };

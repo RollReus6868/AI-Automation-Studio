@@ -59,6 +59,31 @@ module.exports = function e2eQuet({ win, app, LENH, dieuPhoi }) {
       const gui18Moi = (await daGui()).slice(gui18).map((g) => g.prompt || '');
       kiem(gui18Moi.filter((x) => /quét [1-5]/.test(x)).length === 2 && !gui18Moi.some((x) => /quét [124]\b/.test(x)), `Muse chỉ nhận prompt ảnh 3, 5 (${gui18Moi.length} lần gửi)`);
       kiem(LENH.trangThai().nhatKy.some((d) => /🔎 Quét thư mục .*đã có 1 → bỏ qua/.test(d.chu)), 'nhật ký ghi kết quả quét');
+
+      // 19) 1.4.3: bấm "Quét thư mục…" chọn thư mục làm dở (tên chỉ có số, khác mẫu tên của dự án) → quét đúng thư mục
+      //     đó theo số trong tên, mẫu tên tự đổi thành {stt}, file mới nằm cùng thư mục; Muse chỉ nhận số còn thiếu.
+      ghi('-- 19. Chọn thư mục làm dở để quét');
+      const thuMuc19 = path.join(tam, 'lam-do-19');
+      fs.mkdirSync(thuMuc19, { recursive: true });
+      for (const f of ['001.png', '002.png', '0004.png']) fs.writeFileSync(path.join(thuMuc19, f), PNG1);
+      const d19 = LENH.taoDuAn({ ten: 'Lam do', taiKhoan: ['tk-1'] });
+      LENH.datCaiDat({ duAn: d19.id, thuMucAnh: path.join(tam, 'khac-19'), tenAnh: '{duAn}/anh_{stt}', taiAnh: true, boQuaDaCo: false });
+      const ch19 = dieuPhoi.datThuMucQuet(d19.id, 'anh', thuMuc19);
+      const cd19 = LENH.trangThai().duAn.find((d) => d.id === d19.id);
+      kiem(ch19.ok && cd19.thuMucQuet && cd19.thuMucQuet.anh === thuMuc19, 'dự án nhớ thư mục đã chọn để quét');
+      const c19 = dieuPhoi.cd(d19.id);
+      kiem(c19.thuMucAnh === thuMuc19 && c19.boQuaDaCo === true && c19.tenAnh === '{stt}', `file mới lưu vào thư mục đó, bật bỏ qua, mẫu tên {stt} (${JSON.stringify([c19.thuMucAnh, c19.boQuaDaCo, c19.tenAnh])})`);
+      const q19 = LENH.quetDaCo({ duAn: d19.id, loai: 'anh', prompts: [] });
+      kiem(q19.ok && q19.soCo.join() === '1,2,4' && q19.lo.join() === '3', `tóm tắt thư mục: có 1, 2, 4; sót 3 (${JSON.stringify([q19.soCo, q19.lo])})`);
+      const gui19 = (await daGui()).length;
+      const r19 = LENH.them({ duAn: d19.id, loai: 'anh', tyLe: '1:1', prompts: ['lam 1', 'lam 2', 'lam 3', 'lam 4', 'lam 5'], chay: true });
+      kiem(r19.ok && r19.so === 2 && r19.boQua === 3, `thêm 2 việc (3, 5), bỏ qua 3 (${JSON.stringify(r19)})`);
+      await cho(() => viec().filter((j) => j.duAn === d19.id).every((j) => j.trangThai === 'xong' || j.trangThai === 'loi'), 120000, 'chọn thư mục: chạy xong');
+      const ten19 = fs.readdirSync(thuMuc19).sort();
+      ghi(`   thư mục: ${ten19.join(', ')}`);
+      kiem(ten19.some((f) => /^003\.(png|webp)$/.test(f)) && ten19.some((f) => /^005\.(png|webp)$/.test(f)) && ten19.length === 5, 'ảnh 003, 005 mới nằm cùng thư mục, không tạo lại 1, 2, 4');
+      const gui19Moi = (await daGui()).slice(gui19).map((g) => g.prompt || '');
+      kiem(gui19Moi.length === 2 && gui19Moi.every((x) => /lam [35]/.test(x)), `Muse chỉ nhận prompt 3, 5 (${gui19Moi.length} lần gửi)`);
     } catch (err) {
       ghi('LỖI KỊCH BẢN: ' + err.stack);
       loi.push('ngoại lệ');
