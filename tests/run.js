@@ -2531,7 +2531,7 @@ console.log('\n── 1.4.0 ─────────────────�
 
   test('1.4.2 quét thư mục + "Ảnh xong → tự tạo video": ảnh có mà thiếu video → chỉ tạo video từ ảnh đó, video lưu cạnh ảnh', () => {
     const ghi = [];
-    const { dp } = dungDieuPhoi({ ghiFile: (p) => ghi.push(p), dsFile: (g) => (g === '/ra' ? ['001.jpg', '001.mp4', '002.jpg'] : []) });
+    const { dp } = dungDieuPhoi({ ghiFile: (p) => ghi.push(p), dsFile: (g) => (path.resolve(g) === path.resolve('/ra') ? ['001.jpg', '001.mp4', '002.jpg'] : []) });
     dp.datCaiDat({ thuMucAnh: '/ra', videoCanhAnh: true }, 'mac-dinh');
     const p = { duAn: 'mac-dinh', loai: 'anh', nen: 'flow', prompts: ['a1', 'a2', 'a3'], chuoiVideo: { prompt: 'chạy', nen: 'muse' }, boQuaDaCo: true };
     const q = dp.quetDaCo(p);
