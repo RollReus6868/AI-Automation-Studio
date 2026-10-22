@@ -30,9 +30,10 @@ class DriveWeb {
    * @param o.store       {get, set} — nhớ mã thư mục
    * @param o.luuChanDoan(ten, html) → đường dẫn file đã lưu (hoặc '')
    * @param o.ganDebugger(wc) → bool
+   * @param o.thuMucDem   1.4.1: chỗ chép tạm file cần đổi tên trước khi tải lên (mỗi lần tải một thư mục con riêng)
    */
   constructor(o) {
-    this.o = { choMs: 45000, ranhMs: 90000, ...o };
+    this.o = { choMs: 45000, ranhMs: 90000, thuMucDem: path.join(require('os').tmpdir(), 'ai-studio-drive'), ...o };
     this.goc = String(o.goc || 'https://drive.google.com').replace(/\/$/, '');
     this.cs = null;          // { tkId, w, hen }
     this.hang = Promise.resolve();
@@ -49,12 +50,12 @@ class DriveWeb {
     if (this.cs) { clearTimeout(this.cs.hen); this.o.dongCuaSo(this.cs.w); this.cs = null; }
   }
 
-  async _len({ tkId, tenDuAn, loai, files, cu = [] }) {
+  async _len({ tkId, tenDuAn, loai, files, ten: tenDs = [], cu = [] }) {
     const tk = this.o.timTk(tkId);
     if (!tk) return { ok: false, loi: 'Chưa chọn tài khoản Google Drive (Cài đặt → Google Drive)' };
     const sub = THU_MUC_LOAI[loai];
     if (!sub) return { ok: false, loi: 'Chỉ ảnh và video được đưa lên Drive' };
-    const ds = (files || []).filter((f) => f && fs.existsSync(f));
+    const ds = (files || []).map((f, i) => ({ f, ten: tenDs[i] || (f && path.basename(f)) })).filter((x) => x.f && fs.existsSync(x.f));
     if (!ds.length) return { ok: false, loi: 'File kết quả không còn trên máy' };
     const tenDa = tenThuMucDuAn(tenDuAn);
     const wc = this._cuaSo(tk).webContents;
@@ -70,10 +71,24 @@ class DriveWeb {
       buoc = `tìm / tạo thư mục "${tenDa}/${sub}"`;
       const idSub = await this._thuMuc(wc, tk.id, idDa, sub);
       const ra = [];
-      for (const f of ds) {
-        const nhanF = `Drive: ${tenDa}/${sub}/${path.basename(f)}`;
-        buoc = `tải "${path.basename(f)}" lên`;
-        await this._taiLen(wc, idSub, f, cu.includes(nhanF));
+      for (const { f, ten } of ds) {
+        const nhanF = `Drive: ${tenDa}/${sub}/${ten}`;
+        buoc = `tải "${ten}" lên`;
+        // 1.4.1: Drive lấy tên theo tên file trên máy — file trên máy mang tên khác (vd "001 (2).jpg" vì thư mục
+        // máy trùng tên) → chép tạm sang thư mục riêng của LẦN TẢI NÀY với đúng tên, tải lên, rồi xoá bản tạm.
+        let dem = '';
+        try {
+          let tai = f;
+          if (ten !== path.basename(f)) {
+            fs.mkdirSync(this.o.thuMucDem, { recursive: true });
+            dem = fs.mkdtempSync(path.join(this.o.thuMucDem, 'len-'));
+            tai = path.join(dem, ten);
+            fs.copyFileSync(f, tai);
+          }
+          await this._taiLen(wc, idSub, tai, cu.includes(nhanF));
+        } finally {
+          if (dem) fs.rmSync(dem, { recursive: true, force: true });
+        }
         ra.push(nhanF);
       }
       return { ok: true, files: ra, thuMuc: `Drive: ${tenDa}/${sub}` };

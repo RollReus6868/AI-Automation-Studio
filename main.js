@@ -516,6 +516,7 @@ async function lenDriveWeb(x) {
   if (!driveWeb) {
     driveWeb = new DriveWeb({
       goc: DRIVE_GOC, timTk: (id) => taiKhoan.tim(id), store, ganDebugger: ensureDebugger,
+      thuMucDem: path.join(app.getPath('userData'), 'drive-tam'),
       taoCuaSo: (tk) => { const w = taoCuaSoAn(tk, `Google Drive · ${tk.ten}`); if (xemLuong) w.showInactive(); return w; },
       dongCuaSo: (w) => dongCuaSoAn(w),
       luuChanDoan: (ten, html) => {

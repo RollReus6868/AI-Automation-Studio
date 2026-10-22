@@ -235,6 +235,11 @@ class DieuPhoi {
     const c = this.cd(duAnId);
     return ({ video: c.thuMucVideo, nhac: c.thuMucNhac }[loai] ?? c.thuMucAnh) || this.o.thuMucRaMacDinh;
   }
+  /** 1.4.1: chỗ giữ file khi tắt "tải về" — thư mục con RIÊNG từng dự án (trước dùng chung → 001.jpg của dự án này
+   *  thành "001 (2).jpg" vì dự án khác đã có 001.jpg, và tên sai đó đi lên Drive). */
+  thuMucTamDuAn(duAnId) {
+    return path.join(this.o.thuMucTam, String(duAnId || 'chung').replace(/[^\w-]/g, '_'));
+  }
   _duocChay(j) { return this.duAnChay.has(j.duAn) || !!j.chayRieng || !!this._theoHen(j); }
   /** 1.3.6: việc này đang được chạy theo hẹn giờ của chức năng nào ('' = không). Video nối từ ảnh theo hẹn của ảnh. */
   _theoHen(j) {
@@ -781,12 +786,13 @@ class DieuPhoi {
     }
     const web = c.driveCach === 'web';
     const files = [...(j.files || [])];
+    const ten = files.map((f, i) => (j.tenDrive || [])[i] || path.basename(f));
     this._driveCho = this._driveCho.then(async () => {
       const d = this.duAn.find((x) => x.id === j.duAn);
       if (!d || !this.viec.includes(j)) return;
       const r = web
-        ? await this.o.lenDriveWeb({ tkId: c.driveTk, tenDuAn: d.ten, loai: j.loai, files, cu: j.drive || [] })
-        : await this.o.lenDrive({ goc: c.thuMucDrive, tenDuAn: d.ten, loai: j.loai, files, cu: j.drive || [] });
+        ? await this.o.lenDriveWeb({ tkId: c.driveTk, tenDuAn: d.ten, loai: j.loai, files, ten, cu: j.drive || [] })
+        : await this.o.lenDrive({ goc: c.thuMucDrive, tenDuAn: d.ten, loai: j.loai, files, ten, cu: j.drive || [] });
       if (r.ok) {
         j.drive = r.files; delete j.driveLoi;
         this.log('success', `☁ #${j.so} đã đưa lên Google Drive: ${r.files[0]}${r.files.length > 1 ? ` (+${r.files.length - 1} file)` : ''}`);
@@ -896,6 +902,15 @@ class DieuPhoi {
   datCaiDat(c, duAnId) {
     c = c || {};
     const d = duAnId && this.duAn.find((x) => x.id === duAnId);
+    // 1.4.1: vừa BẬT "tự đưa lên Google Drive" → tự tắt "Tải ảnh về" / "Tải video về" (file giữ ở thư mục tạm riêng
+    // của dự án rồi lên Drive, khỏi lưu lẫn vào thư mục máy). Sau đó người dùng bật lại tay thì vẫn được.
+    if (c.driveBat === true && !this.cd(d && d.id).driveBat) {
+      const cd = this.cd(d && d.id);
+      if (cd.taiAnh || cd.taiVideo) {
+        c = { ...c, taiAnh: false, taiVideo: false };
+        this.log('info', `☁ Bật đưa lên Google Drive${d ? ` (dự án "${d.ten}")` : ''} → đã tự tắt "Tải ảnh về" và "Tải video về": ảnh / video giữ trong app (thư mục tạm riêng của dự án) rồi đưa lên Drive.`);
+      }
+    }
     if (!d) {
       this.caiDat = chuanCaiDat({ ...this.caiDat, ...c }, this.caiDat.flow, c.flow);
     } else {
@@ -1532,7 +1547,7 @@ class DieuPhoi {
       try {
         const video = j.loai === 'video', nhac = j.loai === 'nhac';
         const tai = nhac || (video ? c.taiVideo : c.taiAnh);   // nhạc luôn tải về
-        let goc = tai ? this.thuMucRa(j.loai, j.duAn) : this.o.thuMucTam;
+        let goc = tai ? this.thuMucRa(j.loai, j.duAn) : this.thuMucTamDuAn(j.duAn);
         let mau = nhac ? c.tenNhac : video ? c.tenVideo : c.tenAnh;
         // Video nối từ ảnh (Flow ⇄ Muse): lưu NGAY CẠNH ảnh nguồn, cùng tên — 325.jpg → 325.mp4. Người dùng
         // đặt thư mục ảnh riêng mà video vẫn vào thư mục mặc định thì tưởng video không được tải về
@@ -1555,8 +1570,15 @@ class DieuPhoi {
           }
         }
         const cu = j.files || [];
+        // 1.4.1: tên đưa lên Drive = tên ĐÚNG theo mẫu (bỏ " (2)" mà máy phải thêm vì thư mục trên máy đã có file
+        // cùng tên của dự án / lần chạy khác). Video đặt tên theo ảnh ({tenAnh}) → theo tên Drive của ảnh nguồn.
+        const anhGoc = j.tuAnh && this.viec.find((x) => x.id === j.tuAnh);
+        const jTen = anhGoc && (anhGoc.tenDrive || [])[0]
+          ? { ...j, thamChieu: [...(j.thamChieu || []).slice(0, -1), anhGoc.tenDrive[0]] } : j;
+        const tenDrive = [];
         j.files = r.files.map((f, i) => {
           if (f.duongDan && !f.mime) f.mime = hd.mimeTuDuoi(f.duongDan);
+          tenDrive.push(hd.tenFile(d, jTen, f.mime, i, mau).split('/').pop());
           let dich = path.join(goc, hd.tenFile(d, j, f.mime, i, mau));
           // Đã có file trùng tên mà KHÔNG phải file cũ của chính việc này (Tạo lại) → thêm (2), (3)…,
           // không bao giờ ghi đè kết quả khác (kể cả của việc đã dọn khỏi danh sách).
@@ -1567,7 +1589,7 @@ class DieuPhoi {
           else this.o.ghiFile(dich, Buffer.from(f.b64, 'base64'));   // Muse: dữ liệu lấy từ trang
           return dich;
         });
-        Object.assign(j, { trangThai: 'xong', buoc: '', xongLuc: Date.now(), loi: '', tam: !tai });
+        Object.assign(j, { trangThai: 'xong', buoc: '', xongLuc: Date.now(), loi: '', tam: !tai, tenDrive });
         if (r.flowTen) j.flowTen = { tk: j.taiKhoan, ten: r.flowTen };
         this.loiLienTiep[j.taiKhoan] = 0;
         if (j.taiKhoan) this.ketQuaTk[j.taiKhoan] = { ok: true, luc: Date.now() };

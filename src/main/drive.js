@@ -9,6 +9,7 @@
 //  Cấu trúc: <thư mục Drive>/<Tên dự án>/images/<tên file>   (ảnh)
 //            <thư mục Drive>/<Tên dự án>/Videos/<tên file>   (video)
 //  Không ghi đè file khác cùng tên (thêm " (2)"); file Drive cũ của CHÍNH việc đó (Tạo lại) thì ghi đè.
+//  1.4.1: tên trên Drive theo mẫu tên của việc (o.ten), không theo tên file trên máy (có thể đã thành "001 (2).jpg").
 // ============================================================================
 
 const fs = require('fs');
@@ -35,22 +36,22 @@ async function tonTai(p, fsp) {
 /**
  * Chép file kết quả của một việc vào thư mục Drive.
  * @param o.goc      thư mục Google Drive trên máy (vd G:\My Drive)
+ * @param o.ten      1.4.1: tên trên Drive của từng file (theo mẫu tên, không mang " (2)" của thư mục trên máy) — thiếu thì tên file
  * @param o.cu       đường dẫn trên Drive của lần đưa trước (việc Tạo lại) — được ghi đè
  * @returns {ok, files, thuMuc} hoặc {ok:false, loi}
  */
-async function chepLenDrive({ goc, tenDuAn, loai, files, cu = [], fsp = fs.promises }) {
+async function chepLenDrive({ goc, tenDuAn, loai, files, ten: tenDs = [], cu = [], fsp = fs.promises }) {
   const thuMuc = thuMucDich(goc || '', tenDuAn, loai);
   if (!thuMuc) return { ok: false, loi: 'Chỉ ảnh và video được đưa lên Drive' };
   if (!goc) return { ok: false, loi: 'Chưa chọn thư mục Google Drive (Cài đặt → Google Drive)' };
   if (!(await tonTai(goc, fsp))) {
     return { ok: false, loi: `Không thấy thư mục Google Drive "${goc}" — mở Google Drive cho máy tính và đăng nhập, hoặc chọn lại thư mục ở Cài đặt → Google Drive` };
   }
-  const ds = (files || []).filter(Boolean);
+  const ds = (files || []).map((f, i) => ({ f, ten: tenDs[i] || (f && path.basename(f)) })).filter((x) => x.f);
   if (!ds.length) return { ok: false, loi: 'Việc chưa có file' };
   await fsp.mkdir(thuMuc, { recursive: true });
   const ra = [];
-  for (const f of ds) {
-    const ten = path.basename(f);
+  for (const { f, ten } of ds) {
     let dich = path.join(thuMuc, ten);
     // Trùng tên file của việc khác (hoặc file khác của chính lần chép này) → thêm (2), (3)…
     const vuong = async (p) => ra.includes(p) || ((await tonTai(p, fsp)) && !cu.includes(p));

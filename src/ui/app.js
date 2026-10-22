@@ -1598,6 +1598,7 @@
     $('#cdXemLuong').onchange = (e) => api.call('xemLuong', { bat: e.target.checked });
     $('#cdMauGoc').onclick = () => { $('#cdMauAnh').value = HD.MAU_MAC_DINH.anh; $('#cdMauVideo').value = HD.MAU_MAC_DINH.video; };
     $('#cdLuu').onclick = async () => {
+      const batDrive = $('#cdDrive').checked && !S.caiDat.driveBat && (S.caiDat.taiAnh || S.caiDat.taiVideo);   // 1.4.1: vừa bật Drive → app tự tắt tải về máy
       await datCD({
         luongMoiTK: $('#cdLuong').value, nghiGiuaLanGui: $('#cdNghi').value, tuThuLai: $('#cdThuLai').value, tuChayLaiLoi: $('#cdChayLaiLoi').value,
         choAnhGiay: $('#cdChoAnh').value, choVideoGiay: $('#cdChoVideo').value, choChuGiay: $('#cdChoChu').value, choNhacGiay: $('#cdChoNhac').value,
@@ -1610,7 +1611,8 @@
       veCaiDat();
       if ($('#cdDrive').checked && $('#cdDriveCach').value === 'may' && !$('#cdThuMucDrive').value) { toast('Đã lưu — nhưng chưa chọn thư mục Google Drive (bấm Tự tìm hoặc Chọn…)', true); return; }
       if ($('#cdDrive').checked && $('#cdDriveCach').value === 'web' && !$('#cdDriveTk').value) { toast('Đã lưu — nhưng chưa chọn tài khoản Google Drive (Tài khoản → Drive)', true); return; }
-      toast(`Đã lưu cài đặt của dự án "${(duAnHienTai() || {}).ten || ''}"`);
+      toast(batDrive ? 'Đã lưu — bật đưa lên Google Drive nên đã tự tắt "Tải ảnh về" và "Tải video về"'
+        : `Đã lưu cài đặt của dự án "${(duAnHienTai() || {}).ten || ''}"`);
     };
 
     // Nhật ký
