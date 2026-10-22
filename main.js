@@ -106,7 +106,14 @@ function baoTrangThai() {
     if (win.isMinimized()) { boLoBao = true; return; }
     boLoBao = false;
     win.webContents.send('state', trangThai());
-  }, nhipBao());
+  }, win && !win.isDestroyed() && !win.isFocused() ? Math.max(2000, nhipBao()) : nhipBao());
+}
+/** 1.4.4: cửa sổ app quay lại tiêu điểm → báo ngay (lúc không dùng app thì chỉ báo 2 giây một lần, bớt CPU). */
+function baoNgay() {
+  if (henBao) { clearTimeout(henBao); henBao = null; }
+  if (!win || win.isDestroyed() || !dieuPhoi || win.isMinimized()) return;
+  boLoBao = false;
+  win.webContents.send('state', trangThai());
 }
 
 /**
@@ -121,22 +128,32 @@ function docRam() {
   for (const [l, w] of viewCuaLuong) if (w && !w.isDestroyed()) gan(w.webContents, ngan(l.id));
   for (const t of (tabsFlow && tabsFlow.tabs) || []) { try { gan(t.view.webContents, `Flow ${t.id}`); } catch (_) {} }
   if (dangNhap) { try { gan(dangNhap.view.webContents, 'khung đăng nhập'); } catch (_) {} }
-  const phan = new Map();
-  let tong = 0;
+  const phan = new Map(), cpu = new Map();
+  let tong = 0, tongCpu = 0;
   for (const m of app.getAppMetrics()) {
     const kb = (m.memory && m.memory.workingSetSize) || 0;
     tong += kb;
     const ten = nhan.get(m.pid) || (m.type === 'Browser' ? 'lõi app' : m.type === 'GPU' ? 'GPU' : 'khác');
     phan.set(ten, (phan.get(ten) || 0) + kb);
+    // 1.4.4: CPU trung bình từ lần đọc trước (100 = một nhân chạy hết sức) → quy ra % cả máy.
+    const c = (m.cpu && m.cpu.percentCPUUsage) || 0;
+    tongCpu += c;
+    cpu.set(ten, (cpu.get(ten) || 0) + c);
   }
-  return { tong, phan: [...phan.entries()].sort((a, b) => b[1] - a[1]) };
+  const nhan1 = Math.max(1, os.cpus().length);
+  return { tong, phan: [...phan.entries()].sort((a, b) => b[1] - a[1]),
+    cpu: tongCpu / nhan1, cpuPhan: [...cpu.entries()].map(([t, c]) => [t, c / nhan1]).sort((a, b) => b[1] - a[1]) };
 }
 function baoRam() {
-  const { tong, phan } = docRam();
+  const { tong, phan, cpu, cpuPhan } = docRam();
   const gb = (kb) => (kb / 1048576).toFixed(1).replace('.', ',');
   const soTrang = phan.filter(([t]) => /· L\d+$|^Flow /.test(t)).length;
   log(tong > 6 * 1048576 ? 'warning' : 'info', `🧠 RAM app: ${gb(tong)} GB — ${phan.slice(0, 10).map(([t, kb]) => `${t} ${gb(kb)}`).join(' · ')}` +
     (tong > 6 * 1048576 && soTrang > 2 ? ` — ${soTrang} trang Muse/Flow chạy cùng lúc, mỗi trang thường 1–1,5 GB: máy chậm thì giảm số luồng / tab mỗi tài khoản.` : ''));
+  // 1.4.4: CPU từng phần (trung bình từ lần ghi trước) — biết chắc phần nào ngốn CPU.
+  const pt = (x) => `${Math.round(x)}%`;
+  log(cpu > 70 ? 'warning' : 'info', `⚙ CPU app: ${pt(cpu)} cả máy — ${cpuPhan.filter(([, c]) => c >= 0.5).slice(0, 10).map(([t, c]) => `${t} ${pt(c)}`).join(' · ') || 'gần như không dùng'}` +
+    (cpu > 70 && soTrang > 1 ? ` — ${soTrang} trang Muse/Flow chạy cùng lúc: máy nóng / chậm thì giảm "Chạy cùng lúc" hoặc số luồng / tab mỗi tài khoản.` : ''));
 }
 
 function trangThai() {
@@ -248,7 +265,8 @@ function taoCuaSoAn(tk, tieuDe) {
   });
   ganWc(w.webContents);
   // 1.4.0: trang chạy ngầm nhận ưu tiên CPU thấp hơn (đổi trang có thể sang tiến trình mới → áp lại mỗi lần nạp xong).
-  w.webContents.on('dom-ready', () => datUuTien(w.webContents));
+  // 1.4.4: trang mới nạp (tài liệu mới) → chèn lại CSS tắt hiệu ứng động.
+  w.webContents.on('dom-ready', () => { datUuTien(w.webContents); cssDong.delete(w.webContents); datHieuUng(w.webContents); });
   // Người dùng bấm X khi đang xem luồng → chỉ ẩn, luồng vẫn chạy.
   w.on('close', (e) => { if (!appDangThoat && !w.__huy) { e.preventDefault(); w.hide(); } });
   return w;
@@ -293,9 +311,31 @@ function datUuTien(wc) {
   } catch (_) {}
 }
 function datUuTienMoiLuong() {
-  for (const w of viewCuaLuong.values()) if (w && !w.isDestroyed()) datUuTien(w.webContents);
-  for (const t of (tabsFlow && tabsFlow.tabs) || []) { try { datUuTien(t.view.webContents); } catch (_) {} }
+  for (const w of viewCuaLuong.values()) if (w && !w.isDestroyed()) { datUuTien(w.webContents); datHieuUng(w.webContents); }
+  for (const t of (tabsFlow && tabsFlow.tabs) || []) { try { datUuTien(t.view.webContents); datHieuUng(t.view.webContents); } catch (_) {} }
   if (daHaUuTien.size > 500) daHaUuTien.clear();
+}
+
+// 1.4.4: bớt CPU — trang chạy ngầm ẩn nhưng vẫn "visible" (backgroundThrottling:false) nên cứ vẽ ~60 khung/giây mọi
+// hiệu ứng CSS lặp mãi (vòng xoay chờ, ánh lấp lánh "đang tạo"…) suốt mấy phút chờ kết quả, nhân với số luồng / tab.
+// Khi bật "Máy mượt": chèn CSS (lớp người dùng) cho mọi hiệu ứng CSS chạy xong ngay một lần. Chỉ đụng CSS animation
+// (sự kiện animationend vẫn bắn, menu / hộp thoại vẫn đóng mở như cũ); không đụng transition, không đổi cách bấm / đọc trang.
+const CSS_TAT_DONG = '*,*::before,*::after{animation-duration:.01ms!important;animation-delay:0s!important;animation-iteration-count:1!important}';
+const cssDong = new WeakMap();   // webContents → khoá CSS đã chèn ('dang' khi đang chèn)
+async function datHieuUng(wc) {
+  try {
+    if (!wc || wc.isDestroyed()) return;
+    const nhe = !dieuPhoi || dieuPhoi.caiDat.nheMay !== false;
+    const k = cssDong.get(wc);
+    if (nhe && !k) {
+      cssDong.set(wc, 'dang');
+      const khoa = await wc.insertCSS(CSS_TAT_DONG, { cssOrigin: 'user' });
+      if (cssDong.get(wc) === 'dang') cssDong.set(wc, khoa);
+    } else if (!nhe && k) {
+      cssDong.delete(wc);
+      if (k !== 'dang') await wc.removeInsertedCSS(k);
+    }
+  } catch (_) {}
 }
 
 // ── Luồng chạy ngầm ───────────────────────────────────────────────────────
@@ -1017,6 +1057,8 @@ function taoCuaSo() {
   win.webContents.on('did-finish-load', () => baoTrangThai());
   // 1.4.0: thu nhỏ thì thôi báo trạng thái (giao diện không ai xem) — mở lại thì báo ngay.
   win.on('restore', () => { if (boLoBao) baoTrangThai(); });
+  // 1.4.4: không dùng app thì giao diện chỉ được báo 2 giây một lần; quay lại app → báo ngay cho khỏi thấy cũ.
+  win.on('focus', () => baoNgay());
   // Đóng cửa sổ chính = thoát app (các cửa sổ luồng ẩn không được giữ app sống).
   win.on('closed', () => { win = null; app.quit(); });
 }

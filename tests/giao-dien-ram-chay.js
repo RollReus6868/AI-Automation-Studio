@@ -70,6 +70,9 @@ module.exports = async ({ win, app, dieuPhoi, docRam, baoRam, nhatKy }) => {
     baoRam();
     const dong = nhatKy.filter((d) => /🧠/.test(d.chu)).pop();
     ok('nhật ký ghi một dòng "🧠 RAM app: x,x GB — giao diện …"', !!dong && /^🧠 RAM app: \d+,\d GB — .*giao diện \d+,\d/.test(dong.chu), dong && dong.chu);
+    // 1.4.4: CPU từng phần, ngay sau dòng RAM.
+    const dongCpu = nhatKy.filter((d) => /⚙ CPU app/.test(d.chu)).pop();
+    ok('nhật ký ghi một dòng "⚙ CPU app: x% cả máy — …"', !!dongCpu && /^⚙ CPU app: \d+% cả máy — \S/.test(dongCpu.chu) && Number.isFinite(r.cpu), dongCpu && dongCpu.chu);
   } catch (err) {
     loi.push(err.stack || err.message);
     console.log('  ✘ ' + (err.stack || err.message));

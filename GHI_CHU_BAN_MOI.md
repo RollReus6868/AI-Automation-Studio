@@ -1,4 +1,14 @@
-# AI Automation Studio 1.4.3
+# AI Automation Studio 1.4.4
+
+- **Bớt ngốn CPU khi chạy.** Phần tốn CPU nhiều nhất là các trang Muse / Flow / Suno chạy ngầm: mỗi luồng / tab là một trang web đầy đủ, và trong mấy phút chờ kết quả trang cứ vẽ liên tục vòng xoay chờ, ánh lấp lánh "đang tạo"… Càng nhiều luồng / tab cùng lúc càng tốn.
+  - Khi bật **Máy mượt** (Cài đặt → Chạy, bật sẵn), app tắt các hiệu ứng động đó trên trang chạy ngầm. Trên máy thử, 3 trang đang quay hiệu ứng tốn khoảng 74% một nhân CPU, tắt xong còn gần 0%. Cách bấm, cách đọc kết quả trên trang không đổi.
+  - Khi bạn không dùng cửa sổ app (đang mở phần mềm khác), giao diện app chỉ cập nhật 2 giây một lần thay vì liên tục. Quay lại app là cập nhật ngay.
+  - Nhật ký có thêm dòng **⚙ CPU app** mỗi 10 phút (cạnh dòng 🧠 RAM app): CPU cả app và từng phần (từng luồng Muse, từng tab Flow, giao diện, GPU). CPU trên 70% thì dòng này thành cảnh báo và gợi ý giảm *Chạy cùng lúc* hoặc số luồng / tab mỗi tài khoản.
+- Mọi thứ khác giữ nguyên như 1.4.3.
+
+Lưu ý: đã kiểm bằng bài kiểm tự động và trên trang Muse / Flow / Suno giả, chưa đo trên trang thật. Mức giảm thật tuỳ trang Muse / Flow có bao nhiêu hiệu ứng; xem dòng ⚙ CPU app trong nhật ký để biết.
+
+## Bản 1.4.3
 
 - **Nút *Quét thư mục…* giờ cho chọn thư mục.** Bấm nút, chọn thư mục đang có ảnh / video đánh số làm dở, app quét đúng thư mục đó. Bản 1.4.2 chỉ quét thư mục lưu của dự án, nên khi file làm dở nằm ở chỗ khác thì kết quả sai.
   - App đọc số ngay trong tên file, không cần khớp mẫu tên: `253.jpg`, `0253.png`, `253 (2).jpg`, `anh_253.jpg` đều là số 253. Chỉ xét file nằm ngay trong thư mục, đúng loại (trang Tạo ảnh chỉ xét ảnh, trang Tạo video chỉ xét video).
