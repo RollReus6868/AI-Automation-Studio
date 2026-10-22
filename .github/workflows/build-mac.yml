@@ -47,6 +47,9 @@ jobs:
       - name: Kiem thu dau-cuoi (trang Drive gia)
         timeout-minutes: 10
         run: node tests/e2e.js drive
+      - name: Kiem thu dau-cuoi (quet thu muc, trang Muse gia)
+        timeout-minutes: 10
+        run: node tests/e2e.js quet
 
       # 1.3.4: giao dien voi 200 video xong khong phinh RAM (anh nho thay <video>, ve theo tung dong)
       - name: Kiem thu RAM giao dien

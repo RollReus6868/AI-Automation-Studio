@@ -486,3 +486,23 @@ body.trang-nhac .khong-nhac { display: none !important; }
 /* 1.4.0: Cài đặt → Google Drive — chọn cách đưa lên */
 .o-drive-cach { display: grid; gap: 6px; margin: 10px 0 4px; }
 #cdDriveTk { flex: 1; min-width: 0; }
+
+/* 1.4.2: nhãn "áp dụng cho" cạnh từng cài đặt (ảnh / video / nhạc / cả app) */
+.ap { display: inline-block; vertical-align: middle; margin: 0 0 0 6px; padding: 1px 7px; border-radius: 6px; font-size: 10.5px; font-weight: 700;
+  letter-spacing: .2px; white-space: nowrap; line-height: 1.6; }
+.ap-anh { background: rgba(77, 182, 255, .16); color: #8fd0ff; }
+.ap-video { background: rgba(255, 120, 170, .16); color: #ffa3c6; }
+.ap-anh-video { background: rgba(179, 140, 255, .16); color: #cdb6ff; }
+.ap-nhac { background: rgba(255, 196, 77, .16); color: #ffd27a; }
+.ap-tat-ca { background: rgba(110, 220, 160, .14); color: #8fe6b6; }
+.ap-app { background: rgba(255, 255, 255, .08); color: var(--chu-phu, #b9b9c6); }
+label > .ap { margin-left: 6px; }
+.ghi-ap { margin: 0 0 12px; font-size: 12px; line-height: 1.9; color: var(--chu-phu, #b9b9c6); }
+.ghi-ap .ap { margin: 0 2px; }
+.nhom-tai .ghi-ap { margin: 4px 0 6px; }
+.luu-2 { gap: 16px; align-items: start; }
+.cot-luu { display: flex; flex-direction: column; gap: 6px; min-width: 0; padding: 10px; border-radius: 10px; background: rgba(255, 255, 255, .03); }
+.cot-luu h4 { margin: 0 0 4px; display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.cot-luu h4 .ap { margin: 0; }
+.cot-luu .dong-o input { min-width: 0; }
+.nho-chu { font-size: 12px; margin: -4px 0 10px; }

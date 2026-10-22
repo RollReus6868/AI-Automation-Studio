@@ -154,6 +154,17 @@
             </div>
           </div>
 
+          <div class="khoi-chuoi" id="khuQuet">
+            <div class="dong-cong-tac">
+              <div>
+                <b>Bỏ qua số đã có file trong thư mục</b>
+                <small>Khi bấm Tạo: số đã có file trong thư mục lưu (vd <code>253.jpg</code>) hoặc đang chờ thì bỏ qua; làm số còn thiếu trước, rồi làm tiếp prompt chưa làm.<span id="quetGhiAnh"> Đang bật "Ảnh xong → tự tạo video": ảnh có rồi mà thiếu video thì chỉ tạo video từ ảnh đó.</span></small>
+              </div>
+              <label class="cong-tac"><input type="checkbox" id="boQuaDaCo"><span></span></label>
+            </div>
+            <div class="dong-o"><button class="nut-vien nho" id="nutQuet"><i data-icon="search"></i>Quét thư mục</button><span class="mo" id="ghiQuet">Xem trước số đã có / còn thiếu.</span></div>
+          </div>
+
           <details class="nang-cao" id="nangCao">
             <summary><i data-icon="sliders-horizontal"></i>Cài đặt nâng cao<i data-icon="chevron-down" class="mui"></i></summary>
             <div class="luoi-2">
@@ -165,10 +176,11 @@
             <label>Chỉ chạy prompt số <small>(trống = mọi prompt)</small><input type="text" id="chonSo" placeholder="vd: 98, 303, 305-350" spellcheck="false"></label>
             <small class="mo">Ghi số lẻ cách nhau bằng dấu phẩy, khoảng thì dùng gạch nối: <code>98, 303, 305-350</code>. <code>305-</code> = từ 305 tới cuối.</small>
             <label>Thêm vào cuối mỗi prompt<input type="text" id="hauTo" placeholder="vd: phong cách điện ảnh, ánh sáng mềm"></label>
-            <label class="khong-nhac">Số luồng mỗi tài khoản <small>(áp dụng ngay, cả khi đang chạy)</small><input type="number" id="luongNhanh" min="1" max="20"></label>
+            <label class="khong-nhac">Số luồng mỗi tài khoản <small>(áp dụng ngay, cả khi đang chạy)</small><span class="ap ap-tat-ca">Ảnh · Video · Nhạc</span><input type="number" id="luongNhanh" min="1" max="20"></label>
             <small class="mo khong-nhac">Ảnh trong "chọn thư mục" được gán lần lượt: ảnh 1 → prompt 1, ảnh 2 → prompt 2… (xếp theo tên).</small>
 
             <div class="nhom-tai">
+              <p class="ghi-ap khong-nhac" id="ncApDung"></p>
               <div class="dong-cong-tac khong-nhac"><div><b id="ncNhanTai">Tải ảnh về</b><small>Tắt: chỉ giữ trong app (vẫn xem, vẫn làm video được).</small></div><label class="cong-tac"><input type="checkbox" id="ncTai"><span></span></label></div>
               <label id="ncNhanThuMuc">Thư mục lưu ảnh</label>
               <div class="dong-o"><input id="ncThuMuc" readonly><button class="nut-vien nho" id="ncChonThuMuc">Đổi…</button><button class="nut-vien nho" id="ncMoThuMuc">Mở</button></div>
@@ -377,37 +389,60 @@
     <main class="trang" id="trang-caidat" hidden>
       <section class="panel trang-don cuon">
         <div class="panel-dau"><h2><i data-icon="settings"></i><span id="cdTieuDe">Cài đặt</span></h2><button class="nut-gradient nho" id="cdLuu"><i data-icon="check"></i>Lưu cài đặt</button></div>
+        <p class="ghi-ap">Nhãn cạnh mỗi mục cho biết mục đó áp dụng cho việc gì: <span class="ap ap-anh">Chỉ ảnh</span> <span class="ap ap-video">Chỉ video</span> <span class="ap ap-anh-video">Ảnh · Video</span> <span class="ap ap-nhac">Chỉ nhạc</span> <span class="ap ap-tat-ca">Ảnh · Video · Nhạc</span> <span class="ap ap-app">Cả app</span> (cả app = mọi dự án; còn lại là của dự án đang mở).</p>
         <p class="ghi-cai-dat-du-an" id="cdDuAnGhi">Mỗi dự án có cài đặt riêng: trang này đổi cài đặt của dự án đang mở (chọn dự án ở thanh trên cùng). Dự án mới chép cài đặt của dự án đang mở lúc tạo.</p>
         <div class="the-cai">
           <h3><i data-icon="sliders-horizontal"></i>Chạy</h3>
           <div class="luoi-3">
-            <label>Số luồng mỗi tài khoản<input type="number" id="cdLuong" min="1" max="20"></label>
-            <label>Nghỉ giữa 2 lần gửi (giây, mỗi tài khoản)<input type="number" id="cdNghi" min="0" max="120"></label>
-            <label>Lỗi ở mọi tài khoản thì thử thêm (vòng)<input type="number" id="cdThuLai" min="0" max="10"></label>
-            <label>Hết lượt → tự chạy lại việc lỗi (số lượt)<input type="number" id="cdChayLaiLoi" min="0" max="10"></label>
-            <label>Chờ tối đa 1 ảnh (giây) — quá thì chuyển tài khoản dự phòng<input type="number" id="cdChoAnh" min="60" max="1800"></label>
-            <label>Chờ tối đa 1 video (giây) — quá thì chuyển tài khoản dự phòng<input type="number" id="cdChoVideo" min="120" max="3600"></label>
-            <label>Muse trả chữ bao lâu thì coi là lỗi (giây)<input type="number" id="cdChoChu" min="15" max="600"></label>
-            <label>Chờ tối đa 1 lần tạo nhạc Suno (giây)<input type="number" id="cdChoNhac" min="120" max="3600"></label>
+            <label>Số luồng mỗi tài khoản<span class="ap ap-tat-ca">Ảnh · Video · Nhạc</span><input type="number" id="cdLuong" min="1" max="20"></label>
+            <label>Nghỉ giữa 2 lần gửi (giây, mỗi tài khoản)<span class="ap ap-tat-ca">Ảnh · Video · Nhạc</span><input type="number" id="cdNghi" min="0" max="120"></label>
+            <label>Lỗi ở mọi tài khoản thì thử thêm (vòng)<span class="ap ap-tat-ca">Ảnh · Video · Nhạc</span><input type="number" id="cdThuLai" min="0" max="10"></label>
+            <label>Hết lượt → tự chạy lại việc lỗi (số lượt)<span class="ap ap-tat-ca">Ảnh · Video · Nhạc</span><input type="number" id="cdChayLaiLoi" min="0" max="10"></label>
+            <label>Chờ tối đa 1 ảnh (giây) — quá thì chuyển tài khoản dự phòng<span class="ap ap-anh">Chỉ ảnh</span><input type="number" id="cdChoAnh" min="60" max="1800"></label>
+            <label>Chờ tối đa 1 video (giây) — quá thì chuyển tài khoản dự phòng<span class="ap ap-video">Chỉ video</span><input type="number" id="cdChoVideo" min="120" max="3600"></label>
+            <label>Muse trả chữ bao lâu thì coi là lỗi (giây)<span class="ap ap-anh-video">Ảnh · Video</span><input type="number" id="cdChoChu" min="15" max="600"></label>
+            <label>Chờ tối đa 1 lần tạo nhạc Suno (giây)<span class="ap ap-nhac">Chỉ nhạc</span><input type="number" id="cdChoNhac" min="120" max="3600"></label>
           </div>
-          <div class="dong-cong-tac"><div><b>Muse ⇄ Flow: bên này lỗi thì tự chuyển sang bên kia</b><small>Muse từ chối tạo video từ một ảnh → riêng ảnh đó sang Flow. Tài khoản lỗi / nghỉ thì tài khoản Dự phòng cùng bên vào thay trước; hết dự phòng mà số tài khoản còn chạy được ít hơn số tài khoản Chạy của dự án → bên kia chạy thêm đúng số tài khoản còn thiếu và nhận vừa đủ việc cho chúng, để luôn đủ số tài khoản chạy cùng lúc. Bên cũ có lại tài khoản thì việc chưa chạy quay về. Việc hỏng ở mọi tài khoản một bên → sang bên kia. Bên kia cần có tài khoản đã đăng nhập (hoặc được chọn trong dự án).</small></div><label class="cong-tac"><input type="checkbox" id="cdDoiNen"><span></span></label></div>
-          <div class="dong-cong-tac"><div><b>Lưu ảnh dạng PNG</b><small>Muse trả webp; bật để đổi sang png (nặng hơn, dễ dùng hơn).</small></div><label class="cong-tac"><input type="checkbox" id="cdPng"><span></span></label></div>
-          <div class="dong-cong-tac"><div><b>Hiện các luồng chạy ngầm</b><small>Để soi lỗi: trang Muse / Flow của các luồng sẽ hiện đè lên app.</small></div><label class="cong-tac"><input type="checkbox" id="cdXemLuong"><span></span></label></div>
+          <div class="dong-cong-tac"><div><b>Muse ⇄ Flow: bên này lỗi thì tự chuyển sang bên kia</b><span class="ap ap-anh-video">Ảnh · Video</span><small>Muse từ chối tạo video từ một ảnh → riêng ảnh đó sang Flow. Tài khoản lỗi / nghỉ thì tài khoản Dự phòng cùng bên vào thay trước; hết dự phòng mà số tài khoản còn chạy được ít hơn số tài khoản Chạy của dự án → bên kia chạy thêm đúng số tài khoản còn thiếu và nhận vừa đủ việc cho chúng, để luôn đủ số tài khoản chạy cùng lúc. Bên cũ có lại tài khoản thì việc chưa chạy quay về. Việc hỏng ở mọi tài khoản một bên → sang bên kia. Bên kia cần có tài khoản đã đăng nhập (hoặc được chọn trong dự án).</small></div><label class="cong-tac"><input type="checkbox" id="cdDoiNen"><span></span></label></div>
+          <div class="dong-cong-tac"><div><b>Lưu ảnh dạng PNG</b><span class="ap ap-anh">Chỉ ảnh</span><small>Muse trả webp; bật để đổi sang png (nặng hơn, dễ dùng hơn).</small></div><label class="cong-tac"><input type="checkbox" id="cdPng"><span></span></label></div>
+          <div class="dong-cong-tac"><div><b>Hiện các luồng chạy ngầm</b><span class="ap ap-app">Cả app</span><small>Để soi lỗi: trang Muse / Flow của các luồng sẽ hiện đè lên app.</small></div><label class="cong-tac"><input type="checkbox" id="cdXemLuong"><span></span></label></div>
           <small class="mo">Lỗi → chuyển lần lượt sang các tài khoản dự phòng → hết dự phòng thì quay về tài khoản chính thử lại, cứ thế theo vòng. Việc chỉ báo Lỗi khi đã hỏng ở mọi tài khoản thêm số vòng trên; tài khoản lỗi liên tiếp được cho nghỉ 15 phút, mọi tài khoản đều nghỉ thì hàng chờ tạm dừng.</small>
-          <div class="dong-cong-tac"><div><b>Tắt máy khi chạy hết hàng chờ</b><small>Chung cho mọi dự án: tắt khi MỌI dự án đang chạy đều xong. Windows, macOS. Tắt sau 60 giây; Windows huỷ bằng lệnh <code>shutdown /a</code>.</small></div><label class="cong-tac"><input type="checkbox" id="cdTatMay"><span></span></label></div>
-          <div class="dong-cong-tac"><div><b>Máy mượt: ưu tiên máy của bạn hơn các trang chạy ngầm</b><small>Chung cho mọi dự án. Hạ ưu tiên CPU của các trang Muse / Flow / Suno chạy ngầm: máy rảnh thì vẫn chạy đủ nhanh, máy bận thì giao diện app và phần mềm bạn đang dùng không bị giật. Cách chạy không đổi.</small></div><label class="cong-tac"><input type="checkbox" id="cdNheMay"><span></span></label></div>
+          <div class="dong-cong-tac"><div><b>Tắt máy khi chạy hết hàng chờ</b><span class="ap ap-app">Cả app</span><small>Chung cho mọi dự án: tắt khi MỌI dự án đang chạy đều xong. Windows, macOS. Tắt sau 60 giây; Windows huỷ bằng lệnh <code>shutdown /a</code>.</small></div><label class="cong-tac"><input type="checkbox" id="cdTatMay"><span></span></label></div>
+          <div class="dong-cong-tac"><div><b>Máy mượt: ưu tiên máy của bạn hơn các trang chạy ngầm</b><span class="ap ap-app">Cả app</span><small>Chung cho mọi dự án. Hạ ưu tiên CPU của các trang Muse / Flow / Suno chạy ngầm: máy rảnh thì vẫn chạy đủ nhanh, máy bận thì giao diện app và phần mềm bạn đang dùng không bị giật. Cách chạy không đổi.</small></div><label class="cong-tac"><input type="checkbox" id="cdNheMay"><span></span></label></div>
+        </div>
+        <div class="the-cai" id="cdLuuThe">
+          <h3><i data-icon="folder-open"></i>Lưu ảnh &amp; video (tải về, thư mục, tên file)</h3>
+          <p class="mo nho-chu">Ảnh và video lưu riêng: cột trái chỉ áp dụng cho việc <b>Tạo ảnh</b>, cột phải chỉ áp dụng cho việc <b>Tạo video</b> (kể cả video từ thư mục ảnh). Video tự tạo từ ảnh lưu theo mục <i>Video tạo từ ảnh</i> ở dưới. Đổi ở đây hay ở <i>Cài đặt nâng cao</i> của trang Tạo ảnh / Tạo video là một, lưu ngay.</p>
+          <div class="luoi-2 luu-2">
+            <div class="cot-luu" data-loai="anh">
+              <h4><span class="ap ap-anh">Chỉ ảnh</span>Tạo ảnh</h4>
+              <div class="dong-cong-tac"><div><b>Tải ảnh về máy</b><small>Tắt: chỉ giữ trong app (thư mục tạm riêng của dự án).</small></div><label class="cong-tac"><input type="checkbox" id="lvTai_anh"><span></span></label></div>
+              <label>Thư mục lưu ảnh</label>
+              <div class="dong-o"><input id="lvThuMuc_anh" readonly><button class="nut-vien nho" id="lvChon_anh">Đổi…</button><button class="nut-vien nho" id="lvMo_anh">Mở</button></div>
+              <label>Tên file ảnh<input id="lvTen_anh" placeholder="{stt}" spellcheck="false"></label>
+              <small class="mo" id="lvViDu_anh"></small>
+            </div>
+            <div class="cot-luu" data-loai="video">
+              <h4><span class="ap ap-video">Chỉ video</span>Tạo video</h4>
+              <div class="dong-cong-tac"><div><b>Tải video về máy</b><small>Tắt: chỉ giữ trong app (thư mục tạm riêng của dự án).</small></div><label class="cong-tac"><input type="checkbox" id="lvTai_video"><span></span></label></div>
+              <label>Thư mục lưu video</label>
+              <div class="dong-o"><input id="lvThuMuc_video" readonly><button class="nut-vien nho" id="lvChon_video">Đổi…</button><button class="nut-vien nho" id="lvMo_video">Mở</button></div>
+              <label>Tên file video<input id="lvTen_video" placeholder="{duAn}/{duAn}_{so}" spellcheck="false"></label>
+              <small class="mo" id="lvViDu_video"></small>
+            </div>
+          </div>
         </div>
         <div class="the-cai">
-          <h3><i data-icon="download"></i>Tải về &amp; dọn dẹp</h3>
-          <div class="dong-cong-tac"><div><b>Video tạo từ ảnh lưu cạnh ảnh, cùng tên</b><small>Ảnh xong → tự tạo video (Flow ⇄ Muse): video tải về ngay cạnh ảnh nguồn, ví dụ <code>325.jpg</code> → <code>325.mp4</code>. Tắt: lưu vào thư mục chọn ở dưới (vẫn cùng tên ảnh); chưa chọn thì theo thư mục và mẫu tên của trang Tạo video. Dự án đã chọn thư mục riêng ở trang Tạo ảnh (mục <i>Ảnh xong → tự tạo video</i>) thì luôn lưu vào thư mục của dự án đó.</small></div><label class="cong-tac"><input type="checkbox" id="cdVideoCanhAnh"><span></span></label></div>
+          <h3><i data-icon="download"></i>Video tạo từ ảnh &amp; dọn dẹp</h3>
+          <div class="dong-cong-tac"><div><b>Video tạo từ ảnh lưu cạnh ảnh, cùng tên</b><span class="ap ap-video">Chỉ video</span><small>Ảnh xong → tự tạo video (Flow ⇄ Muse): video tải về ngay cạnh ảnh nguồn, ví dụ <code>325.jpg</code> → <code>325.mp4</code>. Tắt: lưu vào thư mục chọn ở dưới (vẫn cùng tên ảnh); chưa chọn thì theo thư mục và mẫu tên của trang Tạo video. Dự án đã chọn thư mục riêng ở trang Tạo ảnh (mục <i>Ảnh xong → tự tạo video</i>) thì luôn lưu vào thư mục của dự án đó.</small></div><label class="cong-tac"><input type="checkbox" id="cdVideoCanhAnh"><span></span></label></div>
           <div class="o-thu-muc-video" id="khoiThuMucVideoAnh"><b>Thư mục lưu video tạo từ ảnh</b>
             <div class="dong-o"><input id="cdThuMucVideoAnh" readonly placeholder="Chưa chọn — theo thư mục của trang Tạo video"><button class="nut-vien nho" id="cdChonThuMucVideoAnh"><i data-icon="folder-open"></i>Chọn…</button><button class="nut-vien nho" id="cdMoThuMucVideoAnh">Mở</button><button class="nut-vien nho" id="cdBoThuMucVideoAnh" title="Bỏ thư mục riêng">Bỏ</button></div></div>
-          <div class="dong-cong-tac"><div><b>Chạy xong thì tự xoá chat Muse</b><small>Chạy hết hàng chờ → xoá đoạn chat trên muse.ai của các việc đã xong (file đã tải vẫn giữ, không khôi phục được chat).</small></div><label class="cong-tac"><input type="checkbox" id="cdXoaChat"><span></span></label></div>
-          <div class="dong-cong-tac"><div><b>Chạy xong thì tự xoá dự án Flow</b><small>Chạy hết hàng chờ → xoá dự án Google Flow mà các tài khoản Flow vừa dùng (không khôi phục được); lần chạy sau app tự mở dự án mới.</small></div><label class="cong-tac"><input type="checkbox" id="cdXoaDuAnFlow"><span></span></label></div>
+          <div class="dong-cong-tac"><div><b>Chạy xong thì tự xoá chat Muse</b><span class="ap ap-anh-video">Ảnh · Video</span><small>Chạy hết hàng chờ → xoá đoạn chat trên muse.ai của các việc đã xong (file đã tải vẫn giữ, không khôi phục được chat).</small></div><label class="cong-tac"><input type="checkbox" id="cdXoaChat"><span></span></label></div>
+          <div class="dong-cong-tac"><div><b>Chạy xong thì tự xoá dự án Flow</b><span class="ap ap-anh-video">Ảnh · Video</span><small>Chạy hết hàng chờ → xoá dự án Google Flow mà các tài khoản Flow vừa dùng (không khôi phục được); lần chạy sau app tự mở dự án mới.</small></div><label class="cong-tac"><input type="checkbox" id="cdXoaDuAnFlow"><span></span></label></div>
         </div>
         <div class="the-cai" id="cdDriveThe">
           <h3><i data-icon="cloud-upload"></i>Google Drive</h3>
-          <div class="dong-cong-tac"><div><b>Ảnh / video xong thì tự đưa lên Google Drive</b><small>Trên Drive tự có thư mục <code>&lt;Tên dự án&gt;/images</code> cho ảnh và <code>&lt;Tên dự án&gt;/Videos</code> cho video. Bật lên thì app tự tắt <b>Tải ảnh về</b> / <b>Tải video về</b>: file giữ trong app (thư mục tạm riêng từng dự án) rồi đưa lên Drive, không lưu lẫn vào thư mục máy.</small></div><label class="cong-tac"><input type="checkbox" id="cdDrive"><span></span></label></div>
+          <div class="dong-cong-tac"><div><b>Ảnh / video xong thì tự đưa lên Google Drive</b><span class="ap ap-anh-video">Ảnh · Video</span><small>Trên Drive tự có thư mục <code>&lt;Tên dự án&gt;/images</code> cho ảnh và <code>&lt;Tên dự án&gt;/Videos</code> cho video. Bật lên thì app tự tắt <b>Tải ảnh về</b> / <b>Tải video về</b>: file giữ trong app (thư mục tạm riêng từng dự án) rồi đưa lên Drive, không lưu lẫn vào thư mục máy.</small></div><label class="cong-tac"><input type="checkbox" id="cdDrive"><span></span></label></div>
           <label class="o-drive-cach">Cách đưa lên<select id="cdDriveCach">
             <option value="may">Chép vào thư mục Google Drive trên máy (Drive cho máy tính tự tải lên)</option>
             <option value="web">Tải thẳng lên drive.google.com bằng trình duyệt trong app</option>
@@ -425,50 +460,50 @@
           <h3><i data-icon="sparkles"></i>Google Flow</h3>
           <small class="mo">Tải về và đặt tên file do app tự lo (theo mẫu tên chung ở Cài đặt nâng cao của trang Tạo). Chạy nhiều tài khoản Flow cùng lúc: chọn ở nút tài khoản cạnh tên dự án.</small>
           <div class="luoi-3">
-            <label>Số tab mỗi tài khoản Flow<input type="number" id="fTab" min="1" max="4"></label>
-            <label>Mỗi mẻ giao Flow tối đa (prompt)<input type="number" id="fMe" min="1" max="50"></label>
-            <label>Số kết quả mỗi prompt<select id="fSoLuong"><option>1</option><option>2</option><option>3</option><option>4</option></select></label>
-            <label>Chờ giữa 2 prompt — từ (giây)<input type="number" id="fChoMin" min="1" max="600"></label>
-            <label>đến (giây)<input type="number" id="fChoMax" min="1" max="600"></label>
-            <label>Thử lại cùng tài khoản (lần), rồi sang tài khoản khác<input type="number" id="fThuLai" min="0" max="10"></label>
-            <label>Giãn nhịp bấm Tạo giữa các tab (giây)<input type="number" id="fGian" min="0" max="600"></label>
-            <label>Chất lượng ảnh tải về<select id="fChatAnh"><option value="img_1k">1K (kích thước gốc, không tốn tín dụng)</option><option value="img_2k">2K (Flow tăng độ phân giải, tốn tín dụng)</option><option value="img_4k">4K (tốn tín dụng)</option></select></label>
-            <label>Chất lượng video tải về<select id="fChatVideo"><option value="720p">720p</option><option value="1080p">1080p</option><option value="4k">4K</option></select></label>
-            <label>Khi nghi mất mạng<select id="fMang"><option value="auto">Gọi thử Flow rồi mới dừng</option><option value="off">Bỏ qua, không dừng</option></select></label>
+            <label>Số tab mỗi tài khoản Flow<span class="ap ap-anh-video">Ảnh · Video</span><input type="number" id="fTab" min="1" max="4"></label>
+            <label>Mỗi mẻ giao Flow tối đa (prompt)<span class="ap ap-anh-video">Ảnh · Video</span><input type="number" id="fMe" min="1" max="50"></label>
+            <label>Số kết quả mỗi prompt<span class="ap ap-anh-video">Ảnh · Video</span><select id="fSoLuong"><option>1</option><option>2</option><option>3</option><option>4</option></select></label>
+            <label>Chờ giữa 2 prompt — từ (giây)<span class="ap ap-anh-video">Ảnh · Video</span><input type="number" id="fChoMin" min="1" max="600"></label>
+            <label>đến (giây)<span class="ap ap-anh-video">Ảnh · Video</span><input type="number" id="fChoMax" min="1" max="600"></label>
+            <label>Thử lại cùng tài khoản (lần), rồi sang tài khoản khác<span class="ap ap-anh-video">Ảnh · Video</span><input type="number" id="fThuLai" min="0" max="10"></label>
+            <label>Giãn nhịp bấm Tạo giữa các tab (giây)<span class="ap ap-anh-video">Ảnh · Video</span><input type="number" id="fGian" min="0" max="600"></label>
+            <label>Chất lượng ảnh tải về<span class="ap ap-anh">Chỉ ảnh</span><select id="fChatAnh"><option value="img_1k">1K (kích thước gốc, không tốn tín dụng)</option><option value="img_2k">2K (Flow tăng độ phân giải, tốn tín dụng)</option><option value="img_4k">4K (tốn tín dụng)</option></select></label>
+            <label>Chất lượng video tải về<span class="ap ap-video">Chỉ video</span><select id="fChatVideo"><option value="720p">720p</option><option value="1080p">1080p</option><option value="4k">4K</option></select></label>
+            <label>Khi nghi mất mạng<span class="ap ap-anh-video">Ảnh · Video</span><select id="fMang"><option value="auto">Gọi thử Flow rồi mới dừng</option><option value="off">Bỏ qua, không dừng</option></select></label>
           </div>
-          <div class="dong-cong-tac"><div><b>Ngẫu nhiên thời gian chờ</b><small>Tắt: luôn chờ đúng số "từ".</small></div><label class="cong-tac"><input type="checkbox" id="fNgauNhien"><span></span></label></div>
-          <div class="dong-cong-tac"><div><b>Thêm số thứ tự vào đầu câu lệnh gửi Flow</b><small>Gắn số việc (vd "#964.") vào đầu prompt; khi tải, app chỉ tìm đúng số đó nên không tải lại video cũ cùng prompt.</small></div><label class="cong-tac"><input type="checkbox" id="fSoThuTu"><span></span></label></div>
-          <div class="dong-cong-tac"><div><b>Cuộn trang ngẫu nhiên giữa các lần tạo</b></div><label class="cong-tac"><input type="checkbox" id="fCuon"><span></span></label></div>
-          <div class="dong-cong-tac"><div><b>Gỡ ảnh tham chiếu bị dính</b><small>Ô nhập còn ảnh của prompt trước thì gỡ trước khi dán (mẻ không gắn ảnh).</small></div><label class="cong-tac"><input type="checkbox" id="fGoAnh"><span></span></label></div>
-          <div class="dong-cong-tac"><div><b>Đổi tên kết quả trên Flow theo mã việc</b><small>Cần cho "ảnh Flow → video Flow" cùng tài khoản khỏi tải ảnh lên lại.</small></div><label class="cong-tac"><input type="checkbox" id="fDoiTen"><span></span></label></div>
-          <div class="dong-cong-tac"><div><b>Tự bấm "Tôi đồng ý" ở hộp "Quyền sử dụng hình ảnh này"</b><small>Flow hỏi khi một tài khoản tải ảnh lên lần đầu; chưa đồng ý thì ảnh không vào kho. Bật là bạn xác nhận với Google bạn có quyền với mọi ảnh app tải lên.</small></div><label class="cong-tac"><input type="checkbox" id="fDongY"><span></span></label></div>
-          <div class="dong-cong-tac"><div><b>Nghỉ giữa các thao tác</b><small>Nghỉ ngẫu nhiên trước khi nhập, bấm Tạo, đổi tên, tải về.</small></div><label class="cong-tac"><input type="checkbox" id="fNghiTT"><span></span></label></div>
+          <div class="dong-cong-tac"><div><b>Ngẫu nhiên thời gian chờ</b><span class="ap ap-anh-video">Ảnh · Video</span><small>Tắt: luôn chờ đúng số "từ".</small></div><label class="cong-tac"><input type="checkbox" id="fNgauNhien"><span></span></label></div>
+          <div class="dong-cong-tac"><div><b>Thêm số thứ tự vào đầu câu lệnh gửi Flow</b><span class="ap ap-anh-video">Ảnh · Video</span><small>Gắn số việc (vd "#964.") vào đầu prompt; khi tải, app chỉ tìm đúng số đó nên không tải lại video cũ cùng prompt.</small></div><label class="cong-tac"><input type="checkbox" id="fSoThuTu"><span></span></label></div>
+          <div class="dong-cong-tac"><div><b>Cuộn trang ngẫu nhiên giữa các lần tạo</b><span class="ap ap-anh-video">Ảnh · Video</span></div><label class="cong-tac"><input type="checkbox" id="fCuon"><span></span></label></div>
+          <div class="dong-cong-tac"><div><b>Gỡ ảnh tham chiếu bị dính</b><span class="ap ap-anh-video">Ảnh · Video</span><small>Ô nhập còn ảnh của prompt trước thì gỡ trước khi dán (mẻ không gắn ảnh).</small></div><label class="cong-tac"><input type="checkbox" id="fGoAnh"><span></span></label></div>
+          <div class="dong-cong-tac"><div><b>Đổi tên kết quả trên Flow theo mã việc</b><span class="ap ap-anh-video">Ảnh · Video</span><small>Cần cho "ảnh Flow → video Flow" cùng tài khoản khỏi tải ảnh lên lại.</small></div><label class="cong-tac"><input type="checkbox" id="fDoiTen"><span></span></label></div>
+          <div class="dong-cong-tac"><div><b>Tự bấm "Tôi đồng ý" ở hộp "Quyền sử dụng hình ảnh này"</b><span class="ap ap-anh-video">Ảnh · Video</span><small>Flow hỏi khi một tài khoản tải ảnh lên lần đầu; chưa đồng ý thì ảnh không vào kho. Bật là bạn xác nhận với Google bạn có quyền với mọi ảnh app tải lên.</small></div><label class="cong-tac"><input type="checkbox" id="fDongY"><span></span></label></div>
+          <div class="dong-cong-tac"><div><b>Nghỉ giữa các thao tác</b><span class="ap ap-anh-video">Ảnh · Video</span><small>Nghỉ ngẫu nhiên trước khi nhập, bấm Tạo, đổi tên, tải về.</small></div><label class="cong-tac"><input type="checkbox" id="fNghiTT"><span></span></label></div>
           <div class="luoi-3">
-            <label>Nghỉ thao tác từ (giây)<input type="number" id="fNghiTTMin" min="0" max="60" step="0.5"></label>
-            <label>đến (giây)<input type="number" id="fNghiTTMax" min="0" max="60" step="0.5"></label>
+            <label>Nghỉ thao tác từ (giây)<span class="ap ap-anh-video">Ảnh · Video</span><input type="number" id="fNghiTTMin" min="0" max="60" step="0.5"></label>
+            <label>đến (giây)<span class="ap ap-anh-video">Ảnh · Video</span><input type="number" id="fNghiTTMax" min="0" max="60" step="0.5"></label>
           </div>
           <h4>Model</h4>
           <div class="luoi-3">
-            <label>Model ảnh<select id="fModelAnh"></select></label>
-            <label>Model video chính<select id="fModelChinh"></select></label>
-            <label>Model video phụ (xen kẽ)<select id="fModelPhu"></select></label>
-            <label>Cứ mấy prompt thì một prompt dùng model phụ<input type="number" id="fXenKe" min="0" max="50"></label>
-            <label>Model dự phòng khi Lower Priority bị chặn<select id="fModelDuPhong"></select></label>
-            <label>Tránh Lower Priority (phút, tăng dần)<input type="number" id="fThuLaiPhut" min="5" max="240"></label>
+            <label>Model ảnh<span class="ap ap-anh">Chỉ ảnh</span><select id="fModelAnh"></select></label>
+            <label>Model video chính<span class="ap ap-video">Chỉ video</span><select id="fModelChinh"></select></label>
+            <label>Model video phụ (xen kẽ)<span class="ap ap-video">Chỉ video</span><select id="fModelPhu"></select></label>
+            <label>Cứ mấy prompt thì một prompt dùng model phụ<span class="ap ap-video">Chỉ video</span><input type="number" id="fXenKe" min="0" max="50"></label>
+            <label>Model dự phòng khi Lower Priority bị chặn<span class="ap ap-video">Chỉ video</span><select id="fModelDuPhong"></select></label>
+            <label>Tránh Lower Priority (phút, tăng dần)<span class="ap ap-video">Chỉ video</span><input type="number" id="fThuLaiPhut" min="5" max="240"></label>
           </div>
           <small class="mo">Danh sách theo các model Flow đang có (28/09/2026). App chọn model trên Flow trước mỗi mẻ; Flow không còn model nào thì nhật ký báo và giữ nguyên model trên trang.</small>
           <h4>Tài khoản lỗi</h4>
           <div class="luoi-3">
-            <label>Mấy prompt khác nhau hỏng liền nhau thì đổi tài khoản<input type="number" id="fNguong" min="1" max="10"></label>
-            <label>Tài khoản lỗi nghỉ (phút)<input type="number" id="fNghi" min="1" max="240"></label>
+            <label>Mấy prompt khác nhau hỏng liền nhau thì đổi tài khoản<span class="ap ap-anh-video">Ảnh · Video</span><input type="number" id="fNguong" min="1" max="10"></label>
+            <label>Tài khoản lỗi nghỉ (phút)<span class="ap ap-anh-video">Ảnh · Video</span><input type="number" id="fNghi" min="1" max="240"></label>
           </div>
           <small class="mo">Luôn bật. Flow báo "hoạt động bất thường" / "quá nhiều yêu cầu" / hết tín dụng → đổi tài khoản ngay từ lỗi đầu tiên. Không đọc được câu đó thì đếm prompt hỏng liền nhau (một prompt thử lại nhiều lần vẫn tính là một, có prompt xong thì đếm lại từ đầu). Tài khoản lỗi nghỉ theo số phút trên (bị lại thì nghỉ gấp đôi, tối đa 4 lần), việc của nó sang ngay tài khoản khác của dự án; dự án không còn tài khoản Flow nào khác thì tài khoản đó tạm dừng rồi tự chạy lại.</small>
         </div>
         <div class="the-cai">
           <h3><i data-icon="file-text"></i>Mẫu câu lệnh gửi Muse</h3>
           <small class="mo">{prompt} = prompt của bạn · {tyLe} = tỷ lệ khung · {thamChieu} = dòng giải thích ảnh đính kèm (tự sinh).</small>
-          <label>Ảnh<textarea id="cdMauAnh" rows="3"></textarea></label>
-          <label>Video<textarea id="cdMauVideo" rows="3"></textarea></label>
+          <label>Ảnh<span class="ap ap-anh">Chỉ ảnh</span><textarea id="cdMauAnh" rows="3"></textarea></label>
+          <label>Video<span class="ap ap-video">Chỉ video</span><textarea id="cdMauVideo" rows="3"></textarea></label>
           <button class="nut-vien nho" id="cdMauGoc"><i data-icon="rotate-ccw"></i>Trả về mẫu gốc</button>
         </div>
         <div class="the-cai">

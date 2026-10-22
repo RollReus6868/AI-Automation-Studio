@@ -78,6 +78,7 @@ const CAI_DAT_MAC_DINH = {
   // 1.4.0: ảnh / video xong → đưa lên Google Drive (<Drive>/<Tên dự án>/images | Videos), hai cách:
   //   'may' = chép vào thư mục Google Drive trên máy (Drive cho máy tính tự tải lên) — thuMucDrive;
   //   'web' = tải thẳng lên drive.google.com bằng trình duyệt trong app, tài khoản Drive driveTk.
+  boQuaDaCo: false,       // 1.4.2: thêm prompt → bỏ qua số đã có file trong thư mục lưu (quét thư mục)
   driveBat: false,
   driveCach: 'may',
   thuMucDrive: '',
@@ -106,6 +107,7 @@ function chuanCaiDat(c, flowGoc, flowMoi) {
   m.thuMucVideo = String(m.thuMucVideo || '').trim();
   m.thuMucVideoAnh = String(m.thuMucVideoAnh || '').trim();
   m.thuMucNhac = String(m.thuMucNhac || '').trim();
+  m.boQuaDaCo = !!m.boQuaDaCo;
   m.driveBat = !!m.driveBat; m.thuMucDrive = String(m.thuMucDrive || '').trim();
   m.driveCach = m.driveCach === 'web' ? 'web' : 'may'; m.driveTk = String(m.driveTk || ''); m.nheMay = m.nheMay !== false;
   m.tenNhac = String(m.tenNhac || '').trim() || hd.MAU_TEN_ANH_MAC_DINH;
@@ -468,15 +470,15 @@ class DieuPhoi {
    *            nhanVatIds:[...] (chế độ Người mẫu), tuNhanVat:bool, soBan, hauTo,
    *            chuoiVideo:{prompt, tyLe} (ảnh xong → tự tạo video từ ảnh đó), chay:bool }
    */
-  them(p) {
+  /** Đọc phần chung của lệnh thêm việc: dự án, prompt được chọn, loại, nơi chạy, chuỗi ảnh → video. */
+  _docThem(p) {
     const d = this.duAn.find((x) => x.id === p.duAn) || this.duAn[0];
     const tatCa = (p.prompts || []).map((x) => String(x).trim()).filter(Boolean);
-    if (!tatCa.length) return { ok: false, loi: 'Chưa có prompt nào' };
+    if (!tatCa.length) return { loi: 'Chưa có prompt nào' };
     // 1.3.0: ô "Chạy prompt số" (vd "98, 303, 305-350"); bài kiểm / bản cũ vẫn gửi tuSo / denSo.
     const coSo = String(p.chonSo || '').trim();
     const chon = coSo ? hd.chonTheoSo(tatCa, coSo) : hd.chonKhoang(tatCa, p.tuSo, p.denSo);
-    if (!chon.length) return { ok: false, loi: `Số prompt không hợp lệ (chỉ có ${tatCa.length} prompt)` };
-    const soBan = Math.max(1, Math.min(10, parseInt(p.soBan, 10) || 1));
+    if (!chon.length) return { loi: `Số prompt không hợp lệ (chỉ có ${tatCa.length} prompt)` };
     // Suno chỉ tạo nhạc, và nhạc chỉ tạo ở Suno.
     const nen = p.loai === 'nhac' ? 'suno' : chuanNen(p.nen) === 'flow' ? 'flow' : 'muse';
     const loai = nen === 'suno' ? 'nhac' : p.loai === 'video' ? 'video' : 'anh';
@@ -484,7 +486,125 @@ class DieuPhoi {
     const cv = p.chuoiVideo && String(p.chuoiVideo.prompt || '').trim() && loai === 'anh'
       ? { prompt: String(p.chuoiVideo.prompt).trim(), tyLe: hd.TY_LE.includes(p.chuoiVideo.tyLe) ? p.chuoiVideo.tyLe : '',
         nen: p.chuoiVideo.nen === 'flow' || p.chuoiVideo.nen === 'muse' ? p.chuoiVideo.nen : nen } : null;
+    return { d, tatCa, chon, nen, loai, cv };
+  }
+
+  /**
+   * 1.4.2 — Quét thư mục lưu của dự án: prompt nào ĐÃ CÓ kết quả thì khỏi làm lại (lần chạy trước bị dừng / mất lịch sử,
+   * thư mục còn 001…261 nhưng thiếu 253, 254…). Một số được coi là đã có khi: thư mục lưu có file khớp mẫu tên của số
+   * đó; hoặc dự án có việc cùng loại, cùng số đang chờ / đang chạy / đã xong mà file còn. Trang Tạo ảnh có "Ảnh xong →
+   * tự tạo video": ảnh đã có mà video chưa có → chỉ tạo video từ ảnh có sẵn.
+   * → {ok, thuMuc, coSan:[stt], dangCho:[stt], thieu:[stt], chiVideo:[{stt, anh}]}
+   */
+  quetDaCo(p) {
+    const r = this._docThem(p);
+    if (r.loi) return { ok: false, loi: r.loi };
+    const { d, chon, loai, cv } = r;
+    const c = this.cd(d.id);
+    // Danh sách file mỗi thư mục (đọc một lần) + chỉ mục theo tên bỏ đuôi / " (2)" / "_2" để thư mục hàng chục nghìn
+    // file vẫn quét nhanh (không thử biểu thức với từng file cho từng prompt).
+    const ds = new Map();
+    const dsFile = (thuMuc) => {
+      if (!ds.has(thuMuc)) {
+        const tep = (this.o.dsFile && this.o.dsFile(thuMuc)) || [];
+        const chiMuc = new Map();
+        for (const f of tep) {
+          const b = f.replace(/\.[^./]+$/, '').toLowerCase(), b1 = b.replace(/_\d+$/, '');
+          for (const k of new Set([b, b1, b.replace(/ \(\d+\)$/, ''), b1.replace(/ \(\d+\)$/, '')])) {
+            if (!chiMuc.has(k)) chiMuc.set(k, []);
+            chiMuc.get(k).push(f);
+          }
+        }
+        ds.set(thuMuc, { tep, chiMuc });
+      }
+      return ds.get(thuMuc);
+    };
+    const tai = (l) => l === 'nhac' || (l === 'video' ? c.taiVideo : c.taiAnh);
+    const noiLuu = (l) => (tai(l) ? this.thuMucRa(l, d.id) : this.thuMucTamDuAn(d.id));
+    const mauCua = (l) => (l === 'nhac' ? c.tenNhac : l === 'video' ? c.tenVideo : c.tenAnh);
+    /** File đã có của (loại, số) trong thư mục `goc` theo `mau` ('' = chưa có). */
+    const timFile = (l, viec, goc, mau) => {
+      const job = { loai: l, so: viec.stt, ...viec };
+      const re = hd.mauKhopFile(d, job, l, mau);
+      const { tep, chiMuc } = dsFile(goc);
+      // Mẫu có {ngay} → không biết trước tên, thử từng file; còn lại tra chỉ mục theo đúng tên mong đợi.
+      const ung = /\{ngay\}/.test(String(mau || '')) ? tep
+        : chiMuc.get(hd.tenFile(d, job, 'image/png', 0, mau).replace(/\.[^./]+$/, '').toLowerCase()) || [];
+      const f = ung.find((x) => re.test(x));
+      return f ? path.join(goc, ...f.split('/')) : '';
+    };
+    /** Việc cùng loại, cùng số trong dự án: 'cho' (đang chờ / chạy / dừng), file còn của việc đã xong, hoặc ''. */
+    const theoSo = new Map();
+    for (const j of this.viec) {
+      if (j.duAn !== d.id) continue;
+      const k = `${j.loai}#${j.stt}`;
+      if (!theoSo.has(k)) theoSo.set(k, []);
+      theoSo.get(k).push(j);
+    }
+    const viecCo = (l, stt) => {
+      let f = '';
+      for (const j of theoSo.get(`${l}#${stt}`) || []) {
+        if (j.trangThai === 'cho' || j.trangThai === 'chay' || j.trangThai === 'dung') return { cho: true };
+        if (j.trangThai === 'xong' && j.files && j.files[0] && this.o.tonTai(j.files[0])) f = f || j.files[0];
+      }
+      return { file: f };
+    };
+    /** Video nối từ ảnh `anh` được lưu ở đâu / tên gì — như _ketThucViec. */
+    const noiVideoTuAnh = (anh) => {
+      if (!tai('video')) return { goc: this.thuMucTamDuAn(d.id), mau: c.tenVideo };
+      if (d.thuMucVideoAnh) return { goc: d.thuMucVideoAnh, mau: '{tenAnh}' };
+      if (c.videoCanhAnh) return { goc: path.dirname(anh), mau: '{tenAnh}' };
+      if (c.thuMucVideoAnh) return { goc: c.thuMucVideoAnh, mau: '{tenAnh}' };
+      return { goc: this.thuMucRa('video', d.id), mau: c.tenVideo };
+    };
+    const kq = { ok: true, thuMuc: noiLuu(loai), coSan: [], dangCho: [], thieu: [], chiVideo: [] };
+    for (const { prompt, stt } of chon) {
+      const tham = [...(p.thamChieu || []), ...((p.thamChieuTheoDong && p.thamChieuTheoDong[stt - 1]) || [])];
+      const v = viecCo(loai, stt);
+      if (v.cho) { kq.dangCho.push(stt); continue; }
+      const f = v.file || timFile(loai, { stt, prompt, thamChieu: tham }, noiLuu(loai), mauCua(loai));
+      if (!f) { kq.thieu.push(stt); continue; }
+      if (cv) {
+        const vv = viecCo('video', stt);
+        if (vv.cho) { kq.dangCho.push(stt); continue; }
+        const nv = noiVideoTuAnh(f);
+        if (!vv.file && !timFile('video', { stt, prompt: cv.prompt, thamChieu: [f] }, nv.goc, nv.mau)) {
+          kq.chiVideo.push({ stt, anh: f });
+          continue;
+        }
+      }
+      kq.coSan.push(stt);
+    }
+    return kq;
+  }
+
+  them(p) {
+    const r = this._docThem(p);
+    if (r.loi) return { ok: false, loi: r.loi };
+    const { d, tatCa, nen, loai, cv } = r;
+    let { chon } = r;
+    const soBan = Math.max(1, Math.min(10, parseInt(p.soBan, 10) || 1));
+    // 1.4.2: "Bỏ qua số đã có file trong thư mục" (gửi kèm, hoặc theo cài đặt dự án).
+    const boQua = p.boQuaDaCo !== undefined ? !!p.boQuaDaCo : !!this.cd(d.id).boQuaDaCo;
+    let q = null;
+    if (boQua) {
+      q = this.quetDaCo(p);
+      const thieu = new Set(q.thieu);
+      chon = chon.filter((x) => thieu.has(x.stt));
+      if (!chon.length && !q.chiVideo.length) {
+        const loi = `Mọi prompt được chọn đã có ${TEN_LOAI[loai]} trong thư mục${q.dangCho.length ? ' hoặc đang chờ trong hàng đợi' : ''} — không còn số nào cần làm`;
+        this.log('info', `🔎 "${d.ten}": ${loi} (đã có ${q.coSan.length}, đang chờ ${q.dangCho.length}).`);
+        return { ok: false, loi, boQua: q.coSan.length + q.dangCho.length };
+      }
+    }
     const moi = [];
+    for (const { stt, anh } of (q ? q.chiVideo : [])) {
+      // Ảnh đã có trong thư mục, video của nó chưa có → chỉ tạo video từ ảnh đó (lưu như video nối từ ảnh).
+      const v = this._viecMoi(d, { nen: cv.nen, loai: 'video', prompt: cv.prompt, stt, so: stt, tyLe: cv.tyLe || p.tyLe, thamChieu: [anh] });
+      v.anhCoSan = true;
+      v.henLoai = 'anh';
+      moi.push(v);
+    }
     for (const { prompt: pr, stt } of chon) {
       const text = p.hauTo ? `${pr} ${String(p.hauTo).trim()}` : pr;
       let nv = (p.nhanVatIds || []).filter((id) => this.nhanVat.some((n) => n.id === id));
@@ -496,11 +616,24 @@ class DieuPhoi {
     }
     this.viec.push(...moi);
     this.luu();
-    const khoang = chon.length < tatCa.length ? ` (prompt ${hd.gonSo(chon.map((x) => x.stt))})` : '';
-    this.log('info', `➕ Thêm ${moi.length} việc ${TEN_LOAI[loai]} ${TEN_NEN[nen]}${khoang} vào "${d.ten}"` +
-      (cv ? ` — ảnh xong sẽ tự tạo video ở ${TEN_NEN[cv.nen]}` : ''));
+    if (q) {
+      // Số bị bỏ sót (nhỏ hơn số lớn nhất đã có) làm trước, rồi làm tiếp các prompt chưa làm — hàng đợi theo thứ tự số.
+      const cao = Math.max(0, ...q.coSan, ...q.chiVideo.map((x) => x.stt));
+      const lo = chon.filter((x) => x.stt < cao).map((x) => x.stt), sau = chon.filter((x) => x.stt > cao).map((x) => x.stt);
+      this.log('info', `🔎 Quét thư mục "${q.thuMuc}": đã có ${q.coSan.length}${q.dangCho.length ? `, đang chờ ${q.dangCho.length}` : ''} → bỏ qua` +
+        `${q.coSan.length + q.dangCho.length ? ` (số ${hd.gonSo([...q.coSan, ...q.dangCho].sort((a, b) => a - b))})` : ''}; làm ${chon.length} số còn thiếu` +
+        `${lo.length ? ` — bị sót ${lo.length} (số ${hd.gonSo(lo)})` : ''}${sau.length ? `${lo.length ? ', rồi' : ' —'} làm tiếp ${sau.length} prompt chưa làm (số ${hd.gonSo(sau)})` : ''}` +
+        `${q.chiVideo.length ? ` + ${q.chiVideo.length} video từ ảnh có sẵn (số ${hd.gonSo(q.chiVideo.map((x) => x.stt))})` : ''}.`);
+    }
+    const nAnh = moi.length - (q ? q.chiVideo.length : 0);
+    const khoang = chon.length < tatCa.length ? ` (prompt ${chon.length ? hd.gonSo(chon.map((x) => x.stt)) : '—'})` : '';
+    if (nAnh) {
+      this.log('info', `➕ Thêm ${nAnh} việc ${TEN_LOAI[loai]} ${TEN_NEN[nen]}${khoang} vào "${d.ten}"` +
+        (cv ? ` — ảnh xong sẽ tự tạo video ở ${TEN_NEN[cv.nen]}` : ''));
+    }
+    if (q && q.chiVideo.length) this.log('info', `➕ Thêm ${q.chiVideo.length} việc video ${TEN_NEN[cv.nen]} từ ảnh đã có vào "${d.ten}"`);
     if (p.chay) this.chayDuAn(d.id);
-    return { ok: true, so: moi.length };
+    return { ok: true, so: moi.length, boQua: q ? q.coSan.length + q.dangCho.length : 0 };
   }
 
   /** Số thứ tự RIÊNG theo loại (1.3.0): 350 ảnh là #1–#350, video cũng đếm từ #1. `so` cho trước (video
@@ -1553,7 +1686,7 @@ class DieuPhoi {
         // đặt thư mục ảnh riêng mà video vẫn vào thư mục mặc định thì tưởng video không được tải về
         // (nhật ký 15/10/2026: ảnh "325.jpg", video "Mac_dinh\Mac_dinh_270.mp4" ở chỗ khác).
         // 1.0.4: tắt "cạnh ảnh" mà đã chọn thư mục riêng cho video nối từ ảnh → lưu vào đó, vẫn cùng tên ảnh.
-        if (video && j.tuAnh && tai) {
+        if (video && (j.tuAnh || j.anhCoSan) && tai) {   // 1.4.2: video từ ảnh đã có trong thư mục lưu như video nối từ ảnh
           const anhNguon = (j.thamChieu || []).slice(-1)[0] || '';
           // 1.2.9: dự án đã chọn thư mục riêng (trang Tạo ảnh → Ảnh xong → tự tạo video) → ưu tiên hơn cài đặt chung.
           if (d.thuMucVideoAnh) {

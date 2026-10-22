@@ -455,6 +455,8 @@
     $('#boThuMucVideoDuAn').hidden = !tmDa;
     if (document.activeElement !== $('#luongNhanh')) $('#luongNhanh').value = S.caiDat.luongMoiTK;
     veTaiVe();
+    $('#boQuaDaCo').checked = !!S.caiDat.boQuaDaCo;
+    $('#quetGhiAnh').hidden = loaiTrang() !== 'anh' || !U.chuoi.bat;
     $('#tachPrompt').value = S.caiDat.tachPrompt;
     for (const b of $$('#cheDo button')) b.classList.toggle('on', b.dataset.v === U.cheDo);
     $('#khuNguoiMau').hidden = U.cheDo !== 'nguoimau';
@@ -777,16 +779,17 @@
     const nen = nenTrang();
     if (!S.taiKhoan.some((a) => nenTk(a) === nen)) { toast(`Chưa có tài khoản ${TEN_NEN[nen]} — vào mục Tài khoản để thêm và đăng nhập`, true); return null; }
     // Nhạc Suno: chỉ prompt (ô Styles) — không ảnh, nhân vật, tỷ lệ hay chuỗi video.
-    if (loai === 'nhac') return { nen, loai, soBan: $('#soBan').value, hauTo: $('#hauTo').value, chonSo: $('#chonSo').value };
+    if (loai === 'nhac') return { nen, loai, soBan: $('#soBan').value, hauTo: $('#hauTo').value, chonSo: $('#chonSo').value, boQuaDaCo: $('#boQuaDaCo').checked };
     return {
       nen, loai, tyLe: U.tyLe[loai], thamChieu: TC().ds, thamChieuTheoDong: theoDong,
       nhanVatIds: U.cheDo === 'nguoimau' ? [...U.nvChon] : [], tuNhanVat: $('#tuNhanVat').checked,
       soBan: $('#soBan').value, hauTo: $('#hauTo').value, chonSo: $('#chonSo').value,
-      chuoiVideo: chuoi
+      chuoiVideo: chuoi, boQuaDaCo: $('#boQuaDaCo').checked
     };
   }
 
-  async function taoViec(chay) {
+  /** Danh sách prompt của cột Tạo (video từ thư mục ảnh: mỗi ảnh một prompt chung). */
+  function promptCotTao() {
     const loai = loaiTrang();
     let prompts = HD.tachPrompt($('#oPrompt').value, $('#tachPrompt').value);
     // Video từ thư mục ảnh: ô prompt dùng chung (hoặc ô Prompt có 0–1 prompt) → mỗi ảnh một video cùng prompt.
@@ -795,6 +798,30 @@
       const p0 = chung || prompts[0] || HD.PROMPT_VIDEO_MAC_DINH;
       prompts = TC().thuMuc.anh.map(() => p0);
     }
+    return prompts;
+  }
+
+  /** 1.4.2: xem trước số nào đã có file trong thư mục lưu, số nào còn thiếu. */
+  async function quetThuMuc() {
+    const prompts = promptCotTao();
+    if (!prompts.length) { toast('Chưa có prompt nào — dán prompt rồi bấm Quét', true); $('#oPrompt').focus(); return; }
+    const ts = await thamSoTao(prompts, false);
+    if (!ts) return;
+    $('#ghiQuet').textContent = 'Đang quét…';
+    const q = await api.call('quetDaCo', { ...ts, duAn: U.duAn, prompts });
+    if (!q || !q.ok) { $('#ghiQuet').textContent = (q && q.loi) || 'Không quét được'; return; }
+    const ds = (a) => (a.length ? ` (${HD.gonSo(a)})` : '');
+    const xem = (a) => HD.gonSo(a).split(', ').slice(0, 12).join(', ') + (HD.gonSo(a).split(', ').length > 12 ? '…' : '');
+    const v = q.chiVideo.map((x) => x.stt);
+    $('#ghiQuet').textContent = `Đã có ${q.coSan.length}` + (q.dangCho.length ? ` · đang chờ ${q.dangCho.length}` : '') +
+      ` · còn thiếu ${q.thieu.length}${q.thieu.length ? ` (${xem(q.thieu)})` : ''}` + (v.length ? ` · thiếu video ${v.length} (${xem(v)})` : '') +
+      ($('#boQuaDaCo').checked ? '' : ' — bật công tắc trên để chỉ làm số còn thiếu');
+    $('#ghiQuet').title = `Thư mục: ${q.thuMuc}\nĐã có${ds(q.coSan)}\nĐang chờ${ds(q.dangCho)}\nCòn thiếu${ds(q.thieu)}\nThiếu video${ds(v)}`;
+  }
+
+  async function taoViec(chay) {
+    const loai = loaiTrang();
+    const prompts = promptCotTao();
     if (!prompts.length) { toast('Chưa có prompt nào', true); $('#oPrompt').focus(); return; }
     const ts = await thamSoTao(prompts, true);
     if (!ts) return;
@@ -802,7 +829,7 @@
     if (!r || !r.ok) { toast((r && r.loi) || 'Không thêm được', true); return; }
     $('#oPrompt').value = ''; U.nhap[loai] = ''; luuUi();
     U.loc = 'tat';
-    toast(`Đã thêm ${r.so} việc ${TEN_NEN[ts.nen]}${chay ? ' và bắt đầu chạy' : ' vào hàng đợi'}${ts.chuoiVideo ? ` — ảnh xong sẽ tự tạo video ở ${TEN_NEN[ts.chuoiVideo.nen]}` : ''}`);
+    toast(`Đã thêm ${r.so} việc ${TEN_NEN[ts.nen]}${r.boQua ? ` (bỏ qua ${r.boQua} số đã có)` : ''}${chay ? ' và bắt đầu chạy' : ' vào hàng đợi'}${ts.chuoiVideo ? ` — ảnh xong sẽ tự tạo video ở ${TEN_NEN[ts.chuoiVideo.nen]}` : ''}`);
   }
 
   /** Đặt lại hàng đợi đang xem (dự án + ảnh/video) về Chờ như lúc mới thêm — dùng chung "Tạo lại". */
@@ -1078,6 +1105,14 @@
   function veCaiDat() {
     if (!S) return;
     const c = S.caiDat;
+    // 1.4.2: thẻ "Lưu ảnh & video" — cột ảnh / cột video, cùng khoá với Cài đặt nâng cao của trang Tạo.
+    for (const l of ['anh', 'video']) {
+      const k = khoaTai(l);
+      $(`#lvTai_${l}`).checked = !!c[k.tai];
+      $(`#lvThuMuc_${l}`).value = S.thuMuc[l] || '';
+      if (document.activeElement !== $(`#lvTen_${l}`)) $(`#lvTen_${l}`).value = c[k.ten] || '';
+      viDuLuu(l);
+    }
     $('#cdLuong').value = c.luongMoiTK; $('#cdNghi').value = c.nghiGiuaLanGui; $('#cdThuLai').value = c.tuThuLai; $('#cdChayLaiLoi').value = c.tuChayLaiLoi;
     $('#cdChoAnh').value = c.choAnhGiay; $('#cdChoVideo').value = c.choVideoGiay; $('#cdChoChu').value = c.choChuGiay; $('#cdChoNhac').value = c.choNhacGiay;
     $('#cdPng').checked = !!c.png;
@@ -1151,6 +1186,12 @@
     const mau = { so: 83, stt: 5, prompt: 'Tranh truyện người que tối giản bố cục dọc', taoLuc: Date.now(), loai };
     $('#ncViDu').textContent = 'Ví dụ: ' + HD.tenFile(d, mau, { video: 'video/mp4', nhac: 'audio/mpeg' }[loai] || 'image/png', 0, $('#ncTen').value);
   }
+  /** Ví dụ tên file ở thẻ "Lưu ảnh & video" (Cài đặt). */
+  function viDuLuu(l) {
+    const d = duAnHienTai() || { ten: 'Mặc định' };
+    const mau = { so: 83, stt: 5, prompt: 'Tranh truyện người que tối giản bố cục dọc', taoLuc: Date.now(), loai: l };
+    $(`#lvViDu_${l}`).textContent = 'Ví dụ: ' + HD.tenFile(d, mau, l === 'video' ? 'video/mp4' : 'image/png', 0, $(`#lvTen_${l}`).value);
+  }
   /** Khối "Tải về & tên file" trong Cài đặt nâng cao: hiện đúng phần của trang đang mở (ảnh / video). */
   function veTaiVe() {
     const loai = loaiTrang(), v = loai === 'video', c = S.caiDat, ten = TEN_LOAI[loai];
@@ -1158,6 +1199,9 @@
     $('#ncNhanThuMuc').textContent = `Thư mục lưu ${ten}`;
     $('#ncNhanTen').firstChild.textContent = `Tên file ${ten}`;
     $('#ncTai').checked = v ? c.taiVideo : c.taiAnh;   // nhạc luôn tải về (công tắc ẩn)
+    // 1.4.2: nói rõ khối này áp dụng cho loại việc nào.
+    datHtml($('#ncApDung'), v ? 'Áp dụng cho <span class="ap ap-video">Chỉ video</span> mọi việc <b>Tạo video</b> của dự án này. Ảnh chỉnh ở trang Tạo ảnh (hoặc Cài đặt → Lưu ảnh &amp; video).'
+      : 'Áp dụng cho <span class="ap ap-anh">Chỉ ảnh</span> mọi việc <b>Tạo ảnh</b> của dự án này. Video chỉnh ở trang Tạo video (hoặc Cài đặt → Lưu ảnh &amp; video); video tự tạo từ ảnh lưu theo Cài đặt → Video tạo từ ảnh.');
     $('#ncThuMuc').value = S.thuMuc[loai];
     if (document.activeElement !== $('#ncTen')) $('#ncTen').value = c[khoaTai(loai).ten];
     $('#ncTen').placeholder = loai === 'nhac' ? '{stt}' : v ? HD.MAU_TEN_MAC_DINH : HD.MAU_TEN_ANH_MAC_DINH;
@@ -1543,6 +1587,15 @@
     // Cài đặt
     // Tải về & tên file (Cài đặt nâng cao của cột Tạo) — lưu ngay, theo trang ảnh / video.
     $('#ncTai').onchange = (e) => { if (khoaTai().tai) datCD({ [khoaTai().tai]: e.target.checked }); };
+    $('#boQuaDaCo').onchange = (e) => datCD({ boQuaDaCo: e.target.checked });   // 1.4.2
+    for (const l of ['anh', 'video']) {   // 1.4.2: thẻ "Lưu ảnh & video" ở Cài đặt — lưu ngay như Cài đặt nâng cao của trang Tạo
+      $(`#lvTai_${l}`).onchange = (e) => { datCD({ [khoaTai(l).tai]: e.target.checked }); toast(`Đã ${e.target.checked ? 'bật' : 'tắt'} tải ${TEN_LOAI[l]} về máy`); };
+      $(`#lvTen_${l}`).addEventListener('input', () => viDuLuu(l));
+      $(`#lvTen_${l}`).onchange = (e) => { datCD({ [khoaTai(l).ten]: e.target.value }); toast(`Đã lưu mẫu tên file ${TEN_LOAI[l]}`); };
+      $(`#lvChon_${l}`).onclick = async () => { const d = await api.call('chonThuMucRa', { loai: l, duAn: (duAnHienTai() || {}).id }); if (d) $(`#lvThuMuc_${l}`).value = d; };
+      $(`#lvMo_${l}`).onclick = () => api.call('moThuMuc', { dir: S.thuMuc[l] });
+    }
+    $('#nutQuet').onclick = () => quetThuMuc();
     $('#ncTen').addEventListener('input', viDuTen);
     $('#ncTen').onchange = (e) => { datCD({ [khoaTai().ten]: e.target.value }); toast('Đã lưu mẫu tên file'); };
     $('#ncChonThuMuc').onclick = async () => { const d = await api.call('chonThuMucRa', { loai: loaiTrang(), duAn: (duAnHienTai() || {}).id }); if (d) $('#ncThuMuc').value = d; };

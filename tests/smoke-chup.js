@@ -54,6 +54,12 @@ module.exports = function smoke({ win, app }) {
       await chup('caidat-flow');
       await js(`(() => { const c = document.querySelector('#cdFlow'); c.scrollIntoView({ block: 'end' }); })()`);
       await chup('caidat-flow-2');
+      // 1.4.2: thẻ "Lưu ảnh & video", nhãn áp dụng; cột Tạo có "Bỏ qua số đã có file".
+      await js(`document.querySelector('#cdLuuThe').scrollIntoView()`);
+      await chup('caidat-luu');
+      await js(`window.__diToi('anh')`);
+      await js(`(() => { document.querySelector('#nangCao').open = true; document.querySelector('#khuQuet').scrollIntoView(); })()`);
+      await chup('anh-quet');
       await js(`window.__diToi('anh')`);
       // Kiểm tràn ngang: phần tử nào thò ra ngoài cửa sổ.
       const tran = await js(`(() => { const W = innerWidth; return [...document.querySelectorAll('.app *')]
