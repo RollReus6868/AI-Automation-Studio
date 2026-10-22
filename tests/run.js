@@ -2065,7 +2065,19 @@ testAsync('1.3.4 Store ghi theo nhịp nhipMs (không ghi sớm hơn, vẫn ghi 
   testAsync('1.3.6 tới giờ dừng → luồng đang làm việc theo hẹn dừng, việc còn lại giữ Chờ; nút Dừng dự án bỏ dự án khỏi lượt hẹn', async () => {
     const daChay = [];
     let gio = luc('2026-10-18T22:00:00');
-    const tao = luongHen(daChay, 60);
+    // Video theo hẹn chạy tới khi bị bảo dừng (không phụ thuộc tốc độ máy: máy CI Windows chậm từng làm việc 60 ms xong
+    // trước giờ dừng → không còn luồng nào để dừng); ảnh xong ngay.
+    const tao = (a, stt, duAnId) => ({
+      id: `${a.id}-${stt}`, nen: a.nen, duAn: duAnId, ranh: true, viec: null, soDung: 0,
+      dung() { this.soDung++; this.biDung = true; if (this.xong) this.xong(); },
+      async chay(j) {
+        this.ranh = false; this.viec = j; this.biDung = false; daChay.push([j.loai, j.duAn, j.so]);
+        await new Promise((r) => { this.xong = r; if (j.loai !== 'video') setTimeout(r, 8); });
+        this.xong = null; this.ranh = true; this.viec = null;
+        if (this.biDung) return { ok: false, dung: true };
+        return { ok: true, files: [{ mime: j.loai === 'video' ? 'video/mp4' : 'image/png', b64: 'AA==' }] };
+      }
+    });
     const ds = [];
     const { dp, nhatKy } = dungDieuPhoi({ taoLuong: (a, s, d) => { const l = tao(a, s, d); ds.push(l); return l; }, bayGio: () => gio });
     dp.datCaiDat({ nghiGiuaLanGui: 0, luongMoiTK: 1 });
