@@ -52,6 +52,7 @@ function tuyCheDo(settings) {
  * @param o.log(muc, chu)
  * @param o.layCaiDat()   cài đặt Flow hiện hành (để đọc selector người dùng tự chỉ)
  * @param o.nghiTaiKhoan(accountId, ms, lyDo) → true nếu bộ điều phối đã lo (có dự phòng)
+ * @param o.nghiCaMay(ms, lyDo, truAccountId)  1.4.5: mọi tài khoản Flow khác nghỉ ms (cả máy bị báo bất thường)
  * @param o.thongBao(tieuDe, chu)
  */
 function taoMayFlow(o) {
@@ -64,6 +65,7 @@ function taoMayFlow(o) {
   let caiDatAnToan = anToan.chuanHoaCaiDat({});
   const soAnToan = new Map();
   const henChayLai = new Map();
+  const ganDayBatThuong = new Map();   // 1.4.5: accountId → lúc Flow báo "bất thường" gần nhất (cả máy nghỉ khi nhiều tài khoản dính)
   const khoa = (id) => id || '(khong-ro)';
 
   function soAnToanCua(accountId) {
@@ -114,11 +116,13 @@ function taoMayFlow(o) {
     if (moi.length) {
       for (const m of moi) so.promptLoi.add(`${tab.id}#${tab._meKhoa || 0}#${m.chiSo}`);
       if (moi.some((m) => m.chacChan)) so.coCauChan = true;
+      if (moi.some((m) => anToan.laCanhBaoChan(m.loi))) so.batThuong = true;
       if (await ghiLyDoTheLoi(tab, true)) so.coCauChan = true;
       if (!so.coCauChan) {
         const doc = await doCanhBaoTrenTrang(tab);
         if (doc && doc.co) {
           so.coCauChan = true;
+          so.batThuong = true;
           if (doc.viDu) so.cauChan = doc.viDu;
           log('error', `🚫 [${tab.id}] Flow đang báo: "${(doc.viDu || '').slice(0, 120)}"`);
         }
@@ -163,6 +167,17 @@ function taoMayFlow(o) {
     // Không còn tab nào đang chạy (các việc đã báo lỗi về điều phối, điều phối tự lo) → bỏ dấu lỗi, kẻo
     // mẻ SAU của tài khoản này bị đổi oan ngay từ bảng đầu tiên (e2e Flow mục 10).
     if (!ds.length) { anToan.xoaDauLoi(so); return; }
+    // 1.4.5: Flow nói "bất thường" / "quá nhiều yêu cầu" → nghỉ lâu (3 giờ, bị lại gấp đôi, tối đa 12 giờ); đủ
+    // CA_MAY_SO_TK tài khoản bị báo trong 30 phút → cả máy nghỉ Flow (mọi tài khoản chung máy, chung mạng).
+    const batThuong = so.batThuong || anToan.laCanhBaoChan(so.cauChan);
+    if (batThuong) ms = Math.max(ms, anToan.thoiGianNghiBatThuong(so.soLanBiChan, caiDatAnToan));
+    const caMay = batThuong && (ganDayBatThuong.set(khoa(accountId), Date.now()), anToan.canNghiCaMay(ganDayBatThuong, Date.now()));
+    const nghiCaMay = () => {
+      if (!caMay || !o.nghiCaMay) return;
+      const soTk = ganDayBatThuong.size;
+      ganDayBatThuong.clear();
+      o.nghiCaMay(anToan.CA_MAY_NGHI_MS, `${soTk} tài khoản Flow bị báo hoạt động bất thường trong 30 phút`, accountId);
+    };
     so.soLanBiChan += 1;
     const ten = ds[0].accountName || accountId || 'tài khoản';
     // 1.3.8: ghi rõ Flow nói gì (thẻ lỗi / thông báo trên trang) — thẻ tài khoản đỏ hiện đúng câu này.
@@ -174,6 +189,7 @@ function taoMayFlow(o) {
     if (o.nghiTaiKhoan && o.nghiTaiKhoan(accountId, ms, `Flow lỗi: ${lyDo}`)) {
       anToan.xoaDauLoi(so);
       log('error', `🛑 [${ten}] Tài khoản lỗi (${lyDo}) — nghỉ ${anToan.doDai(ms)}, việc chuyển ngay sang tài khoản khác.`);
+      nghiCaMay();
       return;
     }
 
@@ -189,6 +205,7 @@ function taoMayFlow(o) {
     const cu = henChayLai.get(khoa(accountId));
     if (cu) clearTimeout(cu);
     henChayLai.set(khoa(accountId), setTimeout(() => ketThucNghi(accountId), ms));
+    nghiCaMay();
   }
 
   async function ketThucNghi(accountId) {

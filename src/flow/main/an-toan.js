@@ -143,6 +143,7 @@ function soMoi() {
   return {
     promptLoi: new Set(), // prompt (khoá theo mẻ) đã hỏng từ lần XONG gần nhất của tài khoản
     coCauChan: false,     // đã đọc được đúng câu "hoạt động bất thường" chưa
+    batThuong: false,     // 1.4.5: câu đó là "bất thường / quá nhiều yêu cầu" (không phải hết lượt) → nghỉ lâu
     soLanBiChan: 0,       // đã phải nghỉ mấy lần trong phiên này
     dangNghi: false,
     nghiDen: 0
@@ -153,6 +154,7 @@ function soMoi() {
 function xoaDauLoi(so) {
   so.promptLoi.clear();
   so.coCauChan = false;
+  so.batThuong = false;
 }
 
 /**
@@ -223,6 +225,33 @@ function thoiGianNghi(soLanBiChan, caiDat) {
   return Math.round(phut * 60000);
 }
 
+/**
+ * 1.4.5: Flow nói "hoạt động bất thường" / "quá nhiều yêu cầu" → nghỉ LÂU, không phải 15–60 phút như lỗi thường. Ảnh
+ * chụp 23/10/2026: 15 phút sau tài khoản quay lại là bị báo lại, cả 6 tài khoản lần lượt dính. Lần đầu 3 giờ, bị lại
+ * gấp đôi, tối đa 12 giờ. Không bao giờ ngắn hơn số phút người dùng đặt cho tài khoản lỗi.
+ */
+const NGHI_BAT_THUONG_MS = 3 * 3600000;
+const NGHI_BAT_THUONG_TOI_DA_MS = 12 * 3600000;
+function thoiGianNghiBatThuong(soLanBiChan, caiDat) {
+  const lan = Math.max(0, Math.min(10, Number(soLanBiChan) || 0));
+  return Math.max(thoiGianNghi(soLanBiChan, caiDat), Math.min(NGHI_BAT_THUONG_TOI_DA_MS, NGHI_BAT_THUONG_MS * Math.pow(2, lan)));
+}
+
+/**
+ * 1.4.5: CẢ MÁY nghỉ Flow. Mọi tài khoản Flow trong app chạy chung một máy, một mạng: khi đã có `CA_MAY_SO_TK` tài khoản
+ * KHÁC NHAU bị báo bất thường trong `CA_MAY_CUA_SO_MS`, chạy tiếp các tài khoản còn lại chỉ làm chúng dính theo → mọi
+ * tài khoản Flow nghỉ `CA_MAY_NGHI_MS` (việc ảnh sang Muse nếu bật Muse ⇄ Flow).
+ * @param ganDay  Map accountId → lúc bị báo gần nhất (bị sửa tại chỗ: bỏ mốc cũ)
+ * @returns true khi phải cho cả máy nghỉ
+ */
+const CA_MAY_SO_TK = 2;
+const CA_MAY_CUA_SO_MS = 30 * 60000;
+const CA_MAY_NGHI_MS = 2 * 3600000;
+function canNghiCaMay(ganDay, bayGio) {
+  for (const [id, luc] of ganDay) if (bayGio - luc > CA_MAY_CUA_SO_MS) ganDay.delete(id);
+  return ganDay.size >= CA_MAY_SO_TK;
+}
+
 // ── Bộ nhịp gợi ý ──────────────────────────────────────────────────────────
 
 /**
@@ -246,7 +275,7 @@ function nhipAnToan(soTab) {
     delayMin: min,
     delayMax: max,
     multiTabStagger: n > 1 ? 15 * n : 0,  // giãn lần bấm "Tạo" giữa các tab
-    randomScroll: true,                   // có cuộn trang, giống người xem kết quả
+    randomScroll: false,                  // 1.4.5: không cuộn trang (chỉ tốn CPU)
     maxRetries: 3,
     networkGuard: 'auto'
   };
@@ -278,6 +307,10 @@ module.exports = {
   xongMoi,
   canNghi,
   thoiGianNghi,
+  NGHI_BAT_THUONG_MS,
+  thoiGianNghiBatThuong,
+  CA_MAY_NGHI_MS,
+  canNghiCaMay,
   nhipAnToan,
   doDai
 };

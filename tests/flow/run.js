@@ -992,7 +992,7 @@ test('an toàn: càng nhiều tab thì nhịp càng thưa', () => {
   // Hạ số lần thử lại là phần quan trọng nhất: lúc bị chặn, mỗi lần thử lại
   // là một lần gõ cửa nữa.
   assert.ok(a.maxRetries <= 3, 'nhịp an toàn phải hạ số lần thử lại');
-  assert.strictEqual(a.randomScroll, true);
+  assert.strictEqual(a.randomScroll, false, '1.4.5: không cuộn trang');
   assert.strictEqual(a.randomDelay, true);
 });
 
@@ -1315,20 +1315,23 @@ test('model: tiêm flow-model.js SAU flow-mode.js', () => {
 test('model: giao diện có đủ ô và gửi settings.chonModel', () => {
   const html = docNguon('src', 'ui', 'index.html');
   const bang = bangOFlow('O_FLOW_MODEL');
-  for (const id of ['fModelChinh', 'fModelPhu', 'fXenKe', 'fModelDuPhong', 'fThuLaiPhut']) {
+  for (const id of ['fModelChinh', 'fModelPhu', 'fXenKe']) {
     assert.ok(html.includes(`id="${id}"`), `thiếu ô #${id}`);
     assert.ok(bang.some(([o]) => o === id), `ô #${id} chưa nối vào O_FLOW_MODEL`);
   }
+  // 1.4.5: Google đã bỏ model Lower Priority → hai ô "model dự phòng khi Lower Priority bị chặn" / "tránh Lower Priority"
+  // không còn tác dụng, bỏ khỏi giao diện (khoá vẫn có mặc định trong chuanHoaKeHoach).
+  for (const id of ['fModelDuPhong', 'fThuLaiPhut']) assert.ok(!html.includes(`id="${id}"`), `#${id} phải bỏ`);
   // 2.8.7: ba ô tên model PHẢI là hộp chọn. Ô gõ chữ kèm gợi ý (<input
   // list>) lọc gợi ý theo chữ đang có trong ô — đã ghi sẵn một tên thì bấm
   // vào không hiện gì, đúng lỗi "không bấm chọn model chính được" 28/09/2026.
-  for (const id of ['fModelChinh', 'fModelPhu', 'fModelDuPhong']) {
+  for (const id of ['fModelChinh', 'fModelPhu']) {
     assert.ok(new RegExp(`<select id="${id}"`).test(html), `#${id} phải là <select>, không phải ô gõ chữ`);
   }
   assert.ok(!/<input[^>]*\slist=/.test(html) && !/<datalist/.test(html),
     'còn ô gõ chữ kèm datalist — bấm vào sẽ không hiện đủ danh sách model');
   // Khoá giao diện gửi = khoá model.js đọc; caiDatEngine mang nguyên chonModel tới máy Flow.
-  assert.deepStrictEqual(bang.map(([, k]) => k).sort(), Object.keys(modelKH.chuanHoaKeHoach({})).sort(),
+  assert.deepStrictEqual([...bang.map(([, k]) => k), 'duPhong', 'thuLaiPhut'].sort(), Object.keys(modelKH.chuanHoaKeHoach({})).sort(),
     'khoá ô model lệch với chuanHoaKeHoach');
   assert.deepStrictEqual(Object.keys(FLOW_MAC_DINH.chonModel).sort(), Object.keys(modelKH.chuanHoaKeHoach({})).sort());
   const s = caiDatEngine({ chonModel: { chinh: FAST, phu: LITE, xenKeMoi: '3' } }, { loai: 'video', ten: [] });
@@ -1339,7 +1342,7 @@ test('model: giao diện có đủ ô và gửi settings.chonModel', () => {
   // Nạp lại cài đặt: hộp chọn phải được dựng lại theo giá trị đã lưu (kể cả tên không có trong gợi ý).
   const app = docNguon('src', 'ui', 'app.js');
   const ve = thanHam(app, 'function veCaiDat');
-  for (const id of ['fModelChinh', 'fModelPhu', 'fModelDuPhong']) assert.ok(ve.includes(`'${id}'`), `veCaiDat chưa dựng lại #${id}`);
+  for (const id of ['fModelChinh', 'fModelPhu']) assert.ok(ve.includes(`'${id}'`), `veCaiDat chưa dựng lại #${id}`);
   assert.ok(/la \? `<option value="\$\{esc\(v\)\}">/.test(thanHam(app, 'function datChonModel')),
     'tên model đã lưu mà không có trong gợi ý sẽ bị mất khi mở lại Cài đặt');
 });
@@ -2210,6 +2213,57 @@ testAsync('tài khoản lỗi (máy Flow): 2 prompt khác nhau hỏng → đổi
   assert.strictEqual(doi.length, 2, 'không tab nào chạy thì không đổi tài khoản');
   await bang([{ index: 1, status: 'ERROR', retries: 0 }]);
   assert.strictEqual(doi.length, 2, 'mẻ mới hỏng 1 prompt — dấu lỗi cũ không được cộng dồn vào');
+});
+
+// ── 1.4.5: "hoạt động bất thường" → nghỉ lâu; 2 tài khoản dính trong 30 phút → cả máy nghỉ Flow ──
+test('1.4.5: thời gian nghỉ khi Flow báo bất thường 3 → 6 → 12 giờ, không ngắn hơn số phút người dùng đặt', () => {
+  const h = 3600000, c = anToan.chuanHoaCaiDat({ nghiPhut: 15 });
+  assert.deepStrictEqual([0, 1, 2, 3, 9].map((n) => anToan.thoiGianNghiBatThuong(n, c)), [3 * h, 6 * h, 12 * h, 12 * h, 12 * h]);
+  assert.strictEqual(anToan.thoiGianNghi(0, c), 15 * 60000, 'lỗi thường vẫn 15 phút');
+  const ganDay = new Map([['a', 0]]);
+  assert.strictEqual(anToan.canNghiCaMay(ganDay, 10 * 60000), false, 'một tài khoản chưa đủ');
+  ganDay.set('b', 31 * 60000);
+  assert.strictEqual(anToan.canNghiCaMay(ganDay, 31 * 60000), false, 'mốc cũ hơn 30 phút bị bỏ');
+  assert.deepStrictEqual([...ganDay.keys()], ['b']);
+  ganDay.set('c', 40 * 60000);
+  assert.strictEqual(anToan.canNghiCaMay(ganDay, 40 * 60000), true);
+});
+testAsync('1.4.5 (máy Flow): Flow báo bất thường → tài khoản nghỉ 3 giờ; tài khoản thứ hai dính trong 30 phút → cả máy nghỉ Flow', async () => {
+  const { taoMayFlow } = require('../../src/flow/may-flow');
+  const doi = [], caMay = [];
+  const lamTab = (id, tk, wc) => ({ id, accountId: tk, accountName: tk, busy: true, ready: true,
+    view: { webContents: { id: wc, isDestroyed: () => false,
+      executeJavaScript: async (js) => (/__flowDocLyDoTheLoi/.test(js) ? { ok: true, lyDo: [] } : /__flowDoCanhBao/.test(js) ? { co: true, viDu: 'Chúng tôi nhận thấy có hoạt động bất thường nào đó.' } : null) } } });
+  const t1 = lamTab('T1', 'flow-1', 7), t2 = lamTab('T2', 'flow-2', 8), t3 = lamTab('T3', 'flow-3', 9);
+  const ds = [t1, t2, t3];
+  const tabs = { tabs: ds, findByWcId: (id) => ds.find((t) => t.view.webContents.id === id), find: () => null, dispatch: async () => ({ ok: true }) };
+  const may = taoMayFlow({ tabs, taiVe: {}, log: () => {}, thongBao: () => {},
+    nghiTaiKhoan: (id, ms, lyDo) => { doi.push([id, ms, lyDo]); return true; },
+    nghiCaMay: (ms, lyDo, tru) => caMay.push([ms, lyDo, tru]) });
+  may.datCaiDatAnToan({ nguong: 2, nghiPhut: 15 });
+  const bang = async (wc, rows) => { await may.handleEngineMessage({ action: 'UPDATE_TABLE_DATA', data: { rows, isRunning: true } }, { id: wc }); await new Promise((r) => setTimeout(r, 5)); };
+  await bang(7, [{ index: 1, status: 'ERROR', retries: 0, error: 'Không thành công' }]);
+  assert.deepStrictEqual(doi.map((x) => x.slice(0, 2)), [['flow-1', 3 * 3600000]], 'bất thường: nghỉ 3 giờ, không phải 15 phút');
+  assert.ok(/Flow ghi: "Chúng tôi nhận thấy có hoạt động bất thường/.test(doi[0][2]), doi[0][2]);
+  assert.strictEqual(caMay.length, 0, 'một tài khoản dính thì chưa cho cả máy nghỉ');
+  await bang(8, [{ index: 1, status: 'ERROR', retries: 0, error: 'Không thành công · Unusual activity detected' }]);
+  assert.strictEqual(doi.length, 2);
+  assert.deepStrictEqual(caMay.map((x) => [x[0], x[2]]), [[2 * 3600000, 'flow-2']], 'tài khoản thứ hai dính → cả máy nghỉ 2 giờ');
+  assert.ok(/2 tài khoản Flow bị báo hoạt động bất thường/.test(caMay[0][1]));
+  // Lỗi thường (không có câu bất thường) vẫn nghỉ như cũ và không tính vào cả máy.
+  t3.view.webContents.executeJavaScript = async (js) => (/__flowDocLyDoTheLoi/.test(js) ? { ok: true, lyDo: [] } : /__flowDoCanhBao/.test(js) ? { co: false } : null);
+  await bang(9, [{ index: 1, status: 'ERROR', retries: 0 }, { index: 2, status: 'ERROR', retries: 0 }]);
+  assert.deepStrictEqual(doi[2].slice(0, 2), ['flow-3', 15 * 60000]);
+  assert.strictEqual(caMay.length, 1);
+});
+test('1.4.5: bỏ công tắc "Ngẫu nhiên thời gian chờ" và "Cuộn trang ngẫu nhiên"', () => {
+  const { chuanHoaFlow, caiDatEngine } = require('../../src/flow/cai-dat-flow');
+  const cu = chuanHoaFlow({ delayMin: 50, delayMax: 77, randomDelay: false, randomScroll: true });
+  assert.deepStrictEqual([cu.delayMin, cu.delayMax, cu.randomDelay, cu.randomScroll], [50, 50, true, false], 'bộ cũ tắt ngẫu nhiên → "đến" = "từ"');
+  const moi = chuanHoaFlow({ ...cu, delayMax: 90 });
+  assert.deepStrictEqual([moi.delayMin, moi.delayMax], [50, 90], 'lưu lại sau đó giữ đúng số "đến" người dùng gõ');
+  const e = caiDatEngine(moi, { loai: 'anh', tyLe: '9:16', ten: ['a'] });
+  assert.deepStrictEqual([e.pasteDelayMin, e.pasteDelayMax, e.randomScroll], [50, 90, false]);
 });
 
 // ── 1.2.7: "Không chọn được chất lượng tải xuống" → luồng lưu tệp chẩn đoán (kèm menu Tải xuống) ──

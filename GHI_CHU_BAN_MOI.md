@@ -1,4 +1,32 @@
-# AI Automation Studio 1.4.4
+# AI Automation Studio 1.4.5
+
+- **Lưu cài đặt lần đầu không còn bị đẩy về số cũ.** Thật ra lần đầu đã lưu được, nhưng trang Cài đặt vẽ lại bằng số cũ nên trông như chưa lưu. Giờ bấm Lưu là thấy ngay số vừa lưu.
+- **Nút lưu luôn ở đáy trang Cài đặt**, không phải cuộn lên đầu trang nữa. Có hai nút:
+  - **Lưu cài đặt**: lưu cho dự án đang mở, như trước.
+  - **Lưu làm cài đặt mặc định**: áp cho mọi dự án đang có và cho dự án tạo sau này. Mỗi dự án vẫn giữ thư mục lưu và mẫu tên file riêng. App hỏi lại trước khi áp.
+- **Flow bị báo "hoạt động bất thường" thì nghỉ lâu hơn.**
+  - Trước đây tài khoản chỉ nghỉ 15 phút, quay lại là bị báo tiếp, nên cả 6 tài khoản lần lượt dính.
+  - Giờ tài khoản bị báo câu này (hoặc "quá nhiều yêu cầu") nghỉ 3 giờ; bị lại thì 6 giờ, tối đa 12 giờ. Lỗi thường vẫn nghỉ theo số phút trong Cài đặt.
+  - Nếu 2 tài khoản Flow khác nhau bị báo trong 30 phút, **cả máy nghỉ Flow 2 giờ**. Các tài khoản Flow chạy chung một máy, một mạng, nên chạy tiếp các tài khoản còn lại chỉ làm chúng dính theo. Trong lúc đó ảnh đang chờ sang Muse nếu dự án bật Muse ⇄ Flow và có tài khoản Muse.
+  - Bấm *Chạy lại ngay* ở thẻ tài khoản vẫn bỏ được giờ nghỉ, nhưng nên để tài khoản nghỉ đủ.
+- **Bỏ các mục cài đặt trùng hoặc không còn tác dụng:**
+  - Thẻ *Lưu ảnh & video* ở Cài đặt (trùng phần *Tải về / Thư mục / Tên file* trong *Cài đặt nâng cao* của trang Tạo ảnh / Tạo video; chỉnh ở đó).
+  - Ô *Thư mục lưu video tạo từ ảnh* ở Cài đặt (trùng ô *Lưu video của dự án này vào* ở trang Tạo ảnh). Thư mục đã chọn tự chuyển sang ô của trang Tạo ảnh.
+  - *Số luồng mỗi tài khoản* ở trang Tạo (đã có ở Cài đặt → Chạy).
+  - Công tắc *Ngẫu nhiên thời gian chờ* của Flow: muốn chờ đúng một số giây thì để ô "đến" bằng ô "từ". Ai đang tắt công tắc này thì app tự để "đến" bằng "từ", cách chạy không đổi.
+  - Công tắc *Cuộn trang ngẫu nhiên* của Flow: chỉ làm trang Flow vẽ lại, tốn CPU.
+  - Hai ô *Model dự phòng khi Lower Priority bị chặn* và *Tránh Lower Priority*: Google đã bỏ model Lower Priority nên hai ô này không còn tác dụng.
+  - Ô *Nghỉ giữa 2 lần gửi* ghi rõ là cho Muse / Suno (Flow dùng *Chờ giữa 2 prompt*).
+- **Bớt CPU thêm khi chạy lâu:**
+  - Chữ tiến độ ("Đang tạo 37%") không còn làm app ghi lại cả file dữ liệu mỗi 1,5 giây.
+  - Kho dự án của engine Flow được cắt gọn ngay khi ghi (trước đây phình tới vài MB trong một lượt chạy dài và được chép qua lại mỗi lần engine lưu).
+  - Mỗi việc Flow xong không còn kiểm tra lại mọi file kết quả cũ trên ổ đĩa khi không cần.
+  - Giao diện app thôi đếm giờ khi cửa sổ đang thu nhỏ.
+- Mọi thứ khác giữ nguyên như 1.4.4.
+
+Lưu ý: đã kiểm bằng bài kiểm tự động và trên trang Muse / Flow giả, chưa chạy trên Flow thật. Không cài đặt nào bảo đảm Google không báo bất thường: đó là Google tự đánh giá.
+
+## Bản 1.4.4
 
 - **Bớt ngốn CPU khi chạy.** Phần tốn CPU nhiều nhất là các trang Muse / Flow / Suno chạy ngầm: mỗi luồng / tab là một trang web đầy đủ, và trong mấy phút chờ kết quả trang cứ vẽ liên tục vòng xoay chờ, ánh lấp lánh "đang tạo"… Càng nhiều luồng / tab cùng lúc càng tốn.
   - Khi bật **Máy mượt** (Cài đặt → Chạy, bật sẵn), app tắt các hiệu ứng động đó trên trang chạy ngầm. Trên máy thử, 3 trang đang quay hiệu ứng tốn khoảng 74% một nhân CPU, tắt xong còn gần 0%. Cách bấm, cách đọc kết quả trên trang không đổi.
