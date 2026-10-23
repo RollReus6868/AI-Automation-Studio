@@ -282,6 +282,26 @@ function dongCuaSoAn(w) {
  * lại từ flow1 — không bỏ thì tab flow1 vừa mở sẽ tự khôi phục mẻ dở của flow1 phiên trước, trong
  * khi hàng đợi đã đưa các việc đó về hàng chờ. Giữ 30 dự án engine gần nhất cho khỏi phình file.
  */
+/**
+ * 1.4.5: bớt CPU — engine lưu dự án (veoProjects) bằng cách đọc CẢ kho, thêm mục của mình, ghi lại CẢ kho, gần như mỗi
+ * lần một prompt đổi trạng thái; mỗi mẻ thêm một mục mới (~15–20 KB) và kho chỉ được cắt lúc mở app (donKhoFlow) → chạy
+ * 2.000 việc là 3–4 MB chép qua lại mỗi lần lưu. Cắt ngay lúc ghi: giữ các dự án mới nhất (dự án đang chạy luôn mới nhất
+ * vì lưu là đặt lại timestamp) và dự án đang được nhắc tới trong trạng thái chạy của engine.
+ */
+function catVeoProjects(arg) {
+  const vp = arg && arg.veoProjects;
+  if (!vp || typeof vp !== 'object') return arg;
+  const ten = Object.keys(vp);
+  const giuToiDa = Math.max(30, 3 * (((tabsFlow && tabsFlow.tabs) || []).length));
+  if (ten.length <= giuToiDa) return arg;
+  const moc = (k) => Math.max((vp[k] && vp[k].timestamp) || 0, (vp[k] && vp[k].startTime) || 0);
+  const dang = storeFlow.get(['veoRunState', 'autoResumeProject', 'activeRunningProject']);
+  const nhac = new Set([dang.autoResumeProject, dang.activeRunningProject, dang.veoRunState && dang.veoRunState.projectName].filter(Boolean));
+  const giu = new Set(ten.sort((a, b) => moc(b) - moc(a)).slice(0, giuToiDa));
+  for (const k of nhac) if (k in vp) giu.add(k);
+  return { ...arg, veoProjects: Object.fromEntries([...giu].map((k) => [k, vp[k]])) };
+}
+
 function donKhoFlow() {
   storeFlow.remove(['veoRunState', 'veoState', 'autoResumeProject', 'activeRunningProject']);
   const { veoProjects } = storeFlow.get('veoProjects');
@@ -798,6 +818,8 @@ const LENH = {
   datHenGio: ({ loai, hen }) => dieuPhoi.datHenGio(loai, hen),
   dungHen: ({ loai }) => dieuPhoi.dungHen(loai),
   datCaiDat: (c) => { const { duAn, ...m } = c || {}; const r = dieuPhoi.datCaiDat(m, duAn); if ('nheMay' in m) datUuTienMoiLuong(); return r; },
+  /** 1.4.5: "Lưu làm cài đặt mặc định" — áp cho dự án mới và mọi dự án đang có (giữ thư mục / mẫu tên riêng). */
+  datCaiDatMacDinh: (c) => { const { duAn, ...m } = c || {}; const r = dieuPhoi.datMacDinh(m, duAn); if ('nheMay' in m) datUuTienMoiLuong(); return r; },
 
   themTaiKhoan: ({ ten, nen }) => { const a = taiKhoan.them(ten, nen); baoTrangThai(); return a; },
   suaTaiKhoan: ({ id, thay }) => { taiKhoan.sua(id, thay); baoTrangThai(); },
@@ -852,13 +874,6 @@ const LENH = {
     const r = await dialog.showOpenDialog(win, { properties: ['openDirectory'] });
     if (r.canceled || !r.filePaths[0]) return null;
     return { thuMuc: r.filePaths[0], anh: anhTrongThuMuc(r.filePaths[0]) };
-  },
-  /** Thư mục riêng cho video nối từ ảnh: chọn xong là thôi lưu cạnh ảnh. */
-  chonThuMucVideoAnh: async ({ duAn } = {}) => {
-    const r = await dialog.showOpenDialog(win, { title: 'Thư mục lưu video tạo từ ảnh', properties: ['openDirectory', 'createDirectory'] });
-    if (r.canceled || !r.filePaths[0]) return null;
-    dieuPhoi.datCaiDat({ thuMucVideoAnh: r.filePaths[0], videoCanhAnh: false }, duAn);
-    return r.filePaths[0];
   },
   /** 1.2.9: thư mục lưu video "Ảnh xong → tự tạo video" RIÊNG của một dự án (trang Tạo ảnh). */
   chonThuMucVideoDuAn: async ({ id }) => {
@@ -1024,7 +1039,7 @@ ipcMain.handle('flow:storage', async (event, { op, arg }) => {
       if (hoi && tab && tab.caiDatEngine) kq.veoSettings = tab.caiDatEngine;
       return locVeoSettings(kq);
     }
-    case 'set': return storeFlow.set(arg) && undefined;
+    case 'set': return storeFlow.set(catVeoProjects(arg)) && undefined;
     case 'remove': return storeFlow.remove(arg) && undefined;
     case 'clear': return undefined;          // không cho engine xoá sạch kho của cả app
     default: return undefined;
@@ -1070,7 +1085,9 @@ app.whenReady().then(() => {
   taiKhoan = new QuanLyTaiKhoan(store, log);
 
   // ── Google Flow: kho của engine (thay chrome.storage.local), tab ngầm, tải về, "background" ──
-  storeFlow = new Store(path.join(app.getPath('userData'), 'flow-engine.json'), (m) => log('warning', m));
+  // 1.4.5: kho engine Flow gom ghi 1 giây (engine lưu dự án gần như mỗi lần prompt đổi trạng thái), không thụt lề.
+  storeFlow = new Store(path.join(app.getPath('userData'), 'flow-engine.json'), (m) => log('warning', m), { nhipMs: 1000 });
+  storeFlow.prettyPrint = false;
   donKhoFlow();
   tabsFlow = new QuanLyTabFlow({
     taoCuaSo: (acc, tieuDe) => { const w = taoCuaSoAn(acc, tieuDe); if (xemLuong) w.showInactive(); return w; },
@@ -1104,7 +1121,8 @@ app.whenReady().then(() => {
       dieuPhoi._choNghi(tkId, lyDo, ms);
       for (const x of dieuPhoi.luong) if (x.taiKhoanId === tkId && !x.luong.ranh) x.luong.dung(lyDo);
       return true;
-    }
+    },
+    nghiCaMay: (ms, lyDo, tru) => dieuPhoi.nghiCaFlow(ms, lyDo, tru)
   });
 
   dieuPhoi = new DieuPhoi({

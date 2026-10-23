@@ -233,8 +233,24 @@
     S.caiDat = (S.caiDatDuAn && S.caiDatDuAn[id]) || S.caiDatChung;
     S.thuMuc = (S.thuMucDuAn && S.thuMucDuAn[id]) || S.thuMuc;
   }
-  /** Lưu cài đặt vào dự án đang mở. */
-  const datCD = (c) => api.call('datCaiDat', { ...c, duAn: (duAnHienTai() || {}).id });
+  /**
+   * Lưu cài đặt vào dự án đang mở. 1.4.5: tiến trình chính trả về bộ cài đặt vừa lưu → cập nhật S ngay, ai vẽ lại
+   * liền sau đó (veCaiDat…) cũng thấy số mới. Trước đây S còn bộ cũ (trạng thái mới chưa kịp đẩy sang) nên lần bấm
+   * Lưu đầu tiên trông như bị đẩy về số cũ. Bản cũ không trả gì thì như trước (chờ trạng thái mới).
+   */
+  const datCD = (c) => api.call('datCaiDat', { ...c, duAn: (duAnHienTai() || {}).id }).then(apCaiDatMoi.bind(null, (duAnHienTai() || {}).id));
+  /**
+   * Ghi bộ cài đặt tiến trình chính vừa trả (datCaiDat / datCaiDatMacDinh) cho dự án duAn vào S rồi tính lại S.caiDat.
+   * Trả lại r nguyên vẹn (datCD vẫn trả đúng kết quả của lệnh).
+   */
+  function apCaiDatMoi(duAn, r) {
+    if (!S || !r || !r.ok) return r;
+    if (r.caiDatChung) S.caiDatChung = r.caiDatChung;
+    if (r.caiDatDuAn) S.caiDatDuAn = { ...(S.caiDatDuAn || {}), ...r.caiDatDuAn };
+    if (duAn && r.caiDat) { S.caiDatDuAn = S.caiDatDuAn || {}; S.caiDatDuAn[duAn] = r.caiDat; }
+    apDuAn();
+    return r;
+  }
   const duAnDangChay = (id) => !!(S && (S.duAnChay || []).includes(id));
   /** 1.3.6: việc đang chờ thuộc lượt hẹn giờ đang chạy (theo loại việc; video nối từ ảnh theo hẹn của ảnh). */
   const theoHen = (j) => !!(S && [j.loai, j.henLoai].some((l) => { const x = l && (S.henChay || {})[l]; return x && (!x.duAn || x.duAn === j.duAn); }));
@@ -447,13 +463,13 @@
     $('#ghiVideoThuMuc').textContent = tm ? `${tm.anh.length} ảnh trong "${tm.thuMuc.split(/[\\/]/).pop()}" → ${tm.anh.length} video` : 'Chưa chọn';
     $('#batChuoi').checked = U.chuoi.bat;
     $('#khuPromptVideo').hidden = !U.chuoi.bat;
-    // 1.2.9: thư mục lưu video nối từ ảnh RIÊNG của dự án đang mở (chưa chọn thì nói rõ đang theo Cài đặt chung).
+    // 1.2.9: thư mục lưu video nối từ ảnh RIÊNG của dự án đang mở. 1.4.5: chỗ chọn thư mục DUY NHẤT (ô cùng tên ở
+    // Cài đặt đã bỏ, thư mục cũ ở đó được chuyển sang dự án) — chưa chọn thì cạnh ảnh hoặc theo trang Tạo video.
     const dTm = duAnHienTai(), tmDa = (dTm && dTm.thuMucVideoAnh) || '';
-    $('#ghiThuMucVideoDuAn').textContent = tmDa || (S.caiDat.videoCanhAnh !== false ? 'Chưa chọn — lưu cạnh ảnh nguồn, cùng tên (theo Cài đặt)'
-      : S.caiDat.thuMucVideoAnh ? `Chưa chọn — theo Cài đặt: ${S.caiDat.thuMucVideoAnh}` : 'Chưa chọn — theo thư mục của trang Tạo video');
+    $('#ghiThuMucVideoDuAn').textContent = tmDa || (S.caiDat.videoCanhAnh !== false ? 'Chưa chọn — lưu cạnh ảnh nguồn, cùng tên (Cài đặt → Video tạo từ ảnh)'
+      : 'Chưa chọn — theo thư mục của trang Tạo video');
     $('#ghiThuMucVideoDuAn').title = tmDa;
     $('#boThuMucVideoDuAn').hidden = !tmDa;
-    if (document.activeElement !== $('#luongNhanh')) $('#luongNhanh').value = S.caiDat.luongMoiTK;
     veTaiVe();
     $('#boQuaDaCo').checked = !!S.caiDat.boQuaDaCo;
     $('#quetGhiAnh').hidden = loaiTrang() !== 'anh' || !U.chuoi.bat;
@@ -1125,14 +1141,6 @@
   function veCaiDat() {
     if (!S) return;
     const c = S.caiDat;
-    // 1.4.2: thẻ "Lưu ảnh & video" — cột ảnh / cột video, cùng khoá với Cài đặt nâng cao của trang Tạo.
-    for (const l of ['anh', 'video']) {
-      const k = khoaTai(l);
-      $(`#lvTai_${l}`).checked = !!c[k.tai];
-      $(`#lvThuMuc_${l}`).value = S.thuMuc[l] || '';
-      if (document.activeElement !== $(`#lvTen_${l}`)) $(`#lvTen_${l}`).value = c[k.ten] || '';
-      viDuLuu(l);
-    }
     $('#cdLuong').value = c.luongMoiTK; $('#cdNghi').value = c.nghiGiuaLanGui; $('#cdThuLai').value = c.tuThuLai; $('#cdChayLaiLoi').value = c.tuChayLaiLoi;
     $('#cdChoAnh').value = c.choAnhGiay; $('#cdChoVideo').value = c.choVideoGiay; $('#cdChoChu').value = c.choChuGiay; $('#cdChoNhac').value = c.choNhacGiay;
     $('#cdPng').checked = !!c.png;
@@ -1141,8 +1149,6 @@
     const dCd = duAnHienTai();
     $('#cdTieuDe').textContent = dCd ? `Cài đặt — dự án "${dCd.ten}"` : 'Cài đặt';
     $('#cdVideoCanhAnh').checked = c.videoCanhAnh !== false;
-    $('#cdThuMucVideoAnh').value = c.thuMucVideoAnh || '';
-    $('#khoiThuMucVideoAnh').classList.toggle('mo-di', c.videoCanhAnh !== false);
     $('#cdXoaChat').checked = !!c.xoaChatKhiXong;
     $('#cdXoaDuAnFlow').checked = !!c.xoaDuAnFlowKhiXong;
     $('#cdDrive').checked = !!c.driveBat;
@@ -1159,7 +1165,7 @@
     $('#cdMauAnh').value = c.mau.anh; $('#cdMauVideo').value = c.mau.video;
     const f = c.flow;
     datChonModel('fModelAnh', f.modelAnh);
-    for (const id of ['fModelChinh', 'fModelPhu', 'fModelDuPhong']) datChonModel(id, f.chonModel[O_FLOW_MODEL.find((x) => x[0] === id)[1]]);
+    for (const id of ['fModelChinh', 'fModelPhu']) datChonModel(id, f.chonModel[O_FLOW_MODEL.find((x) => x[0] === id)[1]]);
     for (const [id, k] of O_FLOW) { const el = $('#' + id); if (el.type === 'checkbox') el.checked = !!f[k]; else el.value = f[k] == null ? '' : f[k]; }
     for (const [id, k] of O_FLOW_MODEL) $('#' + id).value = f.chonModel[k] == null ? '' : f.chonModel[k];
     for (const [id, k] of O_FLOW_AN_TOAN) { const el = $('#' + id); if (el.type === 'checkbox') el.checked = !!f.anToan[k]; else el.value = f.anToan[k]; }
@@ -1171,8 +1177,7 @@
   const DS_MODEL = {
     fModelAnh: { ds: ['Nano Banana 2 Lite'], trong: '(giữ nguyên model đang chọn trên Flow)' },
     fModelChinh: { ds: DS_MODEL_VIDEO, trong: '(giữ nguyên model đang chọn trên Flow)' },
-    fModelPhu: { ds: DS_MODEL_VIDEO, trong: '(không xen kẽ)' },
-    fModelDuPhong: { ds: DS_MODEL_VIDEO, trong: '(không — cho tài khoản nghỉ)' }
+    fModelPhu: { ds: DS_MODEL_VIDEO, trong: '(không xen kẽ)' }
   };
   /** Dựng lại hộp chọn model; tên đã lưu mà danh sách không có thì vẫn hiện (kèm ⚠), KHÔNG lặng lẽ đổi. */
   function datChonModel(id, giaTri) {
@@ -1184,11 +1189,13 @@
     $('#' + id).classList.toggle('canh-bao', la);
   }
   // Ô Cài đặt → Google Flow ↔ khoá trong caiDat.flow (src/flow/cai-dat-flow.js).
+  // 1.4.5: bỏ ô "Ngẫu nhiên thời gian chờ" (trùng hai ô từ / đến: bằng nhau là chờ đúng số đó), "Cuộn trang ngẫu nhiên"
+  // (chỉ tốn CPU, tiến trình chính luôn tắt) và hai ô Lower Priority (Google đã bỏ model đó) — khoá cũ đã lưu vẫn được giữ.
   const O_FLOW = [['fTab', 'tabMoiTK'], ['fMe', 'meToiDa'], ['fSoLuong', 'outputCount'], ['fChoMin', 'delayMin'], ['fChoMax', 'delayMax'],
     ['fThuLai', 'maxRetries'], ['fGian', 'multiTabStagger'], ['fChatAnh', 'chatLuongAnh'], ['fChatVideo', 'chatLuongVideo'], ['fMang', 'networkGuard'],
-    ['fNgauNhien', 'randomDelay'], ['fSoThuTu', 'addIndex'], ['fCuon', 'randomScroll'], ['fGoAnh', 'goAnhThamChieu'], ['fDoiTen', 'doiTenTrenFlow'], ['fDongY', 'dongYQuyenAnh'],
+    ['fSoThuTu', 'addIndex'], ['fGoAnh', 'goAnhThamChieu'], ['fDoiTen', 'doiTenTrenFlow'], ['fDongY', 'dongYQuyenAnh'],
     ['fModelAnh', 'modelAnh'], ['fNghiTT', 'nghiThaoTacBat'], ['fNghiTTMin', 'nghiThaoTacMin'], ['fNghiTTMax', 'nghiThaoTacMax']];
-  const O_FLOW_MODEL = [['fModelChinh', 'chinh'], ['fModelPhu', 'phu'], ['fXenKe', 'xenKeMoi'], ['fModelDuPhong', 'duPhong'], ['fThuLaiPhut', 'thuLaiPhut']];
+  const O_FLOW_MODEL = [['fModelChinh', 'chinh'], ['fModelPhu', 'phu'], ['fXenKe', 'xenKeMoi']];
   // Nhận diện tài khoản lỗi (1.2.0, luôn bật) — khớp chuanHoaCaiDat của src/flow/main/an-toan.js.
   const O_FLOW_AN_TOAN = [['fNguong', 'nguong'], ['fNghi', 'nghiPhut']];
   function docCaiDatFlow() {
@@ -1206,12 +1213,6 @@
     const mau = { so: 83, stt: 5, prompt: 'Tranh truyện người que tối giản bố cục dọc', taoLuc: Date.now(), loai };
     $('#ncViDu').textContent = 'Ví dụ: ' + HD.tenFile(d, mau, { video: 'video/mp4', nhac: 'audio/mpeg' }[loai] || 'image/png', 0, $('#ncTen').value);
   }
-  /** Ví dụ tên file ở thẻ "Lưu ảnh & video" (Cài đặt). */
-  function viDuLuu(l) {
-    const d = duAnHienTai() || { ten: 'Mặc định' };
-    const mau = { so: 83, stt: 5, prompt: 'Tranh truyện người que tối giản bố cục dọc', taoLuc: Date.now(), loai: l };
-    $(`#lvViDu_${l}`).textContent = 'Ví dụ: ' + HD.tenFile(d, mau, l === 'video' ? 'video/mp4' : 'image/png', 0, $(`#lvTen_${l}`).value);
-  }
   /** Khối "Tải về & tên file" trong Cài đặt nâng cao: hiện đúng phần của trang đang mở (ảnh / video). */
   function veTaiVe() {
     const loai = loaiTrang(), v = loai === 'video', c = S.caiDat, ten = TEN_LOAI[loai];
@@ -1219,9 +1220,9 @@
     $('#ncNhanThuMuc').textContent = `Thư mục lưu ${ten}`;
     $('#ncNhanTen').firstChild.textContent = `Tên file ${ten}`;
     $('#ncTai').checked = v ? c.taiVideo : c.taiAnh;   // nhạc luôn tải về (công tắc ẩn)
-    // 1.4.2: nói rõ khối này áp dụng cho loại việc nào.
-    datHtml($('#ncApDung'), v ? 'Áp dụng cho <span class="ap ap-video">Chỉ video</span> mọi việc <b>Tạo video</b> của dự án này. Ảnh chỉnh ở trang Tạo ảnh (hoặc Cài đặt → Lưu ảnh &amp; video).'
-      : 'Áp dụng cho <span class="ap ap-anh">Chỉ ảnh</span> mọi việc <b>Tạo ảnh</b> của dự án này. Video chỉnh ở trang Tạo video (hoặc Cài đặt → Lưu ảnh &amp; video); video tự tạo từ ảnh lưu theo Cài đặt → Video tạo từ ảnh.');
+    // 1.4.2: nói rõ khối này áp dụng cho loại việc nào. 1.4.5: đây là chỗ DUY NHẤT chỉnh tải về / thư mục / tên file.
+    datHtml($('#ncApDung'), v ? 'Áp dụng cho <span class="ap ap-video">Chỉ video</span> mọi việc <b>Tạo video</b> của dự án này. Ảnh chỉnh ở trang Tạo ảnh.'
+      : 'Áp dụng cho <span class="ap ap-anh">Chỉ ảnh</span> mọi việc <b>Tạo ảnh</b> của dự án này. Video chỉnh ở trang Tạo video; video tự tạo từ ảnh lưu theo mục <i>Ảnh xong → tự tạo video</i> ở trên (và Cài đặt → Video tạo từ ảnh).');
     $('#ncThuMuc').value = S.thuMuc[loai];
     if (document.activeElement !== $('#ncTen')) $('#ncTen').value = c[khoaTai(loai).ten];
     $('#ncTen').placeholder = loai === 'nhac' ? '{stt}' : v ? HD.MAU_TEN_MAC_DINH : HD.MAU_TEN_ANH_MAC_DINH;
@@ -1397,15 +1398,10 @@
       const d = duAnHienTai();
       if (!d) return;
       await api.call('boThuMucVideoDuAn', { id: d.id });
-      toast(`Dự án "${d.ten}" bỏ thư mục video riêng — theo Cài đặt chung`);
+      toast(`Dự án "${d.ten}" bỏ thư mục video riêng — ${S.caiDat.videoCanhAnh !== false ? 'video lưu cạnh ảnh nguồn' : 'theo thư mục của trang Tạo video'}`);
     };
     $('#promptThuMuc').addEventListener('input', (e) => { U.promptThuMuc = e.target.value; luuUi(); });
     $('#tyLeVideoChuoi').onchange = (e) => { U.chuoi.tyLe = e.target.value; luuUi(); };
-    $('#luongNhanh').onchange = async (e) => {
-      const n = Math.max(1, Math.min(20, parseInt(e.target.value, 10) || 3));
-      await datCD({ luongMoiTK: n });
-      toast(`Mỗi tài khoản chạy ${n} luồng${n > 6 ? ' — nhiều luồng dễ bị Muse giới hạn, theo dõi nhật ký' : ''}`);
-    };
     $('#tachPrompt').onchange = () => { datCD({ tachPrompt: $('#tachPrompt').value }); };
     $('#tyLe').onclick = (e) => {
       const b = e.target.closest('[data-v]');
@@ -1608,13 +1604,6 @@
     // Tải về & tên file (Cài đặt nâng cao của cột Tạo) — lưu ngay, theo trang ảnh / video.
     $('#ncTai').onchange = (e) => { if (khoaTai().tai) datCD({ [khoaTai().tai]: e.target.checked }); };
     $('#boQuaDaCo').onchange = (e) => datCD({ boQuaDaCo: e.target.checked });   // 1.4.2
-    for (const l of ['anh', 'video']) {   // 1.4.2: thẻ "Lưu ảnh & video" ở Cài đặt — lưu ngay như Cài đặt nâng cao của trang Tạo
-      $(`#lvTai_${l}`).onchange = (e) => { datCD({ [khoaTai(l).tai]: e.target.checked }); toast(`Đã ${e.target.checked ? 'bật' : 'tắt'} tải ${TEN_LOAI[l]} về máy`); };
-      $(`#lvTen_${l}`).addEventListener('input', () => viDuLuu(l));
-      $(`#lvTen_${l}`).onchange = (e) => { datCD({ [khoaTai(l).ten]: e.target.value }); toast(`Đã lưu mẫu tên file ${TEN_LOAI[l]}`); };
-      $(`#lvChon_${l}`).onclick = async () => { const d = await api.call('chonThuMucRa', { loai: l, duAn: (duAnHienTai() || {}).id }); if (d) $(`#lvThuMuc_${l}`).value = d; };
-      $(`#lvMo_${l}`).onclick = () => api.call('moThuMuc', { dir: S.thuMuc[l] });
-    }
     $('#nutQuet').onclick = () => quetThuMuc();
     $('#boQuet').onclick = async () => { await api.call('boThuMucQuet', { duAn: U.duAn, loai: loaiTrang() }); $('#ghiQuet').textContent = 'Đã bỏ chọn — quét thư mục lưu của dự án.'; };
     $('#ncTen').addEventListener('input', viDuTen);
@@ -1622,14 +1611,6 @@
     $('#ncChonThuMuc').onclick = async () => { const d = await api.call('chonThuMucRa', { loai: loaiTrang(), duAn: (duAnHienTai() || {}).id }); if (d) $('#ncThuMuc').value = d; };
     $('#ncMoThuMuc').onclick = () => api.call('moThuMuc', { dir: S.thuMuc[loaiTrang()] });
     $('#cdMoDuLieu').onclick = () => api.call('moThuMucDuLieu');
-    // Thư mục video nối từ ảnh: chọn = lưu ngay + tắt "cạnh ảnh"; bật lại "cạnh ảnh" thì thư mục này nằm im.
-    $('#cdChonThuMucVideoAnh').onclick = async () => {
-      const d = await api.call('chonThuMucVideoAnh', { duAn: (duAnHienTai() || {}).id });
-      if (d) { $('#cdVideoCanhAnh').checked = false; $('#cdThuMucVideoAnh').value = d; $('#khoiThuMucVideoAnh').classList.remove('mo-di'); toast('Video tạo từ ảnh sẽ lưu vào thư mục này'); }
-    };
-    $('#cdMoThuMucVideoAnh').onclick = () => { const d = $('#cdThuMucVideoAnh').value; if (d) api.call('moThuMuc', { dir: d }); };
-    $('#cdBoThuMucVideoAnh').onclick = async () => { await datCD({ thuMucVideoAnh: '' }); $('#cdThuMucVideoAnh').value = ''; };
-    $('#cdVideoCanhAnh').addEventListener('change', (e) => $('#khoiThuMucVideoAnh').classList.toggle('mo-di', e.target.checked));
     // 1.4.0: Google Drive — thư mục Drive trên máy của dự án đang mở (lưu ngay).
     const idDa = () => (duAnHienTai() || {}).id;
     $('#cdDriveCach').onchange = () => veDriveCach();
@@ -1671,9 +1652,13 @@
     $('#cdKiemCapNhat').onclick = () => api.call('kiemCapNhat');
     $('#cdXemLuong').onchange = (e) => api.call('xemLuong', { bat: e.target.checked });
     $('#cdMauGoc').onclick = () => { $('#cdMauAnh').value = HD.MAU_MAC_DINH.anh; $('#cdMauVideo').value = HD.MAU_MAC_DINH.video; };
-    $('#cdLuu').onclick = async () => {
-      const batDrive = $('#cdDrive').checked && !S.caiDat.driveBat && (S.caiDat.taiAnh || S.caiDat.taiVideo);   // 1.4.1: vừa bật Drive → app tự tắt tải về máy
-      await datCD({
+    $('#cdLuu').onclick = () => luuCaiDat(false);
+    // 1.4.5: lưu bộ đang hiện vào dự án đang mở rồi chép thành cài đặt mặc định: dự án mới tạo dùng nó, mọi dự án
+    // đang có cũng đổi theo (thư mục lưu, mẫu tên file vẫn riêng từng dự án — tiến trình chính lo).
+    $('#cdLuuMacDinh').onclick = () => luuCaiDat(true);
+    /** Mọi ô của trang Cài đặt → bộ gửi datCaiDat / datCaiDatMacDinh (hai nút Lưu dùng chung). */
+    function docFormCaiDat() {
+      return {
         luongMoiTK: $('#cdLuong').value, nghiGiuaLanGui: $('#cdNghi').value, tuThuLai: $('#cdThuLai').value, tuChayLaiLoi: $('#cdChayLaiLoi').value,
         choAnhGiay: $('#cdChoAnh').value, choVideoGiay: $('#cdChoVideo').value, choChuGiay: $('#cdChoChu').value, choNhacGiay: $('#cdChoNhac').value,
         png: $('#cdPng').checked, doiNenKhiLoi: $('#cdDoiNen').checked, tatMayKhiXong: $('#cdTatMay').checked,
@@ -1681,13 +1666,31 @@
         driveBat: $('#cdDrive').checked, driveCach: $('#cdDriveCach').value, driveTk: $('#cdDriveTk').value, nheMay: $('#cdNheMay').checked,
         mau: { anh: $('#cdMauAnh').value, video: $('#cdMauVideo').value },
         flow: docCaiDatFlow()
-      });
-      veCaiDat();
-      if ($('#cdDrive').checked && $('#cdDriveCach').value === 'may' && !$('#cdThuMucDrive').value) { toast('Đã lưu — nhưng chưa chọn thư mục Google Drive (bấm Tự tìm hoặc Chọn…)', true); return; }
-      if ($('#cdDrive').checked && $('#cdDriveCach').value === 'web' && !$('#cdDriveTk').value) { toast('Đã lưu — nhưng chưa chọn tài khoản Google Drive (Tài khoản → Drive)', true); return; }
-      toast(batDrive ? 'Đã lưu — bật đưa lên Google Drive nên đã tự tắt "Tải ảnh về" và "Tải video về"'
+      };
+    }
+    async function luuCaiDat(macDinh) {
+      const c = docFormCaiDat();
+      if (macDinh && !await xacNhan('Lưu cài đặt đang hiện làm cài đặt mặc định?',
+        '• Dự án mới tạo sẽ dùng cài đặt này.<br>• Mọi dự án đang có cũng đổi theo (mỗi dự án vẫn giữ thư mục lưu và mẫu tên file riêng).', 'Lưu làm mặc định')) return;
+      const batDrive = c.driveBat && !S.caiDat.driveBat && (S.caiDat.taiAnh || S.caiDat.taiVideo);   // 1.4.1: vừa bật Drive → app tự tắt tải về máy
+      let r;
+      if (macDinh) {
+        const duAn = (duAnHienTai() || {}).id;
+        r = await api.call('datCaiDatMacDinh', { ...c, duAn });
+        if (!r || !r.ok) { toast((r && r.loi) || 'Không lưu được cài đặt mặc định', true); return; }
+        apCaiDatMoi(duAn, r);
+      } else {
+        r = await datCD(c);
+        if (r && r.ok === false) { toast(r.loi || 'Không lưu được cài đặt', true); return; }
+      }
+      veCaiDat();   // S đã có bộ vừa lưu (datCD / apCaiDatMoi) → form giữ đúng số vừa nhập
+      const daLuu = macDinh ? 'Đã lưu làm mặc định' : 'Đã lưu';
+      if (c.driveBat && c.driveCach === 'may' && !$('#cdThuMucDrive').value) { toast(`${daLuu} — nhưng chưa chọn thư mục Google Drive (bấm Tự tìm hoặc Chọn…)`, true); return; }
+      if (c.driveBat && c.driveCach === 'web' && !$('#cdDriveTk').value) { toast(`${daLuu} — nhưng chưa chọn tài khoản Google Drive (Tài khoản → Drive)`, true); return; }
+      if (batDrive) { toast(`${daLuu} — bật đưa lên Google Drive nên đã tự tắt "Tải ảnh về" và "Tải video về"`); return; }
+      toast(macDinh ? `Đã lưu làm mặc định — áp cho ${r.soDuAn} dự án và dự án mới`
         : `Đã lưu cài đặt của dự án "${(duAnHienTai() || {}).ten || ''}"`);
-    };
+    }
 
     // Nhật ký
     $('#nutNhatKy').onclick = () => {
@@ -1722,5 +1725,9 @@
     for (const d of s.nhatKy || []) themLog(d);
     diToi(TEN_TRANG[U.trang] ? U.trang : 'anh');
   });
-  setInterval(() => { capNhatTienDo(); if (S) veDongHo(); }, 1000);
+  // Thanh tiến độ + đồng hồ dự án mỗi giây. 1.4.5: cửa sổ thu nhỏ / bị che hết (document.hidden) thì bỏ qua cho
+  // đỡ CPU, hiện lại thì vẽ ngay một lần.
+  const moiGiay = () => { capNhatTienDo(); if (S) veDongHo(); };
+  setInterval(() => { if (!document.hidden) moiGiay(); }, 1000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) moiGiay(); });
 })();

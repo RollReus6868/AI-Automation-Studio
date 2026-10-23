@@ -501,7 +501,9 @@ class LuongFlow {
 
       // Kết quả "xong" của một việc: bỏ file thừa trước (video cũ cùng prompt — xem _locFileThua).
       const ketQuaOk = (j, flowTen) => {
-        const khac = [...(ctx.fileCu ? ctx.fileCu(j) : []), ...chay.filter((v) => v !== j).flatMap((v) => files.get(v))];
+        // 1.4.5: chỉ khi có file thừa mới cần danh sách file cũ (stat cả nghìn file mỗi việc xong cuối lượt chạy dài).
+        const thua = (files.get(j) || []).length > Math.max(1, c.outputCount || 1);
+        const khac = thua ? [...(ctx.fileCu ? ctx.fileCu(j) : []), ...chay.filter((v) => v !== j).flatMap((v) => files.get(v))] : [];
         const giu = this._locFileThua(j, files.get(j), khac, c.outputCount);
         if (!giu.length) return { ok: false, loi: 'Flow chỉ tải về video/ảnh cũ trùng prompt trong dự án, không thấy kết quả mới' };
         return { ok: true, files: giu.map((p) => ({ duongDan: p })), flowTen };

@@ -445,12 +445,72 @@ test('1.0.4: tắt "cạnh ảnh" + chọn thư mục riêng → video nối t�
   dp.datCaiDat({ videoCanhAnh: false, thuMucVideoAnh: '' });
   assert.ok(chay(a3).startsWith('/video/Mac_dinh/'), 'bỏ thư mục riêng → theo trang Tạo video');
 });
-test('1.0.4: Cài đặt có nút chọn thư mục video tạo từ ảnh, nối lệnh chonThuMucVideoAnh (lưu ngay, tắt cạnh ảnh)', () => {
+test('1.4.5: bỏ ô "Thư mục lưu video tạo từ ảnh" ở Cài đặt (trùng ô của trang Tạo ảnh) và lệnh chonThuMucVideoAnh', () => {
   const ui = docNguon('src/ui/app.js'), m = docNguon('main.js');
   const html = docNguon('src/ui/index.html', true);
-  for (const id of ['cdThuMucVideoAnh', 'cdChonThuMucVideoAnh', 'cdMoThuMucVideoAnh', 'cdBoThuMucVideoAnh']) assert.ok(html.includes(`id="${id}"`), id);
-  assert.ok(/\$\('#cdChonThuMucVideoAnh'\)\.onclick[\s\S]{0,120}api\.call\('chonThuMucVideoAnh', \{ duAn/.test(ui));
-  assert.ok(/chonThuMucVideoAnh: async[\s\S]{0,400}datCaiDat\(\{ thuMucVideoAnh: r\.filePaths\[0\], videoCanhAnh: false \}, duAn\)/.test(m));
+  for (const id of ['cdThuMucVideoAnh', 'cdChonThuMucVideoAnh', 'cdMoThuMucVideoAnh', 'cdBoThuMucVideoAnh']) assert.ok(!html.includes(`id="${id}"`), id);
+  assert.ok(!ui.includes("'chonThuMucVideoAnh'") && !m.includes('chonThuMucVideoAnh:'));
+  assert.ok(html.includes('id="nutThuMucVideoDuAn"'), 'ô của trang Tạo ảnh vẫn còn');
+});
+test('1.4.5: Lưu cài đặt trả bộ vừa lưu (giao diện vẽ lại từ đó, không từ trạng thái cũ) (lần lưu đầu không còn bị đẩy về số cũ)', () => {
+  let bao = 0;
+  const { dp } = dungDieuPhoi();
+  dp.o.bao = () => { bao++; };
+  const d = dp.taoDuAn('P');
+  bao = 0;
+  const r = dp.datCaiDat({ luongMoiTK: '7', flow: { delayMin: '60', delayMax: '120' } }, d.id);
+  assert.ok(r && r.ok && bao >= 1);
+  assert.deepStrictEqual([r.caiDat.luongMoiTK, r.caiDat.flow.delayMin, r.caiDat.flow.delayMax], [7, 60, 120]);
+  assert.strictEqual(r.caiDat, dp.cd(d.id));
+  assert.strictEqual(r.caiDatChung, dp.caiDat);
+  const ui = docNguon('src/ui/app.js');
+  assert.ok(/(const|function) datCD[\s\S]{0,900}caiDatDuAn/.test(ui), 'giao diện phải cập nhật S từ kết quả datCaiDat');
+});
+test('1.4.5: Lưu làm cài đặt mặc định → dự án mới + mọi dự án đang có, giữ thư mục / mẫu tên riêng', () => {
+  const { dp } = dungDieuPhoi();
+  const a = dp.taoDuAn('A'), b = dp.taoDuAn('B');
+  dp.datCaiDat({ thuMucAnh: '/b-anh', tenAnh: '{duAn}_{stt}', luongMoiTK: 2 }, b.id);
+  dp.datCaiDat({ thuMucAnh: '/a-anh', tenVideo: '{stt}' }, a.id);
+  const r = dp.datMacDinh({ luongMoiTK: '5', nghiGiuaLanGui: '9', flow: { tabMoiTK: 1, meToiDa: 8, delayMin: 60, delayMax: 120 } }, a.id);
+  assert.ok(r.ok);
+  assert.strictEqual(r.soDuAn, dp.duAn.length);
+  for (const c of [dp.caiDat, dp.cd(a.id), dp.cd(b.id)]) {
+    assert.deepStrictEqual([c.luongMoiTK, c.nghiGiuaLanGui, c.flow.meToiDa, c.flow.delayMin, c.flow.delayMax], [5, 9, 8, 60, 120]);
+  }
+  assert.strictEqual(dp.cd(b.id).thuMucAnh, '/b-anh', 'thư mục của dự án khác giữ nguyên');
+  assert.strictEqual(dp.cd(b.id).tenAnh, '{duAn}_{stt}', 'mẫu tên của dự án khác giữ nguyên');
+  assert.strictEqual(dp.cd(a.id).thuMucAnh, '/a-anh');
+  assert.notStrictEqual(dp.caiDat.thuMucAnh, '/a-anh', 'thư mục không chép vào cài đặt chung');
+  const c = dp.taoDuAn('C');
+  assert.strictEqual(dp.cd(c.id).luongMoiTK, 5, 'dự án mới dùng cài đặt mặc định');
+  assert.deepStrictEqual(Object.keys(r.caiDatDuAn).sort(), dp.duAn.filter((x) => x.id !== c.id).map((x) => x.id).sort());
+});
+test('1.4.5: cả máy nghỉ Flow — mọi tài khoản Flow khác nghỉ, luồng dừng; Muse không đụng; tài khoản nghỉ lâu hơn giữ nguyên', () => {
+  const { dp, tk, nhatKy } = dungDieuPhoi();
+  const f1 = tk.them('F1', 'flow'), f2 = tk.them('F2', 'flow'), f3 = tk.them('F3', 'flow');
+  const dung = [];
+  dp.luong = [{ taiKhoanId: f2.id, luong: { ranh: false, dung: (l) => dung.push([f2.id, l]) } },
+    { taiKhoanId: 'tk-1', luong: { ranh: false, dung: (l) => dung.push(['tk-1', l]) } }];
+  dp.nghiDen[f3.id] = Date.now() + 5 * 3600000;
+  const ds = dp.nghiCaFlow(2 * 3600000, '2 tài khoản Flow bị báo hoạt động bất thường trong 30 phút', f1.id);
+  assert.ok(ds.includes(f2.id) && !ds.includes(f1.id) && !ds.includes(f3.id) && !ds.includes('tk-1'), JSON.stringify(ds));
+  assert.ok(dp.nghiDen[f2.id] > Date.now() + 3600000 && !dp.nghiDen[f1.id] && !dp.nghiDen['tk-1']);
+  assert.ok(dp.nghiDen[f3.id] > Date.now() + 4 * 3600000, 'đang nghỉ lâu hơn thì không rút ngắn');
+  assert.deepStrictEqual(dung.map((x) => x[0]), [f2.id]);
+  assert.ok(nhatKy.some((x) => /Cả máy nghỉ Flow 2 giờ/.test(x)));
+});
+test('1.4.5: mốc 6 — thư mục video tạo từ ảnh ở Cài đặt chuyển sang ô của dự án (chỉ khi tắt "cạnh ảnh")', () => {
+  const duLieu = { caiDat: { moc: 5, videoCanhAnh: false, thuMucVideoAnh: '/chung' },
+    duAn: [{ id: 'a', ten: 'A' }, { id: 'b', ten: 'B', caiDat: { videoCanhAnh: true, thuMucVideoAnh: '/b' } },
+      { id: 'c', ten: 'C', thuMucVideoAnh: '/c-rieng', caiDat: { videoCanhAnh: false, thuMucVideoAnh: '/c' } }] };
+  const { dp } = dungDieuPhoi({ duLieu });
+  const tim = (id) => dp.duAn.find((d) => d.id === id);
+  assert.strictEqual(tim('a').thuMucVideoAnh, '/chung', 'dự án theo cài đặt chung');
+  assert.ok(!tim('b').thuMucVideoAnh, 'đang bật cạnh ảnh → thư mục đó vốn không dùng, không chuyển');
+  assert.strictEqual(tim('c').thuMucVideoAnh, '/c-rieng', 'ô của dự án đã chọn thì giữ');
+  assert.strictEqual(dp.caiDat.thuMucVideoAnh, '');
+  for (const id of ['a', 'b', 'c']) assert.strictEqual(dp.cd(id).thuMucVideoAnh, '');
+  assert.strictEqual(dp.caiDat.moc, 6);
 });
 test('video nối từ ảnh KHÔNG tải về (ảnh ở bộ nhớ tạm) → video theo thư mục video như cũ', () => {
   const { dp } = dungDieuPhoi();
@@ -463,7 +523,7 @@ test('video nối từ ảnh KHÔNG tải về (ảnh ở bộ nhớ tạm) → 
 });
 test('nâng cấp 1.0.2: mẫu tên ảnh mặc định cũ → {stt}, thử lại 1 → 2 vòng; giá trị tự đặt thì giữ', () => {
   const c = dungDieuPhoi({ duLieu: { caiDat: { tenAnh: '{duAn}/{duAn}_{so}', tuThuLai: 1, moc: 1 } } }).dp.caiDat;
-  assert.deepStrictEqual([c.tenAnh, c.tuThuLai, c.moc], ['{stt}', 2, 5]);
+  assert.deepStrictEqual([c.tenAnh, c.tuThuLai, c.moc], ['{stt}', 2, 6]);
   const t = dungDieuPhoi({ duLieu: { caiDat: { tenAnh: 'anh_{so}', tuThuLai: 4, moc: 1 } } }).dp.caiDat;
   assert.deepStrictEqual([t.tenAnh, t.tuThuLai], ['anh_{so}', 4]);
   assert.strictEqual(dungDieuPhoi({ duLieu: { caiDat: { tenAnh: '{duAn}/{duAn}_{so}', moc: 2 } } }).dp.caiDat.tenAnh, '{duAn}/{duAn}_{so}', 'đã nâng cấp thì không đổi nữa');
@@ -1268,7 +1328,7 @@ testAsync('1.2.1 Muse hỏng ở MỌI tài khoản → việc chuyển sang Flo
 });
 test('1.2.1 nâng cấp: tắt "Flow hỏng → Muse" ở 1.2.0 thì công tắc chung Muse ⇄ Flow cũng tắt; còn lại bật', () => {
   const tat = dungDieuPhoi({ duLieu: { caiDat: { moc: 3, flow: { sangMuseKhiHong: false } } } }).dp.caiDat;
-  assert.deepStrictEqual([tat.doiNenKhiLoi, tat.flow.sangMuseKhiHong, tat.moc], [false, undefined, 5]);
+  assert.deepStrictEqual([tat.doiNenKhiLoi, tat.flow.sangMuseKhiHong, tat.moc], [false, undefined, 6]);
   for (const flow of [{ sangMuseKhiHong: true }, {}]) {
     const c = dungDieuPhoi({ duLieu: { caiDat: { moc: 3, flow } } }).dp.caiDat;
     assert.deepStrictEqual([c.doiNenKhiLoi, c.flow.sangMuseKhiHong], [true, undefined], JSON.stringify(flow));
@@ -1397,7 +1457,7 @@ test('tài khoản: mặc định có Muse 1 + Flow 1 + Suno 1, phiên tách the
 });
 test('model Flow: hộp chọn thật (<select>), gợi ý video khớp model.js, tên đã lưu lạ vẫn hiện', () => {
   const html = docNguon('src/ui/index.html', true), ui = docNguon('src/ui/app.js', true);
-  for (const id of ['fModelAnh', 'fModelChinh', 'fModelPhu', 'fModelDuPhong']) assert.ok(new RegExp(`<select id="${id}"`).test(html), id);
+  for (const id of ['fModelAnh', 'fModelChinh', 'fModelPhu']) assert.ok(new RegExp(`<select id="${id}"`).test(html), id);
   const ds = JSON.parse(ui.match(/const DS_MODEL_VIDEO = (\[[^\]]*\])/)[1].replace(/'/g, '"'));
   assert.deepStrictEqual(ds, require('../src/flow/main/model').MODEL_GOI_Y);
   assert.ok(/không có trong danh sách gợi ý/.test(ui));
@@ -2597,7 +2657,7 @@ console.log('\n── 1.4.0 ─────────────────�
 
   test('1.4.2 giao diện: công tắc "Bỏ qua số đã có file" + Quét thư mục; thẻ "Lưu ảnh & video"; nhãn áp dụng cạnh MỌI cài đặt', () => {
     const html = docNguon('src/ui/index.html'), ui = docNguon('src/ui/app.js'), m = docNguon('main.js');
-    for (const id of ['boQuaDaCo', 'nutQuet', 'ghiQuet', 'cdLuuThe', 'lvTai_anh', 'lvTai_video', 'lvThuMuc_anh', 'lvThuMuc_video', 'lvTen_anh', 'lvTen_video', 'ncApDung']) {
+    for (const id of ['boQuaDaCo', 'nutQuet', 'ghiQuet', 'ncApDung']) {
       assert.ok(new RegExp(`id="${id}"`).test(html), id);
     }
     assert.ok(/quetDaCo: \(p\) => dieuPhoi\.quetDaCo\(p\)/.test(m) && /dsFile: \(goc\) =>/.test(m));

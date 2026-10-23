@@ -87,7 +87,13 @@ function chuanHoaFlow(raw) {
   m.tabMoiTK = Math.round(so(m.tabMoiTK, 1, 4, 1));
   m.meToiDa = Math.round(so(m.meToiDa, 1, 50, 10));
   m.networkGuard = m.networkGuard === 'off' ? 'off' : 'auto';
-  for (const k of ['randomDelay', 'voiceSync', 'addIndex', 'randomScroll', 'goAnhThamChieu', 'nghiThaoTacBat', 'doiTenTrenFlow', 'dongYQuyenAnh']) m[k] = !!m[k];
+  for (const k of ['voiceSync', 'addIndex', 'goAnhThamChieu', 'nghiThaoTacBat', 'doiTenTrenFlow', 'dongYQuyenAnh']) m[k] = !!m[k];
+  // 1.4.5: bỏ công tắc "Ngẫu nhiên thời gian chờ" (trùng hai ô từ / đến): luôn bốc trong [từ, đến], muốn chờ đúng một
+  // số thì để "đến" bằng "từ". Bộ cũ đang TẮT ngẫu nhiên → đổi một lần thành "đến" = "từ" để vẫn chờ y như trước.
+  if (r.randomDelay === false) m.delayMax = m.delayMin;
+  m.randomDelay = true;
+  // 1.4.5: bỏ "Cuộn trang ngẫu nhiên" — chỉ làm trang Flow vẽ lại (tốn CPU), không giúp tạo hay tải.
+  m.randomScroll = false;
   delete m.sangMuseKhiHong;   // 1.2.1: thành công tắc chung caiDat.doiNenKhiLoi (dieu-phoi.js, mốc 4)
   if (!['img_4k', 'img_2k', 'img_1k'].includes(m.chatLuongAnh)) m.chatLuongAnh = 'img_1k';
   if (!['4k', '1080p', '720p'].includes(m.chatLuongVideo)) m.chatLuongVideo = '1080p';
