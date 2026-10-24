@@ -38,7 +38,7 @@ module.exports = function e2eDrive({ win, app, LENH, dieuPhoi, taiKhoan }) {
       kiem(kq === 'da-dang-nhap', 'Kiểm tra tài khoản Drive → đã đăng nhập');
       const ra = path.join(tam, 'ra');
       const d = LENH.taoDuAn({ ten: 'Tập 1: Biển', taiKhoan: ['tk-1'] });
-      const c = { luongMoiTK: 2, nghiGiuaLanGui: 0, choChuGiay: 15, tuThuLai: 0, tuChayLaiLoi: 0, thuMucAnh: ra, thuMucVideo: ra,
+      const c = { luongMoiTK: 2, nghiGiuaLanGui: 0, choChuGiay: 15, tuThuLai: 0, tuChayLaiLoi: 0, tuThuLaiFlow: 0, tuChayLaiLoiFlow: 0, tuThuLaiSuno: 0, tuChayLaiLoiSuno: 0, nghiSuno: 0, thuMucAnh: ra, thuMucVideo: ra,
         driveBat: true, driveCach: 'web', driveTk: tkDrive.id };
       LENH.datCaiDat({ duAn: d.id, ...c });
       kiem(dieuPhoi.cd(d.id).driveCach === 'web' && dieuPhoi.cd(d.id).driveTk === tkDrive.id, 'cài đặt dự án: cách "tải thẳng lên", tài khoản Drive');

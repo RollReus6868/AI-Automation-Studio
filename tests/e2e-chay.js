@@ -46,7 +46,7 @@ module.exports = function e2e({ win, app, LENH, dieuPhoi }) {
       // TK hai thấy Muse tiếng Việt: màn đăng nhập không có câu tiếng Anh nào → phải nhận ra qua ô email.
       await session.fromPartition(tk2.partition).cookies.set({ url: process.env.MUSE_URL, name: 'muse_lang', value: 'vi' });
       const ra = path.join(tam, 'ra');
-      datCD({ luongMoiTK: 3, nghiGiuaLanGui: 0, choChuGiay: 15, tuThuLai: 0, tuChayLaiLoi: 0, thuMucAnh: ra, thuMucVideo: ra });
+      datCD({ luongMoiTK: 3, nghiGiuaLanGui: 0, choChuGiay: 15, tuThuLai: 0, tuChayLaiLoi: 0, tuThuLaiFlow: 0, tuChayLaiLoiFlow: 0, tuThuLaiSuno: 0, tuChayLaiLoiSuno: 0, nghiSuno: 0, thuMucAnh: ra, thuMucVideo: ra });
       const anhNV = path.join(tam, 'lan.png'), anhRef = path.join(tam, 'ref.png');
       fs.writeFileSync(anhNV, PNG1); fs.writeFileSync(anhRef, PNG1);
       LENH.luuNhanVat({ ten: 'Lan', moTa: 'tóc ngắn', anh: [anhNV] });

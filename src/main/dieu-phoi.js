@@ -70,6 +70,13 @@ const CAI_DAT_MAC_DINH = {
   // của dự án). Việc lỗi ở MỌI tài khoản thêm chừng này vòng nữa thì mới đánh Lỗi.
   tuThuLai: 2,
   tuChayLaiLoi: 2,        // hết hàng chờ mà còn việc lỗi → tự đưa về chạy lại, tối đa mấy lượt
+  // 1.4.6: hai số trên là của Muse; Flow và Suno có bộ riêng (Muse và Flow chạy khác nhau). Bản cũ chưa có thì chép
+  // từ số của Muse (tachTheoNen) để người đã chỉnh không bị đổi.
+  tuThuLaiFlow: 2,
+  tuChayLaiLoiFlow: 2,
+  tuThuLaiSuno: 2,
+  tuChayLaiLoiSuno: 2,
+  nghiSuno: 3,            // 1.4.6: giây nghỉ giữa 2 lần gửi Suno (nghiGiuaLanGui giờ chỉ của Muse)
   tatMayKhiXong: false,   // chạy hết hàng chờ thì tắt máy (Windows, macOS) — như Flow Automation Studio
   png: true,              // đổi ảnh webp của Muse sang png
   // 1.2.1: bên này (Muse / Flow) hỏng thì việc tự chuyển sang bên kia: hết tài khoản dùng được, hỏng ở mọi
@@ -96,6 +103,21 @@ const KHOA_RIENG_DU_AN = ['thuMucAnh', 'thuMucVideo', 'thuMucNhac', 'thuMucVideo
 const TRANG_XONG = new Set(['xong', 'loi', 'dung']);
 const LOAI = ['anh', 'video', 'nhac'];
 
+// 1.4.6: khoá cài đặt chạy tách theo nơi chạy: [khoá Muse, khoá Flow, khoá Suno] (null = nơi đó không dùng).
+const KHOA_THEO_NEN = [['tuThuLai', 'tuThuLaiFlow', 'tuThuLaiSuno'], ['tuChayLaiLoi', 'tuChayLaiLoiFlow', 'tuChayLaiLoiSuno'], ['nghiGiuaLanGui', null, 'nghiSuno']];
+/** Giá trị cài đặt `k` (tên khoá của Muse) cho việc chạy ở `nen`. */
+function theoNen(c, nen, k) {
+  const h = KHOA_THEO_NEN.find((x) => x[0] === k);
+  const khoa = h && (nen === 'flow' ? h[1] : nen === 'suno' ? h[2] : h[0]);
+  return c[khoa || k];
+}
+/** 1.4.6: cài đặt lưu từ bản cũ chưa có khoá riêng của Flow / Suno → chép từ khoá Muse (đọc trên bản GỐC đã lưu,
+ *  trước khi trộn mặc định). */
+function tachTheoNen(goc, dich) {
+  if (!goc || typeof goc !== 'object') return;
+  for (const [k, ...moi] of KHOA_THEO_NEN) for (const m of moi) if (m && goc[m] === undefined && goc[k] !== undefined) dich[m] = goc[k];
+}
+
 /** Kẹp mọi giá trị cài đặt về khoảng an toàn (dùng chung cho cài đặt chung và cài đặt riêng của dự án). */
 function chuanCaiDat(c, flowGoc, flowMoi) {
   const so = (v, min, max, md) => Math.max(min, Math.min(max, parseInt(v, 10) || md));
@@ -121,6 +143,8 @@ function chuanCaiDat(c, flowGoc, flowMoi) {
   m.choChuGiay = so(m.choChuGiay, 15, 600, 60);
   m.tuThuLai = Math.max(0, Math.min(10, parseInt(m.tuThuLai, 10) || 0));
   m.tuChayLaiLoi = Math.max(0, Math.min(10, parseInt(m.tuChayLaiLoi, 10) || 0));
+  for (const k of ['tuThuLaiFlow', 'tuThuLaiSuno', 'tuChayLaiLoiFlow', 'tuChayLaiLoiSuno']) m[k] = Math.max(0, Math.min(10, parseInt(m[k], 10) || 0));
+  m.nghiSuno = so(m.nghiSuno, 0, 120, 3);
   m.mau = { ...hd.MAU_MAC_DINH, ...(m.mau || {}) };
   for (const k of ['anh', 'video']) if (!String(m.mau[k] || '').includes('{prompt}')) m.mau[k] = hd.MAU_MAC_DINH[k];
   m.flow = chuanHoaFlow({ ...(flowGoc || {}), ...(flowMoi || {}) });
@@ -147,6 +171,7 @@ class DieuPhoi {
     this.nhanVat = Array.isArray(s.nhanVat) ? s.nhanVat : [];
     this.mauPrompt = Array.isArray(s.mauPrompt) ? s.mauPrompt : [];
     this.caiDat = { ...CAI_DAT_MAC_DINH, ...(s.caiDat || {}) };
+    tachTheoNen(s.caiDat, this.caiDat);
     this.henGio = HG.chuanBoHen(s.henGio);   // 1.3.6: hẹn giờ chạy của từng chức năng (chung cả app)
     this.caiDat.mau = { ...hd.MAU_MAC_DINH, ...(this.caiDat.mau || {}) };
     const sangMuseCu = (this.caiDat.flow || {}).sangMuseKhiHong;   // 1.2.0 — chuanHoaFlow bỏ khoá này, đọc trước (mốc 4)
@@ -204,6 +229,7 @@ class DieuPhoi {
         for (const l of LOAI) d.soLoai[l] = this.viec.filter((j) => j.duAn === d.id && j.loai === l).reduce((m, j) => Math.max(m, j.so || 0), 0);
       }
       if (d.caiDat && moc5 && d.caiDat.flow && d.caiDat.flow.chatLuongAnh === 'img_2k') d.caiDat.flow.chatLuongAnh = 'img_1k';
+      tachTheoNen(d.caiDat, d.caiDat);
       if (d.caiDat) d.caiDat = rieng(chuanCaiDat({ ...this.caiDat, ...d.caiDat }, this.caiDat.flow, d.caiDat.flow));
       if (moc6) {
         const c = this.cd(d.id);
@@ -506,10 +532,21 @@ class DieuPhoi {
     const nen = p.loai === 'nhac' ? 'suno' : chuanNen(p.nen) === 'flow' ? 'flow' : 'muse';
     const loai = nen === 'suno' ? 'nhac' : p.loai === 'video' ? 'video' : 'anh';
     // Ảnh xong → tự tạo video, chạy ở Muse hoặc Flow tuỳ người dùng chọn (mặc định cùng nền tảng với ảnh).
-    const cv = p.chuoiVideo && String(p.chuoiVideo.prompt || '').trim() && loai === 'anh'
-      ? { prompt: String(p.chuoiVideo.prompt).trim(), tyLe: hd.TY_LE.includes(p.chuoiVideo.tyLe) ? p.chuoiVideo.tyLe : '',
-        nen: p.chuoiVideo.nen === 'flow' || p.chuoiVideo.nen === 'muse' ? p.chuoiVideo.nen : nen } : null;
+    // 1.4.6: chuoiVideo.prompts = prompt video RIÊNG từng ảnh (file .txt): ảnh của prompt số N lấy dòng N; ảnh không
+    // có dòng riêng thì dùng prompt dùng chung (trống nữa thì prompt video mặc định).
+    const pc = p.chuoiVideo, ds = pc && Array.isArray(pc.prompts) ? pc.prompts.map((x) => String(x || '').trim()) : [];
+    const cv = pc && loai === 'anh' && (String(pc.prompt || '').trim() || ds.some(Boolean))
+      ? { prompt: String(pc.prompt || '').trim(), prompts: ds.some(Boolean) ? ds : null, tyLe: hd.TY_LE.includes(pc.tyLe) ? pc.tyLe : '',
+        nen: pc.nen === 'flow' || pc.nen === 'muse' ? pc.nen : nen } : null;
     return { d, tatCa, chon, nen, loai, cv };
+  }
+
+  /** 1.4.6: chuỗi ảnh → video của ảnh mang số `stt`: prompt video riêng (dòng `stt` của file .txt) hoặc dùng chung.
+   *  Mỗi việc ảnh chỉ giữ prompt của chính nó (không chép cả danh sách vào mọi việc). */
+  _chuoiCho(cv, stt) {
+    if (!cv) return null;
+    const rieng = (cv.prompts && cv.prompts[stt - 1]) || '';
+    return { prompt: rieng || cv.prompt || hd.PROMPT_VIDEO_MAC_DINH, tyLe: cv.tyLe, nen: cv.nen, ...(rieng ? { rieng: true } : {}) };
   }
 
   /**
@@ -621,7 +658,7 @@ class DieuPhoi {
         const nv = noiVideoTuAnh(f);
         const vv = viecCo('video', stt, nv.goc);
         if (vv.cho) { kq.dangCho.push(stt); continue; }
-        if (!vv.file && !timFile('video', { stt, prompt: cv.prompt, thamChieu: [f] }, nv.goc, nv.mau)) {
+        if (!vv.file && !timFile('video', { stt, prompt: this._chuoiCho(cv, stt).prompt, thamChieu: [f] }, nv.goc, nv.mau)) {
           kq.chiVideo.push({ stt, anh: f });
           continue;
         }
@@ -685,7 +722,7 @@ class DieuPhoi {
     const moi = [];
     for (const { stt, anh } of (q ? q.chiVideo : [])) {
       // Ảnh đã có trong thư mục, video của nó chưa có → chỉ tạo video từ ảnh đó (lưu như video nối từ ảnh).
-      const v = this._viecMoi(d, { nen: cv.nen, loai: 'video', prompt: cv.prompt, stt, so: stt, tyLe: cv.tyLe || p.tyLe, thamChieu: [anh] });
+      const v = this._viecMoi(d, { nen: cv.nen, loai: 'video', prompt: this._chuoiCho(cv, stt).prompt, stt, so: stt, tyLe: cv.tyLe || p.tyLe, thamChieu: [anh] });
       v.anhCoSan = true;
       v.henLoai = 'anh';
       moi.push(v);
@@ -696,7 +733,7 @@ class DieuPhoi {
       if (!nv.length && p.tuNhanVat) nv = hd.timNhanVat(pr, this.nhanVat).map((n) => n.id);
       const thamChieu = [...(p.thamChieu || []), ...((p.thamChieuTheoDong && p.thamChieuTheoDong[stt - 1]) || [])];
       for (let b = 0; b < soBan; b++) {
-        moi.push(this._viecMoi(d, { nen, loai, prompt: text, stt, tyLe: p.tyLe, thamChieu, nhanVat: nv, chuoi: cv }));
+        moi.push(this._viecMoi(d, { nen, loai, prompt: text, stt, tyLe: p.tyLe, thamChieu, nhanVat: nv, chuoi: this._chuoiCho(cv, stt) }));
       }
     }
     this.viec.push(...moi);
@@ -714,7 +751,7 @@ class DieuPhoi {
     const khoang = chon.length < tatCa.length ? ` (prompt ${chon.length ? hd.gonSo(chon.map((x) => x.stt)) : '—'})` : '';
     if (nAnh) {
       this.log('info', `➕ Thêm ${nAnh} việc ${TEN_LOAI[loai]} ${TEN_NEN[nen]}${khoang} vào "${d.ten}"` +
-        (cv ? ` — ảnh xong sẽ tự tạo video ở ${TEN_NEN[cv.nen]}` : ''));
+        (cv ? ` — ảnh xong sẽ tự tạo video ở ${TEN_NEN[cv.nen]}${cv.prompts ? ` (prompt video riêng từng ảnh: ${chon.filter((x) => cv.prompts[x.stt - 1]).length}/${chon.length} ảnh có dòng riêng)` : ''}` : ''));
     }
     if (q && q.chiVideo.length) this.log('info', `➕ Thêm ${q.chiVideo.length} việc video ${TEN_NEN[cv.nen]} từ ảnh đã có vào "${d.ten}"`);
     if (p.chay) this.chayDuAn(d.id);
@@ -1416,7 +1453,7 @@ class DieuPhoi {
         const tkCu = j.tkLoi[j.tkLoi.length - 1];
         j.vongTk = (j.vongTk || 0) + 1;
         j.tkLoi = [];
-        if (j.vongTk > this.cd(j.duAn).tuThuLai) {
+        if (j.vongTk > theoNen(this.cd(j.duAn), j.nen, 'tuThuLai')) {
           // Hỏng ở mọi tài khoản qua đủ vòng → thử bên kia (Muse ⇄ Flow) trước khi đánh Lỗi.
           if (this._coTheDoiNen(j) && this._doiNen([j], `#${j.so} hỏng ở mọi tài khoản ${TEN_NEN[j.nen]}`)) {
             ds = this._tkCho(j);
@@ -1479,12 +1516,12 @@ class DieuPhoi {
       if (!conViec && !ban) {
         // Hết một lượt: việc lỗi còn lượt chạy lại → đưa về hàng chờ (gửi prompt mới) và chạy tiếp.
         const c = this.cd(id);
-        const lai = this.viec.filter((j) => j.duAn === id && j.trangThai === 'loi' && (j.vongLai || 0) < c.tuChayLaiLoi);
+        const lai = this.viec.filter((j) => j.duAn === id && j.trangThai === 'loi' && (j.vongLai || 0) < theoNen(c, j.nen, 'tuChayLaiLoi'));
         if (lai.length) {
           for (const j of lai) {
             Object.assign(j, { trangThai: 'cho', buoc: '', thread: '', taiKhoan: '', thu: 0, tkLoi: [], vongTk: 0, batDauLuc: 0, xongLuc: 0, vongLai: (j.vongLai || 0) + 1 });
           }
-          this.log('warning', `↻ Hết lượt — tự chạy lại ${lai.length} việc lỗi (lượt ${Math.max(...lai.map((j) => j.vongLai))}/${c.tuChayLaiLoi}) — dự án "${ten}"`);
+          this.log('warning', `↻ Hết lượt — tự chạy lại ${lai.length} việc lỗi (lượt ${Math.max(...lai.map((j) => j.vongLai))}/${Math.max(...lai.map((j) => theoNen(c, j.nen, 'tuChayLaiLoi')))}) — dự án "${ten}"`);
           this.luu();
           continue;
         }
@@ -1514,7 +1551,7 @@ class DieuPhoi {
       const ban = this.luong.some((y) => !y.luong.ranh && (y.luong.dsViec || (y.luong.viec ? [y.luong.viec] : [])).some(nho));
       const ten = HG.TEN_CHUC_NANG[l];
       if (!conViec && !ban) {
-        const lai = this.viec.filter((j) => nho(j) && j.trangThai === 'loi' && (j.vongLai || 0) < this.cd(j.duAn).tuChayLaiLoi);
+        const lai = this.viec.filter((j) => nho(j) && j.trangThai === 'loi' && (j.vongLai || 0) < theoNen(this.cd(j.duAn), j.nen, 'tuChayLaiLoi'));
         if (lai.length) {
           for (const j of lai) {
             Object.assign(j, { trangThai: 'cho', buoc: '', thread: '', taiKhoan: '', thu: 0, tkLoi: [], vongTk: 0, batDauLuc: 0, xongLuc: 0, vongLai: (j.vongLai || 0) + 1 });
@@ -1604,7 +1641,7 @@ class DieuPhoi {
       png: cd.png,
       choToiDaGiay: j.loai === 'nhac' ? cd.choNhacGiay : j.loai === 'video' ? cd.choVideoGiay : cd.choAnhGiay,
       choChuGiay: j.loai === 'video' ? cd.choChuGiay * 2 : cd.choChuGiay,
-      choGui: () => this.choGui(x.taiKhoanId, cd.nghiGiuaLanGui),
+      choGui: () => this.choGui(x.taiKhoanId, theoNen(cd, j.nen, 'nghiGiuaLanGui')),
       capNhat: (thay) => { if (j.lanGiao === lan) { Object.assign(j, thay); this._luuBuoc(thay); } }
     });
     if (j.lanGiao !== lan) { this.o.bao(); return; }
@@ -1912,7 +1949,7 @@ class DieuPhoi {
       j.thu = (j.thu || 0) + 1;
       // Mọi tài khoản của dự án đều đã lỗi việc này → hết một vòng, vòng sau bắt đầu lại từ tài khoản chính.
       if (!ds.some((id) => !j.tkLoi.includes(id))) { j.vongTk = (j.vongTk || 0) + 1; j.tkLoi = []; }
-      const vong = j.vongTk || 0, soVong = c.tuThuLai + 1;
+      const vong = j.vongTk || 0, soVong = theoNen(c, j.nen, 'tuThuLai') + 1;
       if (vong < soVong) {
         const sang = hd.taiKhoanChoViecDs({ tkLoi: j.tkLoi }, ds, (id) => this._nghi(id), this._soSong(j.duAn, j.nen, false, j.loai))
           .find((id) => id !== tkId) || hd.taiKhoanChoViec({ tkLoi: j.tkLoi }, ds, (id) => this._nghi(id));

@@ -35,7 +35,7 @@ module.exports = function e2eFlow({ win, app, LENH, dieuPhoi, taiKhoan }) {
       ghi('== E2E Google Flow (trang + engine giả) ==');
       await session.fromPartition('persist:muse-tk-1').cookies.set({ url: process.env.MUSE_URL, name: 'muse_login', value: '1' });
       const ra = path.join(tam, 'ra');
-      datCD({ luongMoiTK: 2, nghiGiuaLanGui: 0, choChuGiay: 15, tuThuLai: 0, tuChayLaiLoi: 0, thuMucAnh: ra, thuMucVideo: ra,
+      datCD({ luongMoiTK: 2, nghiGiuaLanGui: 0, choChuGiay: 15, tuThuLai: 0, tuChayLaiLoi: 0, tuThuLaiFlow: 0, tuChayLaiLoiFlow: 0, tuThuLaiSuno: 0, tuChayLaiLoiSuno: 0, nghiSuno: 0, thuMucAnh: ra, thuMucVideo: ra,
         flow: { delayMin: 1, delayMax: 1, randomDelay: false, modelAnh: '', maxRetries: 1, anToan: { bat: false } } });
       kiem(taiKhoan.ds.some((a) => a.id === 'flow-1' && a.nen === 'flow' && a.partition === 'persist:flow-flow-1'),
         'có sẵn tài khoản "Flow 1" (phiên riêng persist:flow-flow-1)');

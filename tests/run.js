@@ -1315,7 +1315,7 @@ testAsync('1.2.1 Muse hỏng ở MỌI tài khoản → việc chuyển sang Flo
   // Cả hai bên hỏng.
   const daChay2 = [];
   const b = dungDieuPhoi({ taoLuong: luongMuseFlow(daChay2, { hong: new Set(['tk-1']), flowHong: new Set(['flow-1']) }), tonTai: (p) => String(p).startsWith('/anh/') });
-  b.dp.datCaiDat({ luongMoiTK: 1, nghiGiuaLanGui: 0, tuThuLai: 0, tuChayLaiLoi: 0, flow: { meToiDa: 5 } });
+  b.dp.datCaiDat({ luongMoiTK: 1, nghiGiuaLanGui: 0, tuThuLai: 0, tuChayLaiLoi: 0, tuThuLaiFlow: 0, tuChayLaiLoiFlow: 0, flow: { meToiDa: 5 } });
   const d2 = b.dp.taoDuAn('P', ['tk-1', 'flow-1']);
   b.dp.them({ duAn: d2.id, loai: 'anh', prompts: ['a1'] });
   b.dp.chayTatCa();
@@ -2321,7 +2321,7 @@ console.log('\n── 1.4.0 ─────────────────�
     assert.strictEqual(dp.doiPrompt([a.id], { cach: 'thay', moi: ' ' }).ok, false);
     assert.strictEqual(dp.doiPrompt([a.id], { cach: 'tim', tim: '' }).ok, false);
     // Prompt video nối từ ảnh: các ảnh thêm cùng lượt dùng chung một đối tượng chuoi — đổi ảnh a không đổi ảnh b.
-    assert.strictEqual(a.chuoi, b.chuoi);
+    assert.deepStrictEqual(a.chuoi, b.chuoi);
     r = dp.doiPrompt([a.id], { cach: 'thay', dich: 'chuoi', moi: 'xoay quanh' });
     assert.deepStrictEqual([r.doi, a.chuoi.prompt, b.chuoi.prompt, a.prompt], [1, 'xoay quanh', 'zoom chậm', 'mèo ở núi']);
     dp.them({ loai: 'video', prompts: ['v'] });

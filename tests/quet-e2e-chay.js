@@ -27,7 +27,7 @@ module.exports = function e2eQuet({ win, app, LENH, dieuPhoi }) {
     try {
       ghi('== E2E Quét thư mục (trang Muse giả) ==');
       await session.fromPartition('persist:muse-tk-1').cookies.set({ url: process.env.MUSE_URL, name: 'muse_login', value: '1' });
-      LENH.datCaiDat({ luongMoiTK: 2, nghiGiuaLanGui: 0, choChuGiay: 15, tuThuLai: 0, tuChayLaiLoi: 0 });
+      LENH.datCaiDat({ luongMoiTK: 2, nghiGiuaLanGui: 0, choChuGiay: 15, tuThuLai: 0, tuChayLaiLoi: 0, tuThuLaiFlow: 0, tuChayLaiLoiFlow: 0, tuThuLaiSuno: 0, tuChayLaiLoiSuno: 0, nghiSuno: 0 });
 
       // 18) 1.4.2: lần chạy trước dừng giữa chừng / mất lịch sử, thư mục đã có 001, 002, 004 (+ 002.mp4) → bật "Bỏ qua số
       //     đã có file" thì chỉ gửi Muse số còn thiếu: ảnh 003, 005 (kèm video), và CHỈ video 001, 004 từ ảnh có sẵn.
