@@ -29,6 +29,33 @@ module.exports = function e2eFlow({ win, app, LENH, dieuPhoi, taiKhoan }) {
   const xongHet = (ds) => () => ds.every((j) => j.trangThai === 'xong' || j.trangThai === 'loi');
   const inViec = (ds) => { for (const j of ds) ghi(`   #${j.so} ${j.nen} ${j.loai} ${j.trangThai} tk=${j.taiKhoan} ${j.loi || ''} ${(j.files || []).map((f) => path.basename(f)).join(',')}`); };
   const dongNhatKy = (tu) => { for (const d of LENH.trangThai().nhatKy.slice(tu)) ghi(`   | ${d.chu}`); };
+  // Chẩn đoán khi việc Flow hỏng ở bước TẢI VỀ ("Flow tạo xong nhưng không tải về được"): in mốc engine bấm tải / app báo
+  // DOWNLOAD_STARTED (engine giả ghi lại), rồi đợi tối đa 20 s xem file có về MUỘN vào thư mục tải tạm của luồng không.
+  // File về sau lúc luồng đã chốt việc là lỗi đua của app (chốt mẻ khi tải còn dở), không phải engine không tải.
+  const chanDoanTai = async (ds) => {
+    const hong = ds.filter((j) => j.trangThai === 'loi' && /tải về/.test(j.loi || ''));
+    if (!hong.length) return;
+    const goc = path.join(app.getPath('userData'), 'flow-tai-tam');
+    const quet = () => {
+      const ra = [];
+      const di = (d) => { let ds2 = []; try { ds2 = fs.readdirSync(d, { withFileTypes: true }); } catch (_) { return; }
+        for (const e of ds2) { const f = path.join(d, e.name); if (e.isDirectory()) di(f); else { try { ra.push({ f, luc: fs.statSync(f).mtimeMs }); } catch (_) {} } } };
+      di(goc);
+      return ra;
+    };
+    const ten = new Set(ds.map((j) => path.basename((j.files || [])[0] || '')).filter(Boolean));
+    const tim = (j) => quet().filter((x) => new RegExp(`_${String(j.so).padStart(3, '0')}( \\(\\d+\\))?\\.[a-z0-9]+$`, 'i').test(x.f) && !ten.has(path.basename(x.f)));
+    await cho(() => hong.every((j) => tim(j).length), 20000, 'file của việc hỏng về muộn (chẩn đoán)');
+    const g = await flowGhi();
+    for (const x of g.filter((y) => y.loai === 'tai' || y.loai === 'tai-khong-bat-dau')) ghi(`   ⓘ engine giả: ${x.loai} ${JSON.stringify(x.d)} lúc ${new Date(x.luc).toISOString()}`);
+    for (const j of hong) {
+      const ve = tim(j);
+      ghi(`   ⓘ #${j.so}: luồng chốt "${j.loi}" lúc ${j.xongLuc ? new Date(j.xongLuc).toISOString() : '?'}; ` +
+        (ve.length ? ve.map((x) => `file ${path.basename(x.f)} về lúc ${new Date(x.luc).toISOString()} (${Math.round(x.luc - (j.xongLuc || 0))} ms SAU khi chốt)`).join('; ')
+          : 'không thấy file nào về trong 20 s'));
+    }
+    if (hong.some((j) => tim(j).length)) ghi('   ⓘ ⇒ file VỀ MUỘN sau khi luồng đã chốt việc: luồng Flow kết mẻ (AUTOMATION_STOPPED + 3 s) lúc tải còn dở — lỗi đua của app (src/flow/luong-flow.js, t.onDung).');
+  };
 
   win.webContents.once('did-finish-load', async () => {
     try {
@@ -45,14 +72,24 @@ module.exports = function e2eFlow({ win, app, LENH, dieuPhoi, taiKhoan }) {
       let nk = LENH.trangThai().nhatKy.length;
       // Flow tự mở lại dự án cũ "gia-cu" khi tab vào trang chủ lần đầu (xem trang Flow giả).
       await session.fromPartition('persist:flow-flow-1').cookies.set({ url: process.env.FLOW_TEST_URL, name: 'flow_mo_du_an_cu', value: 'gia-cu' });
+      // Chỉ để TÁI HIỆN lỗi CI Windows (bài thường không đặt): FLOW_E2E_TAI_CHAM_MS=<ms> → file mẻ §1 tải xong chậm <ms>.
+      if (process.env.FLOW_E2E_TAI_CHAM_MS) {
+        await session.fromPartition('persist:flow-flow-1').cookies.set({ url: process.env.MUSE_URL, name: 'flow_tai_cham', value: String(process.env.FLOW_E2E_TAI_CHAM_MS) });
+      }
       LENH.them({ duAn: 'mac-dinh', loai: 'anh', nen: 'flow', tyLe: '9:16', prompts: ['con mèo', 'con chó', 'con gà'],
         chuoiVideo: { prompt: 'chuyển động nhẹ', nen: 'muse' }, chay: true });
       const anh1 = viec().filter((j) => j.nen === 'flow' && j.loai === 'anh');
-      await cho(() => xongHet(anh1)() && viec().filter((j) => j.loai === 'video').length === 3 && xongHet(viec().filter((j) => j.loai === 'video'))(),
-        120000, 'ảnh Flow + video Muse xong');
+      // Chờ THEO ĐIỀU KIỆN: mọi ảnh có kết quả và MỖI ảnh xong đã có video của nó chạy xong. Bản cũ đòi đủ 3 video —
+      // ảnh hỏng thì không bao giờ có video, bài ngồi chờ hết 120 s rồi mới in lỗi (CI Windows 18/10, 22/10/2026).
+      const videoCua = (a) => viec().find((j) => j.loai === 'video' && j.tuAnh === a.id);
+      await cho(() => xongHet(anh1)() && anh1.every((a) => a.trangThai !== 'xong' || (videoCua(a) && xongHet([videoCua(a)])())),
+        180000, 'ảnh Flow + video Muse xong');
       const video1 = viec().filter((j) => j.loai === 'video');
       inViec([...anh1, ...video1]);
-      if (!anh1.every((j) => j.trangThai === 'xong')) dongNhatKy(nk);   // hỏng thì in nhật ký app để biết vì sao (CI Windows)
+      if (!anh1.every((j) => j.trangThai === 'xong')) {
+        dongNhatKy(nk);   // hỏng thì in nhật ký app để biết vì sao (CI Windows)
+        await chanDoanTai(anh1);
+      }
       const g1 = await flowGhi();
       const start1 = g1.filter((x) => x.loai === 'start');
       kiem(start1.length === 1 && start1[0].d.videosToCreate.length === 3, `3 prompt ảnh giao trong MỘT mẻ (${start1.length} mẻ)`);
@@ -65,7 +102,10 @@ module.exports = function e2eFlow({ win, app, LENH, dieuPhoi, taiKhoan }) {
       kiem(anh1.every((j) => j.trangThai === 'xong' && j.taiKhoan === 'flow-1' && j.files.length === 1 && /\.png$/.test(j.files[0]) && fs.existsSync(j.files[0])),
         'cả 3 ảnh xong ở "Flow 1", file .png nằm trong thư mục kết quả');
       kiem(anh1.every((j) => j.flowTen && j.flowTen.tk === 'flow-1' && j.flowTen.ten), 'nhớ tên ảnh trên Flow (để video Flow dùng lại bằng @tên)');
-      kiem(new Set(anh1.map((j) => fs.readFileSync(j.files[0]).length)).size === 1 && fs.readFileSync(anh1[0].files[0]).equals(PNG1),
+      // Ảnh hỏng thì không có file: kiểm là ✘ (không ném TypeError làm tắt cả bài như CI 18/10, 22/10/2026 — các mục sau
+      // vẫn chạy, biết được chỉ §1 hỏng hay hỏng cả loạt).
+      const coFile1 = anh1.every((j) => j.files[0] && fs.existsSync(j.files[0]));
+      kiem(coFile1 && new Set(anh1.map((j) => fs.readFileSync(j.files[0]).length)).size === 1 && fs.readFileSync(anh1[0].files[0]).equals(PNG1),
         'nội dung file ảnh đúng là file Flow tải về');
       // Đọc từ KHO đã lưu (không phải object trong bộ nhớ — luồng gán thẳng vào đó nên che mất lỗi kho từ chối địa chỉ).
       // 1.3.0: địa chỉ dự án Flow lưu theo DỰ ÁN của app (mỗi dự án app một dự án Flow riêng ở từng tài khoản).
@@ -76,6 +116,7 @@ module.exports = function e2eFlow({ win, app, LENH, dieuPhoi, taiKhoan }) {
       kiem(!luu1.includes('gia-cu') && LENH.trangThai().nhatKy.some((d) => /dự án Flow cũ — về trang chủ/.test(d.chu)),
         'Flow mở lại dự án cũ → app về trang chủ, tạo dự án MỚI (không dùng dự án cũ)');
       await session.fromPartition('persist:flow-flow-1').cookies.remove(process.env.FLOW_TEST_URL, 'flow_mo_du_an_cu');
+      await session.fromPartition('persist:flow-flow-1').cookies.remove(process.env.MUSE_URL, 'flow_tai_cham');
       kiem(video1.length === 3 && video1.every((j) => j.nen === 'muse' && j.trangThai === 'xong' && j.taiKhoan === 'tk-1' && /\.mp4$/.test(j.files[0] || '')),
         'mỗi ảnh Flow sinh đúng 1 video chạy ở MUSE, xong có file .mp4');
       const gui1 = (await daGui()).filter((g) => /chuyển động nhẹ/.test(g.prompt));

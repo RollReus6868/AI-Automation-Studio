@@ -12,7 +12,7 @@ on:
 jobs:
   build:
     runs-on: windows-latest
-    timeout-minutes: 40
+    timeout-minutes: 45
     steps:
       - name: Lay ma nguon
         uses: actions/checkout@v4
@@ -21,6 +21,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+          # Cache thu muc npm theo package-lock.json (npm ci van cai lai node_modules, chi bot tai tu mang).
+          cache: npm
 
       - name: Cai thu vien
         shell: pwsh
@@ -32,11 +34,18 @@ jobs:
         run: npm test
 
       # Chay APP THAT tren trang Muse gia: nhieu luong, dung giua chung, dang nhap...
+      # Muse tren Windows CI ~500 s (18-22/10/2026), sat han cung 720 s cua tests/e2e.js -> nang han cung len 1000 s
+      # (han chong treo, khong phai bai do toc do); han buoc phai dai hon han cung de log "E2E: QUA GIO" kip in ra.
       - name: Kiem thu dau-cuoi (trang Muse gia)
-        timeout-minutes: 16
+        timeout-minutes: 20
+        env:
+          E2E_HAN_GIAY: '1000'
         run: node tests/e2e.js
 
       # Google Flow trong hang doi + noi Flow <-> Muse (trang + engine Flow gia)
+      # KHONG tu chay lai buoc nay khi do: cac lan do 18/10 + 22/10/2026 (#2/#3 "Flow tao xong nhung khong tai ve duoc")
+      # la loi dua THAT cua app (luong Flow chot me ~3 s sau AUTOMATION_STOPPED khi file con dang tai, Windows quet virus
+      # file vua tai lam "done" toi muon; da sua o 1.4.6: luong-flow cho file dang tai) - chay lai cho xanh la che loi. Do thi xem dong "(i)" (ky hieu \u24D8) + artifact anh-chup-*.
       - name: Kiem thu dau-cuoi (trang Flow gia)
         timeout-minutes: 10
         run: node tests/e2e.js flow

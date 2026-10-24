@@ -1,4 +1,22 @@
-# AI Automation Studio 1.4.5
+# AI Automation Studio 1.4.6
+
+- **Prompt video riêng cho từng ảnh bằng file .txt.** Có ở hai chỗ:
+  - Trang Tạo ảnh → *Ảnh xong → tự tạo video*: bấm **Nhập file .txt — prompt riêng từng ảnh**. Ảnh của prompt số 1 dùng dòng 1 của file, prompt số 2 dùng dòng 2… (theo đúng số thứ tự prompt ảnh, kể cả khi chỉ chạy một số prompt như `98, 303`).
+  - Trang Tạo video → *Tạo video từ thư mục ảnh*: cùng nút đó. Ảnh trong thư mục xếp theo tên: ảnh 1 dùng dòng 1, ảnh 2 dùng dòng 2…
+  - Ảnh nào không có dòng riêng (file ít dòng hơn số ảnh) thì dùng ô *Prompt dùng chung*; ô đó trống thì dùng prompt video mặc định. Số dòng lệch số ảnh thì app hỏi trước khi tạo. Bấm **Bỏ** để quay về dùng chung một prompt.
+  - File tách prompt giống ô Prompt (mỗi dòng một prompt, hoặc cách bằng dòng trống tuỳ *Tách prompt theo*). Dòng trống bị bỏ qua, nên đừng để trống dòng nào ở giữa.
+- **Trang Cài đặt chia theo nơi chạy:** thẻ **Chung (Muse + Flow)**, **Muse — khi chạy**, **Google Flow — khi chạy**, **Suno — khi chạy**, **Google Drive**, **Cả app**. Tiêu đề mỗi thẻ có nhãn nơi chạy; nhãn cạnh từng mục vẫn cho biết áp cho ảnh / video / nhạc.
+- **Cài đặt chạy của Muse và Flow giờ tách riêng:**
+  - *Lỗi ở mọi tài khoản thì thử thêm (vòng)* và *Hết lượt → tự chạy lại việc lỗi* có số riêng cho Muse, cho Flow và cho Suno.
+  - *Nghỉ giữa 2 lần gửi* giờ chỉ của Muse; Suno có ô nghỉ riêng. Flow vẫn dùng *Chờ giữa 2 prompt* trong thẻ Flow.
+  - Lên bản mới, các số Flow / Suno lấy đúng số bạn đang đặt (không đổi cách chạy cho tới khi bạn sửa).
+  - *Chạy xong thì tự xoá dự án Flow* chuyển vào thẻ Flow; *Chạy xong thì tự xoá chat Muse*, *Lưu ảnh PNG*, *Mẫu câu lệnh gửi Muse* nằm ở thẻ Muse.
+- Sửa: ô *Nghỉ giữa 2 lần gửi* đặt 0 trước đây bị lưu thành 3 giây; giờ lưu đúng 0.
+- Mọi thứ khác giữ nguyên như 1.4.5.
+
+Lưu ý: đã kiểm bằng bài kiểm tự động và trên trang Muse / Flow giả, chưa chạy trên Muse / Flow thật.
+
+## Bản 1.4.5
 
 - **Lưu cài đặt lần đầu không còn bị đẩy về số cũ.** Thật ra lần đầu đã lưu được, nhưng trang Cài đặt vẽ lại bằng số cũ nên trông như chưa lưu. Giờ bấm Lưu là thấy ngay số vừa lưu.
 - **Nút lưu luôn ở đáy trang Cài đặt**, không phải cuộn lên đầu trang nữa. Có hai nút:

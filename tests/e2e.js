@@ -110,6 +110,18 @@ const sv = http.createServer((req, res) => {
     return;
   }
   if (req.url === '/__flow-ghi') { res.setHeader('content-type', 'application/json'); res.end(JSON.stringify(flowGhi)); return; }
+  // Engine Flow giả với cookie flow_tai_cham (chỉ để tái hiện): đầu trả lời gửi ngay, thân file giữ ?ms= mới xong.
+  if (req.url.startsWith('/__flow-tai-cham')) {
+    const u = new URL(req.url, 'http://x');
+    const video = u.searchParams.get('video') === '1';
+    const than = video ? Buffer.from(new Uint8Array(3000).map((_, i) => i % 251))
+      : Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFElEQVR4nGP8z8DwnwEJMDGgAQAy2wIDqvFBJQAAAABJRU5ErkJggg==', 'base64');
+    res.writeHead(200, { 'content-type': video ? 'video/mp4' : 'image/png', 'content-length': than.length,
+      'content-disposition': `attachment; filename="flow_goc.${video ? 'mp4' : 'png'}"` });
+    res.write(than.subarray(0, 1));
+    setTimeout(() => res.end(than.subarray(1)), Math.min(60000, Number(u.searchParams.get('ms')) || 0));
+    return;
+  }
   // Danh sách dự án Flow giả (trang chủ Flow đọc / thêm / xoá). "gia-khac" là dự án của người dùng — không được bị xoá.
   if (req.url === '/__flow-du-an' || req.url === '/__flow-xoa-du-an') {
     if (req.method !== 'POST') { res.setHeader('content-type', 'application/json'); res.end(JSON.stringify(duAnFlow)); return; }
@@ -195,14 +207,33 @@ sv.listen(0, '127.0.0.1', () => {
   let raChu = '';
   p.stdout.on('data', (d) => { raChu += d; process.stdout.write(d); });
   p.stderr.on('data', (d) => { const s = String(d); if (!/dbus|bus\.cc|viz_main|command_buffer|Fontconfig|gpu/i.test(s)) process.stderr.write(s); });
-  const hen = setTimeout(() => { console.log('E2E: QUÁ GIỜ (720s)'); p.kill('SIGKILL'); }, 720000);
+  // Hạn cứng chống treo (không phải bài đo tốc độ). Mặc định 720 s; CI đặt E2E_HAN_GIAY riêng từng bước — Muse trên
+  // Windows CI đã ~500 s (18–22/10/2026), sát 720 s. Hạn của bước (timeout-minutes) phải dài hơn hạn này.
+  const hanGiay = Number(process.env.E2E_HAN_GIAY) || 720;
+  const batDau = Date.now();
+  const hen = setTimeout(() => { console.log(`E2E: QUÁ GIỜ (${hanGiay}s)`); p.kill('SIGKILL'); }, hanGiay * 1000);
   p.on('exit', (code) => {
     clearTimeout(hen);
     sv.close();
-    console.log(code === 0 ? 'E2E: PASS' : `E2E: FAIL (mã ${code})`);
+    const giay = Math.round((Date.now() - batDau) / 1000);
+    console.log(code === 0 ? `E2E: PASS (${giay} s / hạn ${hanGiay} s)` : `E2E: FAIL (mã ${code}, ${giay} s / hạn ${hanGiay} s)`);
+    if (code !== 0) {
+      // Đỏ → chép nhật ký bài kiểm + nhật ký app vào shots/ (CI tải lên thành artifact anh-chup-*, kể cả khi đỏ) để truy.
+      const kieu = FLOW ? 'flow' : SUNO ? 'suno' : DRIVE ? 'drive' : QUET ? 'quet' : 'muse';
+      const dich = path.join(__dirname, '..', 'shots', `e2e-${kieu}-${process.platform}`);
+      try {
+        fs.mkdirSync(dich, { recursive: true });
+        fs.writeFileSync(path.join(dich, 'stdout.txt'), raChu);
+        for (const [tu, ten] of [[path.join(tam, 'e2e-log.txt'), 'e2e-log.txt'], [path.join(tam, 'data', 'nhat-ky.txt'), 'nhat-ky-app.txt'],
+          [path.join(tam, 'data', 'nhat-ky-cu.txt'), 'nhat-ky-app-cu.txt']]) {
+          if (fs.existsSync(tu)) fs.copyFileSync(tu, path.join(dich, ten));
+        }
+        console.log(`Nhật ký bài kiểm + app đã chép vào ${dich}`);
+      } catch (err) { console.log(`Không chép được nhật ký: ${err.message}`); }
+    }
     if (code !== 0 && process.env.GITHUB_ACTIONS) {
       // Log của job không tải được từ phiên Claude → đưa các dòng đáng chú ý lên thành annotation.
-      const quanTrong = raChu.split('\n').filter((l) => /✘|⏱|kẹt|LỖI|KẾT QUẢ|^--/.test(l)).join('\n').slice(-5000);
+      const quanTrong = raChu.split('\n').filter((l) => /✘|⏱|ⓘ|kẹt|LỖI|KẾT QUẢ|^--/.test(l)).join('\n').slice(-5000);
       const esc = (x) => x.replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
       console.log(`::error title=E2E ${FLOW ? 'Flow ' : SUNO ? 'Suno ' : DRIVE ? 'Drive ' : QUET ? 'Quet ' : ''}${process.platform}::${esc(quanTrong || raChu.slice(-5000))}`);
     }

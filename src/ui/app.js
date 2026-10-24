@@ -19,6 +19,11 @@
   }, docLuu());
   if (!U.nen || typeof U.nen !== 'object') U.nen = { anh: 'muse', video: 'muse' };
   if (!U.nhap || typeof U.nhap !== 'object') U.nhap = { anh: '', video: '', nhac: '' };
+  // 1.4.6: prompt video RIÊNG từng ảnh nhập từ file .txt — chuoi: "Ảnh xong → tự tạo video", thuMuc: "Tạo video từ thư mục ảnh".
+  // Mỗi cái null hoặc { ten: tên file, ds: [prompt…] } (dòng i ↔ ảnh i).
+  const chuanRieng = (x) => (x && typeof x === 'object' && Array.isArray(x.ds) && x.ds.length
+    ? { ten: String(x.ten || ''), ds: x.ds.map((p) => String(p || '')) } : null);
+  U.rieng = { chuoi: chuanRieng(U.rieng && U.rieng.chuoi), thuMuc: chuanRieng(U.rieng && U.rieng.thuMuc) };
   U.chon = new Set(); U.chiTiet = null; U.nvChon = new Set(); U.log = []; U.dangNhapMo = false;
   // Ảnh tham chiếu / thư mục ảnh RIÊNG cho từng trang: ảnh gắn ở trang video không được dính sang trang ảnh.
   U.tc = { anh: { ds: [], thuMuc: null }, video: { ds: [], thuMuc: null }, nhac: { ds: [], thuMuc: null } };
@@ -28,7 +33,7 @@
   function luuUi() {
     try {
       localStorage.setItem(KHOA, JSON.stringify({ trang: U.trang, duAn: U.duAn, loc: U.loc, moiNhat: U.moiNhat, cheDo: U.cheDo,
-        tyLe: U.tyLe, nhap: U.nhap, tvLoc: U.tvLoc, tvDuAn: U.tvDuAn, chuoi: U.chuoi, promptThuMuc: U.promptThuMuc, nen: U.nen, locNen: U.locNen, nenTk: U.nenTk, mauTai: U.mauTai }));
+        tyLe: U.tyLe, nhap: U.nhap, tvLoc: U.tvLoc, tvDuAn: U.tvDuAn, chuoi: U.chuoi, promptThuMuc: U.promptThuMuc, rieng: U.rieng, nen: U.nen, locNen: U.locNen, nenTk: U.nenTk, mauTai: U.mauTai }));
     } catch (_) {}
   }
 
@@ -463,10 +468,12 @@
     $('#ghiVideoThuMuc').textContent = tm ? `${tm.anh.length} ảnh trong "${tm.thuMuc.split(/[\\/]/).pop()}" → ${tm.anh.length} video` : 'Chưa chọn';
     $('#batChuoi').checked = U.chuoi.bat;
     $('#khuPromptVideo').hidden = !U.chuoi.bat;
+    veRieng('chuoi', ds.length);
+    veRieng('thuMuc', tm ? tm.anh.length : 0);
     // 1.2.9: thư mục lưu video nối từ ảnh RIÊNG của dự án đang mở. 1.4.5: chỗ chọn thư mục DUY NHẤT (ô cùng tên ở
     // Cài đặt đã bỏ, thư mục cũ ở đó được chuyển sang dự án) — chưa chọn thì cạnh ảnh hoặc theo trang Tạo video.
     const dTm = duAnHienTai(), tmDa = (dTm && dTm.thuMucVideoAnh) || '';
-    $('#ghiThuMucVideoDuAn').textContent = tmDa || (S.caiDat.videoCanhAnh !== false ? 'Chưa chọn — lưu cạnh ảnh nguồn, cùng tên (Cài đặt → Video tạo từ ảnh)'
+    $('#ghiThuMucVideoDuAn').textContent = tmDa || (S.caiDat.videoCanhAnh !== false ? 'Chưa chọn — lưu cạnh ảnh nguồn, cùng tên (Cài đặt → Chung → Video tạo từ ảnh lưu cạnh ảnh)'
       : 'Chưa chọn — theo thư mục của trang Tạo video');
     $('#ghiThuMucVideoDuAn').title = tmDa;
     $('#boThuMucVideoDuAn').hidden = !tmDa;
@@ -489,6 +496,34 @@
       `<div class="anh-nho" title="${esc(p)}"><img src="${esc(fileUrl(p))}"><button data-bo="${i}">${ic('x')}</button></div>`).join('');
     if (TC().thuMuc) html += `<div class="ghi-thu-muc">${ic('folder-open')}<span>Thư mục: <b>${TC().thuMuc.anh.length} ảnh</b> → gán lần lượt cho từng prompt</span><button class="lien-ket" data-bo-thu-muc>Bỏ</button></div>`;
     if (datHtml($('#dsThamChieu'), html)) veIcon($('#dsThamChieu'));
+  }
+
+  /** 1.4.6: dòng trạng thái + nút Bỏ + nhãn ô prompt dùng chung của file prompt video riêng từng ảnh.
+   *  k = 'chuoi' (Ảnh xong → tự tạo video) | 'thuMuc' (Tạo video từ thư mục ảnh); soAnh = số prompt ảnh / số ảnh thư mục. */
+  function veRieng(k, soAnh) {
+    const r = U.rieng[k], Ten = k === 'chuoi' ? 'Chuoi' : 'ThuMuc';
+    const o = $(k === 'chuoi' ? '#promptVideoChung' : '#promptThuMuc'), nhan = $(k === 'chuoi' ? '#nhanPromptVideoChung' : '#nhanPromptThuMuc');
+    const ghi = $(`#ghiPromptRieng${Ten}`);
+    if (o.dataset.goc == null) o.dataset.goc = o.placeholder;
+    if (nhan.dataset.goc == null) nhan.dataset.goc = nhan.textContent;
+    $(`#boPromptRieng${Ten}`).hidden = !r;
+    ghi.classList.toggle('co-file', !!r);
+    if (!r) {
+      ghi.textContent = k === 'chuoi' ? 'Chưa nhập — mọi video dùng chung một prompt' : 'Chưa nhập — mọi ảnh dùng chung một prompt';
+      ghi.title = '';
+      o.placeholder = o.dataset.goc; nhan.textContent = nhan.dataset.goc;
+      return;
+    }
+    const n = r.ds.length, ten = k === 'chuoi' ? 'prompt ảnh' : 'ảnh';
+    let lech = '';
+    const chungTrong = !(k === 'chuoi' ? U.chuoi.prompt : U.promptThuMuc).trim();
+    if (soAnh && soAnh !== n) lech = soAnh > n
+      ? ` · có ${soAnh} ${ten}: ${ten} ${n + 1 === soAnh ? n + 1 : `${n + 1}–${soAnh}`} không có dòng riêng → ${chungTrong ? 'prompt mặc định (ô dùng chung đang trống)' : 'prompt dùng chung'}`
+      : ` · có ${soAnh} ${ten}: thừa ${n - soAnh} dòng, bỏ qua`;
+    ghi.textContent = `Đã nhập ${n} prompt từ ${r.ten || 'file'} · ${k === 'chuoi' ? 'ảnh của prompt 1 ↔ dòng 1' : 'ảnh 1 ↔ prompt 1'}…${lech}`;
+    ghi.title = r.ds.slice(0, 20).map((p, i) => `${i + 1}. ${p}`).join('\n') + (n > 20 ? `\n… còn ${n - 20} dòng` : '');
+    nhan.textContent = 'Prompt dùng chung — cho ảnh không có dòng riêng';
+    o.placeholder = 'Dùng cho ảnh không có dòng riêng trong file (để trống = prompt mặc định)';
   }
 
   const NHAN_BUOC = { 'mo-trang': 'Đang mở Muse', 'mo-lai': 'Mở lại chat cũ', gui: 'Đang gửi prompt', tai: 'Đang tải về' };
@@ -787,10 +822,26 @@
     const loai = loaiTrang();
     let chuoi = null;
     if (loai === 'anh' && U.chuoi.bat) {
-      if (!U.chuoi.prompt.trim()) { toast('Đang bật "Ảnh xong → tự tạo video" nhưng chưa nhập prompt video', true); $('#promptVideoChung').focus(); return null; }
-      chuoi = { prompt: U.chuoi.prompt, tyLe: U.chuoi.tyLe, nen: U.chuoi.nen || nenTrang() };
+      // 1.4.6: đã nhập file prompt riêng thì được để trống ô dùng chung (ảnh thiếu dòng riêng → prompt mặc định).
+      const rieng = U.rieng.chuoi ? U.rieng.chuoi.ds : null;
+      if (!U.chuoi.prompt.trim() && !rieng) { toast('Đang bật "Ảnh xong → tự tạo video" nhưng chưa nhập prompt video (gõ prompt dùng chung hoặc nhập file .txt prompt riêng)', true); $('#promptVideoChung').focus(); return null; }
+      if (rieng && hoiLech && rieng.length !== prompts.length) {
+        const n = rieng.length, m = prompts.length, chung = U.chuoi.prompt.trim() ? 'prompt video dùng chung' : 'prompt video mặc định (ô dùng chung đang trống)';
+        if (!(await xacNhan('Số prompt video riêng lệch số prompt ảnh',
+          `File <b>${esc(U.rieng.chuoi.ten)}</b> có <b>${n}</b> prompt video nhưng có <b>${m}</b> prompt ảnh. Ảnh của prompt số N dùng dòng N của file; ` +
+          (m > n ? `ảnh của prompt ${n + 1 === m ? n + 1 : `${n + 1}–${m}`} không có dòng riêng nên dùng ${chung}.` : `${n - m} dòng thừa cuối file bị bỏ qua.`), 'Vẫn tạo'))) return null;
+      }
+      chuoi = { prompt: U.chuoi.prompt, ...(rieng ? { prompts: rieng } : {}), tyLe: U.chuoi.tyLe, nen: U.chuoi.nen || nenTrang() };
     }
     let theoDong = null;
+    // 1.4.6: video từ thư mục ảnh + file prompt riêng — số ảnh lệch số dòng thì hỏi một lần (promptCotTao đã ghép ảnh i ↔ dòng i).
+    const rTm = loai === 'video' && TC().thuMuc && U.rieng.thuMuc;
+    if (rTm && hoiLech && rTm.ds.length !== TC().thuMuc.anh.length) {
+      const n = TC().thuMuc.anh.length, m = rTm.ds.length, chung = U.promptThuMuc.trim() ? 'prompt dùng chung' : 'prompt video mặc định (ô dùng chung đang trống)';
+      if (!(await xacNhan('Số ảnh và số prompt riêng lệch nhau',
+        `Thư mục có <b>${n}</b> ảnh nhưng file <b>${esc(rTm.ten)}</b> có <b>${m}</b> prompt. Ảnh thứ i (xếp theo tên) dùng dòng i của file; ` +
+        (n > m ? `ảnh ${m + 1 === n ? m + 1 : `${m + 1}–${n}`} không có dòng riêng nên dùng ${chung}.` : `${m - n} dòng thừa cuối file bị bỏ qua.`), 'Vẫn tạo'))) return null;
+    }
     if (TC().thuMuc) {
       const n = TC().thuMuc.anh.length;
       if (hoiLech && n !== prompts.length && !(await xacNhan('Số ảnh và số prompt lệch nhau',
@@ -815,6 +866,11 @@
     let prompts = HD.tachPrompt($('#oPrompt').value, $('#tachPrompt').value);
     // Video từ thư mục ảnh: ô prompt dùng chung (hoặc ô Prompt có 0–1 prompt) → mỗi ảnh một video cùng prompt.
     const chung = U.promptThuMuc.trim();
+    // 1.4.6: đã nhập file prompt riêng → ảnh thứ i (thư mục xếp theo tên) lấy dòng i; thiếu dòng → prompt dùng chung → mặc định.
+    if (loai === 'video' && TC().thuMuc && U.rieng.thuMuc) {
+      const ds = U.rieng.thuMuc.ds;
+      return TC().thuMuc.anh.map((_, i) => (ds[i] || '').trim() || chung || HD.PROMPT_VIDEO_MAC_DINH);
+    }
     if (loai === 'video' && TC().thuMuc && (chung || prompts.length <= 1)) {
       const p0 = chung || prompts[0] || HD.PROMPT_VIDEO_MAC_DINH;
       prompts = TC().thuMuc.anh.map(() => p0);
@@ -1143,6 +1199,9 @@
     const c = S.caiDat;
     $('#cdLuong').value = c.luongMoiTK; $('#cdNghi').value = c.nghiGiuaLanGui; $('#cdThuLai').value = c.tuThuLai; $('#cdChayLaiLoi').value = c.tuChayLaiLoi;
     $('#cdChoAnh').value = c.choAnhGiay; $('#cdChoVideo').value = c.choVideoGiay; $('#cdChoChu').value = c.choChuGiay; $('#cdChoNhac').value = c.choNhacGiay;
+    // 1.4.6: thử lại / chạy lại lỗi / nghỉ gửi riêng của Flow và Suno (các ô cdThuLai, cdChayLaiLoi, cdNghi giờ chỉ của Muse)
+    $('#cdThuLaiFlow').value = c.tuThuLaiFlow; $('#cdChayLaiLoiFlow').value = c.tuChayLaiLoiFlow;
+    $('#cdThuLaiSuno').value = c.tuThuLaiSuno; $('#cdChayLaiLoiSuno').value = c.tuChayLaiLoiSuno; $('#cdNghiSuno').value = c.nghiSuno;
     $('#cdPng').checked = !!c.png;
     $('#cdDoiNen').checked = c.doiNenKhiLoi !== false;
     $('#cdTatMay').checked = !!(S.caiDatChung || c).tatMayKhiXong;   // chung cho mọi dự án
@@ -1222,7 +1281,7 @@
     $('#ncTai').checked = v ? c.taiVideo : c.taiAnh;   // nhạc luôn tải về (công tắc ẩn)
     // 1.4.2: nói rõ khối này áp dụng cho loại việc nào. 1.4.5: đây là chỗ DUY NHẤT chỉnh tải về / thư mục / tên file.
     datHtml($('#ncApDung'), v ? 'Áp dụng cho <span class="ap ap-video">Chỉ video</span> mọi việc <b>Tạo video</b> của dự án này. Ảnh chỉnh ở trang Tạo ảnh.'
-      : 'Áp dụng cho <span class="ap ap-anh">Chỉ ảnh</span> mọi việc <b>Tạo ảnh</b> của dự án này. Video chỉnh ở trang Tạo video; video tự tạo từ ảnh lưu theo mục <i>Ảnh xong → tự tạo video</i> ở trên (và Cài đặt → Video tạo từ ảnh).');
+      : 'Áp dụng cho <span class="ap ap-anh">Chỉ ảnh</span> mọi việc <b>Tạo ảnh</b> của dự án này. Video chỉnh ở trang Tạo video; video tự tạo từ ảnh lưu theo mục <i>Ảnh xong → tự tạo video</i> ở trên (và Cài đặt → <i>Chung (Muse + Flow)</i> → <i>Video tạo từ ảnh lưu cạnh ảnh</i>).');
     $('#ncThuMuc').value = S.thuMuc[loai];
     if (document.activeElement !== $('#ncTen')) $('#ncTen').value = c[khoaTai(loai).ten];
     $('#ncTen').placeholder = loai === 'nhac' ? '{stt}' : v ? HD.MAU_TEN_MAC_DINH : HD.MAU_TEN_ANH_MAC_DINH;
@@ -1387,7 +1446,7 @@
     $('#oPrompt').addEventListener('input', () => { U.nhap[loaiTrang()] = $('#oPrompt').value; luuUi(); veTao(); });
     $('#chonSo').addEventListener('input', veTao);
     $('#batChuoi').onchange = (e) => { U.chuoi.bat = e.target.checked; luuUi(); veTao(); if (U.chuoi.bat) $('#promptVideoChung').focus(); };
-    $('#promptVideoChung').addEventListener('input', (e) => { U.chuoi.prompt = e.target.value; luuUi(); });
+    $('#promptVideoChung').addEventListener('input', (e) => { U.chuoi.prompt = e.target.value; luuUi(); veTao(); });
     $('#nutThuMucVideoDuAn').onclick = async () => {
       const d = duAnHienTai();
       if (!d) return;
@@ -1400,7 +1459,23 @@
       await api.call('boThuMucVideoDuAn', { id: d.id });
       toast(`Dự án "${d.ten}" bỏ thư mục video riêng — ${S.caiDat.videoCanhAnh !== false ? 'video lưu cạnh ảnh nguồn' : 'theo thư mục của trang Tạo video'}`);
     };
-    $('#promptThuMuc').addEventListener('input', (e) => { U.promptThuMuc = e.target.value; luuUi(); });
+    $('#promptThuMuc').addEventListener('input', (e) => { U.promptThuMuc = e.target.value; luuUi(); veTao(); });
+    // 1.4.6: file .txt prompt video riêng từng ảnh — tách cùng quy tắc với ô Prompt (mỗi dòng / dòng trống).
+    const nhapRieng = async (k) => {
+      const f = await api.call('nhapPromptRieng');
+      if (!f) return;
+      const ds = HD.tachPrompt(f.noiDung, $('#tachPrompt').value);
+      if (!ds.length) { toast(`File "${f.ten}" không có prompt nào`, true); return; }
+      U.rieng[k] = { ten: f.ten, ds }; luuUi(); veTao();
+      const chung = (k === 'chuoi' ? U.chuoi.prompt : U.promptThuMuc).trim();
+      toast(`Đã nhập ${ds.length} prompt video riêng từ ${f.ten} — ${k === 'chuoi' ? 'ảnh của prompt 1 dùng dòng 1, prompt 2 dùng dòng 2…' : 'ảnh 1 (xếp theo tên) dùng dòng 1, ảnh 2 dùng dòng 2…'}; ` +
+        `ảnh không có dòng riêng dùng ${chung ? 'prompt dùng chung' : 'prompt mặc định'}`);
+    };
+    const boRieng = (k) => { U.rieng[k] = null; luuUi(); veTao(); toast(`Đã bỏ file prompt riêng — mọi ${k === 'chuoi' ? 'video' : 'ảnh'} dùng chung prompt`); };
+    $('#nutPromptRiengChuoi').onclick = () => nhapRieng('chuoi');
+    $('#nutPromptRiengThuMuc').onclick = () => nhapRieng('thuMuc');
+    $('#boPromptRiengChuoi').onclick = () => boRieng('chuoi');
+    $('#boPromptRiengThuMuc').onclick = () => boRieng('thuMuc');
     $('#tyLeVideoChuoi').onchange = (e) => { U.chuoi.tyLe = e.target.value; luuUi(); };
     $('#tachPrompt').onchange = () => { datCD({ tachPrompt: $('#tachPrompt').value }); };
     $('#tyLe').onclick = (e) => {
@@ -1423,7 +1498,9 @@
       if (boLe) TC().ds = [];
       veTao();
       toast(loaiTrang() === 'video'
-        ? `Thư mục có ${r.anh.length} ảnh — mỗi ảnh một video, dùng prompt ở ô "Prompt dùng chung"${boLe ? '. Đã bỏ ảnh tham chiếu lẻ.' : ''}`
+        ? `Thư mục có ${r.anh.length} ảnh — mỗi ảnh một video, ${U.rieng.thuMuc
+          ? `ảnh 1 ↔ dòng 1 của ${U.rieng.thuMuc.ten} (${U.rieng.thuMuc.ds.length} prompt riêng)${U.rieng.thuMuc.ds.length < r.anh.length ? ', ảnh thiếu dòng dùng prompt dùng chung' : ''}`
+          : 'dùng prompt ở ô "Prompt dùng chung"'}${boLe ? '. Đã bỏ ảnh tham chiếu lẻ.' : ''}`
         : `Thư mục có ${r.anh.length} ảnh — gán lần lượt cho từng prompt`);
     };
     $('#nutChonThuMuc').onclick = chonThuMucAnh;
@@ -1661,6 +1738,9 @@
       return {
         luongMoiTK: $('#cdLuong').value, nghiGiuaLanGui: $('#cdNghi').value, tuThuLai: $('#cdThuLai').value, tuChayLaiLoi: $('#cdChayLaiLoi').value,
         choAnhGiay: $('#cdChoAnh').value, choVideoGiay: $('#cdChoVideo').value, choChuGiay: $('#cdChoChu').value, choNhacGiay: $('#cdChoNhac').value,
+        // 1.4.6: thẻ "Google Flow — khi chạy" / "Suno — khi chạy"
+        tuThuLaiFlow: $('#cdThuLaiFlow').value, tuChayLaiLoiFlow: $('#cdChayLaiLoiFlow').value,
+        tuThuLaiSuno: $('#cdThuLaiSuno').value, tuChayLaiLoiSuno: $('#cdChayLaiLoiSuno').value, nghiSuno: $('#cdNghiSuno').value,
         png: $('#cdPng').checked, doiNenKhiLoi: $('#cdDoiNen').checked, tatMayKhiXong: $('#cdTatMay').checked,
         videoCanhAnh: $('#cdVideoCanhAnh').checked, xoaChatKhiXong: $('#cdXoaChat').checked, xoaDuAnFlowKhiXong: $('#cdXoaDuAnFlow').checked,
         driveBat: $('#cdDrive').checked, driveCach: $('#cdDriveCach').value, driveTk: $('#cdDriveTk').value, nheMay: $('#cdNheMay').checked,

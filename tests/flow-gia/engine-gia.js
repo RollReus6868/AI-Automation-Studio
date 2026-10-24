@@ -25,12 +25,35 @@ const themKho = (ds) => localStorage.setItem('khoAnhFlow', JSON.stringify([...ne
 let me = null;
 
 const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFElEQVR4nGP8z8DwnwEJMDGgAQAy2wIDqvFBJQAAAABJRU5ErkJggg==';
+// Cookie flow_tai_cham=<ms> (chỉ để TÁI HIỆN lỗi CI Windows, bài thường không đặt): file tải từ máy chủ test, máy chủ gửi
+// đầu trả lời ngay (will-download / DOWNLOAD_STARTED tới liền) nhưng giữ thân file <ms> mới xong — như Windows quét
+// virus file vừa tải (sự kiện "done" tới muộn vài giây).
+const taiCham = () => Number((document.cookie.match(/(?:^|;\s*)flow_tai_cham=(\d+)/) || [])[1]) || 0;
 function taiFile(ten, video) {
-  const bytes = video ? new Uint8Array(3000).map((_, i) => i % 251) : Uint8Array.from(atob(PNG), (c) => c.charCodeAt(0));
-  const url = URL.createObjectURL(new Blob([bytes], { type: video ? 'video/mp4' : 'image/png' }));
   const a = document.createElement('a');
-  a.href = url; a.download = `flow_goc_${Date.now()}.${video ? 'mp4' : 'png'}`;
+  const cham = taiCham();
+  if (cham) {
+    a.href = `/__flow-tai-cham?ms=${cham}&video=${video ? 1 : 0}`;
+  } else {
+    const bytes = video ? new Uint8Array(3000).map((_, i) => i % 251) : Uint8Array.from(atob(PNG), (c) => c.charCodeAt(0));
+    a.href = URL.createObjectURL(new Blob([bytes], { type: video ? 'video/mp4' : 'image/png' }));
+  }
+  a.download = `flow_goc_${Date.now()}.${video ? 'mp4' : 'png'}`;
   document.body.appendChild(a); a.click(); a.remove();
+}
+// Như engine thật (flow-engine.js, "ĐỒNG BỘ VỚI CHROME DOWNLOADS"): sau khi bấm tải, CHỜ app báo DOWNLOAD_STARTED đúng
+// tên đã đặt rồi mới làm tiếp (engine thật chờ tới 120 s). Bản cũ bấm xong là đi tiếp → máy chậm (CI Windows) engine
+// giả báo AUTOMATION_STOPPED trước cả khi file bắt đầu tải — lệch hợp đồng với engine thật.
+function choBatDauTai(ten, ms = 120000) {
+  return new Promise((giai) => {
+    let hen = null;
+    const nghe = (msg) => {
+      if (!msg || msg.action !== 'DOWNLOAD_STARTED' || msg.filename !== ten) return;
+      chrome.runtime.onMessage.removeListener(nghe); clearTimeout(hen); giai(true);
+    };
+    chrome.runtime.onMessage.addListener(nghe);
+    hen = setTimeout(() => { chrome.runtime.onMessage.removeListener(nghe); giai(false); }, ms);
+  });
 }
 
 async function chayMe(d) {
@@ -61,8 +84,18 @@ async function chayMe(d) {
     const goc = ten[r.index - 1] || `flow_${r.index}`;
     const n = s.outputCount || 1;
     for (let k = 1; k <= n; k++) {
-      await gui({ action: 'SET_NEXT_FILENAME', filename: n > 1 ? `${goc}_${k}` : goc });
+      const tenTai = n > 1 ? `${goc}_${k}` : goc;
+      await gui({ action: 'SET_NEXT_FILENAME', filename: tenTai });
+      const batDau = choBatDauTai(tenTai);
+      const bam = Date.now();
       taiFile(goc, s.runMode === 'video');
+      const daBatDau = await batDau;
+      ghi('tai', { ten: tenTai, batDau: daBatDau, choMs: Date.now() - bam });   // bài kiểm in ra khi mục Flow đỏ ở bước tải
+      if (!daBatDau) {
+        // Như engine thật: hết giờ chờ thì rút tên khỏi hàng đợi (kẻo file sau ăn nhầm tên) rồi tính là lỗi tải.
+        await gui({ action: 'UNSET_NEXT_FILENAME', filename: tenTai });
+        ghi('tai-khong-bat-dau', { ten: tenTai });
+      }
       await ngu(300);
     }
     if (s.autoRename) themKho([goc]);

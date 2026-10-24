@@ -137,14 +137,16 @@ function chuanCaiDat(c, flowGoc, flowMoi) {
   m.driveCach = m.driveCach === 'web' ? 'web' : 'may'; m.driveTk = String(m.driveTk || ''); m.nheMay = m.nheMay !== false;
   m.tenNhac = String(m.tenNhac || '').trim() || hd.MAU_TEN_ANH_MAC_DINH;
   m.choNhacGiay = so(m.choNhacGiay, 120, 3600, 600);
-  m.nghiGiuaLanGui = so(m.nghiGiuaLanGui, 0, 120, 3);
+  // 1.4.6: ô nghỉ cho phép 0 (không nghỉ) — so() coi 0 là "trống" nên trước đây nhập 0 thành 3.
+  const so0 = (v, max, md) => { const n = parseInt(v, 10); return Number.isFinite(n) ? Math.max(0, Math.min(max, n)) : md; };
+  m.nghiGiuaLanGui = so0(m.nghiGiuaLanGui, 120, 3);
   m.choAnhGiay = so(m.choAnhGiay, 60, 1800, 180);
   m.choVideoGiay = so(m.choVideoGiay, 120, 3600, 300);
   m.choChuGiay = so(m.choChuGiay, 15, 600, 60);
   m.tuThuLai = Math.max(0, Math.min(10, parseInt(m.tuThuLai, 10) || 0));
   m.tuChayLaiLoi = Math.max(0, Math.min(10, parseInt(m.tuChayLaiLoi, 10) || 0));
   for (const k of ['tuThuLaiFlow', 'tuThuLaiSuno', 'tuChayLaiLoiFlow', 'tuChayLaiLoiSuno']) m[k] = Math.max(0, Math.min(10, parseInt(m[k], 10) || 0));
-  m.nghiSuno = so(m.nghiSuno, 0, 120, 3);
+  m.nghiSuno = so0(m.nghiSuno, 120, 3);
   m.mau = { ...hd.MAU_MAC_DINH, ...(m.mau || {}) };
   for (const k of ['anh', 'video']) if (!String(m.mau[k] || '').includes('{prompt}')) m.mau[k] = hd.MAU_MAC_DINH[k];
   m.flow = chuanHoaFlow({ ...(flowGoc || {}), ...(flowMoi || {}) });
