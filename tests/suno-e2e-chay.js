@@ -37,7 +37,7 @@ module.exports = function e2eSuno({ win, app, LENH, dieuPhoi, taiKhoan }) {
     try {
       ghi('== E2E Suno (trang Create giả) ==');
       const nhac = path.join(tam, 'nhac');
-      datCD({ nghiGiuaLanGui: 0, tuThuLai: 0, tuChayLaiLoi: 0, choNhacGiay: 120, thuMucNhac: nhac, tenNhac: '{stt}' });
+      datCD({ nghiGiuaLanGui: 0, tuThuLai: 0, tuChayLaiLoi: 0, tuThuLaiFlow: 0, tuChayLaiLoiFlow: 0, tuThuLaiSuno: 0, tuChayLaiLoiSuno: 0, nghiSuno: 0, choNhacGiay: 120, thuMucNhac: nhac, tenNhac: '{stt}' });
       kiem(taiKhoan.ds.some((a) => a.id === 'suno-1' && a.nen === 'suno' && a.partition === 'persist:suno-suno-1'),
         'có sẵn tài khoản "Suno 1" (phiên riêng persist:suno-suno-1)');
 

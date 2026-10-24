@@ -121,11 +121,12 @@
             <div class="dong-cong-tac">
               <div>
                 <b>Tạo video từ thư mục ảnh</b>
-                <small>Chọn thư mục ảnh có sẵn trên máy: mỗi ảnh thành một video, tất cả dùng chung prompt bên dưới. (Để trống ô này mà ô Prompt có đúng số prompt bằng số ảnh thì ghép ảnh 1 ↔ prompt 1…)</small>
+                <small>Chọn thư mục ảnh có sẵn trên máy (xếp theo tên): mỗi ảnh thành một video. Nhập file .txt để mỗi ảnh có prompt riêng theo thứ tự (ảnh 1 ↔ dòng 1, ảnh 2 ↔ dòng 2…); không nhập file thì mọi ảnh dùng chung prompt bên dưới. (Không nhập file, để trống ô dưới mà ô Prompt có đúng số prompt bằng số ảnh thì ghép ảnh 1 ↔ prompt 1…)</small>
               </div>
             </div>
             <div class="dong-o"><button class="nut-vien nho" id="nutVideoThuMuc"><i data-icon="folder-open"></i>Chọn thư mục ảnh</button><span class="mo" id="ghiVideoThuMuc">Chưa chọn</span></div>
-            <label class="o-chon nho" for="promptThuMuc"><b>Prompt dùng chung</b></label>
+            <div class="dong-prompt-rieng"><button class="nut-vien nho" id="nutPromptRiengThuMuc"><i data-icon="file-text"></i>Nhập file .txt — prompt riêng từng ảnh</button><button class="lien-ket" id="boPromptRiengThuMuc" title="Bỏ file prompt riêng — mọi ảnh dùng chung prompt bên dưới" hidden>Bỏ</button><span class="ghi-prompt-rieng" id="ghiPromptRiengThuMuc">Chưa nhập — mọi ảnh dùng chung một prompt</span></div>
+            <label class="o-chon nho" for="promptThuMuc"><b id="nhanPromptThuMuc">Prompt dùng chung</b></label>
             <textarea id="promptThuMuc" rows="3" spellcheck="false" placeholder="Prompt dùng chung cho mọi ảnh trong thư mục, vd: nhân vật quay đầu mỉm cười, tóc bay nhẹ trong gió"></textarea>
           </div>
 
@@ -133,11 +134,13 @@
             <div class="dong-cong-tac">
               <div>
                 <b>Ảnh xong → tự tạo video</b>
-                <small>Mỗi ảnh tạo xong được dùng làm khung đầu cho một video, tất cả video dùng chung prompt bên dưới.</small>
+                <small>Mỗi ảnh tạo xong được dùng làm khung đầu cho một video. Nhập file .txt để mỗi ảnh có prompt video riêng theo thứ tự (ảnh của prompt 1 ↔ dòng 1, prompt 2 ↔ dòng 2…); không nhập file thì mọi video dùng chung prompt bên dưới.</small>
               </div>
               <label class="cong-tac"><input type="checkbox" id="batChuoi"><span></span></label>
             </div>
             <div id="khuPromptVideo" hidden>
+              <div class="dong-prompt-rieng"><button class="nut-vien nho" id="nutPromptRiengChuoi"><i data-icon="file-text"></i>Nhập file .txt — prompt riêng từng ảnh</button><button class="lien-ket" id="boPromptRiengChuoi" title="Bỏ file prompt riêng — mọi video dùng chung prompt bên dưới" hidden>Bỏ</button><span class="ghi-prompt-rieng" id="ghiPromptRiengChuoi">Chưa nhập — mọi video dùng chung một prompt</span></div>
+              <label class="o-chon nho" for="promptVideoChung"><b id="nhanPromptVideoChung">Prompt video dùng chung</b></label>
               <textarea id="promptVideoChung" rows="3" spellcheck="false" placeholder="Prompt video dùng chung, vd: máy quay đẩy chậm vào nhân vật, gió nhẹ, ánh sáng điện ảnh"></textarea>
               <div class="hang-chon">
                 <label class="o-chon nho">Video chạy ở
@@ -149,7 +152,7 @@
               </div>
               <div class="thu-muc-video-du-an">
                 <b>Lưu video của dự án này vào</b>
-                <div class="dong-o"><button class="nut-vien nho" id="nutThuMucVideoDuAn"><i data-icon="folder-open"></i>Chọn thư mục</button><span class="mo" id="ghiThuMucVideoDuAn"></span><button class="lien-ket" id="boThuMucVideoDuAn" title="Bỏ thư mục riêng — video lưu cạnh ảnh nguồn hoặc theo thư mục của trang Tạo video (Cài đặt → Video tạo từ ảnh)" hidden>Bỏ</button></div>
+                <div class="dong-o"><button class="nut-vien nho" id="nutThuMucVideoDuAn"><i data-icon="folder-open"></i>Chọn thư mục</button><span class="mo" id="ghiThuMucVideoDuAn"></span><button class="lien-ket" id="boThuMucVideoDuAn" title="Bỏ thư mục riêng — video lưu cạnh ảnh nguồn hoặc theo thư mục của trang Tạo video (Cài đặt → Chung → Video tạo từ ảnh lưu cạnh ảnh)" hidden>Bỏ</button></div>
               </div>
             </div>
           </div>
@@ -309,18 +312,18 @@
           <li><b>Tạo ảnh / Tạo video:</b> dán prompt (mỗi dòng một prompt), chọn tỷ lệ khung, bấm <i>Tạo &amp; chạy</i>. Mỗi prompt chạy trong một chat phụ mới của Muse nên không dính ngữ cảnh cũ.</li>
           <li><b>Ảnh tham chiếu:</b> kéo thả ảnh để gửi kèm mọi prompt. <i>Chọn thư mục</i> để gán ảnh 1 → prompt 1, ảnh 2 → prompt 2 (dùng làm khung đầu khi tạo video từ ảnh).</li>
           <li><b>Nhân vật:</b> lưu ảnh nhân vật kèm tên. Bật <i>Giữ nguyên nhân vật</i>, prompt nhắc tên nào thì tự gửi ảnh nhân vật đó. Chế độ <i>Người mẫu</i>: chọn nhân vật gắn vào mọi prompt.</li>
-          <li><b>Ảnh → video:</b> ở một ảnh đã xong, bấm <i>⋮ → Tạo video từ ảnh này</i>. Muốn cả mẻ: bật <i>Ảnh xong → tự tạo video</i> ở cột Tạo ảnh và nhập một prompt video dùng chung — ảnh nào xong là tự có video tương ứng.</li>
+          <li><b>Ảnh → video:</b> ở một ảnh đã xong, bấm <i>⋮ → Tạo video từ ảnh này</i>. Muốn cả mẻ: bật <i>Ảnh xong → tự tạo video</i> ở cột Tạo ảnh và nhập một prompt video dùng chung — ảnh nào xong là tự có video tương ứng. Muốn mỗi ảnh một chuyển động riêng: bấm <i>Nhập file .txt — prompt riêng từng ảnh</i>, mỗi dòng (hoặc mỗi đoạn, theo <i>Tách prompt theo</i>) một prompt video, đúng thứ tự prompt ảnh (ảnh của prompt 1 ↔ dòng 1…); ảnh không có dòng riêng dùng prompt dùng chung (trống thì prompt mặc định).</li>
           <li><b>Chạy một số prompt:</b> <i>Cài đặt nâng cao → Chỉ chạy prompt số</i>, ghi ví dụ <code>98, 303, 305-350</code> (để trống = chạy hết). Đặt tên file bằng <code>{stt}</code> để số trong tên khớp số dòng prompt.</li>
           <li><b>Nhiều dự án chạy song song:</b> mỗi dự án có <i>Cài đặt</i> riêng và luồng riêng. Bấm <i>Chạy dự án</i> ở dự án 1, chuyển sang dự án 2 bấm <i>Chạy dự án</i> nữa — hai dự án chạy cùng lúc, kể cả khi dùng chung tài khoản. Menu dự án có <i>Chạy tất cả dự án</i> / <i>Dừng tất cả dự án</i>. Số thứ tự ảnh và video đếm riêng (350 ảnh → video cũng số 1–350).</li>
           <li><b>Cài đặt mặc định:</b> ở trang Cài đặt chỉnh xong bấm <i>Lưu làm cài đặt mặc định</i> (thanh dưới đáy trang): mọi dự án đang có và dự án mới dùng bộ đó; thư mục lưu, mẫu tên file vẫn riêng từng dự án. <i>Lưu cài đặt</i> chỉ đổi dự án đang mở.</li>
           <li><b>Hẹn giờ chạy:</b> mục <i>Hẹn giờ</i> có thẻ riêng cho Tạo ảnh, Tạo video, Tạo nhạc. Bật thẻ, chọn giờ bắt đầu (và giờ dừng nếu muốn), mỗi ngày hay một lần, mọi dự án hay một dự án → <i>Lưu hẹn giờ</i>. Tới giờ app chạy các việc <b>đang chờ</b> của đúng chức năng đó; thêm việc trước bằng <i>Chỉ thêm vào hàng đợi</i>. App phải đang mở, máy đang bật.</li>
           <li><b>Dừng / chạy từng việc:</b> mỗi dòng đang chạy có nút <i>Dừng</i>; việc đã dừng có nút <i>Chạy</i> (chạy ngay, kể cả khi dự án đang dừng). Chọn nhiều dòng rồi bấm <i>Chạy</i> / <i>Dừng</i> / <i>Tạo lại</i> ở thanh chọn.</li>
           <li><b>Dự án Flow mới:</b> mỗi dự án của tool chạy trên một dự án Flow MỚI riêng ở từng tài khoản Flow, không dùng chung dự án Flow cũ.</li>
-          <li><b>Video từ ảnh có sẵn:</b> trang Tạo video → <i>Tạo video từ thư mục ảnh</i> → chọn thư mục; gõ prompt vào ô <i>Prompt dùng chung</i> rồi Tạo &amp; chạy — mỗi ảnh một video. Đặt tên video <code>{tenAnh}</code> để video trùng tên ảnh.</li>
+          <li><b>Video từ ảnh có sẵn:</b> trang Tạo video → <i>Tạo video từ thư mục ảnh</i> → chọn thư mục; gõ prompt vào ô <i>Prompt dùng chung</i> rồi Tạo &amp; chạy — mỗi ảnh một video. Mỗi ảnh một prompt riêng: bấm <i>Nhập file .txt — prompt riêng từng ảnh</i> — ảnh thứ 1 (thư mục xếp theo tên) dùng dòng 1, ảnh 2 dùng dòng 2… Đặt tên video <code>{tenAnh}</code> để video trùng tên ảnh.</li>
           <li><b>Ảnh và video chạy song song:</b> khi bật <i>Ảnh xong → tự tạo video</i>, ảnh nào xong là video của nó được chạy ngay ở luồng rảnh kế tiếp, không chờ hết mẻ ảnh.</li>
-          <li><b>Việc lỗi:</b> hết hàng chờ mà còn việc lỗi, tool tự chạy lại chúng (mặc định tối đa 2 lượt — đổi ở Cài đặt).</li>
-          <li><b>Nhiều luồng hơn:</b> tăng <i>Số luồng mỗi tài khoản</i> (Cài đặt → Chạy), hoặc cho dự án <b>chạy nhiều tài khoản cùng lúc</b>: bấm nút tài khoản cạnh tên dự án → đặt các tài khoản muốn chạy là <i>Chạy</i>. Các tài khoản <i>Chạy</i> chạy song song, việc chia đều; tài khoản nào lỗi thì nghỉ và tài khoản <i>Dự phòng</i> vào thay.</li>
-          <li><b>Tài khoản chính + dự phòng:</b> bấm nút tài khoản cạnh tên dự án (hoặc khi tạo dự án mới) để chọn. Việc nào lỗi hoặc quá lâu (ảnh quá 3 phút, video quá 5 phút — chỉnh ở Cài đặt) thì chạy lại NGAY ở tài khoản dự phòng kế tiếp; tài khoản chính lỗi 2 việc liền (hoặc Muse "Connecting...") thì nghỉ 15 phút, cả dự án sang dự phòng. Bấm <i>Chạy dự án</i> lại là cho mọi tài khoản cơ hội mới.</li>
+          <li><b>Việc lỗi:</b> hết hàng chờ mà còn việc lỗi, tool tự chạy lại chúng (mặc định tối đa 2 lượt — đổi riêng cho Muse, Flow, Suno ở thẻ <i>… — khi chạy</i> của từng nơi trong Cài đặt).</li>
+          <li><b>Nhiều luồng hơn:</b> tăng <i>Số luồng mỗi tài khoản Muse</i> (Cài đặt → <i>Muse — khi chạy</i>; Flow: <i>Số tab mỗi tài khoản Flow</i> ở thẻ <i>Google Flow — khi chạy</i>), hoặc cho dự án <b>chạy nhiều tài khoản cùng lúc</b>: bấm nút tài khoản cạnh tên dự án → đặt các tài khoản muốn chạy là <i>Chạy</i>. Các tài khoản <i>Chạy</i> chạy song song, việc chia đều; tài khoản nào lỗi thì nghỉ và tài khoản <i>Dự phòng</i> vào thay.</li>
+          <li><b>Tài khoản chính + dự phòng:</b> bấm nút tài khoản cạnh tên dự án (hoặc khi tạo dự án mới) để chọn. Việc nào lỗi hoặc quá lâu (Muse: ảnh quá 3 phút, video quá 5 phút — chỉnh ở Cài đặt → <i>Muse — khi chạy</i>) thì chạy lại NGAY ở tài khoản dự phòng kế tiếp; tài khoản chính lỗi 2 việc liền (hoặc Muse "Connecting...") thì nghỉ 15 phút, cả dự án sang dự phòng. Bấm <i>Chạy dự án</i> lại là cho mọi tài khoản cơ hội mới.</li>
           <li><b>Kết quả</b>: thư mục lưu, công tắc tải về và mẫu tên file nằm trong <i>Cài đặt nâng cao</i> của từng trang Tạo ảnh / Tạo video (mặc định <code>Mac_dinh/Mac_dinh_001.png</code>).</li>
           <li><b>Nhiều file .txt:</b> bấm <i>Nhập nhiều file .txt</i>, chọn cả loạt — mỗi file thành một dự án mang tên file, dùng chung tuỳ chọn đang chọn ở cột Tạo, rồi tự chạy.</li>
           <li><b>Dừng giữa chừng</b> không mất lượt: chạy lại, tool mở lại đúng chat cũ để lấy kết quả chứ không gửi lại prompt.</li>
@@ -331,7 +334,7 @@
           <li><b>Google Flow:</b> Tài khoản → <i>Thêm Flow</i> → <i>Đăng nhập</i> → đăng nhập Google, mở (hoặc tạo) một dự án Flow → <i>Xong</i>. Ở trang Tạo ảnh / Tạo video chọn <i>Chạy trên: Google Flow</i> rồi Tạo &amp; chạy như Muse. Flow nhận việc theo mẻ (mặc định 10 prompt), engine Flow tự dán, bấm Tạo, thử lại, tải về; từng việc vẫn hiện riêng trên hàng đợi. App tự chuyển Flow sang mục <i>Hình ảnh</i> hay <i>Video</i> theo việc (video từ ảnh thì chọn thêm <i>Thành phần</i>), và tự tải ảnh lên kho Flow bằng nút [+] → <i>Tải nội dung nghe nhìn lên</i>. Tài khoản không được tải 1080p / 4K (mục bị khoá, có nút <i>Nâng cấp</i>) thì app tự tải 720p (ảnh: cỡ gốc). Vẫn không tải / gắn được ảnh thì app lưu một tệp chẩn đoán vào <code>Tài liệu/AI Automation Studio/chan-doan-flow</code> — gửi tệp đó kèm nhật ký.</li>
           <li><b>Flow ⇄ Muse tự động:</b> bật <i>Ảnh xong → tự tạo video</i> và chọn <i>Video chạy ở</i>: ảnh Flow → video Muse, ảnh Muse → video Flow, hoặc cùng một nơi. Ảnh lưu vào thư mục chung (mặc định <code>Tài liệu/AI Automation Studio</code>), video tự lấy ảnh từ đó. Video Flow gắn ảnh bằng <code>@tên</code> (Character Sync) — ảnh chưa có trên Flow thì app tự tải lên.</li>
           <li><b>Tài khoản Flow lỗi:</b> Flow báo "hoạt động bất thường" / hết tín dụng, hoặc 2 prompt khác nhau hỏng liền nhau → tài khoản đó nghỉ, việc chuyển ngay sang tài khoản Flow khác của dự án. Mọi tài khoản Flow đều lỗi → việc còn lại tự tạo tiếp ở Muse.</li>
-          <li><b>Muse ⇄ Flow:</b> Muse từ chối một ảnh ("Mình không thể tạo video từ ảnh này") → riêng ảnh đó sang Flow tạo video, ảnh khác vẫn ở Muse. Tài khoản lỗi thì Dự phòng cùng bên vào thay; hết dự phòng mà còn thiếu so với số tài khoản Chạy (vd chạy 5 Flow, chỉ còn 1 Flow chạy được) → Muse chạy thêm 4 tài khoản cho đủ 5, Flow có lại tài khoản thì việc chưa chạy quay về Flow. Bên kia cần có tài khoản đã đăng nhập. Tắt ở Cài đặt → Chạy.</li>
+          <li><b>Muse ⇄ Flow:</b> Muse từ chối một ảnh ("Mình không thể tạo video từ ảnh này") → riêng ảnh đó sang Flow tạo video, ảnh khác vẫn ở Muse. Tài khoản lỗi thì Dự phòng cùng bên vào thay; hết dự phòng mà còn thiếu so với số tài khoản Chạy (vd chạy 5 Flow, chỉ còn 1 Flow chạy được) → Muse chạy thêm 4 tài khoản cho đủ 5, Flow có lại tài khoản thì việc chưa chạy quay về Flow. Bên kia cần có tài khoản đã đăng nhập. Tắt ở Cài đặt → <i>Chung (Muse + Flow)</i>.</li>
           <li><b>Tạo nhạc (Suno):</b> Tài khoản → <i>Thêm Suno</i> → <i>Đăng nhập</i> → đăng nhập suno.com → <i>Xong</i>. Trang <i>Tạo nhạc</i>: mỗi dòng một prompt mô tả phong cách (vd <code>lofi chill piano, mưa nhẹ, 80 bpm</code>). App mở Create ở chế độ Advanced, điền prompt vào ô <i>Styles</i>, để trống lời (nhạc không lời), bấm Create. Suno free ra 4 bài: app chỉ xét 2 bài đầu và tải bản MP3 của bài <b>dài hơn</b>, đặt tên theo mẫu (mặc định <code>{stt}</code> → <code>001.mp3</code>) vào thư mục chọn ở Cài đặt nâng cao của trang Tạo nhạc. Mỗi tài khoản Suno làm <b>từng prompt một</b>: chờ bài tạo xong → bấm <i>⋯</i> cạnh bài → <i>Download</i> → chọn MP3 → <i>Unlock &amp; Download</i> (trừ 1 lượt tải của tài khoản) → chờ Suno <i>Preparing…</i> rồi tự tải file, xong mới gửi prompt kế tiếp. Tải hỏng thì app tải lại đúng bài đó (tối đa 3 lần), <b>không gửi lại prompt</b>. Chạy song song với ảnh / video.</li>
           <li><b>Suno hết lượt:</b> tài khoản Suno báo hết credit (nút Create ghi <i>Create again in …</i>) / hết lượt tải thì bài đó được tạo lại và tải ở tài khoản Suno dự phòng; tài khoản hết lượt nghỉ 6 giờ (bấm <i>Kiểm tra</i> ở tài khoản đó để cho chạy lại sớm). Suno hỏi captcha thì cửa sổ Suno hiện lên để bạn tự giải — app không giải hộ. Đăng nhập Suno bằng Google mà Google báo <i>Couldn't sign you in</i>: bấm <i>Try again</i>; vẫn không được thì gửi ảnh chụp cho người phát triển.</li>
           <li><b>Google Drive (1.4.0), cách 1 (chép vào thư mục Drive trên máy):</b> cài <i>Google Drive cho máy tính</i>, đăng nhập Drive. Cài đặt → <i>Google Drive</i> → <i>Cách đưa lên: Chép vào thư mục…</i> → <i>Tự tìm</i> (hoặc <i>Chọn…</i> ổ <code>G:\My Drive</code>) → bật <i>tự đưa lên Google Drive</i> → <i>Lưu cài đặt</i>.</li>
@@ -340,7 +343,7 @@
           <li><b>Đổi ngay sang Muse / Flow:</b> nút <i>⋮</i> ở mỗi dòng → <i>Đổi sang Flow / Muse &amp; chạy ngay</i>; chọn nhiều dòng → <i>Sang Muse</i> / <i>Sang Flow</i>. Việc đang chạy dừng ở bên cũ rồi chạy ở bên mới; việc đã xong thì được tạo lại ở bên mới.</li>
           <li><b>Đồng hồ dự án:</b> cạnh tên dự án là thời gian dự án đã chạy (lượt này) và dự đoán còn bao lâu nữa (tính theo tốc độ thật của lượt đang chạy).</li>
           <li><b>Chạy lại tài khoản đang nghỉ:</b> tài khoản đỏ vì lỗi mà bạn đã sửa được (đăng nhập lại, đổi mạng…) → bấm <i>Chạy lại ngay</i> ở thẻ tài khoản (hoặc <i>Chạy lại TK đang nghỉ</i> cho mọi tài khoản): tài khoản nhận việc lại luôn, dự án đã tự tạm dừng thì chạy tiếp.</li>
-          <li><b>Lỗi lạ:</b> Cài đặt → bật <i>Hiện các luồng chạy ngầm</i> để nhìn thấy trang Muse / Flow của từng luồng; nhật ký đầy đủ ở thư mục dữ liệu (<code>nhat-ky.txt</code>).</li>
+          <li><b>Lỗi lạ:</b> Cài đặt → <i>Cả app</i> → bật <i>Hiện các luồng chạy ngầm</i> để nhìn thấy trang Muse / Flow của từng luồng; nhật ký đầy đủ ở thư mục dữ liệu (<code>nhat-ky.txt</code>).</li>
         </ol>
       </section>
     </main>
@@ -390,60 +393,49 @@
     <main class="trang" id="trang-caidat" hidden>
       <section class="panel trang-don cuon">
         <div class="panel-dau"><h2><i data-icon="settings"></i><span id="cdTieuDe">Cài đặt</span></h2></div>
-        <p class="ghi-ap">Nhãn cạnh mỗi mục cho biết mục đó áp dụng cho việc gì: <span class="ap ap-anh">Chỉ ảnh</span> <span class="ap ap-video">Chỉ video</span> <span class="ap ap-anh-video">Ảnh · Video</span> <span class="ap ap-nhac">Chỉ nhạc</span> <span class="ap ap-tat-ca">Ảnh · Video · Nhạc</span> <span class="ap ap-app">Cả app</span> (cả app = mọi dự án; còn lại là của dự án đang mở).</p>
+        <!-- 1.4.6: cài đặt chạy tách theo nơi chạy — mỗi thẻ ghi rõ chỉ áp cho Muse, Google Flow, Suno, chung hay cả app -->
+        <p class="ghi-ap">Nhãn ở <b>tiêu đề thẻ</b> cho biết thẻ đó áp cho việc chạy ở đâu: <span class="ap ap-muse">Muse</span> <span class="ap ap-flow">Google Flow</span> <span class="ap ap-suno">Suno</span> <span class="ap ap-app">Cả app</span> — Muse, Flow và Suno chạy khác nhau nên mỗi nơi có số thử lại, chờ, nghỉ riêng. Nhãn <b>cạnh mỗi mục</b> cho biết mục đó áp cho loại việc nào: <span class="ap ap-anh">Chỉ ảnh</span> <span class="ap ap-video">Chỉ video</span> <span class="ap ap-anh-video">Ảnh · Video</span> <span class="ap ap-nhac">Chỉ nhạc</span> <span class="ap ap-app">Cả app</span> (cả app = mọi dự án; còn lại là của dự án đang mở).</p>
         <p class="ghi-cai-dat-du-an" id="cdDuAnGhi">Mỗi dự án có cài đặt riêng: <b>Lưu cài đặt</b> (thanh dưới đáy trang) chỉ đổi dự án đang mở (chọn dự án ở thanh trên cùng); <b>Lưu làm cài đặt mặc định</b> áp cho mọi dự án đang có và dự án mới (thư mục lưu, mẫu tên file vẫn riêng từng dự án). Dự án mới chép cài đặt của dự án đang mở lúc tạo.</p>
-        <div class="the-cai">
-          <h3><i data-icon="sliders-horizontal"></i>Chạy</h3>
+        <div class="the-cai noi-chung" id="cdChungThe">
+          <h3><i data-icon="arrow-left-right"></i>Chung (Muse + Flow)<span class="ap ap-muse">Muse</span><span class="ap ap-flow">Google Flow</span></h3>
+          <small class="mo">Áp cho việc ảnh / video ở cả Muse lẫn Google Flow của dự án đang mở.</small>
+          <div class="dong-cong-tac"><div><b>Muse ⇄ Flow: bên này lỗi thì tự chuyển sang bên kia</b><span class="ap ap-anh-video">Ảnh · Video</span><small>Muse từ chối tạo video từ một ảnh → riêng ảnh đó sang Flow. Tài khoản lỗi / nghỉ thì tài khoản Dự phòng cùng bên vào thay trước; hết dự phòng mà số tài khoản còn chạy được ít hơn số tài khoản Chạy của dự án → bên kia chạy thêm đúng số tài khoản còn thiếu và nhận vừa đủ việc cho chúng, để luôn đủ số tài khoản chạy cùng lúc. Bên cũ có lại tài khoản thì việc chưa chạy quay về. Việc hỏng ở mọi tài khoản một bên (hết số vòng thử thêm của bên đó) → sang bên kia. Bên kia cần có tài khoản đã đăng nhập (hoặc được chọn trong dự án).</small></div><label class="cong-tac"><input type="checkbox" id="cdDoiNen"><span></span></label></div>
+          <div class="dong-cong-tac"><div><b>Video tạo từ ảnh lưu cạnh ảnh, cùng tên</b><span class="ap ap-video">Chỉ video</span><small>Ảnh xong → tự tạo video (Flow ⇄ Muse). Bật: video tải về ngay cạnh ảnh nguồn, cùng tên, ví dụ <code>325.jpg</code> → <code>325.mp4</code>. Tắt: lưu vào thư mục chọn ở trang Tạo ảnh → <i>Ảnh xong → tự tạo video</i> → <i>Lưu video của dự án này vào</i> (vẫn cùng tên ảnh); chưa chọn thì theo thư mục và mẫu tên của trang Tạo video. Đã chọn thư mục ở đó thì video luôn lưu vào thư mục đó, kể cả khi bật.</small></div><label class="cong-tac"><input type="checkbox" id="cdVideoCanhAnh"><span></span></label></div>
+        </div>
+        <div class="the-cai noi-muse" id="cdMuseThe">
+          <h3><i data-icon="wand-sparkles"></i>Muse — khi chạy<span class="ap ap-muse">Muse</span></h3>
+          <small class="mo">Chỉ áp cho việc chạy trên Muse (muse.ai). Việc chạy ở Google Flow hay Suno dùng thẻ của nơi đó bên dưới.</small>
           <div class="luoi-3">
-            <label>Số luồng mỗi tài khoản<span class="ap ap-tat-ca">Ảnh · Video · Nhạc</span><input type="number" id="cdLuong" min="1" max="20"></label>
-            <label>Nghỉ giữa 2 lần gửi Muse / Suno (giây, mỗi tài khoản)<span class="ap ap-tat-ca">Ảnh · Video · Nhạc</span><input type="number" id="cdNghi" min="0" max="120"><small class="ghi-o">Chỉ Muse và Suno. Google Flow dùng "Chờ giữa 2 prompt" ở thẻ Google Flow.</small></label>
-            <label>Lỗi ở mọi tài khoản thì thử thêm (vòng)<span class="ap ap-tat-ca">Ảnh · Video · Nhạc</span><input type="number" id="cdThuLai" min="0" max="10"></label>
-            <label>Hết lượt → tự chạy lại việc lỗi (số lượt)<span class="ap ap-tat-ca">Ảnh · Video · Nhạc</span><input type="number" id="cdChayLaiLoi" min="0" max="10"></label>
+            <label>Số luồng mỗi tài khoản Muse<span class="ap ap-anh-video">Ảnh · Video</span><input type="number" id="cdLuong" min="1" max="20"><small class="ghi-o">Flow dùng "Số tab mỗi tài khoản Flow" ở thẻ Google Flow; Suno luôn 1 luồng mỗi tài khoản.</small></label>
+            <label>Nghỉ giữa 2 lần gửi Muse (giây, mỗi tài khoản)<span class="ap ap-anh-video">Ảnh · Video</span><input type="number" id="cdNghi" min="0" max="120"><small class="ghi-o">Flow dùng "Chờ giữa 2 prompt", Suno có ô nghỉ riêng ở thẻ của mình.</small></label>
+            <label>Lỗi ở mọi tài khoản Muse thì thử thêm (vòng)<span class="ap ap-anh-video">Ảnh · Video</span><input type="number" id="cdThuLai" min="0" max="10"></label>
+            <label>Hết lượt → tự chạy lại việc lỗi Muse (số lượt)<span class="ap ap-anh-video">Ảnh · Video</span><input type="number" id="cdChayLaiLoi" min="0" max="10"></label>
             <label>Chờ tối đa 1 ảnh (giây) — quá thì chuyển tài khoản dự phòng<span class="ap ap-anh">Chỉ ảnh</span><input type="number" id="cdChoAnh" min="60" max="1800"></label>
             <label>Chờ tối đa 1 video (giây) — quá thì chuyển tài khoản dự phòng<span class="ap ap-video">Chỉ video</span><input type="number" id="cdChoVideo" min="120" max="3600"></label>
             <label>Muse trả chữ bao lâu thì coi là lỗi (giây)<span class="ap ap-anh-video">Ảnh · Video</span><input type="number" id="cdChoChu" min="15" max="600"></label>
-            <label>Chờ tối đa 1 lần tạo nhạc Suno (giây)<span class="ap ap-nhac">Chỉ nhạc</span><input type="number" id="cdChoNhac" min="120" max="3600"></label>
           </div>
-          <div class="dong-cong-tac"><div><b>Muse ⇄ Flow: bên này lỗi thì tự chuyển sang bên kia</b><span class="ap ap-anh-video">Ảnh · Video</span><small>Muse từ chối tạo video từ một ảnh → riêng ảnh đó sang Flow. Tài khoản lỗi / nghỉ thì tài khoản Dự phòng cùng bên vào thay trước; hết dự phòng mà số tài khoản còn chạy được ít hơn số tài khoản Chạy của dự án → bên kia chạy thêm đúng số tài khoản còn thiếu và nhận vừa đủ việc cho chúng, để luôn đủ số tài khoản chạy cùng lúc. Bên cũ có lại tài khoản thì việc chưa chạy quay về. Việc hỏng ở mọi tài khoản một bên → sang bên kia. Bên kia cần có tài khoản đã đăng nhập (hoặc được chọn trong dự án).</small></div><label class="cong-tac"><input type="checkbox" id="cdDoiNen"><span></span></label></div>
+          <small class="mo">Lỗi → chuyển lần lượt sang các tài khoản dự phòng → hết dự phòng thì quay về tài khoản chính thử lại, cứ thế theo vòng. Việc chỉ báo Lỗi khi đã hỏng ở mọi tài khoản thêm số vòng trên; tài khoản lỗi liên tiếp được cho nghỉ 15 phút, mọi tài khoản đều nghỉ thì hàng chờ tạm dừng. Flow và Suno làm y như vậy, theo số vòng / số lượt ở thẻ của mình.</small>
           <div class="dong-cong-tac"><div><b>Lưu ảnh dạng PNG</b><span class="ap ap-anh">Chỉ ảnh</span><small>Muse trả webp; bật để đổi sang png (nặng hơn, dễ dùng hơn).</small></div><label class="cong-tac"><input type="checkbox" id="cdPng"><span></span></label></div>
-          <div class="dong-cong-tac"><div><b>Hiện các luồng chạy ngầm</b><span class="ap ap-app">Cả app</span><small>Để soi lỗi: trang Muse / Flow của các luồng sẽ hiện đè lên app.</small></div><label class="cong-tac"><input type="checkbox" id="cdXemLuong"><span></span></label></div>
-          <small class="mo">Lỗi → chuyển lần lượt sang các tài khoản dự phòng → hết dự phòng thì quay về tài khoản chính thử lại, cứ thế theo vòng. Việc chỉ báo Lỗi khi đã hỏng ở mọi tài khoản thêm số vòng trên; tài khoản lỗi liên tiếp được cho nghỉ 15 phút, mọi tài khoản đều nghỉ thì hàng chờ tạm dừng.</small>
-          <div class="dong-cong-tac"><div><b>Tắt máy khi chạy hết hàng chờ</b><span class="ap ap-app">Cả app</span><small>Chung cho mọi dự án: tắt khi MỌI dự án đang chạy đều xong. Windows, macOS. Tắt sau 60 giây; Windows huỷ bằng lệnh <code>shutdown /a</code>.</small></div><label class="cong-tac"><input type="checkbox" id="cdTatMay"><span></span></label></div>
-          <div class="dong-cong-tac"><div><b>Máy mượt: ưu tiên máy của bạn hơn các trang chạy ngầm</b><span class="ap ap-app">Cả app</span><small>Chung cho mọi dự án. Hạ ưu tiên CPU của các trang Muse / Flow / Suno chạy ngầm và tắt hiệu ứng động trên các trang đó (vòng xoay chờ, ánh lấp lánh lúc đang tạo) cho bớt ngốn CPU: máy rảnh thì vẫn chạy đủ nhanh, máy bận thì giao diện app và phần mềm bạn đang dùng không bị giật. Cách chạy không đổi.</small></div><label class="cong-tac"><input type="checkbox" id="cdNheMay"><span></span></label></div>
-        </div>
-        <div class="the-cai">
-          <h3><i data-icon="download"></i>Video tạo từ ảnh &amp; dọn dẹp</h3>
-          <div class="dong-cong-tac"><div><b>Video tạo từ ảnh lưu cạnh ảnh, cùng tên</b><span class="ap ap-video">Chỉ video</span><small>Ảnh xong → tự tạo video (Flow ⇄ Muse). Bật: video tải về ngay cạnh ảnh nguồn, cùng tên, ví dụ <code>325.jpg</code> → <code>325.mp4</code>. Tắt: lưu vào thư mục chọn ở trang Tạo ảnh → <i>Ảnh xong → tự tạo video</i> → <i>Lưu video của dự án này vào</i> (vẫn cùng tên ảnh); chưa chọn thì theo thư mục và mẫu tên của trang Tạo video. Đã chọn thư mục ở đó thì video luôn lưu vào thư mục đó, kể cả khi bật.</small></div><label class="cong-tac"><input type="checkbox" id="cdVideoCanhAnh"><span></span></label></div>
           <div class="dong-cong-tac"><div><b>Chạy xong thì tự xoá chat Muse</b><span class="ap ap-anh-video">Ảnh · Video</span><small>Chạy hết hàng chờ → xoá đoạn chat trên muse.ai của các việc đã xong (file đã tải vẫn giữ, không khôi phục được chat).</small></div><label class="cong-tac"><input type="checkbox" id="cdXoaChat"><span></span></label></div>
-          <div class="dong-cong-tac"><div><b>Chạy xong thì tự xoá dự án Flow</b><span class="ap ap-anh-video">Ảnh · Video</span><small>Chạy hết hàng chờ → xoá dự án Google Flow mà các tài khoản Flow vừa dùng (không khôi phục được); lần chạy sau app tự mở dự án mới.</small></div><label class="cong-tac"><input type="checkbox" id="cdXoaDuAnFlow"><span></span></label></div>
+          <h4>Mẫu câu lệnh gửi Muse</h4>
+          <small class="mo">{prompt} = prompt của bạn · {tyLe} = tỷ lệ khung · {thamChieu} = dòng giải thích ảnh đính kèm (tự sinh). Flow nhận nguyên prompt, không dùng mẫu này.</small>
+          <label>Ảnh<span class="ap ap-anh">Chỉ ảnh</span><textarea id="cdMauAnh" rows="3"></textarea></label>
+          <label>Video<span class="ap ap-video">Chỉ video</span><textarea id="cdMauVideo" rows="3"></textarea></label>
+          <button class="nut-vien nho" id="cdMauGoc"><i data-icon="rotate-ccw"></i>Trả về mẫu gốc</button>
         </div>
-        <div class="the-cai" id="cdDriveThe">
-          <h3><i data-icon="cloud-upload"></i>Google Drive</h3>
-          <div class="dong-cong-tac"><div><b>Ảnh / video xong thì tự đưa lên Google Drive</b><span class="ap ap-anh-video">Ảnh · Video</span><small>Trên Drive tự có thư mục <code>&lt;Tên dự án&gt;/images</code> cho ảnh và <code>&lt;Tên dự án&gt;/Videos</code> cho video. Bật lên thì app tự tắt <b>Tải ảnh về</b> / <b>Tải video về</b>: file giữ trong app (thư mục tạm riêng từng dự án) rồi đưa lên Drive, không lưu lẫn vào thư mục máy.</small></div><label class="cong-tac"><input type="checkbox" id="cdDrive"><span></span></label></div>
-          <label class="o-drive-cach">Cách đưa lên<select id="cdDriveCach">
-            <option value="may">Chép vào thư mục Google Drive trên máy (Drive cho máy tính tự tải lên)</option>
-            <option value="web">Tải thẳng lên drive.google.com bằng trình duyệt trong app</option>
-          </select></label>
-          <div class="o-thu-muc-video" data-drive-cach="web" hidden><b>Tài khoản Google Drive</b>
-            <div class="dong-o"><select id="cdDriveTk"></select><button class="nut-vien nho" id="cdDriveTkMoi"><i data-icon="contact"></i>Tài khoản Drive…</button></div>
-            <small class="mo">Thêm và đăng nhập tài khoản ở mục Tài khoản → thẻ Drive (đăng nhập Google một lần trong app, app không giữ mật khẩu). App mở drive.google.com ở cửa sổ ẩn, tự tạo thư mục và tải từng file lên.</small>
-          </div>
-          <div class="o-thu-muc-video" data-drive-cach="may"><b>Thư mục Google Drive trên máy</b>
-            <div class="dong-o"><input id="cdThuMucDrive" readonly placeholder="Chưa chọn — vd G:\My Drive"><button class="nut-vien nho" id="cdTimDrive" title="Tự tìm thư mục Google Drive trên máy"><i data-icon="search"></i>Tự tìm</button><button class="nut-vien nho" id="cdChonDrive"><i data-icon="folder-open"></i>Chọn…</button><button class="nut-vien nho" id="cdMoDrive">Mở</button></div>
-          </div>
-          <small class="mo" data-drive-cach="may">Cần cài <b>Google Drive cho máy tính</b> (drive.google.com → Tải xuống Drive cho máy tính) và đăng nhập sẵn tài khoản Drive. Thư mục thường là ổ <code>G:\My Drive</code> (hoặc <code>G:\Drive của tôi</code>) trên Windows. App không đăng nhập Google, không cần mật khẩu. Việc đã xong từ trước: chọn việc → <b>Lên Drive</b>.</small>
-        </div>
-        <div class="the-cai" id="cdFlow">
-          <h3><i data-icon="sparkles"></i>Google Flow</h3>
-          <small class="mo">Tải về và đặt tên file do app tự lo (theo mẫu tên chung ở Cài đặt nâng cao của trang Tạo). Chạy nhiều tài khoản Flow cùng lúc: chọn ở nút tài khoản cạnh tên dự án.</small>
+        <div class="the-cai noi-flow" id="cdFlow">
+          <h3><i data-icon="sparkles"></i>Google Flow — khi chạy<span class="ap ap-flow">Google Flow</span></h3>
+          <small class="mo">Chỉ áp cho việc chạy trên Google Flow. Tải về và đặt tên file do app tự lo (theo mẫu tên chung ở Cài đặt nâng cao của trang Tạo). Chạy nhiều tài khoản Flow cùng lúc: chọn ở nút tài khoản cạnh tên dự án.</small>
           <div class="luoi-3">
             <label>Số tab mỗi tài khoản Flow<span class="ap ap-anh-video">Ảnh · Video</span><input type="number" id="fTab" min="1" max="4"></label>
             <label>Mỗi mẻ giao Flow tối đa (prompt)<span class="ap ap-anh-video">Ảnh · Video</span><input type="number" id="fMe" min="1" max="50"></label>
             <label>Số kết quả mỗi prompt<span class="ap ap-anh-video">Ảnh · Video</span><select id="fSoLuong"><option>1</option><option>2</option><option>3</option><option>4</option></select></label>
             <label>Chờ giữa 2 prompt — từ (giây)<span class="ap ap-anh-video">Ảnh · Video</span><input type="number" id="fChoMin" min="1" max="600"></label>
             <label>đến (giây) — bằng số "từ" là chờ đúng số đó<span class="ap ap-anh-video">Ảnh · Video</span><input type="number" id="fChoMax" min="1" max="600"></label>
-            <label>Thử lại cùng tài khoản (lần), rồi sang tài khoản khác<span class="ap ap-anh-video">Ảnh · Video</span><input type="number" id="fThuLai" min="0" max="10"></label>
             <label>Giãn nhịp bấm Tạo giữa các tab (giây)<span class="ap ap-anh-video">Ảnh · Video</span><input type="number" id="fGian" min="0" max="600"></label>
+            <label>Thử lại cùng tài khoản (lần), rồi sang tài khoản khác<span class="ap ap-anh-video">Ảnh · Video</span><input type="number" id="fThuLai" min="0" max="10"></label>
+            <label>Lỗi ở mọi tài khoản Flow thì thử thêm (vòng)<span class="ap ap-anh-video">Ảnh · Video</span><input type="number" id="cdThuLaiFlow" min="0" max="10"><small class="ghi-o">Hết số vòng mà vẫn hỏng → Lỗi (hoặc sang Muse nếu bật Muse ⇄ Flow).</small></label>
+            <label>Hết lượt → tự chạy lại việc lỗi Flow (số lượt)<span class="ap ap-anh-video">Ảnh · Video</span><input type="number" id="cdChayLaiLoiFlow" min="0" max="10"></label>
             <label>Chất lượng ảnh tải về<span class="ap ap-anh">Chỉ ảnh</span><select id="fChatAnh"><option value="img_1k">1K (kích thước gốc, không tốn tín dụng)</option><option value="img_2k">2K (Flow tăng độ phân giải, tốn tín dụng)</option><option value="img_4k">4K (tốn tín dụng)</option></select></label>
             <label>Chất lượng video tải về<span class="ap ap-video">Chỉ video</span><select id="fChatVideo"><option value="720p">720p</option><option value="1080p">1080p</option><option value="4k">4K</option></select></label>
             <label>Khi nghi mất mạng<span class="ap ap-anh-video">Ảnh · Video</span><select id="fMang"><option value="auto">Gọi thử Flow rồi mới dừng</option><option value="off">Bỏ qua, không dừng</option></select></label>
@@ -452,6 +444,7 @@
           <div class="dong-cong-tac"><div><b>Gỡ ảnh tham chiếu bị dính</b><span class="ap ap-anh-video">Ảnh · Video</span><small>Ô nhập còn ảnh của prompt trước thì gỡ trước khi dán (mẻ không gắn ảnh).</small></div><label class="cong-tac"><input type="checkbox" id="fGoAnh"><span></span></label></div>
           <div class="dong-cong-tac"><div><b>Đổi tên kết quả trên Flow theo mã việc</b><span class="ap ap-anh-video">Ảnh · Video</span><small>Cần cho "ảnh Flow → video Flow" cùng tài khoản khỏi tải ảnh lên lại.</small></div><label class="cong-tac"><input type="checkbox" id="fDoiTen"><span></span></label></div>
           <div class="dong-cong-tac"><div><b>Tự bấm "Tôi đồng ý" ở hộp "Quyền sử dụng hình ảnh này"</b><span class="ap ap-anh-video">Ảnh · Video</span><small>Flow hỏi khi một tài khoản tải ảnh lên lần đầu; chưa đồng ý thì ảnh không vào kho. Bật là bạn xác nhận với Google bạn có quyền với mọi ảnh app tải lên.</small></div><label class="cong-tac"><input type="checkbox" id="fDongY"><span></span></label></div>
+          <div class="dong-cong-tac"><div><b>Chạy xong thì tự xoá dự án Flow</b><span class="ap ap-anh-video">Ảnh · Video</span><small>Chạy hết hàng chờ → xoá dự án Google Flow mà các tài khoản Flow vừa dùng (không khôi phục được); lần chạy sau app tự mở dự án mới.</small></div><label class="cong-tac"><input type="checkbox" id="cdXoaDuAnFlow"><span></span></label></div>
           <div class="dong-cong-tac"><div><b>Nghỉ giữa các thao tác</b><span class="ap ap-anh-video">Ảnh · Video</span><small>Nghỉ ngẫu nhiên trước khi nhập, bấm Tạo, đổi tên, tải về.</small></div><label class="cong-tac"><input type="checkbox" id="fNghiTT"><span></span></label></div>
           <div class="luoi-3">
             <label>Nghỉ thao tác từ (giây)<span class="ap ap-anh-video">Ảnh · Video</span><input type="number" id="fNghiTTMin" min="0" max="60" step="0.5"></label>
@@ -472,12 +465,38 @@
           </div>
           <small class="mo">Luôn bật. Flow báo "hoạt động bất thường" / "quá nhiều yêu cầu" / hết tín dụng → đổi tài khoản ngay từ lỗi đầu tiên. Không đọc được câu đó thì đếm prompt hỏng liền nhau (một prompt thử lại nhiều lần vẫn tính là một, có prompt xong thì đếm lại từ đầu). Tài khoản lỗi nghỉ theo số phút trên (bị lại thì nghỉ gấp đôi, tối đa 4 lần); riêng khi Flow báo "hoạt động bất thường" / "quá nhiều yêu cầu" thì nghỉ 3 giờ (bị lại 6 giờ, tối đa 12 giờ), và 2 tài khoản bị báo trong 30 phút thì mọi tài khoản Flow cùng nghỉ 2 giờ, việc của nó sang ngay tài khoản khác của dự án; dự án không còn tài khoản Flow nào khác thì tài khoản đó tạm dừng rồi tự chạy lại.</small>
         </div>
-        <div class="the-cai">
-          <h3><i data-icon="file-text"></i>Mẫu câu lệnh gửi Muse</h3>
-          <small class="mo">{prompt} = prompt của bạn · {tyLe} = tỷ lệ khung · {thamChieu} = dòng giải thích ảnh đính kèm (tự sinh).</small>
-          <label>Ảnh<span class="ap ap-anh">Chỉ ảnh</span><textarea id="cdMauAnh" rows="3"></textarea></label>
-          <label>Video<span class="ap ap-video">Chỉ video</span><textarea id="cdMauVideo" rows="3"></textarea></label>
-          <button class="nut-vien nho" id="cdMauGoc"><i data-icon="rotate-ccw"></i>Trả về mẫu gốc</button>
+        <div class="the-cai noi-suno" id="cdSunoThe">
+          <h3><i data-icon="music"></i>Suno — khi chạy<span class="ap ap-suno">Suno</span></h3>
+          <small class="mo">Chỉ áp cho việc tạo nhạc chạy trên Suno. Mỗi tài khoản Suno làm từng prompt một (luôn 1 luồng); thư mục, mẫu tên file nhạc ở Cài đặt nâng cao của trang Tạo nhạc.</small>
+          <div class="luoi-3">
+            <label>Chờ tối đa 1 lần tạo nhạc Suno (giây)<span class="ap ap-nhac">Chỉ nhạc</span><input type="number" id="cdChoNhac" min="120" max="3600"></label>
+            <label>Nghỉ giữa 2 lần gửi Suno (giây, mỗi tài khoản)<span class="ap ap-nhac">Chỉ nhạc</span><input type="number" id="cdNghiSuno" min="0" max="120"></label>
+            <label>Lỗi ở mọi tài khoản Suno thì thử thêm (vòng)<span class="ap ap-nhac">Chỉ nhạc</span><input type="number" id="cdThuLaiSuno" min="0" max="10"></label>
+            <label>Hết lượt → tự chạy lại việc lỗi Suno (số lượt)<span class="ap ap-nhac">Chỉ nhạc</span><input type="number" id="cdChayLaiLoiSuno" min="0" max="10"></label>
+          </div>
+        </div>
+        <div class="the-cai noi-chung" id="cdDriveThe">
+          <h3><i data-icon="cloud-upload"></i>Google Drive<span class="ap ap-muse">Muse</span><span class="ap ap-flow">Google Flow</span></h3>
+          <div class="dong-cong-tac"><div><b>Ảnh / video xong thì tự đưa lên Google Drive</b><span class="ap ap-anh-video">Ảnh · Video</span><small>Trên Drive tự có thư mục <code>&lt;Tên dự án&gt;/images</code> cho ảnh và <code>&lt;Tên dự án&gt;/Videos</code> cho video. Bật lên thì app tự tắt <b>Tải ảnh về</b> / <b>Tải video về</b>: file giữ trong app (thư mục tạm riêng từng dự án) rồi đưa lên Drive, không lưu lẫn vào thư mục máy.</small></div><label class="cong-tac"><input type="checkbox" id="cdDrive"><span></span></label></div>
+          <label class="o-drive-cach">Cách đưa lên<select id="cdDriveCach">
+            <option value="may">Chép vào thư mục Google Drive trên máy (Drive cho máy tính tự tải lên)</option>
+            <option value="web">Tải thẳng lên drive.google.com bằng trình duyệt trong app</option>
+          </select></label>
+          <div class="o-thu-muc-video" data-drive-cach="web" hidden><b>Tài khoản Google Drive</b>
+            <div class="dong-o"><select id="cdDriveTk"></select><button class="nut-vien nho" id="cdDriveTkMoi"><i data-icon="contact"></i>Tài khoản Drive…</button></div>
+            <small class="mo">Thêm và đăng nhập tài khoản ở mục Tài khoản → thẻ Drive (đăng nhập Google một lần trong app, app không giữ mật khẩu). App mở drive.google.com ở cửa sổ ẩn, tự tạo thư mục và tải từng file lên.</small>
+          </div>
+          <div class="o-thu-muc-video" data-drive-cach="may"><b>Thư mục Google Drive trên máy</b>
+            <div class="dong-o"><input id="cdThuMucDrive" readonly placeholder="Chưa chọn — vd G:\My Drive"><button class="nut-vien nho" id="cdTimDrive" title="Tự tìm thư mục Google Drive trên máy"><i data-icon="search"></i>Tự tìm</button><button class="nut-vien nho" id="cdChonDrive"><i data-icon="folder-open"></i>Chọn…</button><button class="nut-vien nho" id="cdMoDrive">Mở</button></div>
+          </div>
+          <small class="mo" data-drive-cach="may">Cần cài <b>Google Drive cho máy tính</b> (drive.google.com → Tải xuống Drive cho máy tính) và đăng nhập sẵn tài khoản Drive. Thư mục thường là ổ <code>G:\My Drive</code> (hoặc <code>G:\Drive của tôi</code>) trên Windows. App không đăng nhập Google, không cần mật khẩu. Việc đã xong từ trước: chọn việc → <b>Lên Drive</b>.</small>
+        </div>
+        <div class="the-cai noi-app" id="cdAppThe">
+          <h3><i data-icon="monitor"></i>Cả app<span class="ap ap-app">Cả app</span></h3>
+          <small class="mo">Chung cho mọi dự án và mọi nơi chạy (Muse, Google Flow, Suno).</small>
+          <div class="dong-cong-tac"><div><b>Hiện các luồng chạy ngầm</b><span class="ap ap-app">Cả app</span><small>Để soi lỗi: trang Muse / Flow / Suno của các luồng sẽ hiện đè lên app.</small></div><label class="cong-tac"><input type="checkbox" id="cdXemLuong"><span></span></label></div>
+          <div class="dong-cong-tac"><div><b>Tắt máy khi chạy hết hàng chờ</b><span class="ap ap-app">Cả app</span><small>Chung cho mọi dự án: tắt khi MỌI dự án đang chạy đều xong. Windows, macOS. Tắt sau 60 giây; Windows huỷ bằng lệnh <code>shutdown /a</code>.</small></div><label class="cong-tac"><input type="checkbox" id="cdTatMay"><span></span></label></div>
+          <div class="dong-cong-tac"><div><b>Máy mượt: ưu tiên máy của bạn hơn các trang chạy ngầm</b><span class="ap ap-app">Cả app</span><small>Chung cho mọi dự án. Hạ ưu tiên CPU của các trang Muse / Flow / Suno chạy ngầm và tắt hiệu ứng động trên các trang đó (vòng xoay chờ, ánh lấp lánh lúc đang tạo) cho bớt ngốn CPU: máy rảnh thì vẫn chạy đủ nhanh, máy bận thì giao diện app và phần mềm bạn đang dùng không bị giật. Cách chạy không đổi.</small></div><label class="cong-tac"><input type="checkbox" id="cdNheMay"><span></span></label></div>
         </div>
         <div class="the-cai">
           <h3><i data-icon="refresh-cw"></i>Cập nhật</h3>

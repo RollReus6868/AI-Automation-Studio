@@ -216,6 +216,11 @@ select option { background: var(--panel-dac); }
 .chon-het input { width: 16px; height: 16px; accent-color: var(--g2); cursor: pointer; }
 #khuVideoThuMuc .dong-o { margin-top: 8px; }
 #khuVideoThuMuc .dong-o .mo { font-size: 12.5px; }
+/* 1.4.6: file .txt prompt video riêng từng ảnh (Ảnh xong → tự tạo video / Tạo video từ thư mục ảnh) */
+.dong-prompt-rieng { margin-top: 8px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; min-width: 0; }
+.dong-prompt-rieng .nut-vien { flex: 0 1 auto; min-width: 0; white-space: normal; text-align: left; }
+.ghi-prompt-rieng { flex: 1 1 100%; min-width: 0; font-size: 12.5px; color: var(--chu-mo); overflow-wrap: anywhere; }
+.ghi-prompt-rieng.co-file { color: var(--chu-phu); }
 .thu-muc-video-du-an { margin-top: 10px; }
 .thu-muc-video-du-an > b { font-size: 12.5px; }
 .thu-muc-video-du-an .dong-o { margin-top: 6px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }
@@ -495,6 +500,18 @@ body.trang-nhac .khong-nhac { display: none !important; }
 .ap-nhac { background: rgba(255, 196, 77, .16); color: #ffd27a; }
 .ap-tat-ca { background: rgba(110, 220, 160, .14); color: #8fe6b6; }
 .ap-app { background: rgba(255, 255, 255, .08); color: var(--chu-phu, #b9b9c6); }
+/* 1.4.6: nhãn NƠI CHẠY (Muse / Google Flow / Suno) ở tiêu đề thẻ Cài đặt — viền để khác nhãn loại việc */
+.ap-muse { background: rgba(129, 140, 248, .14); color: #b4bcff; box-shadow: inset 0 0 0 1px rgba(129, 140, 248, .5); }
+.ap-flow { background: rgba(45, 212, 191, .12); color: #7eeadb; box-shadow: inset 0 0 0 1px rgba(45, 212, 191, .45); }
+.ap-suno { background: rgba(251, 146, 60, .13); color: #ffc08f; box-shadow: inset 0 0 0 1px rgba(251, 146, 60, .45); }
+.the-cai h3 { flex-wrap: wrap; }
+.the-cai h3 .ap { margin: 0; font-size: 11px; }
+.the-cai h3 .ap:first-of-type { margin-left: 4px; }
+.the-cai.noi-muse { border-left: 3px solid rgba(129, 140, 248, .7); }
+.the-cai.noi-flow { border-left: 3px solid rgba(45, 212, 191, .65); }
+.the-cai.noi-suno { border-left: 3px solid rgba(251, 146, 60, .65); }
+.the-cai.noi-chung { border-left: 3px solid rgba(179, 140, 255, .55); }
+.the-cai.noi-app { border-left: 3px solid rgba(255, 255, 255, .22); }
 label > .ap { margin-left: 6px; }
 .ghi-ap { margin: 0 0 12px; font-size: 12px; line-height: 1.9; color: var(--chu-phu, #b9b9c6); }
 .ghi-ap .ap { margin: 0 2px; }

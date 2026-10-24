@@ -903,6 +903,12 @@ const LENH = {
     const r = await dialog.showOpenDialog(win, { properties: ['openFile'], filters: [{ name: 'Văn bản', extensions: ['txt', 'csv', 'md'] }] });
     return r.canceled ? null : fs.readFileSync(r.filePaths[0], 'utf8').replace(/^\uFEFF/, '');
   },
+  // 1.4.6: file .txt prompt video RIÊNG từng ảnh (Ảnh xong → tự tạo video / Tạo video từ thư mục ảnh): dòng N ↔ ảnh N.
+  nhapPromptRieng: async () => {
+    const r = await dialog.showOpenDialog(win, { title: 'Chọn file .txt prompt video riêng từng ảnh', properties: ['openFile'], filters: [{ name: 'Văn bản', extensions: ['txt', 'csv', 'md'] }] });
+    if (r.canceled || !r.filePaths[0]) return null;
+    return { ten: path.basename(r.filePaths[0]), noiDung: fs.readFileSync(r.filePaths[0], 'utf8').replace(/^\uFEFF/, '') };
+  },
   nhapNhieuFile: async () => {
     const r = await dialog.showOpenDialog(win, { properties: ['openFile', 'multiSelections'], filters: [{ name: 'Văn bản', extensions: ['txt', 'csv', 'md'] }] });
     if (r.canceled) return [];

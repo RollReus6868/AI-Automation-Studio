@@ -583,7 +583,21 @@ class LuongFlow {
           hetViec();
         };
         // AUTOMATION_STOPPED: engine đã kết thúc mẻ (máy Flow gọi trễ 1,5 s cho file cuối kịp về).
-        t.onDung = () => setTimeout(() => ket('dung-engine'), 1500);
+        // 1.4.6: engine chỉ chờ trình duyệt BẮT ĐẦU tải (will-download), không chờ tải xong. Trên Windows file vừa tải còn
+        // bị quét virus vài giây mới "xong" → chốt mẻ sau 1,5 s từng đánh hỏng oan "Flow tạo xong nhưng không tải về được"
+        // (CI Windows e2e Flow §1 đỏ nhiều lần; người dùng thật thì tạo lại ở tài khoản khác, tốn tín dụng). Còn việc đã
+        // tạo xong + engine đã tải mà file chưa về → đợi thêm (tối đa min(choTaiMs, 2 phút) từ lúc engine dừng); file về
+        // thì thuXong chốt từng việc.
+        t.onDung = () => {
+          const dungLuc = Date.now(), han = Math.min(this.choTaiMs, 120000);
+          const dangTai = () => [...conLai].some((j) => { const h = hang.get(j); return h && h.status === 'COMPLETED' && h.downloaded && !files.get(j).length; });
+          const lap = () => {
+            if (daKet) return;
+            if (!conLai.size || !dangTai() || Date.now() - dungLuc > han) return ket('dung-engine');
+            setTimeout(lap, 500);
+          };
+          setTimeout(lap, 1500);
+        };
         // Menu Tải xuống không còn mục chất lượng nào bấm được (nhật ký 17/10/2026) → lưu menu đó để sửa tiếp.
         t.onLoiChatLuong = () => { this._chupChanDoan('engine không chọn được chất lượng tải xuống', false).catch(() => {}); };
         // Engine không thấy nút Tạo / ô tìm kiếm của bảng kho sau khi gắn ảnh → lưu khung ô nhập + lớp phủ để sửa tiếp.
