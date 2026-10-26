@@ -171,12 +171,16 @@ function taoMayFlow(o) {
     // CA_MAY_SO_TK tài khoản bị báo trong 30 phút → cả máy nghỉ Flow (mọi tài khoản chung máy, chung mạng).
     const batThuong = so.batThuong || anToan.laCanhBaoChan(so.cauChan);
     if (batThuong) ms = Math.max(ms, anToan.thoiGianNghiBatThuong(so.soLanBiChan, caiDatAnToan));
-    const caMay = batThuong && (ganDayBatThuong.set(khoa(accountId), Date.now()), anToan.canNghiCaMay(ganDayBatThuong, Date.now()));
+    // 1.4.7: công tắc "Cả máy nghỉ Flow" + số phút (Cài đặt → Flow → Tài khoản lỗi); tắt = chạy như trước 1.4.5.
+    const caMayMs = anToan.thoiGianNghiCaMay(caiDatAnToan);
+    const caMay = batThuong && (ganDayBatThuong.set(khoa(accountId), Date.now()), caMayMs > 0 && anToan.canNghiCaMay(ganDayBatThuong, Date.now()));
+    // 1.4.7: nhớ lần bị báo trên tài khoản (qua các lần mở app) để nhận ra tài khoản bị Google đánh dấu.
+    if (batThuong && o.ghiBatThuong) { try { o.ghiBatThuong(accountId); } catch (err) { log('error', err.message); } }
     const nghiCaMay = () => {
       if (!caMay || !o.nghiCaMay) return;
       const soTk = ganDayBatThuong.size;
       ganDayBatThuong.clear();
-      o.nghiCaMay(anToan.CA_MAY_NGHI_MS, `${soTk} tài khoản Flow bị báo hoạt động bất thường trong 30 phút`, accountId);
+      o.nghiCaMay(caMayMs, `${soTk} tài khoản Flow bị báo hoạt động bất thường trong 30 phút`, accountId);
     };
     so.soLanBiChan += 1;
     const ten = ds[0].accountName || accountId || 'tài khoản';

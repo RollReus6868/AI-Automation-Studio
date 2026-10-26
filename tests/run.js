@@ -534,6 +534,48 @@ test('1.4.5: cả máy nghỉ Flow — mọi tài khoản Flow khác nghỉ, lu�
   assert.deepStrictEqual(dung.map((x) => x[0]), [f2.id]);
   assert.ok(nhatKy.some((x) => /Cả máy nghỉ Flow 2 giờ/.test(x)));
 });
+test('1.4.7: cả máy nghỉ — thẻ đỏ ghi rõ tài khoản này không bị báo', () => {
+  const { dp, tk } = dungDieuPhoi();
+  const f1 = tk.them('F1', 'flow'), f2 = tk.them('F2', 'flow');
+  dp.nghiCaFlow(2 * 3600000, '2 tài khoản Flow bị báo hoạt động bất thường trong 30 phút', f1.id);
+  const sk = dp.sucKhoeTk()[f2.id];
+  assert.strictEqual(sk.muc, 'loi');
+  assert.ok(/Cả máy nghỉ Flow \(tài khoản này không bị báo\): 2 tài khoản Flow bị báo/.test(sk.chu), sk.chu);
+});
+test('1.4.7: nhớ lần Flow báo bất thường trên tài khoản → cảnh báo "nghi bị Google đánh dấu", bỏ cảnh báo được', () => {
+  const { dp, tk, nhatKy } = dungDieuPhoi();
+  const f = tk.them('Flow 5', 'flow'), g = tk.them('Flow 1', 'flow');
+  // Lần đầu (mở app chưa làm việc nào → không biết số việc): chưa cảnh báo.
+  assert.strictEqual(dp.ghiBatThuong(f.id).nghi, false);
+  assert.ok(!dp.sucKhoeTk()[f.id].danhDau);
+  assert.strictEqual(tk.tim(f.id).batThuong.length, 1, 'phải lưu lên tài khoản (nhớ qua lần mở app)');
+  assert.strictEqual(tk.tim(f.id).batThuong[0].anh, null);
+  // Làm xong 1 việc rồi bị báo lại, sau đó 2 việc rồi bị báo nữa → 2 lần "sớm" + 3 lần trong 3 ngày → nghi.
+  dp.xongTuBatThuong[f.id] += 1;
+  dp.ghiBatThuong(f.id);
+  assert.deepStrictEqual(tk.tim(f.id).batThuong.map((x) => x.anh), [null, 1]);
+  dp.xongTuBatThuong[f.id] += 2;
+  const r = dp.ghiBatThuong(f.id);
+  assert.ok(r.nghi);
+  const sk = dp.sucKhoeTk();
+  assert.ok(sk[f.id].danhDau && /không nên dùng/.test(sk[f.id].danhDau.lyDo), JSON.stringify(sk[f.id]));
+  assert.ok(!sk[g.id].danhDau, 'tài khoản khác không bị cảnh báo');
+  assert.strictEqual(nhatKy.filter((x) => /nghi đã bị Google đánh dấu/.test(x)).length, 1, 'nhật ký ghi cảnh báo đúng một lần khi vừa thành nghi');
+  dp.ghiBatThuong(f.id);
+  assert.strictEqual(nhatKy.filter((x) => /nghi đã bị Google đánh dấu/.test(x)).length, 1, 'bị báo thêm không ghi lặp');
+  assert.deepStrictEqual(dp.boDanhDau(f.id), { ok: true });
+  assert.ok(!tk.tim(f.id).batThuong && !dp.sucKhoeTk()[f.id].danhDau, 'Bỏ cảnh báo xoá lịch sử');
+  assert.strictEqual(dp.boDanhDau('khong-co').ok, false);
+});
+test('1.4.7: việc xong đếm vào số việc kể từ lần bị báo bất thường', () => {
+  const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'src', 'main', 'dieu-phoi.js'), 'utf8');
+  const i = src.indexOf("trangThai: 'xong', buoc: ''"), k = src.indexOf('this.xongTuBatThuong[j.taiKhoan] = (this.xongTuBatThuong[j.taiKhoan] || 0) + 1');
+  assert.ok(i > 0 && k > i && k - i < 800, 'nhánh việc xong của _ketThuc phải tăng xongTuBatThuong');
+  const mf = require('fs').readFileSync(require('path').join(__dirname, '..', 'src', 'flow', 'may-flow.js'), 'utf8');
+  assert.ok(/o\.ghiBatThuong\(accountId\)/.test(mf), 'máy Flow phải báo lần bị bất thường lên điều phối');
+  const m = require('fs').readFileSync(require('path').join(__dirname, '..', 'main.js'), 'utf8');
+  assert.ok(/ghiBatThuong: \(tkId\) => dieuPhoi\.ghiBatThuong\(tkId\)/.test(m), 'main.js phải nối ghiBatThuong');
+});
 test('1.4.5: mốc 6 — thư mục video tạo từ ảnh ở Cài đặt chuyển sang ô của dự án (chỉ khi tắt "cạnh ảnh")', () => {
   const duLieu = { caiDat: { moc: 5, videoCanhAnh: false, thuMucVideoAnh: '/chung' },
     duAn: [{ id: 'a', ten: 'A' }, { id: 'b', ten: 'B', caiDat: { videoCanhAnh: true, thuMucVideoAnh: '/b' } },
@@ -837,9 +879,9 @@ test('cài đặt Flow: kẹp giá trị, giữ khoá con khi lưu thiếu, Flow
   assert.strictEqual(c.tabMoiTK, 4);
   assert.strictEqual(c.anToan.nguong, 5);
   assert.strictEqual(c.anToan.nghiPhut, 15, 'thiếu khoá con thì lấy mặc định');
-  assert.deepStrictEqual(Object.keys(c.anToan).sort(), ['nghiPhut', 'nguong'], 'chỉ còn 2 khoá nhận diện tài khoản lỗi');
+  assert.deepStrictEqual(Object.keys(c.anToan).sort(), ['caMayBat', 'caMayPhut', 'nghiPhut', 'nguong'], '1.4.7: 4 khoá nhận diện tài khoản lỗi (thêm công tắc + số phút cả máy nghỉ)');
   // Bộ cũ (chế độ an toàn: "3 lỗi trong 5 phút") mang nghĩa khác → lấy mặc định mới.
-  assert.deepStrictEqual(CF.chuanHoaFlow({ anToan: { bat: false, nguong: 3, cuaSoPhut: 5, nghiPhut: 10, cuMoi: 20 } }).anToan, { nguong: 2, nghiPhut: 15 });
+  assert.deepStrictEqual(CF.chuanHoaFlow({ anToan: { bat: false, nguong: 3, cuaSoPhut: 5, nghiPhut: 10, cuMoi: 20 } }).anToan, { nguong: 2, nghiPhut: 15, caMayBat: true, caMayPhut: 120 });
   assert.strictEqual(CF.chuanHoaFlow({ sangMuseKhiHong: true }).sangMuseKhiHong, undefined, '1.2.1: thành công tắc chung doiNenKhiLoi');
   assert.strictEqual(CF.chuanHoaFlow({}).maxRetries, 1);
   assert.strictEqual(c.chatLuongAnh, 'img_1k');

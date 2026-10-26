@@ -115,7 +115,9 @@ function laLoiChungChung(text) {
 
 const MAC_DINH = {
   nguong: 2,            // 2 prompt khác nhau hỏng liền nhau → tài khoản hỏng
-  nghiPhut: 15          // tài khoản hỏng nghỉ bấy nhiêu phút
+  nghiPhut: 15,         // tài khoản hỏng nghỉ bấy nhiêu phút
+  caMayBat: true,       // 1.4.7: công tắc "Cả máy nghỉ Flow" (tắt = tài khoản bị báo chỉ mình nó nghỉ, việc sang tài khoản khác ngay)
+  caMayPhut: 120        // 1.4.7: cả máy nghỉ bao lâu (phút)
 };
 const HE_SO_NGHI_TOI_DA = 4;
 
@@ -132,7 +134,10 @@ function chuanHoaCaiDat(raw) {
   };
   return {
     nguong:   so(r.nguong,   MAC_DINH.nguong,   1, 10),
-    nghiPhut: so(r.nghiPhut, MAC_DINH.nghiPhut, 1, 240)
+    nghiPhut: so(r.nghiPhut, MAC_DINH.nghiPhut, 1, 240),
+    // Giao diện gửi true/false; bộ cũ không có khoá → bật như 1.4.5–1.4.6.
+    caMayBat: r.caMayBat === undefined || r.caMayBat === null || r.caMayBat === '' ? MAC_DINH.caMayBat : !(r.caMayBat === false || r.caMayBat === 'false' || r.caMayBat === 0),
+    caMayPhut: so(r.caMayPhut, MAC_DINH.caMayPhut, 10, 1440)
   };
 }
 
@@ -251,6 +256,48 @@ function canNghiCaMay(ganDay, bayGio) {
   for (const [id, luc] of ganDay) if (bayGio - luc > CA_MAY_CUA_SO_MS) ganDay.delete(id);
   return ganDay.size >= CA_MAY_SO_TK;
 }
+/** 1.4.7: cả máy nghỉ bao lâu theo cài đặt (công tắc tắt → 0 = không cho cả máy nghỉ). */
+function thoiGianNghiCaMay(caiDat) {
+  const c = chuanHoaCaiDat(caiDat);
+  return c.caMayBat ? c.caMayPhut * 60000 : 0;
+}
+
+/**
+ * 1.4.7: NGHI TÀI KHOẢN BỊ GOOGLE ĐÁNH DẤU. Nhật ký 18–26/10/2026 (máy thứ hai của người dùng): Flow 1 bị báo
+ * "bất thường" 2 lần / 77 mẻ, Flow 3 2 / 68 — còn Flow 2 24 / 36, Flow 4 16 / 22, Flow 5 8 / 14, Flow 6 7 / 9: cứ chạy là
+ * bị báo, nhiều lần chỉ sau 1–3 ảnh (Flow 5 ngày 26/10 vào thay, mỗi tab 1 ảnh, 2 phút rưỡi sau đã bị báo). Đó là dấu
+ * hiệu Google đã đánh dấu chính tài khoản, không phải do nhịp chạy. App chỉ CẢNH BÁO (không tự bỏ tài khoản).
+ *   • lan  — mảng {luc, anh} các lần bị báo (anh = số việc tài khoản làm xong kể từ lần bị báo trước / lúc mở app;
+ *            null = không biết)
+ *   • nghi khi trong DANH_DAU_CUA_SO_MS (3 ngày): ≥ DANH_DAU_SO_LAN (3) lần, hoặc ≥ 2 lần bị báo "sớm" (≤ DANH_DAU_ANH_IT
+ *     = 5 việc xong trước đó)
+ */
+const DANH_DAU_CUA_SO_MS = 3 * 24 * 3600000;
+const DANH_DAU_SO_LAN = 3;
+const DANH_DAU_SO_LAN_SOM = 2;
+const DANH_DAU_ANH_IT = 5;
+const DANH_DAU_GIU_MS = 7 * 24 * 3600000;
+function chuanLanBatThuong(lan, bayGio) {
+  return (Array.isArray(lan) ? lan : [])
+    .filter((x) => x && Number.isFinite(Number(x.luc)) && bayGio - Number(x.luc) <= DANH_DAU_GIU_MS && Number(x.luc) <= bayGio + 60000)
+    .map((x) => ({ luc: Number(x.luc), anh: x.anh === null || x.anh === undefined || !Number.isFinite(Number(x.anh)) ? null : Number(x.anh) }))
+    .slice(-50);
+}
+function danhGiaDanhDau(lan, bayGio) {
+  const gan = chuanLanBatThuong(lan, bayGio).filter((x) => bayGio - x.luc <= DANH_DAU_CUA_SO_MS);
+  const som = gan.filter((x) => x.anh !== null && x.anh <= DANH_DAU_ANH_IT).length;
+  const nghi = gan.length >= DANH_DAU_SO_LAN || som >= DANH_DAU_SO_LAN_SOM;
+  if (!nghi) return { nghi: false, soLan: gan.length, som };
+  const chiTiet = som >= DANH_DAU_SO_LAN_SOM
+    ? `bị báo ${gan.length} lần trong 3 ngày, ${som} lần chỉ sau ≤ ${DANH_DAU_ANH_IT} việc`
+    : `bị báo ${gan.length} lần trong 3 ngày`;
+  return {
+    nghi: true, soLan: gan.length, som,
+    // Hết cảnh báo khi lần bị báo cũ nhất còn tính rơi khỏi cửa sổ 3 ngày mà không bị báo thêm (tính lại mỗi lần đọc).
+    gan: gan[gan.length - 1].luc,
+    lyDo: `Tài khoản nghi đã bị Google đánh dấu hoạt động bất thường (${chiTiet}) — không nên dùng`
+  };
+}
 
 // ── Bộ nhịp gợi ý ──────────────────────────────────────────────────────────
 
@@ -311,6 +358,10 @@ module.exports = {
   thoiGianNghiBatThuong,
   CA_MAY_NGHI_MS,
   canNghiCaMay,
+  thoiGianNghiCaMay,
+  chuanLanBatThuong,
+  danhGiaDanhDau,
+  DANH_DAU_ANH_IT,
   nhipAnToan,
   doDai
 };

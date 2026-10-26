@@ -444,6 +444,15 @@ select.canh-bao { border-color: #e0a100; }
 .dem-nen.co-loi { color: #f87171; }
 .the-tk .tt .tag { display: inline-block; margin: 0 6px 0 0; }
 .du-an-flow { word-break: break-all; }
+/* 1.4.7: tài khoản nghi bị Google đánh dấu "hoạt động bất thường" — dòng cảnh báo cam (hiện cả khi tài khoản đang xanh) */
+.canh-bao-dd { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; min-width: 0; margin: 6px 0 2px; padding: 6px 9px;
+  border-radius: 8px; border: 1px solid rgba(251, 146, 60, .55); background: rgba(251, 146, 60, .12); color: #fdba74; font-size: 12px; line-height: 1.4; }
+.canh-bao-dd .cb-dd-chu { flex: 1 1 100%; min-width: 0; overflow-wrap: anywhere; font-weight: 700; }
+.canh-bao-dd .nut-bo-dd { flex: none; padding: 3px 9px; font-size: 12px; border-color: rgba(251, 146, 60, .6); color: #fdba74; }
+.the-tk.co-dd:not(.sk-loi) { border-color: rgba(251, 146, 60, .7) !important; box-shadow: inset 4px 0 0 #f97316; }
+.hang-vai .ly-dd { flex-basis: 100%; min-width: 0; overflow-wrap: anywhere; color: #fdba74; font-size: 11.5px; font-weight: 700; line-height: 1.35; margin-top: -2px; }
+/* 1.4.7: công tắc "Cả máy nghỉ Flow" tắt → ô số phút mờ */
+.luoi-3.tat label { opacity: .5; }
 
 /* ── Trang Tạo nhạc (Suno): dùng chung cột Tạo, ẩn phần chỉ dành cho ảnh / video ── */
 .chi-nhac { display: none; }
