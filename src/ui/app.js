@@ -296,6 +296,8 @@
           return `<div class="hang-vai" data-vai="${vai}"><span title="${esc(`${a.ten} — ${sk.chu}`)}"><i class="cham-sk sk-${sk.muc}"></i>${esc(a.ten)}${a.trangThai === 'can-dang-nhap' ? ' <small>(chưa đăng nhập)</small>' : ''}</span>` +
             loai + `<select name="vai_${esc(id)}" data-vai-tk>${VAI_TK.map(([k, t]) => `<option value="${k}" ${k === vai ? 'selected' : ''}>${t}</option>`).join('')}</select>` +
             // 1.3.8: tài khoản đang lỗi → ghi rõ lỗi ngay dưới tên (không phải rê chuột mới thấy).
+            // 1.4.7: nghi bị Google đánh dấu → dòng cảnh báo cam dưới tên (cả khi tài khoản đang xanh).
+            (sk.danhDau ? `<small class="ly-dd">⚠ ${esc(sk.danhDau.lyDo)}</small>` : '') +
             (sk.muc === 'loi' ? `<small class="ly-loi">${esc(sk.chu)}${a.trangThai !== 'can-dang-nhap' ? ` <button type="button" class="lien-ket" data-chay-lai-tk="${esc(id)}" title="Lỗi đã sửa xong — cho tài khoản nhận việc lại ngay">Chạy lại ngay</button>` : ''}</small>` : '') + '</div>';
         }).join('')}</div><small class="mo">Để "Không dùng" hết = dự án dùng mọi tài khoản ${TEN_NEN[nen]}.</small></div>`;
       }).join('');
@@ -1060,9 +1062,9 @@
       const dang = S.dangNhap && S.dangNhap.id === a.id;
       const nen = nenTk(a), flow = nen === 'flow', drive = nen === 'drive';
       const sk = skTk(a.id);
-      return `<div class="the-tk tk-${nen} sk-${sk.muc}" title="${esc(sk.chu)}">
+      return `<div class="the-tk tk-${nen} sk-${sk.muc}${sk.danhDau && !drive ? ' co-dd' : ''}" title="${esc(sk.chu)}">
         <div class="av">${esc((a.ten || '?').trim().charAt(0).toUpperCase())}</div>
-        <div class="tt"><b>${esc(a.ten)}</b><span class="tag nen-${nen}">${TEN_NEN[nen].toUpperCase()}</span><span class="pill ${cls}">${nhan}</span>${drive ? '' : veSucKhoe(sk)}${drive
+        <div class="tt"><b>${esc(a.ten)}</b><span class="tag nen-${nen}">${TEN_NEN[nen].toUpperCase()}</span><span class="pill ${cls}">${nhan}</span>${drive ? '' : veSucKhoe(sk) + veDanhDau(sk, a.id)}${drive
           ? '<div class="han-muc mo">Chỉ dùng để tải ảnh / video lên Google Drive — chọn tài khoản này ở Cài đặt → Google Drive → "Tải thẳng lên drive.google.com".</div>'
           : nen === 'suno' ? veHetLuot(a)
           : flow ? `<div class="han-muc mo du-an-flow" title="${esc(a.flowUrl || '')}">Dự án Flow: ${a.flowUrl ? esc(a.flowUrl.replace(/^https:\/\/labs\.google\/fx\/(\w+\/)?tools\/flow\//, '…/')) : 'chưa chọn — app tự mở dự án mới (hoặc Đăng nhập → mở một dự án → Xong)'}</div>`
@@ -1090,6 +1092,15 @@
     const g = (t) => { const d = new Date(t), hai = (n) => String(n).padStart(2, '0'); return `${hai(d.getHours())}:${hai(d.getMinutes())}`; };
     const them = [sk.den ? `tới ${g(sk.den)}` : '', sk.luc ? `lúc ${g(sk.luc)}` : '', sk.dang ? `đang chạy ${sk.dang} việc` : ''].filter(Boolean).join(' · ');
     return `<div class="suc-khoe sk-${sk.muc}"><i></i><span>${esc(sk.chu)}${them ? ` <small>(${esc(them)})</small>` : ''}</span></div>`;
+  }
+  /**
+   * 1.4.7: thẻ tài khoản — nghi bị Google đánh dấu "hoạt động bất thường" → dòng cảnh báo cam riêng (hiện cả khi
+   * tài khoản đang xanh) kèm nút "Bỏ cảnh báo".
+   */
+  function veDanhDau(sk, id) {
+    if (!sk || !sk.danhDau) return '';
+    return `<div class="canh-bao-dd"><span class="cb-dd-chu">⚠ ${esc(sk.danhDau.lyDo || 'Tài khoản nghi bị Google đánh dấu hoạt động bất thường — không nên dùng')}</span>` +
+      `<button type="button" class="nut-vien nho nut-bo-dd" data-tk="boDanhDau" data-id="${esc(id)}" title="Xoá các lần bị báo đã nhớ — tài khoản hết bị cảnh báo">Bỏ cảnh báo</button></div>`;
   }
   /** Tài khoản Suno: còn đang nghỉ vì hết lượt tạo / tải không (nhớ qua cả lần tắt app). */
   function veHetLuot(a) {
@@ -1120,7 +1131,10 @@
     const a = S.taiKhoan.find((x) => x.id === id);
     if (!a) return;
     if (lenh === 'dangNhap') { U.dangNhapMo = true; await api.call('moDangNhap', { id, khung: khungTrinhDuyet() }); }
-    else if (lenh === 'chayLai') {
+    else if (lenh === 'boDanhDau') {
+      const r = await api.call('boDanhDau', { id });
+      toast(r && r.ok ? `Đã bỏ cảnh báo của "${a.ten}"` : (r && r.loi) || 'Không được', !(r && r.ok));
+    } else if (lenh === 'chayLai') {
       const r = await api.call('chayLaiTaiKhoan', { id });
       toast(r && r.ok ? `"${a.ten}" nhận việc lại ngay${r.tiep ? ` · chạy tiếp ${r.tiep} dự án đã tạm dừng` : ''}` : (r && r.loi) || 'Không được', !(r && r.ok));
     } else if (lenh === 'kiem') { toast(`Đang kiểm "${a.ten}"…`); const r = await api.call('kiemTaiKhoan', { id }); toast(r === 'da-dang-nhap' ? `"${a.ten}" đã đăng nhập` : `"${a.ten}" chưa đăng nhập`, r !== 'da-dang-nhap'); }
@@ -1228,6 +1242,7 @@
     for (const [id, k] of O_FLOW) { const el = $('#' + id); if (el.type === 'checkbox') el.checked = !!f[k]; else el.value = f[k] == null ? '' : f[k]; }
     for (const [id, k] of O_FLOW_MODEL) $('#' + id).value = f.chonModel[k] == null ? '' : f.chonModel[k];
     for (const [id, k] of O_FLOW_AN_TOAN) { const el = $('#' + id); if (el.type === 'checkbox') el.checked = !!f.anToan[k]; else el.value = f.anToan[k]; }
+    veCaMay();
     veCapNhat();
   }
   // Model Flow là <select> thật, KHÔNG phải <input list>: Chromium lọc gợi ý datalist theo chữ đang có trong ô,
@@ -1256,7 +1271,14 @@
     ['fModelAnh', 'modelAnh'], ['fNghiTT', 'nghiThaoTacBat'], ['fNghiTTMin', 'nghiThaoTacMin'], ['fNghiTTMax', 'nghiThaoTacMax']];
   const O_FLOW_MODEL = [['fModelChinh', 'chinh'], ['fModelPhu', 'phu'], ['fXenKe', 'xenKeMoi']];
   // Nhận diện tài khoản lỗi (1.2.0, luôn bật) — khớp chuanHoaCaiDat của src/flow/main/an-toan.js.
-  const O_FLOW_AN_TOAN = [['fNguong', 'nguong'], ['fNghi', 'nghiPhut']];
+  // 1.4.7: công tắc + số phút "Cả máy nghỉ Flow" (caMayBat / caMayPhut).
+  const O_FLOW_AN_TOAN = [['fNguong', 'nguong'], ['fNghi', 'nghiPhut'], ['fCaMayBat', 'caMayBat'], ['fCaMayPhut', 'caMayPhut']];
+  /** 1.4.7: công tắc "Cả máy nghỉ Flow" tắt → ô số phút mờ đi, không sửa được. */
+  function veCaMay() {
+    const bat = $('#fCaMayBat').checked;
+    $('#fCaMayPhut').disabled = !bat;
+    $('#khuCaMay').classList.toggle('tat', !bat);
+  }
   function docCaiDatFlow() {
     const doc = (id) => { const el = $('#' + id); return el.type === 'checkbox' ? el.checked : el.value; };
     const f = { chonModel: {}, anToan: {} };
@@ -1729,6 +1751,7 @@
     $('#cdKiemCapNhat').onclick = () => api.call('kiemCapNhat');
     $('#cdXemLuong').onchange = (e) => api.call('xemLuong', { bat: e.target.checked });
     $('#cdMauGoc').onclick = () => { $('#cdMauAnh').value = HD.MAU_MAC_DINH.anh; $('#cdMauVideo').value = HD.MAU_MAC_DINH.video; };
+    $('#fCaMayBat').onchange = veCaMay;
     $('#cdLuu').onclick = () => luuCaiDat(false);
     // 1.4.5: lưu bộ đang hiện vào dự án đang mở rồi chép thành cài đặt mặc định: dự án mới tạo dùng nó, mọi dự án
     // đang có cũng đổi theo (thư mục lưu, mẫu tên file vẫn riêng từng dự án — tiến trình chính lo).

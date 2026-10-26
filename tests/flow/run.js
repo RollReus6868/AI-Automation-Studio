@@ -978,7 +978,7 @@ test('tài khoản lỗi: nghỉ gấp đôi khi bị lại, tối đa 4 lần s
 
 test('tài khoản lỗi: gõ bậy vào ô số thì lấy mặc định; khoá cũ của chế độ an toàn bị bỏ', () => {
   const c = anToan.chuanHoaCaiDat({ nguong: 'ba', nghiPhut: null, bat: false, cuaSoPhut: 5, cuMoi: 20 });
-  assert.deepStrictEqual(c, { nguong: anToan.MAC_DINH.nguong, nghiPhut: anToan.MAC_DINH.nghiPhut });
+  assert.deepStrictEqual(c, { nguong: anToan.MAC_DINH.nguong, nghiPhut: anToan.MAC_DINH.nghiPhut, caMayBat: true, caMayPhut: 120 });
   assert.strictEqual(anToan.chuanHoaCaiDat({ nguong: 9999 }).nguong, 10);
   assert.strictEqual(anToan.chuanHoaCaiDat({ nguong: -5 }).nguong, 1);
 });
@@ -2255,6 +2255,65 @@ testAsync('1.4.5 (máy Flow): Flow báo bất thường → tài khoản nghỉ 
   await bang(9, [{ index: 1, status: 'ERROR', retries: 0 }, { index: 2, status: 'ERROR', retries: 0 }]);
   assert.deepStrictEqual(doi[2].slice(0, 2), ['flow-3', 15 * 60000]);
   assert.strictEqual(caMay.length, 1);
+});
+// ── 1.4.7: công tắc "Cả máy nghỉ Flow" + số phút; nhớ lần bị báo để nhận ra tài khoản bị Google đánh dấu ──
+test('1.4.7: cài đặt cả máy nghỉ — mặc định bật 120 phút, tắt được, số phút trong 10–1440', () => {
+  const c0 = anToan.chuanHoaCaiDat({ nguong: 2, nghiPhut: 15 });
+  assert.deepStrictEqual([c0.caMayBat, c0.caMayPhut], [true, 120], 'bộ cũ không có khoá → bật như 1.4.5');
+  assert.strictEqual(anToan.thoiGianNghiCaMay(c0), 2 * 3600000);
+  assert.strictEqual(anToan.thoiGianNghiCaMay({ caMayBat: false, caMayPhut: 300 }), 0, 'tắt → không cho cả máy nghỉ');
+  assert.strictEqual(anToan.thoiGianNghiCaMay({ caMayBat: 'false' }), 0, 'giao diện gửi chuỗi "false"');
+  assert.strictEqual(anToan.thoiGianNghiCaMay({ caMayBat: true, caMayPhut: '45' }), 45 * 60000);
+  assert.deepStrictEqual([anToan.chuanHoaCaiDat({ caMayPhut: 1 }).caMayPhut, anToan.chuanHoaCaiDat({ caMayPhut: 99999 }).caMayPhut], [10, 1440]);
+  const { chuanHoaFlow, caiDatEngine } = require('../../src/flow/cai-dat-flow');
+  const f = chuanHoaFlow({ anToan: { nguong: 3, nghiPhut: 20, caMayBat: false, caMayPhut: 30 } });
+  assert.deepStrictEqual(f.anToan, { nguong: 3, nghiPhut: 20, caMayBat: false, caMayPhut: 30 }, 'chuẩn hoá Flow phải giữ hai khoá mới');
+  assert.deepStrictEqual(chuanHoaFlow({}).anToan, { nguong: 2, nghiPhut: 15, caMayBat: true, caMayPhut: 120 });
+  assert.deepStrictEqual(caiDatEngine(f, { loai: 'anh', tyLe: '9:16', ten: ['a'] }).anToan, f.anToan, 'máy Flow nhận được cài đặt qua mẻ');
+});
+testAsync('1.4.7 (máy Flow): tắt "Cả máy nghỉ" → 2 tài khoản dính vẫn chỉ từng tài khoản nghỉ, việc sang tài khoản khác ngay; bật thì nghỉ đúng số phút', async () => {
+  const { taoMayFlow } = require('../../src/flow/may-flow');
+  const chay = async (caiDat) => {
+    const doi = [], caMay = [], ghi = [];
+    const lamTab = (id, tk, wc, batThuong) => ({ id, accountId: tk, accountName: tk, busy: true, ready: true,
+      view: { webContents: { id: wc, isDestroyed: () => false,
+        executeJavaScript: async (js) => (/__flowDocLyDoTheLoi/.test(js) ? { ok: true, lyDo: [] } : /__flowDoCanhBao/.test(js)
+          ? (batThuong ? { co: true, viDu: 'Chúng tôi nhận thấy có hoạt động bất thường nào đó.' } : { co: false }) : null) } } });
+    const ds = [lamTab('T1', 'flow-1', 7, true), lamTab('T2', 'flow-2', 8, true), lamTab('T3', 'flow-3', 9, false)];
+    const tabs = { tabs: ds, findByWcId: (id) => ds.find((t) => t.view.webContents.id === id), find: () => null, dispatch: async () => ({ ok: true }) };
+    const may = taoMayFlow({ tabs, taiVe: {}, log: () => {}, thongBao: () => {},
+      nghiTaiKhoan: (id, ms, lyDo) => { doi.push([id, ms]); return true; },
+      nghiCaMay: (ms, lyDo, tru) => caMay.push([ms, tru]), ghiBatThuong: (id) => ghi.push(id) });
+    may.datCaiDatAnToan(caiDat);
+    const bang = async (wc, rows) => { await may.handleEngineMessage({ action: 'UPDATE_TABLE_DATA', data: { rows, isRunning: true } }, { id: wc }); await new Promise((r) => setTimeout(r, 5)); };
+    await bang(7, [{ index: 1, status: 'ERROR', retries: 0, error: 'Không thành công' }]);
+    await bang(8, [{ index: 1, status: 'ERROR', retries: 0, error: 'Không thành công' }]);
+    await bang(9, [{ index: 1, status: 'ERROR', retries: 0 }, { index: 2, status: 'ERROR', retries: 0 }]);
+    return { doi, caMay, ghi };
+  };
+  const tat = await chay({ nguong: 2, nghiPhut: 15, caMayBat: false, caMayPhut: 120 });
+  assert.deepStrictEqual(tat.doi.map((x) => x[0]), ['flow-1', 'flow-2', 'flow-3'], 'tài khoản lỗi vẫn nghỉ riêng + việc sang tài khoản khác');
+  assert.strictEqual(tat.caMay.length, 0, 'công tắc tắt → không cho cả máy nghỉ');
+  assert.deepStrictEqual(tat.ghi, ['flow-1', 'flow-2'], 'chỉ lần bị báo BẤT THƯỜNG mới ghi lên tài khoản (lỗi thường thì không)');
+  const bat = await chay({ nguong: 2, nghiPhut: 15, caMayBat: true, caMayPhut: 45 });
+  assert.deepStrictEqual(bat.caMay, [[45 * 60000, 'flow-2']], 'bật → cả máy nghỉ đúng số phút người dùng đặt');
+});
+test('1.4.7: nghi tài khoản bị Google đánh dấu — số liệu nhật ký 18–26/10/2026', () => {
+  const h = 3600000, ngay = 24 * h, bay = Date.UTC(2026, 9, 26, 12, 18);
+  // Flow 1: bị báo 18/10 và 22/10, chạy nhiều mẻ giữa hai lần → KHÔNG nghi.
+  assert.strictEqual(anToan.danhGiaDanhDau([{ luc: bay - 8 * ngay, anh: 30 }, { luc: bay - 4 * ngay, anh: 120 }], bay).nghi, false);
+  // Một lần bị báo sớm thôi → chưa nghi.
+  assert.strictEqual(anToan.danhGiaDanhDau([{ luc: bay - h, anh: 1 }], bay).nghi, false);
+  // Flow 5 / Flow 4: hai lần bị báo khi mới làm 1–3 việc trong 3 ngày → nghi.
+  const r = anToan.danhGiaDanhDau([{ luc: bay - 2 * ngay, anh: 3 }, { luc: bay - 5 * 60000, anh: 1 }], bay);
+  assert.ok(r.nghi && /nghi đã bị Google đánh dấu/.test(r.lyDo) && /không nên dùng/.test(r.lyDo) && /2 lần chỉ sau ≤ 5 việc/.test(r.lyDo), r.lyDo);
+  // Ba lần trong 3 ngày (dù mỗi lần đã làm nhiều việc / không biết số việc) → nghi.
+  assert.ok(anToan.danhGiaDanhDau([{ luc: bay - 50 * h, anh: 40 }, { luc: bay - 20 * h, anh: null }, { luc: bay - h, anh: 25 }], bay).nghi);
+  // Hai lần bị báo sớm nhưng một lần đã quá 3 ngày → hết nghi; quá 7 ngày thì bỏ hẳn khỏi danh sách.
+  assert.strictEqual(anToan.danhGiaDanhDau([{ luc: bay - 4 * ngay, anh: 1 }, { luc: bay - h, anh: 1 }], bay).nghi, false);
+  assert.deepStrictEqual(anToan.chuanLanBatThuong([{ luc: bay - 8 * ngay, anh: 1 }, { luc: bay - h, anh: '2' }, { luc: 'x' }, null], bay), [{ luc: bay - h, anh: 2 }]);
+  // anh = 6 (> 5) không tính là "sớm".
+  assert.strictEqual(anToan.danhGiaDanhDau([{ luc: bay - 2 * h, anh: 6 }, { luc: bay - h, anh: 6 }], bay).nghi, false);
 });
 test('1.4.5: bỏ công tắc "Ngẫu nhiên thời gian chờ" và "Cuộn trang ngẫu nhiên"', () => {
   const { chuanHoaFlow, caiDatEngine } = require('../../src/flow/cai-dat-flow');

@@ -1,4 +1,20 @@
-# AI Automation Studio 1.4.6
+# AI Automation Studio 1.4.7
+
+- **Công tắc "Cả máy nghỉ Flow"** ở Cài đặt → Flow → *Tài khoản lỗi*, kèm ô **số phút nghỉ** (10–1440, mặc định 120 = 2 giờ).
+  - Bật (mặc định, như 1.4.5–1.4.6): 2 tài khoản Flow khác nhau bị báo "hoạt động bất thường" trong 30 phút thì mọi tài khoản Flow nghỉ theo số phút đó.
+  - Tắt: chỉ tài khoản bị báo nghỉ; việc của nó chuyển ngay sang tài khoản khác để chạy tiếp.
+- **Thẻ đỏ ghi rõ hơn.** Tài khoản nghỉ vì cả máy nghỉ giờ ghi *"Cả máy nghỉ Flow (tài khoản này không bị báo)"*. Trước đây thẻ đọc như chính tài khoản đó bị Google báo.
+- **Cảnh báo tài khoản nghi bị Google đánh dấu.**
+  - App nhớ các lần Flow báo "hoạt động bất thường" của từng tài khoản (nhớ qua các lần mở app, giữ 7 ngày).
+  - Trong 3 ngày mà bị báo từ 3 lần, hoặc 2 lần bị báo khi mới làm xong 5 việc trở xuống → thẻ tài khoản và hộp chọn tài khoản của dự án hiện dòng vàng *"Tài khoản nghi đã bị Google đánh dấu hoạt động bất thường … — không nên dùng"*, nhật ký ghi một dòng ⚠.
+  - App chỉ cảnh báo, không tự bỏ tài khoản. Nên để tài khoản đó ở vai **Không dùng** vài ngày. Nút **Bỏ cảnh báo** trên thẻ tài khoản xoá cảnh báo.
+  - Lý do (nhật ký 18–26/10): Flow 1 bị báo 2/77 mẻ, Flow 3 2/68, còn Flow 2 24/36, Flow 4 16/22, Flow 5 8/14, Flow 6 7/9. Mấy tài khoản sau cứ chạy là bị báo, có lần chỉ sau 1 ảnh.
+- App không có proxy / VPN / giả vân tay trình duyệt, không lách kiểm tra của Google hay Meta; cảnh báo chỉ giúp bạn chọn tài khoản nên dùng.
+- Mọi thứ khác giữ nguyên như 1.4.6.
+
+Lưu ý: đã kiểm bằng bài kiểm tự động, chưa chạy trên Flow thật. Không cài đặt nào bảo đảm Google không báo bất thường: đó là Google tự đánh giá.
+
+## Bản 1.4.6
 
 - **Prompt video riêng cho từng ảnh bằng file .txt.** Có ở hai chỗ:
   - Trang Tạo ảnh → *Ảnh xong → tự tạo video*: bấm **Nhập file .txt — prompt riêng từng ảnh**. Ảnh của prompt số 1 dùng dòng 1 của file, prompt số 2 dùng dòng 2… (theo đúng số thứ tự prompt ảnh, kể cả khi chỉ chạy một số prompt như `98, 303`).

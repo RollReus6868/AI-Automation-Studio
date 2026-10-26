@@ -784,6 +784,7 @@ const LENH = {
   doiNenViec: ({ ids, nen, chay = true }) => dieuPhoi.doiNenViec(ids || [], nen, chay),
   lenDriveViec: ({ ids }) => dieuPhoi.lenDriveViec(ids || []),
   chayLaiTaiKhoan: ({ id }) => dieuPhoi.chayLaiTaiKhoan(id),
+  boDanhDau: ({ id }) => dieuPhoi.boDanhDau(id),   // 1.4.7: bỏ cảnh báo "nghi bị Google đánh dấu"
   chayLaiMoiTaiKhoan: () => {
     const ds = taiKhoan.list().filter((a) => { const sk = dieuPhoi.sucKhoeTk()[a.id]; return sk && sk.muc === 'loi' && a.trangThai !== 'can-dang-nhap'; });
     for (const a of ds) dieuPhoi.chayLaiTaiKhoan(a.id);
@@ -1128,7 +1129,8 @@ app.whenReady().then(() => {
       for (const x of dieuPhoi.luong) if (x.taiKhoanId === tkId && !x.luong.ranh) x.luong.dung(lyDo);
       return true;
     },
-    nghiCaMay: (ms, lyDo, tru) => dieuPhoi.nghiCaFlow(ms, lyDo, tru)
+    nghiCaMay: (ms, lyDo, tru) => dieuPhoi.nghiCaFlow(ms, lyDo, tru),
+    ghiBatThuong: (tkId) => dieuPhoi.ghiBatThuong(tkId)   // 1.4.7: nhận ra tài khoản bị Google đánh dấu
   });
 
   dieuPhoi = new DieuPhoi({

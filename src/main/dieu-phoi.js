@@ -26,6 +26,7 @@ const hd = require('./hang-doi');
 const { chuanHoaFlow, khoaMe } = require('../flow/cai-dat-flow');
 const { laUrlDuAnFlow } = require('../flow/tab-flow');
 const HG = require('./hen-gio');
+const { danhGiaDanhDau, chuanLanBatThuong } = require('../flow/main/an-toan');
 
 const NGHI_MS = 15 * 60 * 1000;   // tài khoản lỗi liên tiếp / mất kết nối → tạm nghỉ chừng này
 const LOI_LIEN_TIEP_NGHI = 2;
@@ -251,6 +252,7 @@ class DieuPhoi {
     this._baoHet = true;          // đã báo "chạy hết hàng chờ" cho lượt hiện tại (lượt mới bắt đầu thì đặt lại)
     this.lanGui = {};         // taiKhoanId → thời điểm gửi gần nhất
     this.nghiDen = {};        // taiKhoanId → tạm nghỉ tới lúc (lỗi liên tiếp / mất kết nối)
+    this.xongTuBatThuong = {}; // 1.4.7: taiKhoanId → số việc xong kể từ lần bị báo bất thường gần nhất (từ lúc mở app)
     this.lyDoNghi = {};       // taiKhoanId → lý do tạm nghỉ
     this.loiLienTiep = {};    // taiKhoanId → số việc lỗi liên tiếp
     this.ketQuaTk = {};       // 1.3.7: taiKhoanId → { ok, luc, loi } của việc gần nhất (màu đỏ / xanh ở mục Tài khoản)
@@ -476,9 +478,43 @@ class DieuPhoi {
       else if (dang) x = { muc: 'tot', chu: 'Đang chạy' };
       else if (a.trangThai === 'da-dang-nhap') x = { muc: 'tot', chu: 'Đã đăng nhập — chưa chạy việc nào' };
       else x = { muc: 'cho', chu: 'Chưa kiểm — bấm Kiểm tra' };
-      ra[id] = { ...x, dang };
+      // 1.4.7: tài khoản nghi bị Google đánh dấu → dòng cảnh báo riêng (kể cả khi đang chạy được / đã hết giờ nghỉ).
+      const dd = (a.batThuong || []).length ? danhGiaDanhDau(a.batThuong, bay) : null;
+      ra[id] = { ...x, dang, ...(dd && dd.nghi ? { danhDau: { lyDo: dd.lyDo, soLan: dd.soLan, gan: dd.gan } } : {}) };
     }
     return ra;
+  }
+
+  /**
+   * 1.4.7: Flow báo "hoạt động bất thường" cho tài khoản này → nhớ lần bị báo (trên tài khoản, qua các lần mở app) kèm
+   * số việc tài khoản làm xong từ lần trước; vừa thành "nghi bị Google đánh dấu" thì ghi cảnh báo vào nhật ký.
+   */
+  ghiBatThuong(id) {
+    const a = this.o.taiKhoan.tim(id);
+    if (!a) return null;
+    const bay = this.bayGio();
+    const truoc = danhGiaDanhDau(a.batThuong || [], bay);
+    const anh = Object.prototype.hasOwnProperty.call(this.xongTuBatThuong, id) ? this.xongTuBatThuong[id] : null;
+    const lan = chuanLanBatThuong([...(a.batThuong || []), { luc: bay, anh }], bay);
+    this.xongTuBatThuong[id] = 0;
+    this.o.taiKhoan.sua(id, { batThuong: lan });
+    const sau = danhGiaDanhDau(lan, bay);
+    if (sau.nghi && !truoc.nghi) {
+      this.log('error', `⚠ "${a.ten}": ${sau.lyDo}. Nên để tài khoản này ở vai "Không dùng" vài ngày rồi thử lại vài ảnh; ` +
+        'muốn bỏ cảnh báo thì bấm "Bỏ cảnh báo" ở thẻ tài khoản.');
+    }
+    this.o.bao();
+    return sau;
+  }
+
+  /** 1.4.7: người dùng bấm "Bỏ cảnh báo" — xoá các lần bị báo bất thường đã nhớ của tài khoản. */
+  boDanhDau(id) {
+    const a = this.o.taiKhoan.tim(id);
+    if (!a) return { ok: false, loi: 'Không tìm thấy tài khoản' };
+    this.o.taiKhoan.sua(id, { batThuong: [] });
+    this.log('info', `👤 "${a.ten}": đã bỏ cảnh báo "nghi bị Google đánh dấu".`);
+    this.o.bao();
+    return { ok: true };
   }
 
   /** 1.2.9: thư mục lưu video nối từ ảnh RIÊNG của dự án ('' = bỏ, dùng cài đặt chung). */
@@ -1875,6 +1911,8 @@ class DieuPhoi {
         if (r.flowTen) j.flowTen = { tk: j.taiKhoan, ten: r.flowTen };
         this.loiLienTiep[j.taiKhoan] = 0;
         if (j.taiKhoan) this.ketQuaTk[j.taiKhoan] = { ok: true, luc: Date.now() };
+        // 1.4.7: đếm việc xong kể từ lần bị báo "bất thường" gần nhất — bị báo lại chỉ sau vài việc là dấu hiệu bị đánh dấu.
+        if (j.taiKhoan) this.xongTuBatThuong[j.taiKhoan] = (this.xongTuBatThuong[j.taiKhoan] || 0) + 1;
         this.log('success', `✅ [HỆ THỐNG] Việc #${j.so} xong ${TEN_LOAI[j.loai] || 'ảnh'}${r.ghiChu ? ` (${r.ghiChu})` : ''}: ` +
           (tai ? j.files[0] : `${path.basename(j.files[0])} (không tải về — chỉ giữ trong app)`));
         this._lenDrive(j);   // 1.4.0: bật "tự đưa lên Google Drive" thì chép sang thư mục Drive (chạy nền)
@@ -1997,7 +2035,8 @@ class DieuPhoi {
     for (const tk of this.o.taiKhoan.ds) {
       if ((tk.nen || 'muse') !== 'flow' || tk.id === tru || (this.nghiDen[tk.id] || 0) >= den) continue;
       this.nghiDen[tk.id] = den;
-      this.lyDoNghi[tk.id] = lyDo;
+      // 1.4.7: ghi rõ đây là nghỉ theo CẢ MÁY — người dùng đọc thẻ đỏ tưởng chính tài khoản này bị Google báo (26/10/2026).
+      this.lyDoNghi[tk.id] = `Cả máy nghỉ Flow (tài khoản này không bị báo): ${lyDo}`;
       ds.push(tk.id);
       for (const x of this.luong) if (x.taiKhoanId === tk.id && !x.luong.ranh) x.luong.dung(lyDo);
     }

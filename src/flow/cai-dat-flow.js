@@ -40,7 +40,8 @@ const FLOW_MAC_DINH = {
   // Nhận diện tài khoản lỗi (src/flow/main/an-toan.js) — 1.2.0 luôn bật, thay "chế độ an toàn":
   // Flow báo "hoạt động bất thường" / hết lượt → đổi tài khoản ngay; `nguong` prompt KHÁC NHAU hỏng
   // liền nhau (chưa prompt nào xong xen giữa) → đổi tài khoản; tài khoản lỗi nghỉ `nghiPhut` phút.
-  anToan: { nguong: 2, nghiPhut: 15 },
+  // 1.4.7: caMayBat / caMayPhut = công tắc + số phút "Cả máy nghỉ Flow" (2 tài khoản bị báo bất thường trong 30 phút).
+  anToan: { nguong: 2, nghiPhut: 15, caMayBat: true, caMayPhut: 120 },
   // Chất lượng tải về
   // 1.3.7: 1K = "Kích thước gốc" (tải ngay, không tốn tín dụng); 2K / 4K là Flow tăng độ phân giải — tốn tín dụng AI.
   chatLuongAnh: 'img_1k',
@@ -75,7 +76,9 @@ function chuanHoaFlow(raw) {
   // Bộ cũ (có cuaSoPhut) mang nghĩa khác ("3 lỗi trong 5 phút") → lấy mặc định mới.
   const at = r.anToan && !('cuaSoPhut' in r.anToan) ? r.anToan : {};
   m.anToan = { nguong: Math.round(so(at.nguong, 1, 10, FLOW_MAC_DINH.anToan.nguong)),
-    nghiPhut: Math.round(so(at.nghiPhut, 1, 240, FLOW_MAC_DINH.anToan.nghiPhut)) };
+    nghiPhut: Math.round(so(at.nghiPhut, 1, 240, FLOW_MAC_DINH.anToan.nghiPhut)),
+    caMayBat: at.caMayBat === undefined ? FLOW_MAC_DINH.anToan.caMayBat : !(at.caMayBat === false || at.caMayBat === 'false'),
+    caMayPhut: Math.round(so(at.caMayPhut, 10, 1440, FLOW_MAC_DINH.anToan.caMayPhut)) };
   m.selectors = r.selectors && typeof r.selectors === 'object' ? { ...r.selectors } : {};
   m.outputCount = Math.round(so(m.outputCount, 1, 4, 1));
   m.delayMin = Math.round(so(m.delayMin, 1, 600, 20));
