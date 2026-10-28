@@ -1235,6 +1235,7 @@
       veDriveCach();
     }
     $('#cdNheMay').checked = (S.caiDatChung || c).nheMay !== false;   // chung cả app
+    $('#cdAnhTruocVideo').checked = (S.caiDatChung || c).anhTruocVideo !== false;   // 1.4.8: chung cả app
     $('#cdMauAnh').value = c.mau.anh; $('#cdMauVideo').value = c.mau.video;
     const f = c.flow;
     datChonModel('fModelAnh', f.modelAnh);
@@ -1767,6 +1768,7 @@
         png: $('#cdPng').checked, doiNenKhiLoi: $('#cdDoiNen').checked, tatMayKhiXong: $('#cdTatMay').checked,
         videoCanhAnh: $('#cdVideoCanhAnh').checked, xoaChatKhiXong: $('#cdXoaChat').checked, xoaDuAnFlowKhiXong: $('#cdXoaDuAnFlow').checked,
         driveBat: $('#cdDrive').checked, driveCach: $('#cdDriveCach').value, driveTk: $('#cdDriveTk').value, nheMay: $('#cdNheMay').checked,
+        anhTruocVideo: $('#cdAnhTruocVideo').checked,   // 1.4.8: ảnh xong hết rồi mới tạo video (chung cả app)
         mau: { anh: $('#cdMauAnh').value, video: $('#cdMauVideo').value },
         flow: docCaiDatFlow()
       };

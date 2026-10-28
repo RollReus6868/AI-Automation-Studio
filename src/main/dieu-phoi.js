@@ -94,11 +94,13 @@ const CAI_DAT_MAC_DINH = {
   driveTk: '',
   // 1.4.0: máy mượt — hạ ưu tiên CPU của các trang Muse / Flow / Suno chạy ngầm (chung cả app, main.js áp).
   nheMay: true,
+  // 1.4.8: tạo ảnh xong hết rồi mới tạo video (chung cả app) — ảnh và video không chạy song song, bớt trang chạy cùng lúc.
+  anhTruocVideo: true,
   mau: { ...hd.MAU_MAC_DINH },
   flow: chuanHoaFlow({})  // cài đặt Google Flow (src/flow/cai-dat-flow.js)
 };
 // 1.3.0: cài đặt của CẢ APP (không theo dự án) — còn lại mỗi dự án một bộ riêng (d.caiDat).
-const KHOA_CHUNG = ['tatMayKhiXong', 'moc', 'nheMay'];
+const KHOA_CHUNG = ['tatMayKhiXong', 'moc', 'nheMay', 'anhTruocVideo'];
 // 1.4.5: khoá luôn riêng từng dự án — "Lưu làm cài đặt mặc định" không chép sang dự án khác.
 const KHOA_RIENG_DU_AN = ['thuMucAnh', 'thuMucVideo', 'thuMucNhac', 'thuMucVideoAnh', 'tenAnh', 'tenVideo', 'tenNhac', 'boQuaDaCo'];
 const TRANG_XONG = new Set(['xong', 'loi', 'dung']);
@@ -136,6 +138,7 @@ function chuanCaiDat(c, flowGoc, flowMoi) {
   m.boQuaDaCo = !!m.boQuaDaCo;
   m.driveBat = !!m.driveBat; m.thuMucDrive = String(m.thuMucDrive || '').trim();
   m.driveCach = m.driveCach === 'web' ? 'web' : 'may'; m.driveTk = String(m.driveTk || ''); m.nheMay = m.nheMay !== false;
+  m.anhTruocVideo = m.anhTruocVideo !== false;
   m.tenNhac = String(m.tenNhac || '').trim() || hd.MAU_TEN_ANH_MAC_DINH;
   m.choNhacGiay = so(m.choNhacGiay, 120, 3600, 600);
   // 1.4.6: ô nghỉ cho phép 0 (không nghỉ) — so() coi 0 là "trống" nên trước đây nhập 0 thành 3.
@@ -1448,6 +1451,25 @@ class DieuPhoi {
     }
   }
 
+  /**
+   * 1.4.8: "Tạo ảnh xong hết rồi mới tạo video" (Cài đặt → Cả app): còn ảnh đang chạy, hoặc ảnh đang chờ mà có tài khoản
+   * chạy được ngay (dự án nào cũng tính) → video chưa giao (bỏ khỏi nhamToi: không mở luồng / tab cho video, không tính
+   * là dự án tạm dừng). Ảnh còn chờ mà mọi tài khoản ảnh đang nghỉ thì video cứ chạy (khỏi đứng chờ hàng giờ).
+   * Video bấm Chạy riêng không bị giữ.
+   */
+  _giuVideo(nhamToi) {
+    const giu = this.caiDat.anhTruocVideo !== false && this.viec.some((j) => j.loai === 'anh' &&
+      (j.trangThai === 'chay' || (j.trangThai === 'cho' && (nhamToi.get(j) || []).length)));
+    const ds = giu ? [...nhamToi.keys()].filter((j) => j.loai === 'video' && !j.chayRieng) : [];
+    for (const j of ds) nhamToi.delete(j);
+    if (ds.length && !this._dangGiuVideo) {
+      this.log('info', `⏳ Ảnh xong hết rồi mới tạo video (Cài đặt → Cả app): ${ds.length} video chờ ảnh chạy xong.`);
+    } else if (!ds.length && this._dangGiuVideo) {
+      this.log('info', '▶ Hết ảnh đang chạy — bắt đầu tạo video.');
+    }
+    this._dangGiuVideo = ds.length > 0;
+  }
+
   /** Luồng dùng chung (Suno) chọn việc: chat / bài dở của chính tài khoản trước, rồi việc được bấm Chạy riêng,
    *  rồi CHIA LƯỢT ĐỀU giữa các dự án (dự án đang có ít việc chạy nhất trước) — dự án sau không phải chờ dự án trước. */
   _viecChung(x, boQua) {
@@ -1507,6 +1529,7 @@ class DieuPhoi {
       }
       nhamToi.set(j, ds);
     }
+    this._giuVideo(nhamToi);
     const can = new Set();
     for (const [j, ds] of nhamToi) for (const t of ds) can.add(this._khoa(t, j.duAn));
     for (const x of this.luong) if (!x.luong.ranh) can.add(this._khoaLuong(x));

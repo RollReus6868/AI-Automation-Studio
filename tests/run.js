@@ -363,6 +363,102 @@ const luongGia = (daChay, hong, kq) => (a, stt) => ({
   }
 });
 async function chayHet(dp) { for (let i = 0; i < 200 && dp.dangChay; i++) { dp._vong(); await new Promise((r) => setTimeout(r, 15)); } dp._vong(); }
+testAsync('1.4.8: "Tạo ảnh xong hết rồi mới tạo video" — video chỉ bắt đầu khi không còn ảnh chạy / chờ; tắt thì chạy song song như cũ', async () => {
+  const chay = async (bat) => {
+    const nk = [];   // [loai, 'bd'|'xong', so]
+    const taoLuong = (a, stt) => ({ id: `${a.id}-${stt}`, ranh: true, viec: null, dung() {},
+      async chay(j) { this.ranh = false; this.viec = j; nk.push([j.loai, 'bd', j.so]); await new Promise((r) => setTimeout(r, 25));
+        nk.push([j.loai, 'xong', j.so]); this.ranh = true; this.viec = null;
+        return { ok: true, files: [{ mime: j.loai === 'video' ? 'video/mp4' : 'image/png', b64: 'AA==' }] }; } });
+    const { dp, nhatKy } = dungDieuPhoi({ taoLuong });
+    dp.datCaiDat({ luongMoiTK: 2, nghiGiuaLanGui: 0, anhTruocVideo: bat });
+    dp.them({ loai: 'video', prompts: ['v rời'] });
+    dp.them({ prompts: ['a1', 'a2', 'a3'], chuoiVideo: { prompt: 'zoom' } });
+    dp.chayTatCa();
+    await chayHet(dp);
+    return { dp, nk, nhatKy };
+  };
+  const { dp, nk, nhatKy } = await chay(true);
+  assert.ok(dp.viec.every((j) => j.trangThai === 'xong') && dp.viec.filter((j) => j.loai === 'video').length === 4, JSON.stringify(dp.viec.map((j) => [j.loai, j.trangThai])));
+  const anhXongCuoi = nk.map((x, i) => (x[0] === 'anh' && x[1] === 'xong' ? i : -1)).reduce((a, b) => Math.max(a, b));
+  const videoBdDau = nk.findIndex((x) => x[0] === 'video' && x[1] === 'bd');
+  assert.ok(videoBdDau > anhXongCuoi, `video đầu tiên phải bắt đầu sau ảnh cuối cùng xong: ${JSON.stringify(nk)}`);
+  assert.ok(nhatKy.some((d) => /⏳ Ảnh xong hết rồi mới tạo video/.test(d)) && nhatKy.some((d) => /▶ Hết ảnh đang chạy/.test(d)), nhatKy.join('\n'));
+  assert.strictEqual(dp.caiDat.anhTruocVideo, true);
+  // Tắt → video rời chạy ngay cùng lúc với ảnh (như trước 1.4.8).
+  const tat = await chay(false);
+  const vd = tat.nk.findIndex((x) => x[0] === 'video' && x[1] === 'bd');
+  const ax = tat.nk.map((x, i) => (x[0] === 'anh' && x[1] === 'xong' ? i : -1)).reduce((a, b) => Math.max(a, b));
+  assert.ok(vd < ax, `tắt công tắc: video chạy song song với ảnh: ${JSON.stringify(tat.nk)}`);
+  // Chung cả app, mặc định bật; bộ cũ không có khoá → bật.
+  assert.strictEqual(dungDieuPhoi().dp.caiDat.anhTruocVideo, true);
+  assert.strictEqual(dungDieuPhoi({ duLieu: { caiDat: { anhTruocVideo: false } } }).dp.caiDat.anhTruocVideo, false);
+});
+testAsync('1.4.8: giữ video — video bấm Chạy riêng không bị giữ; ảnh còn chờ mà mọi tài khoản ảnh đang nghỉ thì video cứ chạy', async () => {
+  const daChay = [];
+  const { dp } = dungDieuPhoi({ taoLuong: luongGia(daChay, new Set()) });
+  dp.datCaiDat({ luongMoiTK: 1, nghiGiuaLanGui: 0 });
+  dp.them({ prompts: ['a1'] });
+  dp.them({ loai: 'video', prompts: ['v1'] });
+  const [a, v] = dp.viec;
+  // Ảnh chờ có tài khoản chạy được → video bị giữ (không vào nhamToi).
+  let nham = new Map([[a, ['tk-1']], [v, ['tk-1']]]);
+  dp._giuVideo(nham);
+  assert.deepStrictEqual([...nham.keys()], [a]);
+  // Video chạy riêng → không giữ.
+  v.chayRieng = true;
+  nham = new Map([[a, ['tk-1']], [v, ['tk-1']]]);
+  dp._giuVideo(nham);
+  assert.deepStrictEqual([...nham.keys()], [a, v]);
+  delete v.chayRieng;
+  // Ảnh chờ nhưng không tài khoản nào chạy được ngay (nghỉ / hết lượt) → video cứ chạy.
+  nham = new Map([[a, []], [v, ['tk-1']]]);
+  dp._giuVideo(nham);
+  assert.deepStrictEqual([...nham.keys()], [a, v]);
+  // Ảnh đang chạy → giữ.
+  a.trangThai = 'chay';
+  nham = new Map([[v, ['tk-1']]]);
+  dp._giuVideo(nham);
+  assert.strictEqual(nham.size, 0);
+});
+test('1.4.8: trang Muse chạy ngầm có preload "Máy mượt" (rAF thưa, dừng video tự phát), khung đăng nhập thì không', () => {
+  const fs = require('fs');
+  const m = fs.readFileSync(path.join(__dirname, '..', 'main.js'), 'utf8');
+  const tao = m.slice(m.indexOf('function taoCuaSoAn('), m.indexOf('function dongCuaSoAn('));
+  assert.ok(/preload: path\.join\(__dirname, 'src\/main\/preload-muse\.js'\)/.test(tao) && /--muse-nhe=\$\{nhe \? 1 : 0\}/.test(tao), 'taoCuaSoAn gắn preload-muse cho Muse');
+  assert.ok(/\(tk\.nen \|\| 'muse'\) === 'muse'/.test(tao), 'chỉ trang Muse');
+  const view = m.slice(m.indexOf('const WEB_PREFS'), m.indexOf('function taoCuaSoAn('));
+  assert.ok(!/preload-muse/.test(view), 'khung đăng nhập không dùng preload-muse');
+  assert.ok(/window\.__museNhe !== undefined && \(window\.__museNhe = \$\{nhe\}\)/.test(m), 'đổi Máy mượt giữa chừng thì báo trang Muse');
+  // Chạy hàm cài của preload trên window giả: rAF thưa khi bật, như cũ khi tắt; cancel đúng; play → pause.
+  const src = fs.readFileSync(path.join(__dirname, '..', 'src', 'main', 'preload-muse.js'), 'utf8');
+  const caiNhe = new Function(`${src.slice(src.indexOf('function caiNhe'), src.indexOf('\ntry {'))}; return caiNhe;`)();
+  const goiRaf = [], huy = [], nghe = {};
+  const timers = [];
+  const w = { requestAnimationFrame: (cb) => { goiRaf.push(cb); return goiRaf.length; }, cancelAnimationFrame: (k) => huy.push(k) };
+  const g = { window: w, document: { addEventListener: (ten, f, cap) => { nghe[ten] = [f, cap]; } },
+    setTimeout: (f, ms) => { timers.push([f, ms]); return timers.length; }, clearTimeout: (k) => { timers[k - 1] = null; } };
+  const chay = new Function('window', 'document', 'setTimeout', 'clearTimeout', `(${caiNhe.toString()})(true)`);
+  chay(g.window, g.document, g.setTimeout, g.clearTimeout);
+  assert.strictEqual(w.__museNhe, true);
+  let lan = 0;
+  const k = w.requestAnimationFrame(() => lan++);
+  assert.ok(k > 1e9 && goiRaf.length === 0 && timers[0][1] === 200, 'bật: chờ 200 ms rồi mới xin khung');
+  timers[0][0](); goiRaf[0](123);
+  assert.strictEqual(lan, 1);
+  const k2 = w.requestAnimationFrame(() => lan++);
+  w.cancelAnimationFrame(k2);
+  assert.strictEqual(timers[1], null, 'cancel huỷ cả hẹn giờ chờ');
+  w.cancelAnimationFrame(5); assert.deepStrictEqual(huy, [5], 'mã rAF thật (trước khi cài) vẫn huỷ được');
+  w.__museNhe = false;
+  w.requestAnimationFrame(() => lan++);
+  assert.strictEqual(goiRaf.length, 2, 'tắt: xin khung ngay');
+  const [f, cap] = nghe.play;
+  let dung = 0;
+  w.__museNhe = true; f({ target: { pause: () => dung++ } });
+  w.__museNhe = false; f({ target: { pause: () => dung++ } });
+  assert.deepStrictEqual([cap, dung], [true, 1], 'play → dừng khi bật, nghe ở pha bắt');
+});
 test('chọn tài khoản cho việc: chat dở → đúng tài khoản; chưa lỗi ở đâu → tài khoản chính; lỗi → dự phòng kế tiếp', () => {
   const ds = ['A', 'B', 'C'];
   assert.strictEqual(HD.taiKhoanChoViec({}, ds), 'A');

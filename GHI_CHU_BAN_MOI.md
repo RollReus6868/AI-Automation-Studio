@@ -1,4 +1,20 @@
-# AI Automation Studio 1.4.7
+# AI Automation Studio 1.4.8
+
+- **Công tắc mới "Tạo ảnh xong hết rồi mới tạo video"** ở Cài đặt → **Cả app**. Mặc định **bật**, kể cả khi lên từ bản cũ.
+  - Bật: còn ảnh đang tạo, hoặc ảnh đang chờ mà có tài khoản chạy được ngay (Muse hay Flow, dự án nào cũng tính), thì video chờ. Hết ảnh, app tự bắt đầu tạo video. Nhật ký ghi một dòng ⏳ lúc video bắt đầu chờ và một dòng ▶ lúc bắt đầu tạo video.
+  - Ít trang Muse / Flow chạy cùng lúc hơn nên máy bớt ngốn CPU.
+  - Ảnh còn chờ mà mọi tài khoản tạo ảnh đều đang nghỉ thì video vẫn chạy, không đứng chờ hàng giờ.
+  - Nhạc Suno không bị ảnh hưởng. Video bạn bấm nút ▶ *Chạy ngay việc này* ở dòng việc vẫn chạy luôn.
+  - Muốn ảnh và video chạy song song như trước: Cài đặt → **Cả app** → tắt công tắc này → **Lưu cài đặt**.
+- **"Máy mượt" làm nhẹ trang Muse thêm.** Khi bật (Cài đặt → Cả app, mặc định bật), trên các trang Muse chạy ngầm:
+  - Hoạt hình trên trang chạy chậm lại, khoảng 5 khung hình mỗi giây.
+  - Video / nhạc trên trang bị dừng ngay khi bắt đầu tự phát. Kết quả vẫn tải về bình thường.
+  - Trang Flow và Suno giữ như cũ.
+- Mọi thứ khác giữ nguyên như 1.4.7.
+
+Lưu ý: đã kiểm bằng bài kiểm tự động trên trang Muse / Flow giả, chưa chạy trên Muse / Flow thật, nên chưa đo được máy bớt CPU bao nhiêu khi chạy thật.
+
+## Bản 1.4.7
 
 - **Công tắc "Cả máy nghỉ Flow"** ở Cài đặt → Flow → *Tài khoản lỗi*, kèm ô **số phút nghỉ** (10–1440, mặc định 120 = 2 giờ).
   - Bật (mặc định, như 1.4.5–1.4.6): 2 tài khoản Flow khác nhau bị báo "hoạt động bất thường" trong 30 phút thì mọi tài khoản Flow nghỉ theo số phút đó.

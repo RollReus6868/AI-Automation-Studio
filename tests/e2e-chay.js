@@ -246,16 +246,24 @@ module.exports = function e2e({ win, app, LENH, dieuPhoi }) {
       const ui5 = await js(`document.querySelector('#tenDuAn').textContent`);
       kiem(/^Tập 1/.test(ui5), `chuyển sang dự án đầu tiên vừa tạo ("${ui5}")`);
 
-      // 6) 1.3.0: ảnh và video song song — 1 luồng, 3 ảnh nối video: video 1 phải chạy TRƯỚC ảnh 2.
-      ghi('-- 6. Ảnh và video song song');
-      datCD({ luongMoiTK: 1 });
-      const truoc6 = viec().length;
-      LENH.them({ duAn: 'mac-dinh', loai: 'anh', prompts: ['ss một', 'ss hai', 'ss ba'], chuoiVideo: { prompt: 'ss chuyển động' }, chay: true });
-      await cho(() => viec().length >= truoc6 + 6 && !dieuPhoi.dangChay && !dieuPhoi.coViecDangChay(), 90000, 'chạy xong 3 ảnh + 3 video');
-      const thuTu = viec().slice(truoc6).filter((j) => j.batDauLuc).sort((x, y) => x.batDauLuc - y.batDauLuc)
-        .map((j) => (j.loai === 'video' ? 'V' : 'A') + j.stt);
-      ghi(`   thứ tự chạy: ${thuTu.join(' → ')}`);
-      kiem(thuTu.join(',') === 'A1,V1,A2,V2,A3,V3', 'ảnh xong là video của nó chạy ngay, không chờ hết mẻ ảnh');
+      // 6) 1.3.0: ảnh và video song song — 1 luồng, 3 ảnh nối video: video 1 phải chạy TRƯỚC ảnh 2 (tắt công tắc 1.4.8
+      //    "Tạo ảnh xong hết rồi mới tạo video"); bật (mặc định) thì 3 ảnh xong hết rồi mới tới 3 video.
+      const chay6 = async (anhTruocVideo, so) => {
+        datCD({ luongMoiTK: 1, anhTruocVideo });
+        const truoc6 = viec().length;
+        LENH.them({ duAn: 'mac-dinh', loai: 'anh', prompts: [`ss${so} một`, `ss${so} hai`, `ss${so} ba`], chuoiVideo: { prompt: 'ss chuyển động' }, chay: true });
+        await cho(() => viec().length >= truoc6 + 6 && !dieuPhoi.dangChay && !dieuPhoi.coViecDangChay(), 90000, 'chạy xong 3 ảnh + 3 video');
+        const thuTu = viec().slice(truoc6).filter((j) => j.batDauLuc).sort((x, y) => x.batDauLuc - y.batDauLuc)
+          .map((j) => (j.loai === 'video' ? 'V' : 'A') + j.stt);
+        ghi(`   thứ tự chạy (ảnh trước video ${anhTruocVideo ? 'bật' : 'tắt'}): ${thuTu.join(' → ')}`);
+        return thuTu.join(',');
+      };
+      ghi('-- 6. Ảnh và video song song / ảnh xong hết rồi mới tạo video');
+      kiem(dieuPhoi.caiDat.anhTruocVideo === true, '1.4.8: "Tạo ảnh xong hết rồi mới tạo video" mặc định bật');
+      const tt6a = await chay6(false, 'a');
+      kiem(/^A(\d+),V\1,A(\d+),V\2,A(\d+),V\3$/.test(tt6a), 'tắt công tắc: ảnh xong là video của nó chạy ngay, không chờ hết mẻ ảnh');
+      const tt6b = await chay6(true, 'b');
+      kiem(/^A\d+,A\d+,A\d+,V\d+,V\d+,V\d+$/.test(tt6b), '1.4.8 bật công tắc: 3 ảnh xong hết rồi mới tạo video');
       datCD({ luongMoiTK: 3 });
 
       // 7) Hết lượt còn việc lỗi → tự chạy lại.
