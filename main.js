@@ -258,10 +258,14 @@ function taoView(tk) {
  * kể cả sau show()/hide() và khi cửa sổ chính thu nhỏ.
  */
 function taoCuaSoAn(tk, tieuDe) {
+  // 1.4.8: trang Muse chạy ngầm có preload riêng — "Máy mượt" cho hoạt hình JavaScript chạy thưa, dừng video tự phát.
+  const muse = (tk.nen || 'muse') === 'muse';
+  const nhe = !dieuPhoi || dieuPhoi.caiDat.nheMay !== false;
   const w = new BrowserWindow({
     show: false, width: 1280, height: 800, skipTaskbar: !xemLuong, title: tieuDe,
     icon: path.join(__dirname, 'icons', process.platform === 'win32' ? 'icon.ico' : 'icon256.png'),
-    autoHideMenuBar: true, webPreferences: WEB_PREFS(tk)
+    autoHideMenuBar: true,
+    webPreferences: muse ? { ...WEB_PREFS(tk), preload: path.join(__dirname, 'src/main/preload-muse.js'), additionalArguments: [`--muse-nhe=${nhe ? 1 : 0}`] } : WEB_PREFS(tk)
   });
   ganWc(w.webContents);
   // 1.4.0: trang chạy ngầm nhận ưu tiên CPU thấp hơn (đổi trang có thể sang tiến trình mới → áp lại mỗi lần nạp xong).
@@ -346,6 +350,8 @@ async function datHieuUng(wc) {
   try {
     if (!wc || wc.isDestroyed()) return;
     const nhe = !dieuPhoi || dieuPhoi.caiDat.nheMay !== false;
+    // 1.4.8: trang Muse chạy ngầm (preload-muse.js) — bật / tắt hoạt hình thưa + dừng video theo "Máy mượt".
+    wc.executeJavaScript(`window.__museNhe !== undefined && (window.__museNhe = ${nhe}); undefined`, true).catch(() => {});
     const k = cssDong.get(wc);
     if (nhe && !k) {
       cssDong.set(wc, 'dang');
