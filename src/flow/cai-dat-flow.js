@@ -42,6 +42,9 @@ const FLOW_MAC_DINH = {
   // liền nhau (chưa prompt nào xong xen giữa) → đổi tài khoản; tài khoản lỗi nghỉ `nghiPhut` phút.
   // 1.4.7: caMayBat / caMayPhut = công tắc + số phút "Cả máy nghỉ Flow" (2 tài khoản bị báo bất thường trong 30 phút).
   anToan: { nguong: 2, nghiPhut: 15, caMayBat: true, caMayPhut: 120 },
+  // 1.4.9: một việc đứng yên (cùng bước, cùng %) quá chừng này phút lúc đang dán / đang tạo — vd kẹt "Flow đang tạo
+  // 99%" — thì bỏ, việc sang tài khoản khác (tính một lỗi của tài khoản). Bản cũ không có hạn này: kẹt là đứng mãi.
+  treoPhut: 5,
   // Chất lượng tải về
   // 1.3.7: 1K = "Kích thước gốc" (tải ngay, không tốn tín dụng); 2K / 4K là Flow tăng độ phân giải — tốn tín dụng AI.
   chatLuongAnh: 'img_1k',
@@ -80,6 +83,7 @@ function chuanHoaFlow(raw) {
     caMayBat: at.caMayBat === undefined ? FLOW_MAC_DINH.anToan.caMayBat : !(at.caMayBat === false || at.caMayBat === 'false'),
     caMayPhut: Math.round(so(at.caMayPhut, 10, 1440, FLOW_MAC_DINH.anToan.caMayPhut)) };
   m.selectors = r.selectors && typeof r.selectors === 'object' ? { ...r.selectors } : {};
+  m.treoPhut = Math.round(so(m.treoPhut, 2, 60, FLOW_MAC_DINH.treoPhut));
   m.outputCount = Math.round(so(m.outputCount, 1, 4, 1));
   m.delayMin = Math.round(so(m.delayMin, 1, 600, 20));
   m.delayMax = Math.max(m.delayMin, Math.round(so(m.delayMax, 1, 600, 30)));

@@ -14,7 +14,7 @@
   let S = null;
   const U = Object.assign({
     trang: 'anh', duAn: '', loc: 'tat', tim: '', moiNhat: true, cheDo: 'tudo', tyLe: { anh: '9:16', video: '9:16' },
-    nhap: { anh: '', video: '', nhac: '' }, tvLoc: 'tat', tvDuAn: '', chuoi: { bat: false, prompt: '', tyLe: '', nen: '' }, promptThuMuc: '',
+    nhap: { anh: '', video: '', nhac: '' }, tvLoc: 'tat', tvDuAn: '', chuoi: { bat: false, prompt: '', tyLe: '', nen: '' }, promptThuMuc: '', theoDoiTm: false,
     nen: { anh: 'muse', video: 'muse' }, locNen: '', nenTk: 'muse'
   }, docLuu());
   if (!U.nen || typeof U.nen !== 'object') U.nen = { anh: 'muse', video: 'muse' };
@@ -33,7 +33,7 @@
   function luuUi() {
     try {
       localStorage.setItem(KHOA, JSON.stringify({ trang: U.trang, duAn: U.duAn, loc: U.loc, moiNhat: U.moiNhat, cheDo: U.cheDo,
-        tyLe: U.tyLe, nhap: U.nhap, tvLoc: U.tvLoc, tvDuAn: U.tvDuAn, chuoi: U.chuoi, promptThuMuc: U.promptThuMuc, rieng: U.rieng, nen: U.nen, locNen: U.locNen, nenTk: U.nenTk, mauTai: U.mauTai }));
+        tyLe: U.tyLe, nhap: U.nhap, tvLoc: U.tvLoc, tvDuAn: U.tvDuAn, chuoi: U.chuoi, promptThuMuc: U.promptThuMuc, theoDoiTm: U.theoDoiTm, rieng: U.rieng, nen: U.nen, locNen: U.locNen, nenTk: U.nenTk, mauTai: U.mauTai }));
     } catch (_) {}
   }
 
@@ -468,6 +468,7 @@
     $('#khuVideoThuMuc').hidden = loaiTrang() !== 'video';
     const tm = TC().thuMuc;
     $('#ghiVideoThuMuc').textContent = tm ? `${tm.anh.length} ảnh trong "${tm.thuMuc.split(/[\\/]/).pop()}" → ${tm.anh.length} video` : 'Chưa chọn';
+    veTheoDoi();
     $('#batChuoi').checked = U.chuoi.bat;
     $('#khuPromptVideo').hidden = !U.chuoi.bat;
     veRieng('chuoi', ds.length);
@@ -498,6 +499,19 @@
       `<div class="anh-nho" title="${esc(p)}"><img src="${esc(fileUrl(p))}"><button data-bo="${i}">${ic('x')}</button></div>`).join('');
     if (TC().thuMuc) html += `<div class="ghi-thu-muc">${ic('folder-open')}<span>Thư mục: <b>${TC().thuMuc.anh.length} ảnh</b> → gán lần lượt cho từng prompt</span><button class="lien-ket" data-bo-thu-muc>Bỏ</button></div>`;
     if (datHtml($('#dsThamChieu'), html)) veIcon($('#dsThamChieu'));
+  }
+
+  /** 1.4.9: công tắc "Theo dõi thư mục" + dòng trạng thái theo dõi của dự án đang mở (trang Tạo video). */
+  function veTheoDoi() {
+    $('#theoDoiThuMuc').checked = !!U.theoDoiTm;
+    const d = duAnHienTai(), t = d && d.theoDoi, dong = $('#dongTheoDoi');
+    dong.hidden = !t;
+    if (!t) return;
+    const gio = t.quetLuc ? new Date(t.quetLuc).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—';
+    dong.classList.toggle('mat', !!t.mat);
+    $('#ghiTheoDoi').textContent = `${t.mat ? 'Không thấy thư mục' : 'Đang theo dõi'} "${t.thuMuc.split(/[\\/]/).pop()}" · đã thêm ${t.soDaThem} video · quét lúc ${gio}` +
+      (t.tuChay ? '' : ' · video mới chỉ vào hàng chờ (bấm Chạy để tự chạy)');
+    $('#ghiTheoDoi').title = t.thuMuc;
   }
 
   /** 1.4.6: dòng trạng thái + nút Bỏ + nhãn ô prompt dùng chung của file prompt video riêng từng ảnh.
@@ -614,14 +628,19 @@
   }
   /** 1.3.0: nút Dừng (việc đang chạy / đang chờ) hoặc Chạy (việc đã dừng / lỗi / còn chờ khi dự án chưa chạy) của riêng một việc. */
   function nutDieuKhien(j) {
+    // 1.4.9: việc đang chạy (vd treo ở 99%) / chờ lấy tiếp chat dở ở một tài khoản → nút Đổi tài khoản cạnh nút Dừng.
+    const doiTk = coTheDoiTk(j)
+      ? `<button class="nut-dk doi-tk" data-dk="doiTaiKhoan" title="Đổi sang tài khoản kế tiếp — bỏ tài khoản đang chạy (vd treo ở 99%), gửi lại prompt ở tài khoản tiếp theo">${ic('users')}</button>` : '';
     if (j.trangThai === 'chay' || (j.trangThai === 'cho' && (duAnDangChay(j.duAn) || j.chayRieng || theoHen(j)))) {
-      return `<button class="nut-dk dung" data-dk="dungViec" title="Dừng riêng việc này — việc khác vẫn chạy">${ic('square')}</button>`;
+      return doiTk + `<button class="nut-dk dung" data-dk="dungViec" title="Dừng riêng việc này — việc khác vẫn chạy">${ic('square')}</button>`;
     }
     if (j.trangThai === 'cho' || j.trangThai === 'dung' || j.trangThai === 'loi') {
-      return `<button class="nut-dk chay" data-dk="chayViec" title="${j.trangThai === 'loi' ? 'Tạo lại và chạy ngay việc này' : 'Chạy ngay việc này'}">${ic('play')}</button>`;
+      return doiTk + `<button class="nut-dk chay" data-dk="chayViec" title="${j.trangThai === 'loi' ? 'Tạo lại và chạy ngay việc này' : 'Chạy ngay việc này'}">${ic('play')}</button>`;
     }
     return '';
   }
+  /** 1.4.9: đổi tài khoản được — việc đang chạy, hoặc đang chờ lấy tiếp chat dở ở một tài khoản. */
+  function coTheDoiTk(j) { return j.trangThai === 'chay' || (j.trangThai === 'cho' && !!j.taiKhoan); }
 
   function capNhatTienDo() {
     if (!S) return;
@@ -664,6 +683,7 @@
         <button class="nut-vien" data-ct="chayViec" ${['cho', 'dung', 'loi'].includes(j.trangThai) ? '' : 'disabled'}>${ic('play')}Chạy ngay</button>
         <button class="nut-vien" data-ct="dungViec" ${j.trangThai === 'chay' || j.trangThai === 'cho' ? '' : 'disabled'}>${ic('square')}Dừng</button>
       </div>` : ''}
+      ${coTheDoiTk(j) ? `<div class="ct-nut" style="grid-template-columns:1fr"><button class="nut-vien" data-ct="doiTaiKhoan" title="Bỏ tài khoản đang chạy (vd treo ở 99%), gửi lại prompt ở tài khoản tiếp theo">${ic('users')}Đổi sang tài khoản kế tiếp</button></div>` : ''}
       <div class="ct-dau"><span>Prompt</span><button class="nut-icon" data-ct="chep" title="Sao chép prompt">${ic('copy')}</button></div>
       <div class="ct-text">${esc(j.prompt)}</div>
       ${j.thamChieu && j.thamChieu.length ? `<div class="ct-dau"><span>Ảnh đính kèm</span></div><div class="ds-tham-chieu">${j.thamChieu.map((p) => `<div class="anh-nho"><img src="${esc(fileUrl(p))}"></div>`).join('')}</div>` : ''}
@@ -688,7 +708,7 @@
       if (j.trangThai === 'xong' && !(await xacNhan('Tạo lại?', `Việc #${so3(j.so)} sẽ chạy lại từ đầu (gửi prompt mới), kết quả mới ghi đè file cũ.`, 'Tạo lại'))) return;
       await api.call('taoLai', { ids: [j.id], chay: true });
       toast(`Đã tạo lại #${so3(j.so)} và chạy ngay`);
-    } else if (lenh === 'dungViec' || lenh === 'chayViec') {
+    } else if (lenh === 'dungViec' || lenh === 'chayViec' || lenh === 'doiTaiKhoan') {
       dieuKhienViec(lenh, [j.id]);
     } else if (lenh === 'doiNen') {
       doiNen([j.id], nenTk(j) === 'flow' ? 'muse' : 'flow');
@@ -728,9 +748,22 @@
   /** Dừng / chạy riêng các việc (nút ở dòng việc, thanh chọn, chi tiết, menu ⋯). */
   async function dieuKhienViec(lenh, ids) {
     if (!ids.length) return;
+    if (lenh === 'doiTaiKhoan') { doiTaiKhoan(ids); return; }
     const n = await api.call(lenh, { ids });
     if (lenh === 'dungViec') toast(n ? `Đã dừng ${n} việc — việc khác vẫn chạy` : 'Không có việc nào đang chạy / chờ để dừng', !n);
     else toast(n ? `Đang chạy ngay ${n} việc` : 'Không có việc nào chạy được (việc đã xong thì dùng Tạo lại)', !n);
+  }
+
+  /** 1.4.9: nút "Đổi tài khoản" — việc đang chạy / treo bỏ tài khoản hiện tại, chạy ngay ở tài khoản kế tiếp cùng nền tảng. */
+  async function doiTaiKhoan(ids) {
+    const ds = ids.map(viecTheoId).filter((j) => j && coTheDoiTk(j));
+    if (!ds.length) { toast('Chỉ đổi được tài khoản của việc đang chạy (hoặc đang chờ lấy tiếp chat dở)', true); return; }
+    const r = await api.call('doiTaiKhoan', { ids: ds.map((j) => j.id) });
+    const doi = (r && r.doi) || [];
+    if (doi.length === 1) toast(`#${so3(doi[0].so)}: ${doi[0].tu} → ${doi[0].den}`);
+    else if (doi.length) toast(`Đã đổi tài khoản ${doi.length} việc`);
+    if (r && r.loi) setTimeout(() => toast(r.loi, true), doi.length ? 2500 : 0);
+    else if (!doi.length) toast('Không đổi được tài khoản nào', true);
   }
 
   /** 1.4.0: đổi ngay các việc sang Muse / Flow rồi chạy luôn (việc đang chạy dừng ở bên cũ, việc đã xong tạo lại). */
@@ -783,6 +816,7 @@
     m.innerHTML = [
       f ? `<button data-l="xem">${ic('eye')}Xem</button><button data-l="thuMuc">${ic('folder-open')}Mở thư mục</button>` : '',
       j.trangThai === 'chay' || j.trangThai === 'cho' ? `<button data-l="dungViec">${ic('square')}Dừng việc này</button>` : '',
+      coTheDoiTk(j) ? `<button data-l="doiTaiKhoan">${ic('users')}Đổi sang tài khoản kế tiếp</button>` : '',
       ['cho', 'dung', 'loi'].includes(j.trangThai) ? `<button data-l="chayViec">${ic('play')}Chạy ngay việc này</button>` : '',
       j.trangThai !== 'chay' ? `<button data-l="taoLai">${ic('rotate-ccw')}Tạo lại</button><button data-l="sua">${ic('pencil')}${f && j.loai === 'anh' ? 'Chỉnh sửa ảnh' : 'Sửa prompt'}</button>` : '',
       f && j.loai === 'anh' ? `<button data-l="video">${ic('film')}Tạo video từ ảnh này</button>` : '',
@@ -919,11 +953,29 @@
     if (!prompts.length) { toast('Chưa có prompt nào', true); $('#oPrompt').focus(); return; }
     const ts = await thamSoTao(prompts, true);
     if (!ts) return;
+    // 1.4.9: chụp lại trước khi ô Prompt bị xoá — để đăng ký theo dõi thư mục sau khi thêm việc.
+    const td = loai === 'video' && TC().thuMuc && U.theoDoiTm ? thamSoTheoDoi(ts, chay) : null;
     const r = await api.call('them', { ...ts, duAn: U.duAn, prompts, chay });
-    if (!r || !r.ok) { toast((r && r.loi) || 'Không thêm được', true); return; }
+    if ((!r || !r.ok) && !td) { toast((r && r.loi) || 'Không thêm được', true); return; }
+    if (td) {
+      const k = await api.call('theoDoiThuMuc', td);
+      if (!k || !k.ok) { toast((k && k.loi) || 'Không theo dõi được thư mục', true); return; }
+      if (!r || !r.ok) { toast(`${(r && r.loi) || 'Không thêm được việc'} — vẫn theo dõi thư mục, ảnh mới vào sẽ tự tạo video`); return; }
+    }
     $('#oPrompt').value = ''; U.nhap[loai] = ''; luuUi();
     U.loc = 'tat';
-    toast(`Đã thêm ${r.so} việc ${TEN_NEN[ts.nen]}${r.boQua ? ` (bỏ qua ${r.boQua} số đã có)` : ''}${chay ? ' và bắt đầu chạy' : ' vào hàng đợi'}${ts.chuoiVideo ? ` — ảnh xong sẽ tự tạo video ở ${TEN_NEN[ts.chuoiVideo.nen]}` : ''}`);
+    toast(`Đã thêm ${r.so} việc ${TEN_NEN[ts.nen]}${r.boQua ? ` (bỏ qua ${r.boQua} số đã có)` : ''}${chay ? ' và bắt đầu chạy' : ' vào hàng đợi'}${ts.chuoiVideo ? ` — ảnh xong sẽ tự tạo video ở ${TEN_NEN[ts.chuoiVideo.nen]}` : ''}` +
+      (td ? ' — đang theo dõi thư mục, ảnh mới thêm vào sẽ tự tạo video' : ''));
+  }
+
+  /** 1.4.9: tham số đăng ký theo dõi thư mục — prompt như cách promptCotTao ghép cho ảnh có sẵn: file riêng (ảnh i ↔ dòng i),
+   *  hoặc ô Prompt có nhiều prompt (ảnh i ↔ prompt i), còn lại prompt dùng chung → mặc định. */
+  function thamSoTheoDoi(ts, chay) {
+    const tm = TC().thuMuc, chung = U.promptThuMuc.trim();
+    const o = HD.tachPrompt($('#oPrompt').value, $('#tachPrompt').value);
+    const prompts = U.rieng.thuMuc ? U.rieng.thuMuc.ds : (!chung && o.length > 1 ? o : null);
+    return { duAn: U.duAn, thuMuc: tm.thuMuc, anhDaCo: tm.anh, prompt: chung || (o.length === 1 ? o[0] : ''), prompts, tuChay: !!chay,
+      thamSo: { nen: ts.nen, tyLe: ts.tyLe, soBan: ts.soBan, hauTo: ts.hauTo, nhanVatIds: ts.nhanVatIds, tuNhanVat: ts.tuNhanVat } };
   }
 
   /** Đặt lại hàng đợi đang xem (dự án + ảnh/video) về Chờ như lúc mới thêm — dùng chung "Tạo lại". */
@@ -1269,7 +1321,8 @@
   const O_FLOW = [['fTab', 'tabMoiTK'], ['fMe', 'meToiDa'], ['fSoLuong', 'outputCount'], ['fChoMin', 'delayMin'], ['fChoMax', 'delayMax'],
     ['fThuLai', 'maxRetries'], ['fGian', 'multiTabStagger'], ['fChatAnh', 'chatLuongAnh'], ['fChatVideo', 'chatLuongVideo'], ['fMang', 'networkGuard'],
     ['fSoThuTu', 'addIndex'], ['fGoAnh', 'goAnhThamChieu'], ['fDoiTen', 'doiTenTrenFlow'], ['fDongY', 'dongYQuyenAnh'],
-    ['fModelAnh', 'modelAnh'], ['fNghiTT', 'nghiThaoTacBat'], ['fNghiTTMin', 'nghiThaoTacMin'], ['fNghiTTMax', 'nghiThaoTacMax']];
+    ['fModelAnh', 'modelAnh'], ['fNghiTT', 'nghiThaoTacBat'], ['fNghiTTMin', 'nghiThaoTacMin'], ['fNghiTTMax', 'nghiThaoTacMax'],
+    ['fTreo', 'treoPhut']];   // 1.4.9: việc Flow đứng yên (vd "Flow đang tạo 99%") quá chừng này phút → đổi tài khoản
   const O_FLOW_MODEL = [['fModelChinh', 'chinh'], ['fModelPhu', 'phu'], ['fXenKe', 'xenKeMoi']];
   // Nhận diện tài khoản lỗi (1.2.0, luôn bật) — khớp chuanHoaCaiDat của src/flow/main/an-toan.js.
   // 1.4.7: công tắc + số phút "Cả máy nghỉ Flow" (caMayBat / caMayPhut).
@@ -1350,7 +1403,7 @@
     m.innerHTML = S.duAn.map((d) => {
       const n = S.viec.filter((j) => j.duAn === d.id).length;
       const g = soDongHo(d.id);
-      return `<button data-du-an="${esc(d.id)}" class="${d.id === U.duAn ? 'on' : ''}">${ic(duAnDangChay(d.id) ? 'play' : 'folder')}${esc(d.ten)} - ${n}${duAnDangChay(d.id) ? ` <small class="dang-chay">đang chạy${g && g.dangChay ? ` ${dongHoChu(g.daChay)}${g.soCon ? ` · còn ≈ ${khoangChu(g.conLai)}` : ''}` : ''}</small>` : ''}</button>`;
+      return `<button data-du-an="${esc(d.id)}" class="${d.id === U.duAn ? 'on' : ''}">${ic(duAnDangChay(d.id) ? 'play' : 'folder')}${esc(d.ten)} - ${n}${d.theoDoi ? `<span class="dau-theo-doi" title="Đang theo dõi thư mục ảnh: ${esc(d.theoDoi.thuMuc)}">${ic('eye')}</span>` : ''}${duAnDangChay(d.id) ? ` <small class="dang-chay">đang chạy${g && g.dangChay ? ` ${dongHoChu(g.daChay)}${g.soCon ? ` · còn ≈ ${khoangChu(g.conLai)}` : ''}` : ''}</small>` : ''}</button>`;
     }).join('') + `<div class="tach"></div><button data-du-an-moi>${ic('plus')}Dự án mới…</button>`;
   }
   async function duAnMoi() {
@@ -1483,6 +1536,14 @@
       toast(`Dự án "${d.ten}" bỏ thư mục video riêng — ${S.caiDat.videoCanhAnh !== false ? 'video lưu cạnh ảnh nguồn' : 'theo thư mục của trang Tạo video'}`);
     };
     $('#promptThuMuc').addEventListener('input', (e) => { U.promptThuMuc = e.target.value; luuUi(); veTao(); });
+    $('#theoDoiThuMuc').onchange = (e) => {
+      U.theoDoiTm = e.target.checked; luuUi(); veTao();
+      if (U.theoDoiTm) toast(TC().thuMuc ? 'Bấm Tạo / Tạo & chạy để bắt đầu theo dõi thư mục' : 'Chọn thư mục ảnh rồi bấm Tạo / Tạo & chạy để bắt đầu theo dõi');
+    };
+    $('#nutBoTheoDoi').onclick = async () => {
+      const r = await api.call('boTheoDoiThuMuc', { duAn: U.duAn });
+      toast(r && r.ok ? 'Đã dừng theo dõi thư mục — ảnh mới thêm vào không tự tạo video nữa' : (r && r.loi) || 'Không dừng được', !(r && r.ok));
+    };
     // 1.4.6: file .txt prompt video riêng từng ảnh — tách cùng quy tắc với ô Prompt (mỗi dòng / dòng trống).
     const nhapRieng = async (k) => {
       const f = await api.call('nhapPromptRieng');
@@ -1643,6 +1704,7 @@
     $('#chonSangFlow').onclick = () => doiNen([...U.chon], 'flow');
     $('#chonDrive').onclick = () => lenDrive([...U.chon]);
     $('#chonDung').onclick = () => { dieuKhienViec('dungViec', [...U.chon]); U.chon.clear(); };
+    $('#chonDoiTk').onclick = () => { doiTaiKhoan([...U.chon]); U.chon.clear(); };
 
     // Chi tiết
     $('#chiTiet').addEventListener('click', (e) => {

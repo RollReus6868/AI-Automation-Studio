@@ -1,4 +1,26 @@
-# AI Automation Studio 1.4.8
+# AI Automation Studio 1.4.9
+
+- **Sửa lỗi việc treo ở 99% mà không đổi tài khoản.**
+  - 99% là tiến độ app ƯỚC theo thời gian. Việc đứng ở đó mãi vì luồng chờ một thứ không bao giờ trả lời: trang Muse chạy ngầm bị đứng / sập, tải file kết quả đứng giữa chừng, hoặc trên Flow việc kẹt ở *"Flow đang tạo 99%"*.
+  - **Muse:** mọi bước giờ đều có hạn (mở trang, gửi prompt, hỏi kết quả, tải file ảnh / video). Quá *Chờ tối đa 1 ảnh / 1 video* (Cài đặt → Muse) mà chưa có kết quả, kể cả khi kẹt lúc tải file → việc tự chuyển sang tài khoản kế tiếp. Thêm một lớp canh cuối: một lần chạy quá thời gian chờ tối đa + 10 phút thì app đóng hẳn trang Muse đó, mở trang mới và chạy việc ở tài khoản khác.
+  - **Flow:** ô mới **Treo quá … phút thì đổi tài khoản** (Cài đặt → Google Flow → *Tài khoản lỗi*, mặc định 5 phút, 2–60). Một việc đứng ở cùng bước / cùng % quá số phút đó thì bị bỏ và chạy lại ở tài khoản Flow khác; mẻ không còn việc nào thì app nạp lại trang Flow.
+  - Treo được tính là một lần lỗi của tài khoản (như "quá … giây chưa thấy kết quả"), nên tài khoản treo liên tiếp sẽ được cho nghỉ như cũ.
+- **Nút Đổi tài khoản** (biểu tượng hai người) ở dòng việc đang chạy, hoặc đang chờ lấy tiếp chat dở. Bấm → việc bỏ tài khoản đang chạy (vd Muse 1) và chạy ngay ở tài khoản kế tiếp cùng nền tảng của dự án (Muse 2, rồi Muse 3…, hết thì quay vòng; tài khoản đang nghỉ / chưa đăng nhập được bỏ qua). Prompt được gửi lại ở tài khoản mới.
+  - Cũng có ở menu ⋯ của dòng, ô chi tiết bên phải, và thanh chọn nhiều dòng (*Đổi tài khoản*).
+  - Đổi tay không tính là lỗi của tài khoản cũ.
+  - Dự án chỉ có một tài khoản của nền tảng đó → app báo không có tài khoản khác để đổi.
+- **Tạo video từ thư mục ảnh: theo dõi thư mục.** Trang Tạo video → *Tạo video từ thư mục ảnh* có công tắc mới **Theo dõi thư mục — ảnh mới thêm vào tự tạo video** (mặc định tắt; tắt thì quét một lần như cũ).
+  - Bật, chọn thư mục rồi bấm **Tạo & chạy**: ảnh đang có thành video như trước. Sau đó app quét lại thư mục khoảng 5 giây một lần; ảnh mới bạn thêm vào (đã ghi xong) tự thành việc video và chạy luôn.
+  - Prompt: có file .txt prompt riêng thì ảnh thứ N (xếp theo tên) dùng dòng N; không có dòng thì dùng prompt dùng chung, trống nữa thì dùng prompt mặc định.
+  - Dự án đã chạy hết hàng chờ mà có ảnh mới → app tự chạy lại dự án. Bấm **Dừng** dự án thì ảnh mới vẫn được thêm vào hàng chờ nhưng không tự chạy; bấm **Chạy** lại thì chạy tiếp.
+  - Dòng trạng thái ghi thư mục đang theo dõi, số video đã thêm, lần quét gần nhất, kèm nút **Dừng theo dõi**. Đóng app mở lại vẫn theo dõi tiếp. Xoá dự án thì thôi theo dõi.
+  - Đang theo dõi (tự chạy) thì *Tắt máy khi xong* không tắt máy, nhật ký ghi lý do.
+  - Nên đặt tên ảnh tăng dần (001, 002…). Ảnh mới mà tên xếp chen trước ảnh cũ sẽ lệch số thứ tự ↔ dòng prompt riêng.
+- Mọi thứ khác giữ nguyên như 1.4.8.
+
+Lưu ý: đã kiểm bằng bài kiểm tự động trên trang Muse / Flow giả (gồm việc treo giả, ảnh thêm dần vào thư mục), chưa chạy trên Muse / Flow thật. Gặp việc treo, bạn gửi giúp nhật ký .txt để xem app đã tự đổi tài khoản sau bao lâu.
+
+## Bản 1.4.8
 
 - **Công tắc mới "Tạo ảnh xong hết rồi mới tạo video"** ở Cài đặt → **Cả app**. Mặc định **bật**, kể cả khi lên từ bản cũ.
   - Bật: còn ảnh đang tạo, hoặc ảnh đang chờ mà có tài khoản chạy được ngay (Muse hay Flow, dự án nào cũng tính), thì video chờ. Hết ảnh, app tự bắt đầu tạo video. Nhật ký ghi một dòng ⏳ lúc video bắt đầu chờ và một dòng ▶ lúc bắt đầu tạo video.

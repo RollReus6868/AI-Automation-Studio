@@ -1058,8 +1058,13 @@ test('an toàn: nghỉ hạ nhiệt — luồng Flow không coi mẻ là xong, v
   assert.ok(/if \(hetViecLuc && d && d\.isRunning === false\) ket\('xong'\)/.test(l),
     'onBang kết thúc mẻ khi isRunning=false mà chưa xong hết việc — nghỉ hạ nhiệt sẽ cắt mẻ');
   const gac = khoiGiua(l, 'const gac = setInterval(', '}, 5000);');
-  const iNghi = gac.indexOf('if (t.nghiAnToan) { lanCuoi = Date.now(); return; }');
-  assert.ok(iNghi > 0 && iNghi < gac.indexOf('this.dungYenMs'), 'gác đứng im tính cả giờ nghỉ hạ nhiệt — sẽ dừng mẻ giữa giờ nghỉ');
+  // 1.4.9: khối nghỉ còn đặt lại mốc "treo" (doiLuc / doiMeLuc) — giờ nghỉ không tính là treo.
+  const iNghi = gac.indexOf('if (t.nghiAnToan) {');
+  const khoiNghi = gac.slice(iNghi, gac.indexOf('return;', iNghi));
+  assert.ok(iNghi > 0 && iNghi < gac.indexOf('this.dungYenMs') && /lanCuoi = doiMeLuc = Date\.now\(\)/.test(khoiNghi),
+    'gác đứng im tính cả giờ nghỉ hạ nhiệt — sẽ dừng mẻ giữa giờ nghỉ');
+  assert.ok(iNghi < gac.indexOf("['PASTING', 'CREATING']") && /doiLuc\.set\(j, Date\.now\(\)\)/.test(khoiNghi),
+    'gác treo tính cả giờ nghỉ hạ nhiệt — sẽ bỏ việc giữa giờ nghỉ');
   const dp = docGoc('src', 'main', 'dieu-phoi.js');
   assert.strictEqual((dp.match(/this\._noiVideo\(/g) || []).length, 1, 'chỉ được nối video ở MỘT chỗ (việc ảnh xong)');
   assert.ok(/_noiVideo\(j, d\) \{\s*if \(j\.loai !== 'anh' \|\| !j\.chuoi \|\| j\.daNoiVideo \|\| !j\.files\[0\]\) return;/.test(dp),
@@ -1101,6 +1106,48 @@ testAsync('an toàn: nghỉ hạ nhiệt — chạy thật LuongFlow: engine d�
     assert.ok(l.ranh, 'xong mẻ thì luồng phải rảnh');
   } finally {
     if (l._ketMe) l._ketMe('dung');          // đừng để setInterval của gác giữ tiến trình
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+testAsync('1.4.9 treo 99%: việc đứng ở "Flow đang tạo 99%" (engine vẫn gửi bảng đều) quá hạn treo → bỏ việc đó, việc khác vẫn xong; hết việc thì nạp lại tab', async () => {
+  const { LuongFlow } = require('../../src/flow/luong-flow');
+  const { chuanHoaFlow, FLOW_MAC_DINH } = require('../../src/flow/cai-dat-flow');
+  assert.strictEqual(FLOW_MAC_DINH.treoPhut, 5);
+  assert.deepStrictEqual([chuanHoaFlow({}).treoPhut, chuanHoaFlow({ treoPhut: 1 }).treoPhut, chuanHoaFlow({ treoPhut: 99 }).treoPhut, chuanHoaFlow({ treoPhut: 12 }).treoPhut], [5, 2, 60, 12]);
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fs-treo-'));
+  const url = 'https://labs.google/fx/vi/tools/flow/project/thu';
+  let napLai = 0;
+  const wc = { isDestroyed: () => false, getURL: () => url, isLoading: () => false, executeJavaScript: async () => true, reload: () => { napLai++; } };
+  const tab = { id: 'flow1', ready: true, view: { webContents: wc } };
+  let giao; const daGiao = new Promise((r) => { giao = r; });
+  const lenh = [];
+  const tabs = { find: () => tab, taoTab: () => tab,
+    dispatch: async (_id, m) => { lenh.push(m.action); if (m.action === 'START_AUTOMATION') giao(m); return { ok: true }; } };
+  const may = { chuanBiMe: async (_t, s) => ({ ok: true, caiDat: s }) };
+  const nhatKy = [];
+  const l = new LuongFlow({ id: 'L1', taiKhoan: { id: 'tk', ten: 'TK', flowUrl: url }, tabs, may, thuMucTam: dir, log: (m, c) => nhatKy.push(`[${m}] ${c}`) });
+  l.treoMsThu = 1500;
+  const kq = new Map();
+  const j1 = { so: 1, loai: 'video', tyLe: '9:16', prompt: 'a' }, j2 = { so: 2, loai: 'video', tyLe: '9:16', prompt: 'b' };
+  const chay = l.chayMe([j1, j2], { caiDat: {}, tenFile: (j) => `Viec_${j.so}`, anhCua: () => [], capNhat: () => {}, xong: (j, r) => kq.set(j.so, r) });
+  let bom;
+  try {
+    await daGiao;
+    // Engine báo bảng mỗi 200 ms: việc 1 đứng 99% mãi; việc 2 xong và tải về.
+    bom = setInterval(() => tab.onBang && tab.onBang([{ index: 1, status: 'CREATING', progress: 99 }, { index: 2, status: kq.has(2) ? 'COMPLETED' : 'CREATING', progress: kq.has(2) ? 100 : 40, downloaded: kq.has(2) }], { isRunning: true }), 200);
+    await new Promise((r) => setTimeout(r, 400));
+    tab.onTai(path.join(dir, 'Viec_2.mp4'));
+    tab.onBang([{ index: 1, status: 'CREATING', progress: 99 }, { index: 2, status: 'COMPLETED', downloaded: true }], { isRunning: true });
+    assert.ok(kq.get(2) && kq.get(2).ok, 'việc 2 xong bình thường');
+    await Promise.race([chay, new Promise((r) => setTimeout(r, 15000))]);
+    assert.ok(kq.get(1) && !kq.get(1).ok && /Flow treo ở "Flow đang tạo 99%" quá 2 giây/.test(kq.get(1).loi), JSON.stringify(kq.get(1)));
+    assert.ok(!kq.get(1).dung && !kq.get(1).matKetNoi, 'treo là lỗi thường của tài khoản → điều phối chuyển tài khoản khác');
+    assert.ok(nhatKy.some((x) => /⏱ \[L1\] #1: Flow treo ở "Flow đang tạo 99%"/.test(x)), nhatKy.join('\n'));
+    assert.ok(l.ranh && napLai === 1 && lenh.includes('STOP_AUTOMATION'), `nhả mẻ + nạp lại tab: ranh=${l.ranh} napLai=${napLai} ${lenh}`);
+  } finally {
+    clearInterval(bom);
+    if (l._ketMe) l._ketMe('dung');
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });

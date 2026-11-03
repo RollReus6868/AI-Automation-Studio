@@ -110,6 +110,8 @@ class LuongFlow {
     // Flow báo tạo xong mà quá chừng này chưa tải về được → thôi chờ, việc sang tài khoản khác (engine tự
     // "Audit" thử tải lại tới ~16 phút — nhật ký 16/10/2026).
     this.choTaiMs = Number(process.env.FLOW_CHO_TAI_MS) || 5 * 60000;
+    // 1.4.9: hạn "treo" (Cài đặt → Google Flow → Treo quá … phút); biến môi trường chỉ để bài kiểm rút ngắn.
+    this.treoMsThu = Number(process.env.FLOW_TREO_MS) || 0;
   }
 
   get ranh() { return !this.dsViec; }
@@ -498,6 +500,14 @@ class LuongFlow {
       const thuMucTai = path.join(this.thuMucTam, `me-${Date.now().toString(36)}`);
       fs.mkdirSync(thuMucTai, { recursive: true });
       let lanCuoi = Date.now();
+      // 1.4.9 — TREO: lúc bảng tiến độ của từng việc ĐỔI (bước / % / số lần thử) gần nhất. Engine gửi bảng đều đặn kể
+      // cả khi một việc kẹt "Flow đang tạo 99%" → lanCuoi (đứng im) không bao giờ quá hạn, việc đứng mãi.
+      const doiLuc = new Map(chay.map((j) => [j, Date.now()]));
+      let doiMeLuc = Date.now();
+      const treoMs = this.treoMsThu || (c.treoPhut || 5) * 60000;
+      const treoChu = treoMs >= 60000 ? `${Math.round(treoMs / 60000)} phút` : `${Math.round(treoMs / 1000)} giây`;
+      // Cả mẻ không việc nào nhúc nhích: chờ thêm khoảng nghỉ giữa 2 prompt (người dùng đặt tới 600 s) cho khỏi oan.
+      const treoMeMs = treoMs + 2 * (c.delayMax || 30) * 1000 + 60000;
 
       // Kết quả "xong" của một việc: bỏ file thừa trước (video cũ cùng prompt — xem _locFileThua).
       const ketQuaOk = (j, flowTen) => {
@@ -559,6 +569,9 @@ class LuongFlow {
             const truoc = hang.get(j);
             hang.set(j, r);
             if (r.status === 'COMPLETED' && !xongTaoLuc.has(j)) xongTaoLuc.set(j, Date.now());
+            if (!truoc || truoc.status !== r.status || truoc.progress !== r.progress || (truoc.retries || 0) !== (r.retries || 0)) {
+              doiLuc.set(j, Date.now()); doiMeLuc = Date.now();
+            }
             if (conLai.has(j) && (!truoc || truoc.status !== r.status || truoc.progress !== r.progress)) {
               const thay = { buoc: (TRANG_THAI_BUOC[r.status] || r.status) + (r.status === 'CREATING' && r.progress ? ` ${r.progress}%` : '') +
                 (r.retries ? ` · thử lại ${r.retries}/${c.maxRetries}` : '') };
@@ -632,7 +645,33 @@ class LuongFlow {
               return;
             }
           }
-          if (t.nghiAnToan) { lanCuoi = Date.now(); return; }   // đang nghỉ an toàn — không phải đứng im
+          if (t.nghiAnToan) {   // đang nghỉ an toàn — không phải đứng im / treo
+            lanCuoi = doiMeLuc = Date.now();
+            for (const j of conLai) doiLuc.set(j, Date.now());
+            return;
+          }
+          // 1.4.9: việc đang dán / đang tạo mà bước + % không đổi quá treoMs → treo: bỏ việc đó, sang tài khoản khác.
+          for (const j of [...conLai]) {
+            const h = hang.get(j);
+            if (!h || !['PASTING', 'CREATING'].includes(h.status) || Date.now() - (doiLuc.get(j) || 0) < treoMs) continue;
+            const buoc = (TRANG_THAI_BUOC[h.status] || h.status) + (h.progress ? ` ${h.progress}%` : '');
+            this.log('error', `⏱ [${this.id}] #${j.so}: Flow treo ở "${buoc}" quá ${treoChu} — bỏ, chạy lại ở tài khoản khác.`);
+            xong(j, { ok: false, loi: `Flow treo ở "${buoc}" quá ${treoChu}` });
+          }
+          const conTao = [...conLai].filter((j) => { const h = hang.get(j); return !h || h.status !== 'COMPLETED'; });
+          if (conTao.length && Date.now() - Math.max(doiMeLuc, taiGanNhat) > treoMeMs) {
+            this.log('error', `⏱ [${this.id}] Mẻ Flow không việc nào nhúc nhích quá ${Math.round(treoMeMs / 60000)} phút — dừng mẻ, việc chưa xong chạy lại ở tài khoản khác.`);
+            for (const j of conTao) xong(j, { ok: false, loi: `Flow treo: mẻ đứng yên quá ${Math.round(treoMeMs / 60000)} phút` });
+          }
+          if (!conLai.size && !hetViecLuc) {
+            // Mọi việc của mẻ đã bỏ vì treo: engine còn kẹt ở lần tạo dở → nạp lại trang dự án (như "quá … chưa tải về").
+            nhipTT.huy(t);
+            this.tabs.dispatch(t.id, { action: 'STOP_AUTOMATION' }).catch(() => {});
+            napLai = true;
+            this._chupChanDoan('việc Flow treo, tiến độ không đổi', false).catch(() => {})
+              .then(() => { this._napLaiTab(t, 'việc Flow treo'); ket('xong'); });
+            return;
+          }
           if (Date.now() - lanCuoi > this.dungYenMs) {
             this.log('error', `❌ [${this.id}] Flow không báo gì quá ${Math.round(this.dungYenMs / 60000)} phút — dừng mẻ.`);
             nhipTT.huy(t);

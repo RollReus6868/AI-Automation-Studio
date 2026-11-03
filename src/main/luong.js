@@ -11,6 +11,21 @@
 
 const hd = require('./hang-doi');
 
+// 1.4.9: hạn cho từng thao tác với trang Muse (biến môi trường chỉ để bài kiểm rút ngắn).
+const HAN_GOI_MS = Number(process.env.MUSE_HAN_GOI_MS) || 60000;           // một lần hỏi trang (trạng thái, kết quả…)
+const HAN_GUI_MS = Number(process.env.MUSE_HAN_GUI_MS) || 180000;          // gửi prompt (đính kèm ảnh ≤30 s, nút Gửi ≤60 s…)
+const HAN_LAY_FILE_MS = Number(process.env.MUSE_HAN_LAY_FILE_MS) || 240000; // lấy file gốc (video vài chục MB)
+const HAN_MO_TRANG_MS = Number(process.env.MUSE_HAN_MO_TRANG_MS) || 45000;
+
+/** Promise có hạn: quá `ms` thì trả lỗi (promise gốc vẫn chạy nốt, kết quả về sau bị bỏ). */
+function hanChot(p, ms, ten) {
+  let h;
+  return Promise.race([
+    Promise.resolve(p).finally(() => clearTimeout(h)),
+    new Promise((_, loi) => { h = setTimeout(() => loi(new Error(`${ten} không trả lời quá ${Math.round(ms / 1000)} giây`)), ms); })
+  ]);
+}
+
 class Luong {
   /**
    * @param o.id, o.taiKhoan  ({id, ten, partition})
@@ -42,13 +57,18 @@ class Luong {
   }
 
   async moTrang(url) {
-    try { await this.wc.loadURL(url); } catch (_) { /* SPA tự chuyển hướng → ERR_ABORTED, bỏ qua */ }
+    // 1.4.9: loadURL chỉ xong khi trang nạp HẾT — một tài nguyên của Muse treo là đứng mãi ở đây (việc kẹt "99%").
+    try { await hanChot(this.wc.loadURL(url), HAN_MO_TRANG_MS, 'mở trang Muse'); } catch (_) { /* SPA tự chuyển hướng → ERR_ABORTED / quá hạn: chờ ô nhập bên dưới */ }
   }
 
-  async goi(bieuThuc) {
-    const co = await this.wc.executeJavaScript('!!(window.__muse && window.__muse.phienBan === 1)', true).catch(() => false);
-    if (!co) await this.wc.executeJavaScript(this.nguon, true);
-    return await this.wc.executeJavaScript(bieuThuc, true);
+  /**
+   * Chạy mã trong trang. 1.4.9: có HẠN — trang ngầm sập (hết RAM) / đứng thì executeJavaScript không bao giờ trả lời,
+   * việc đứng mãi ở "99%", nút Dừng cũng không ăn (nhật ký người dùng 11/2026). Quá hạn → ném lỗi như trang hỏng.
+   */
+  async goi(bieuThuc, hanMs = HAN_GOI_MS) {
+    const co = await hanChot(this.wc.executeJavaScript('!!(window.__muse && window.__muse.phienBan === 1)', true), HAN_GOI_MS, 'trang Muse').catch(() => false);
+    if (!co) await hanChot(this.wc.executeJavaScript(this.nguon, true), HAN_GOI_MS, 'trang Muse');
+    return await hanChot(this.wc.executeJavaScript(bieuThuc, true), hanMs, 'trang Muse');
   }
 
   /**
@@ -81,9 +101,11 @@ class Luong {
     await this.moTrang(tiepTuc ? job.thread : `${this.goc}/thread/new`);
 
     // Chờ trang sẵn sàng: có ô nhập (đã đăng nhập) hoặc thấy màn đăng nhập.
+    // 1.4.9: chờ theo GIỜ (30 s như cũ 120 × 250 ms), không theo số lần — mỗi lần hỏi có thể chờ tới hạn của nó.
     let tt = null;
-    for (let i = 0; i < 120; i++) {
-      tt = await this.goi('window.__muse.trangThai()').catch(() => null);
+    for (const hetSan = Date.now() + 30000; ;) {
+      tt = await this.goi('window.__muse.trangThai()', 15000).catch(() => null);
+      if (Date.now() >= hetSan && !(tt && (tt.coONhap || tt.canDangNhap))) break;
       if (tt && (tt.coONhap || tt.canDangNhap)) break;
       if (!(await this.ngu(250, huyLuc))) return { ok: false, dung: true, giuThread: true };
     }
@@ -102,7 +124,7 @@ class Luong {
       await ctx.choGui();
       if (this.huy !== huyLuc) return { ok: false, dung: true };
       ctx.capNhat({ buoc: 'gui' });
-      const r = await this.goi(`window.__muse.gui(${JSON.stringify({ text: ctx.tinNhan, files: ctx.files || [] })})`);
+      const r = await this.goi(`window.__muse.gui(${JSON.stringify({ text: ctx.tinNhan, files: ctx.files || [] })})`, HAN_GUI_MS);
       if (!r || !r.ok) {
         if (r && r.loi === 'can-dang-nhap') return { ok: false, canDangNhap: true, loi: 'Tài khoản chưa đăng nhập Muse' };
         const GIAI_THICH = {
@@ -149,11 +171,18 @@ class Luong {
         ctx.capNhat({ buoc: 'tai' });
         // Chờ chút cho các khung khác (nếu Muse trả nhiều) nạp xong.
         await this.ngu(1500, huyLuc);
-        const files = await this.goi(`window.__muse.layFile(${JSON.stringify({ png: !!ctx.png })})`);
+        // 1.4.9: lấy file có hạn — tải video gốc từ máy chủ Muse đứng giữa chừng là việc kẹt mãi ở bước "Đang tải".
+        let files = null, loiLay = '';
+        try {
+          files = await this.goi(`window.__muse.layFile(${JSON.stringify({ png: !!ctx.png, hanMs: HAN_LAY_FILE_MS - 15000 })})`, HAN_LAY_FILE_MS);
+        } catch (err) { loiLay = err.message; }
         const dung = (files || []).filter((f) => f.loai === (job.loai === 'video' ? 'video' : 'anh'));
         if (dung.length) return { ok: true, files: dung, chu: kq.chu };
-        // Khung có mà chưa lấy được file → thử lại vòng sau, nhưng không mãi.
-        if (++lanLayHong >= 5) return { ok: false, loi: 'Muse đã trả kết quả nhưng không lấy được file (5 lần)', giuThread: true };
+        // Khung có mà chưa lấy được file → thử lại vòng sau, nhưng không mãi (quá hạn lấy file: thử thêm 1 lần).
+        if (loiLay) this.log('warning', `[${this.id}] #${job.so} lấy file chưa được: ${loiLay}`);
+        if (++lanLayHong >= (loiLay ? 2 : 5) || (loiLay && Date.now() >= het)) {
+          return { ok: false, loi: `Muse đã trả kết quả nhưng không lấy được file${loiLay ? ` (${loiLay})` : ' (5 lần)'}`, giuThread: !loiLay };
+        }
         continue;
       }
 

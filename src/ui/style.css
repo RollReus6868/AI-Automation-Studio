@@ -216,6 +216,16 @@ select option { background: var(--panel-dac); }
 .chon-het input { width: 16px; height: 16px; accent-color: var(--g2); cursor: pointer; }
 #khuVideoThuMuc .dong-o { margin-top: 8px; }
 #khuVideoThuMuc .dong-o .mo { font-size: 12.5px; }
+/* 1.4.9: theo dõi thư mục ảnh → video */
+#khuVideoThuMuc .theo-doi-tm { margin-top: 10px; }
+.dong-theo-doi { margin-top: 8px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-width: 0; padding: 7px 10px; border-radius: 9px;
+  border: 1px solid rgba(80, 200, 140, .35); background: rgba(80, 200, 140, .08); font-size: 12.5px; color: var(--chu-phu); }
+.dong-theo-doi > i { width: 14px; height: 14px; color: #5fd49a; flex: 0 0 auto; }
+.dong-theo-doi > span { flex: 1 1 200px; min-width: 0; overflow-wrap: anywhere; }
+.dong-theo-doi.mat { border-color: rgba(240, 170, 60, .45); background: rgba(240, 170, 60, .08); }
+.dong-theo-doi.mat > i { color: #f0aa3c; }
+.dau-theo-doi { display: inline-flex; vertical-align: -2px; margin-left: 5px; color: #5fd49a; }
+.dau-theo-doi i, .dau-theo-doi svg { width: 13px; height: 13px; }
 /* 1.4.6: file .txt prompt video riêng từng ảnh (Ảnh xong → tự tạo video / Tạo video từ thư mục ảnh) */
 .dong-prompt-rieng { margin-top: 8px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; min-width: 0; }
 .dong-prompt-rieng .nut-vien { flex: 0 1 auto; min-width: 0; white-space: normal; text-align: left; }
@@ -234,7 +244,7 @@ select option { background: var(--panel-dac); }
 .thanh-chon { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 10px; margin-bottom: 8px; border-radius: 10px; background: var(--tim-nen); font-size: 13px; font-weight: 600; }
 .thanh-chon span { flex: 1; white-space: nowrap; }
 .ds-hang { padding-right: 4px; }
-.dong-viec { display: grid; grid-template-columns: 22px 46px 56px minmax(0, 1fr) 150px 60px; align-items: center; gap: 10px; padding: 10px 8px; border-radius: 12px;
+.dong-viec { display: grid; grid-template-columns: 22px 46px 56px minmax(0, 1fr) 150px 88px; align-items: center; gap: 10px; padding: 10px 8px; border-radius: 12px;
   border: 1px solid transparent; cursor: pointer; }
 .dong-viec + .dong-viec { border-top-color: var(--vien); border-radius: 0; }
 .dong-viec:hover { background: var(--the); border-radius: 12px; }
@@ -274,6 +284,7 @@ img[data-vthumb]:not([src]), img[data-vthumb].vthumb-loi { visibility: hidden; }
 .nut-dk:hover { background: var(--the-hover); color: var(--chu); }
 .nut-dk.dung:hover { color: var(--do); }
 .nut-dk.chay:hover { color: var(--xanh); }
+.nut-dk.doi-tk:hover { color: var(--vang); }   /* 1.4.9: Đổi tài khoản */
 #menuDuAn small.dang-chay { margin-left: 6px; color: var(--xanh); font-weight: 700; }
 .ghi-cai-dat-du-an { margin: 0 0 12px; padding: 8px 12px; border-radius: 10px; background: var(--tim-nen); font-size: 12.5px; color: var(--chu-phu); }
 .trang-thai small { display: block; margin-top: 3px; font-size: 11px; color: var(--chu-mo); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px; }
@@ -391,7 +402,11 @@ img[data-vthumb]:not([src]), img[data-vthumb].vthumb-loi { visibility: hidden; }
   .ba-cot { grid-template-columns: 280px minmax(380px, 1fr) 250px; }
   #chipHomNay { display: none !important; }
   /* Cửa sổ hẹp: bỏ cột #số (số đã có ở đầu prompt), thu cột trạng thái. */
-  .dong-viec { grid-template-columns: 18px 50px minmax(0, 1fr) 118px 56px; gap: 8px; }
+  /* 1.4.9: thêm nút Đổi tài khoản → nút dòng nhỏ lại, thẻ nhỏ xuống dòng thay vì tràn sang cột trạng thái. */
+  .dong-viec { grid-template-columns: 18px 50px minmax(0, 1fr) 108px 78px; gap: 8px; }
+  .nut-dk, .dong-viec .ba-cham { width: 24px; height: 26px; }
+  .the-nho { flex-wrap: wrap; row-gap: 4px; }
+  .trang-thai small { max-width: 108px; }
   .dong-viec .so { display: none; }
   .thumb { width: 50px; height: 50px; }
   .ct-nut .nut-vien, .ct-nut .nut-gradient { font-size: 12px; gap: 4px; }

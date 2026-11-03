@@ -27,9 +27,14 @@ const { chuanHoaFlow, khoaMe } = require('../flow/cai-dat-flow');
 const { laUrlDuAnFlow } = require('../flow/tab-flow');
 const HG = require('./hen-gio');
 const { danhGiaDanhDau, chuanLanBatThuong } = require('../flow/main/an-toan');
+const TD = require('./theo-doi-thu-muc');
 
 const NGHI_MS = 15 * 60 * 1000;   // tài khoản lỗi liên tiếp / mất kết nối → tạm nghỉ chừng này
 const LOI_LIEN_TIEP_NGHI = 2;
+// 1.4.9: canh treo — lần giao Muse quá (thời gian chờ kết quả + chừng này giây) thì bỏ, đổi tài khoản. Luồng Muse tự có
+// hạn từng bước (mở trang 45 s, sẵn sàng 30 s, mất kết nối 60 s, gửi 180 s, lấy file 2 × 240 s) — đây là lưới cuối.
+const HAN_THEM_GIAY = Number(process.env.MUSE_HAN_THEM_GIAY) || 600;
+const HAN_THEM_SUNO_GIAY = 900;
 const CHAN_VIDEO_MS = 24 * 60 * 60 * 1000;  // 1.2.9: Muse chặn video theo khu vực → tài khoản thôi nhận video 24 giờ (nhớ qua lần chạy / mở app)
 const NGHI_CHAN_LOAI_MS = 60 * 60 * 1000;  // Muse chặn tài khoản tạo loại việc khác video → thôi giao loại đó cho nó chừng này
 const TEN_NEN = { muse: 'Muse', flow: 'Flow', suno: 'Suno' };
@@ -265,8 +270,21 @@ class DieuPhoi {
     this._driveCho = Promise.resolve();   // 1.4.0: chép lên Google Drive lần lượt, không chặn điều phối
     this._driveLoiCuoi = { chu: '', luc: 0 };
     this.idMoi = this.viec.reduce((m, j) => Math.max(m, j.id || 0), 0) + 1;
+    // 1.4.9: theo dõi thư mục ảnh → video (d.theoDoi, lưu trong dự án). Ảnh đã thấy lần quét trước (size + mtime) để biết
+    // ảnh đã ghi xong; thư mục đang mất (đã ghi nhật ký); lúc quét gần nhất; fs.watch của từng dự án.
+    this._theoDoiTruoc = new Map();
+    this._theoDoiMat = new Set();
+    this._quetLuc = {};
+    this._gac = new Map();
+    for (const d of this.duAn) {
+      if (!d.theoDoi || !d.theoDoi.thuMuc) { delete d.theoDoi; continue; }
+      d.theoDoi.daCo = [...new Set(d.theoDoi.daCo || [])];
+      this._ganGac(d);
+    }
     this.luu();
     this.hen = setInterval(() => this._vong(), 1000);
+    this.henTheoDoi = setInterval(() => this.quetTheoDoi(), TD.NHIP_MS);
+    if (this.henTheoDoi.unref) this.henTheoDoi.unref();
   }
 
   log(m, c) { this.o.log(m, c); }
@@ -337,7 +355,9 @@ class DieuPhoi {
   trangThai() {
     const thuMuc = (id) => ({ anh: this.thuMucRa('anh', id), video: this.thuMucRa('video', id), nhac: this.thuMucRa('nhac', id) });
     return {
-      duAn: this.duAn, viec: this.viec, nhanVat: this.nhanVat, caiDat: this.caiDat,
+      // 1.4.9: theo dõi thư mục chỉ gửi bản tóm tắt (danh sách ảnh đã nhận có thể hàng nghìn đường dẫn).
+      duAn: this.duAn.map((d) => (d.theoDoi ? { ...d, theoDoi: this._tomTatTheoDoi(d) } : d)),
+      viec: this.viec, nhanVat: this.nhanVat, caiDat: this.caiDat,
       mauPrompt: this.mauPrompt, dangChay: this.dangChay, duAnChay: [...this.duAnChay],
       thuMuc: thuMuc(null),
       // 1.3.0: cài đặt + thư mục áp cho TỪNG dự án (giao diện hiện đúng bộ của dự án đang mở).
@@ -417,6 +437,12 @@ class DieuPhoi {
   }
   /** Tài khoản việc này được chạy ngay bây giờ (nhóm chạy cùng lúc của dự án, trừ tài khoản đã lỗi việc này). */
   _tkCho(j) {
+    // 1.4.9: người dùng bấm "Đổi tài khoản" → việc chạy ở đúng tài khoản đã chọn (còn dùng được thì thôi).
+    if (j.tkMuon) {
+      const ds = this._dsTk(j.duAn, j.nen, j.loai);
+      if (ds.includes(j.tkMuon) && !this._nghi(j.tkMuon) && !this._nghiLoai(j.tkMuon, j.loai)) return [j.tkMuon];
+      delete j.tkMuon;
+    }
     return hd.taiKhoanChoViecDs(j, this._dsTk(j.duAn, j.nen, j.loai), (id) => this._nghi(id) || this._nghiLoai(id, j.loai), this._soSong(j.duAn, j.nen, false, j.loai));
   }
   _nghiLoai(id, loai) {
@@ -540,6 +566,7 @@ class DieuPhoi {
     if (this.viec.some((j) => j.duAn === id && j.trangThai === 'chay')) return { ok: false, loi: 'Dự án đang có việc chạy' };
     this.duAn = this.duAn.filter((d) => d.id !== id);
     this.duAnTamDung.delete(id);
+    this._boGac(id);   // 1.4.9: thôi theo dõi thư mục ảnh của dự án vừa xoá
     this.viec = this.viec.filter((j) => j.duAn !== id);
     // 1.3.6: hẹn giờ chỉ cho dự án này → tắt hẹn (không tự chuyển sang chạy mọi dự án).
     for (const l of HG.LOAI_HEN) {
@@ -741,6 +768,128 @@ class DieuPhoi {
     return { ok: true, thuMuc: t, doiMau: doiMau.trim() };
   }
 
+  // ── 1.4.9: "Tạo video từ thư mục ảnh" THEO DÕI thư mục ─────────────────────
+  /**
+   * Đăng ký theo dõi thư mục ảnh cho một dự án (trang Tạo video, công tắc "Theo dõi thư mục", gọi ngay sau khi Tạo).
+   * Ảnh đã có lúc đăng ký (`anhDaCo` — danh sách giao diện vừa tạo việc; không gửi thì mọi ảnh đang có) không làm lại;
+   * ảnh MỚI về sau ghi xong là thành việc video (quetTheoDoi).
+   * @param p { duAn, thuMuc, anhDaCo?:[đường dẫn], prompt (dùng chung), prompts (dòng riêng ảnh i ↔ dòng i, có thể null),
+   *            thamSo: { nen, tyLe, soBan, hauTo, nhanVatIds, tuNhanVat }, tuChay (đăng ký bằng "Tạo & chạy") }
+   */
+  theoDoiThuMuc(p) {
+    const d = this.duAn.find((x) => x.id === (p && p.duAn));
+    if (!d) return { ok: false, loi: 'Không tìm thấy dự án' };
+    const thuMuc = String(p.thuMuc || '').trim();
+    const doc = thuMuc ? TD.docThuMuc(thuMuc, new Set()) : null;
+    if (!doc) return { ok: false, loi: 'Không đọc được thư mục ảnh' };
+    const daCo = Array.isArray(p.anhDaCo) ? p.anhDaCo.map(String) : doc.ds;
+    const ts = p.thamSo || {};
+    const ds = Array.isArray(p.prompts) ? p.prompts.map((x) => String(x || '').trim()) : [];
+    this._boGac(d.id);
+    d.theoDoi = {
+      thuMuc, prompt: String(p.prompt || '').trim(), prompts: ds.some(Boolean) ? ds : null,
+      thamSo: { nen: chuanNen(ts.nen) === 'flow' ? 'flow' : 'muse', tyLe: hd.TY_LE.includes(ts.tyLe) ? ts.tyLe : '',
+        soBan: Math.max(1, Math.min(10, parseInt(ts.soBan, 10) || 1)), hauTo: String(ts.hauTo || ''),
+        nhanVatIds: Array.isArray(ts.nhanVatIds) ? ts.nhanVatIds.map(String) : [], tuNhanVat: !!ts.tuNhanVat },
+      tuChay: !!p.tuChay, daCo: [...new Set(daCo)], soDaThem: 0, batDauLuc: this.bayGio()
+    };
+    this._ganGac(d);
+    this.log('info', `📂 "${d.ten}": theo dõi thư mục "${thuMuc}" — ảnh mới thêm vào sẽ tự tạo video ${TEN_NEN[d.theoDoi.thamSo.nen]}` +
+      ` (${d.theoDoi.daCo.length} ảnh đã có không làm lại)${d.theoDoi.tuChay ? '' : '; dự án chưa chạy — bấm Chạy để tạo'}.`);
+    this.luu();
+    this.quetTheoDoi(d.id);   // ghi nhận ảnh lần đầu (ảnh mới phải đứng yên qua 2 lần quét mới nhận)
+    return { ok: true, theoDoi: this._tomTatTheoDoi(d) };
+  }
+
+  boTheoDoiThuMuc(id) {
+    const d = this.duAn.find((x) => x.id === id);
+    if (!d || !d.theoDoi) return { ok: false, loi: 'Dự án không theo dõi thư mục nào' };
+    this.log('info', `📂 "${d.ten}": thôi theo dõi thư mục "${d.theoDoi.thuMuc}" (đã thêm ${d.theoDoi.soDaThem || 0} video từ ảnh mới).`);
+    delete d.theoDoi;
+    this._boGac(id);
+    this.luu();
+    return { ok: true };
+  }
+
+  /** Có dự án đang theo dõi thư mục mà ảnh mới sẽ TỰ CHẠY — "Tắt máy khi xong" không tắt máy. */
+  coTheoDoiTuChay() { return this.duAn.some((d) => d.theoDoi && d.theoDoi.tuChay); }
+
+  _tomTatTheoDoi(d) {
+    const t = d.theoDoi;
+    return { thuMuc: t.thuMuc, tuChay: !!t.tuChay, soDaThem: t.soDaThem || 0, soAnhDaCo: (t.daCo || []).length,
+      nen: t.thamSo && t.thamSo.nen, rieng: !!t.prompts, quetLuc: this._quetLuc[d.id] || 0, mat: this._theoDoiMat.has(d.id) };
+  }
+
+  _ganGac(d) {
+    this._boGac(d.id, true);
+    const id = d.id;
+    this._gac.set(id, TD.gacThuMuc(d.theoDoi.thuMuc, () => this.quetTheoDoi(id)));
+  }
+
+  _boGac(id, giuTrangThai) {
+    const dong = this._gac.get(id);
+    if (dong) dong();
+    this._gac.delete(id);
+    if (!giuTrangThai) { this._theoDoiTruoc.delete(id); this._theoDoiMat.delete(id); delete this._quetLuc[id]; }
+  }
+
+  /** Quét thư mục theo dõi (mọi dự án, hoặc chỉ dự án `chiId`). @returns số việc video đã thêm */
+  quetTheoDoi(chiId) {
+    let n = 0;
+    for (const d of this.duAn) {
+      if (!d.theoDoi || (chiId && d.id !== chiId)) continue;
+      try { n += this._quetMot(d); } catch (err) { this.log('error', `❌ Theo dõi thư mục "${d.theoDoi && d.theoDoi.thuMuc}": ${err.message}`); }
+    }
+    if (n === 0 && this.duAn.some((d) => d.theoDoi)) this.o.bao();   // "quét lúc …" trên giao diện
+    return n;
+  }
+
+  _quetMot(d) {
+    const td = d.theoDoi, bay = this.bayGio();
+    const doc = TD.docThuMuc(td.thuMuc, new Set(td.daCo));
+    this._quetLuc[d.id] = bay;
+    if (!doc) {
+      if (!this._theoDoiMat.has(d.id)) {
+        this._theoDoiMat.add(d.id);
+        this._theoDoiTruoc.delete(d.id);
+        this.log('warning', `📂 "${d.ten}": không thấy thư mục theo dõi "${td.thuMuc}" — vẫn theo dõi, thư mục có lại thì app chạy tiếp.`);
+      }
+      return 0;
+    }
+    if (this._theoDoiMat.delete(d.id)) {
+      this.log('info', `📂 "${d.ten}": thư mục "${td.thuMuc}" đã có lại — theo dõi tiếp.`);
+      this._ganGac(d);
+    }
+    const { moi, truoc } = TD.chonAnhMoi(doc.ung, this._theoDoiTruoc.get(d.id), bay);
+    this._theoDoiTruoc.set(d.id, truoc);
+    return moi.length ? this._themTuTheoDoi(d, doc.ds, moi) : 0;
+  }
+
+  /** Ảnh mới → việc video, đi ĐÚNG đường thêm việc của "Tạo video từ thư mục ảnh" (them + thamChieuTheoDong):
+   *  ảnh thứ i (thư mục xếp theo tên) ↔ prompt số i (dòng riêng i → dùng chung → mặc định). */
+  _themTuTheoDoi(d, ds, moi) {
+    const td = d.theoDoi;
+    const viTri = moi.map((a) => ds.indexOf(a) + 1).filter((x) => x > 0).sort((a, b) => a - b);
+    td.daCo = [...td.daCo, ...moi];
+    const truoc = this.viec.length;
+    const r = this.them({ ...td.thamSo, duAn: d.id, loai: 'video', prompts: ds.map((_, i) => TD.promptCho(i, td.prompt, td.prompts)),
+      thamChieu: [], thamChieuTheoDong: ds.map((a) => [a]), chonSo: viTri.join(', '), boQuaDaCo: false, chuoiVideo: null, chay: false });
+    if (!r.ok) {
+      this.log('error', `❌ 📂 "${d.ten}": không thêm được video cho ${moi.length} ảnh mới: ${r.loi}`);
+      this.luu();
+      return 0;
+    }
+    const moiViec = this.viec.slice(truoc);
+    td.soDaThem = (td.soDaThem || 0) + moiViec.length;
+    const so = moiViec.map((j) => j.so).sort((a, b) => a - b);
+    this.log('info', `📂 Thư mục "${path.basename(td.thuMuc)}": thêm ${moi.length} ảnh mới → ${moiViec.length} video (#${hd.gonSo(so).replace(/, /g, ', #')})`);
+    if (td.tuChay && !this.duAnChay.has(d.id) && this.chayDuAn(d.id, true)) {
+      this.log('info', `▶ 📂 "${d.ten}": ảnh mới trong thư mục theo dõi — tự chạy lại dự án.`);
+    }
+    this.luu();
+    return moiViec.length;
+  }
+
   them(p) {
     const r = this._docThem(p);
     if (r.loi) return { ok: false, loi: r.loi };
@@ -919,6 +1068,95 @@ class DieuPhoi {
     if (n) this.log('warning', `⏹ Đã dừng ${n} việc — bấm Chạy ở việc đó để chạy tiếp.`);
     this.luu();
     return n;
+  }
+
+  /** Luồng đang chạy việc j (Flow: mẻ có j). */
+  _luongCuaViec(j) {
+    return this.luong.find((y) => y.luong.nen === 'flow' ? (y.luong.dsViec || []).includes(j) : y.luong.viec === j);
+  }
+
+  /**
+   * 1.4.9: tháo việc đang chạy khỏi luồng của nó NGAY, không đợi luồng trả lời (luồng có thể đang treo): kết quả về
+   * sau của lần giao này bị bỏ (lanGiao). Muse / Suno: luồng (cửa sổ ngầm) bị huỷ, _vong mở luồng mới. Flow: việc
+   * rời mẻ; mẻ không còn việc nào chạy thì dừng mẻ.
+   */
+  _thaoViec(j) {
+    const x = this._luongCuaViec(j);
+    j.lanGiao = (j.lanGiao || 0) + 1;
+    if (!x) return;
+    if (x.luong.nen === 'flow') {
+      if ((x.luong.dsViec || []).every((v) => v === j || v.trangThai !== 'chay')) x.luong.dung();
+      return;
+    }
+    x.luong.dung();
+    this.luong.splice(this.luong.indexOf(x), 1);
+    try { this.o.huyLuong(x.luong); } catch (err) { this.log('error', `❌ Đóng luồng treo: ${err.message}`); }
+  }
+
+  /** 1.4.9: hạn CỨNG của một lần giao Muse / Suno: thời gian chờ kết quả + mở trang, gửi prompt, lấy file. */
+  _hanGiaoMs(j) {
+    const c = this.cd(j.duAn);
+    const cho = j.loai === 'nhac' ? c.choNhacGiay : j.loai === 'video' ? c.choVideoGiay : c.choAnhGiay;
+    return (cho + (j.loai === 'nhac' ? HAN_THEM_SUNO_GIAY : HAN_THEM_GIAY)) * 1000;
+  }
+
+  /**
+   * 1.4.9 — CANH TREO (người dùng 11/2026: "chạy ảnh hoặc video hay bị treo ở 99%, treo mãi mà không tự đổi sang tài
+   * khoản khác"). 99% là tiến độ ƯỚC theo giờ: việc vẫn "đang chạy" vì luồng đứng ở một lệnh không bao giờ trả lời
+   * (trang ngầm sập / đứng, tải file đứng giữa chừng). Luồng đã có hạn từng bước; đây là lưới cuối: lần giao quá hạn
+   * cứng → bỏ, tính một lỗi của tài khoản (như "Quá … giây chưa thấy kết quả") → việc sang tài khoản kế tiếp.
+   */
+  _canhTreo() {
+    const bay = Date.now();
+    for (const x of [...this.luong]) {
+      if (x.luong.nen === 'flow' || x.luong.ranh || !x.giaoLuc) continue;
+      const j = x.luong.viec;
+      if (!j || x.viecGiao !== j || !this.viec.includes(j) || j.trangThai !== 'chay') continue;
+      const han = this._hanGiaoMs(j);
+      if (bay - x.giaoLuc < han) continue;
+      const tk = this.o.taiKhoan.tim(x.taiKhoanId);
+      const loi = `Treo quá ${Math.round(han / 60000)} phút${j.buoc ? ` ở bước "${j.buoc}"` : ''} — bỏ lần chạy này`;
+      this.log('error', `⏱ [${x.luong.id || this._tenTk(x.taiKhoanId)}] #${j.so}: ${loi}, đổi tài khoản.`);
+      this._thaoViec(j);
+      this._ketThuc(j, { ok: false, loi }, tk);
+    }
+  }
+
+  /**
+   * 1.4.9 — nút "Đổi tài khoản": việc đang chạy (hoặc đang chờ lấy tiếp chat dở) bỏ tài khoản hiện tại và chạy NGAY ở
+   * tài khoản KẾ TIẾP của dự án cùng nền tảng (Muse 1 → Muse 2 …, quay vòng; bỏ qua tài khoản đang nghỉ / chưa đăng nhập).
+   * Không tính là lỗi của tài khoản cũ, không tính lần thử. Gửi prompt mới ở tài khoản mới (chat cũ bỏ).
+   * @returns {ok, doi:[{so, tu, den}], loi?}
+   */
+  doiTaiKhoan(ids) {
+    const doi = [], khong = [];
+    for (const j of this.viec) {
+      if (!ids.includes(j.id)) continue;
+      const cu = j.taiKhoan;
+      if (!(j.trangThai === 'chay' || (j.trangThai === 'cho' && cu))) continue;
+      const ds = this._dsTk(j.duAn, j.nen, j.loai);
+      const i = ds.indexOf(cu);
+      const sau = i < 0 ? ds : [...ds.slice(i + 1), ...ds.slice(0, i)];
+      const den = sau.find((id) => id !== cu && !this._nghi(id) && !this._nghiLoai(id, j.loai));
+      if (!den) { khong.push(j); continue; }
+      if (j.trangThai === 'chay') this._thaoViec(j);
+      Object.assign(j, { trangThai: 'cho', buoc: '', thread: '', taiKhoan: '', loi: '', tkMuon: den });
+      j.sunoBai = null;
+      delete j.flowAnh;
+      delete j.dungTay;
+      this._chayRieng([j]);
+      doi.push({ so: j.so, tu: cu, den });
+      this.log('warning', `⇄ #${j.so}: đổi tài khoản tay "${this._tenTk(cu)}" → "${this._tenTk(den)}" — gửi lại prompt ở tài khoản mới.`);
+    }
+    let loi = '';
+    if (khong.length) {
+      const nen = TEN_NEN[khong[0].nen] || khong[0].nen;
+      loi = `Không có tài khoản ${nen} nào khác dùng được cho #${khong.map((j) => j.so).join(', #')} — thêm / đăng nhập tài khoản ${nen} khác, hoặc chọn thêm trong hộp tài khoản của dự án.`;
+      this.log('warning', `⇄ ${loi}`);
+    }
+    if (doi.length) { this.luu(); this._vong(); }
+    this.o.bao();
+    return { ok: doi.length > 0, doi: doi.map((d) => ({ ...d, tu: this._tenTk(d.tu), den: this._tenTk(d.den) })), loi };
   }
 
   /**
@@ -1253,8 +1491,14 @@ class DieuPhoi {
       this.log('error', '⛔ Chưa có tài khoản nào — vào mục Tài khoản thêm và đăng nhập.');
       return false;
     }
+    // 1.4.9: bấm Chạy dự án đang theo dõi thư mục → ảnh mới về sau cũng tự chạy (kể cả lúc chưa còn việc chờ).
+    if (d.theoDoi && !d.theoDoi.tuChay) { d.theoDoi.tuChay = true; this.luu(); }
     if (!this.viec.some((j) => j.duAn === id && (j.trangThai === 'cho' || j.trangThai === 'chay'))) {
-      if (!imLang) this.log('warning', `Dự án "${d.ten}" không còn việc nào đang chờ${this.viec.some((j) => j.duAn === id && j.trangThai === 'dung') ? ' (việc đã dừng: bấm Chạy ở từng việc)' : ''}.`);
+      if (!imLang) {
+        this.log(d.theoDoi ? 'info' : 'warning', d.theoDoi
+          ? `📂 Dự án "${d.ten}" chưa có việc chờ — đang theo dõi thư mục "${d.theoDoi.thuMuc}", ảnh mới vào là tự tạo video.`
+          : `Dự án "${d.ten}" không còn việc nào đang chờ${this.viec.some((j) => j.duAn === id && j.trangThai === 'dung') ? ' (việc đã dừng: bấm Chạy ở từng việc)' : ''}.`);
+      }
       return false;
     }
     this.duAnTamDung.delete(id);
@@ -1292,6 +1536,7 @@ class DieuPhoi {
     if (!d) return false;
     this.duAnChay.delete(id);
     this.duAnTamDung.delete(id);
+    if (d.theoDoi) d.theoDoi.tuChay = false;   // 1.4.9: ảnh mới vẫn thành việc nhưng không tự chạy
     for (const j of this.viec) if (j.duAn === id) delete j.chayRieng;
     for (const x of this.loaiChay.values()) x.bo.add(id);   // 1.3.6: lượt hẹn giờ đang chạy cũng thôi chạy dự án này
     for (const x of this.luong) if (this._luongCuaDuAn(x, id)) x.luong.dung();
@@ -1303,6 +1548,7 @@ class DieuPhoi {
   dungTatCa() {
     this.duAnChay.clear();
     this.duAnTamDung.clear();
+    for (const d of this.duAn) if (d.theoDoi) d.theoDoi.tuChay = false;   // 1.4.9
     this.loaiChay.clear();
     for (const j of this.viec) delete j.chayRieng;
     for (const x of this.luong) x.luong.dung();
@@ -1502,6 +1748,7 @@ class DieuPhoi {
     // Mỗi việc chờ (của dự án đang chạy, hoặc được bấm Chạy riêng) nhắm tới các tài khoản được chạy nó NGAY
     // BÂY GIỜ: nhóm chạy cùng lúc của dự án, tài khoản nào trong nhóm lỗi việc này thì dự phòng kế tiếp.
     // Bên nào thiếu tài khoản chạy được (so với số tài khoản Chạy của dự án) → mượn tài khoản bên kia cho đủ.
+    this._canhTreo();
     this._canBang();
     const nhamToi = new Map();
     for (const j of this.viec) {
@@ -1682,6 +1929,8 @@ class DieuPhoi {
   async _giao(x, j) {
     const tk = this.o.taiKhoan.tim(x.taiKhoanId);
     const lan = j.lanGiao = (j.lanGiao || 0) + 1;   // 1.4.0: lần giao này — kết quả của lần giao cũ (việc đã đổi bên) bị bỏ
+    x.giaoLuc = Date.now(); x.viecGiao = j;          // 1.4.9: canh treo (_canhTreo)
+    delete j.tkMuon;
     Object.assign(j, { trangThai: 'chay', taiKhoan: x.taiKhoanId, batDauLuc: j.thread ? (j.batDauLuc || Date.now()) : Date.now(), loi: '' });
     this.luu();
     const nv = j.nhanVat.map((id) => this.nhanVat.find((n) => n.id === id)).filter(Boolean);
@@ -1712,7 +1961,7 @@ class DieuPhoi {
   /** Giao một MẺ việc cho luồng Flow; mỗi việc xong / lỗi là báo về _ketThuc ngay, không đợi cả mẻ. */
   async _giaoMe(x, ds) {
     const tk = this.o.taiKhoan.tim(x.taiKhoanId);
-    for (const j of ds) Object.assign(j, { trangThai: 'chay', taiKhoan: x.taiKhoanId, batDauLuc: Date.now(), loi: '', buoc: 'Chờ Flow' });
+    for (const j of ds) { Object.assign(j, { trangThai: 'chay', taiKhoan: x.taiKhoanId, batDauLuc: Date.now(), loi: '', buoc: 'Chờ Flow' }); delete j.tkMuon; }
     // 1.4.0: việc tách khỏi mẻ (đổi sang Muse, dừng rồi chạy lại ở mẻ khác…) → kết quả về sau của mẻ NÀY không ghi vào nó nữa.
     const lan = new Map(ds.map((j) => [j, (j.lanGiao = (j.lanGiao || 0) + 1)]));
     const cuaMe = (j) => lan.get(j) === j.lanGiao;
@@ -2069,7 +2318,11 @@ class DieuPhoi {
     return ds;
   }
 
-  dong() { clearInterval(this.hen); for (const x of this.luong) x.luong.dung(); }
+  dong() {
+    clearInterval(this.hen); clearInterval(this.henTheoDoi);
+    for (const id of [...this._gac.keys()]) this._boGac(id, true);
+    for (const x of this.luong) x.luong.dung();
+  }
 }
 
 module.exports = { DieuPhoi, CAI_DAT_MAC_DINH, NGHI_HET_LUOT_MS };
