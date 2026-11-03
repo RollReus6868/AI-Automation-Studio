@@ -216,6 +216,16 @@ select option { background: var(--panel-dac); }
 .chon-het input { width: 16px; height: 16px; accent-color: var(--g2); cursor: pointer; }
 #khuVideoThuMuc .dong-o { margin-top: 8px; }
 #khuVideoThuMuc .dong-o .mo { font-size: 12.5px; }
+/* 1.4.9: theo dõi thư mục ảnh → video */
+#khuVideoThuMuc .theo-doi-tm { margin-top: 10px; }
+.dong-theo-doi { margin-top: 8px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-width: 0; padding: 7px 10px; border-radius: 9px;
+  border: 1px solid rgba(80, 200, 140, .35); background: rgba(80, 200, 140, .08); font-size: 12.5px; color: var(--chu-phu); }
+.dong-theo-doi > i { width: 14px; height: 14px; color: #5fd49a; flex: 0 0 auto; }
+.dong-theo-doi > span { flex: 1 1 200px; min-width: 0; overflow-wrap: anywhere; }
+.dong-theo-doi.mat { border-color: rgba(240, 170, 60, .45); background: rgba(240, 170, 60, .08); }
+.dong-theo-doi.mat > i { color: #f0aa3c; }
+.dau-theo-doi { display: inline-flex; vertical-align: -2px; margin-left: 5px; color: #5fd49a; }
+.dau-theo-doi i, .dau-theo-doi svg { width: 13px; height: 13px; }
 /* 1.4.6: file .txt prompt video riêng từng ảnh (Ảnh xong → tự tạo video / Tạo video từ thư mục ảnh) */
 .dong-prompt-rieng { margin-top: 8px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; min-width: 0; }
 .dong-prompt-rieng .nut-vien { flex: 0 1 auto; min-width: 0; white-space: normal; text-align: left; }

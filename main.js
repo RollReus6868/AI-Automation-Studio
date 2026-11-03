@@ -907,6 +907,9 @@ const LENH = {
     return dieuPhoi.datThuMucQuet(duAn, loai, r.filePaths[0]);
   },
   boThuMucQuet: ({ duAn, loai }) => dieuPhoi.datThuMucQuet(duAn, loai, ''),
+  // 1.4.9: "Tạo video từ thư mục ảnh" theo dõi thư mục — ảnh mới thêm vào tự thành việc video.
+  theoDoiThuMuc: (p) => dieuPhoi.theoDoiThuMuc(p),
+  boTheoDoiThuMuc: ({ duAn }) => dieuPhoi.boTheoDoiThuMuc(duAn),
   nhapPrompt: async () => {
     const r = await dialog.showOpenDialog(win, { properties: ['openFile'], filters: [{ name: 'Văn bản', extensions: ['txt', 'csv', 'md'] }] });
     return r.canceled ? null : fs.readFileSync(r.filePaths[0], 'utf8').replace(/^\uFEFF/, '');
@@ -1170,7 +1173,11 @@ app.whenReady().then(() => {
       return so && so.dangNghi ? { den: so.nghiDen, lyDo: so.lyDoNghi || 'Flow báo lỗi, tự chạy lại khi hết giờ nghỉ' } : null;
     },
     hetLuot: () => {
-      if (dieuPhoi.caiDat.tatMayKhiXong) mayFlow.handleEngineMessage({ action: 'TRIGGER_SHUTDOWN', delay: 60 }, { id: -1 });
+      if (dieuPhoi.caiDat.tatMayKhiXong) {
+        // 1.4.9: còn dự án theo dõi thư mục ảnh (ảnh mới vào là tự chạy) → không tắt máy.
+        if (dieuPhoi.coTheoDoiTuChay()) log('warning', '⏻ Không tắt máy dù bật "Tắt máy khi xong": còn dự án đang theo dõi thư mục ảnh, ảnh mới vào sẽ tự tạo video. Bấm "Dừng theo dõi" (trang Tạo video) hoặc Dừng dự án nếu muốn tắt máy khi xong.');
+        else mayFlow.handleEngineMessage({ action: 'TRIGGER_SHUTDOWN', delay: 60 }, { id: -1 });
+      }
       if (taiKhoan.ds.some((a) => a.nen === 'muse')) capNhatToken();   // chạy xong hàng chờ → cập nhật mức token Muse
     }
   });
