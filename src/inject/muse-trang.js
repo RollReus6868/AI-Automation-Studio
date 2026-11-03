@@ -290,8 +290,16 @@
    * Lấy file gốc của mọi ảnh/video Muse trả trong chat này.
    * @param {{png:boolean}} p  png=true: đổi ảnh webp sang png
    */
+  // 1.4.9: tải file gốc có hạn (AbortController) — máy chủ Muse đứng giữa chừng thì fetch() chờ mãi, việc kẹt "99%".
+  async function taiBlob(url, hanMs) {
+    const ac = typeof AbortController === 'function' ? new AbortController() : null;
+    const h = ac && hanMs > 0 ? setTimeout(() => ac.abort(), hanMs) : 0;
+    try { return await (await fetch(url, ac ? { signal: ac.signal } : undefined)).blob(); } finally { clearTimeout(h); }
+  }
+
   async function layFile(p) {
     const ra = [];
+    const han = (p && p.hanMs) || 0;
     for (const khung of $$('[data-testid="hatch-chat-attachment-presentation-image"]')) {
       let img = anhDaNap(khung);
       let moXem = false;
@@ -300,7 +308,7 @@
         // nếu không, mỗi vòng lại mở thêm một trình xem chồng lên.
         if (!img) { const x = await moTrinhXem(khung); moXem = x.daMo; img = x.img; }
         if (!img) continue;
-        let b = await (await fetch(img.src)).blob();
+        let b = await taiBlob(img.src, han);
         if (p && p.png && b.type !== 'image/png') b = (await anhSangPng(img)) || b;
         ra.push({ loai: 'anh', mime: b.type || 'image/png', w: img.naturalWidth, h: img.naturalHeight, b64: await blobSangB64(b) });
       } finally {
@@ -310,7 +318,7 @@
     for (const khung of $$('[data-testid="hatch-chat-attachment-presentation-video"]')) {
       const v = videoCoNguon(khung);
       if (!v) continue;
-      const b = await (await fetch(v.currentSrc || v.src)).blob();
+      const b = await taiBlob(v.currentSrc || v.src, han);
       ra.push({ loai: 'video', mime: b.type || 'video/mp4', w: v.videoWidth || 0, h: v.videoHeight || 0, b64: await blobSangB64(b) });
     }
     return ra;

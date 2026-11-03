@@ -30,6 +30,10 @@ const { danhGiaDanhDau, chuanLanBatThuong } = require('../flow/main/an-toan');
 
 const NGHI_MS = 15 * 60 * 1000;   // tài khoản lỗi liên tiếp / mất kết nối → tạm nghỉ chừng này
 const LOI_LIEN_TIEP_NGHI = 2;
+// 1.4.9: canh treo — lần giao Muse quá (thời gian chờ kết quả + chừng này giây) thì bỏ, đổi tài khoản. Luồng Muse tự có
+// hạn từng bước (mở trang 45 s, sẵn sàng 30 s, mất kết nối 60 s, gửi 180 s, lấy file 2 × 240 s) — đây là lưới cuối.
+const HAN_THEM_GIAY = Number(process.env.MUSE_HAN_THEM_GIAY) || 600;
+const HAN_THEM_SUNO_GIAY = 900;
 const CHAN_VIDEO_MS = 24 * 60 * 60 * 1000;  // 1.2.9: Muse chặn video theo khu vực → tài khoản thôi nhận video 24 giờ (nhớ qua lần chạy / mở app)
 const NGHI_CHAN_LOAI_MS = 60 * 60 * 1000;  // Muse chặn tài khoản tạo loại việc khác video → thôi giao loại đó cho nó chừng này
 const TEN_NEN = { muse: 'Muse', flow: 'Flow', suno: 'Suno' };
@@ -417,6 +421,12 @@ class DieuPhoi {
   }
   /** Tài khoản việc này được chạy ngay bây giờ (nhóm chạy cùng lúc của dự án, trừ tài khoản đã lỗi việc này). */
   _tkCho(j) {
+    // 1.4.9: người dùng bấm "Đổi tài khoản" → việc chạy ở đúng tài khoản đã chọn (còn dùng được thì thôi).
+    if (j.tkMuon) {
+      const ds = this._dsTk(j.duAn, j.nen, j.loai);
+      if (ds.includes(j.tkMuon) && !this._nghi(j.tkMuon) && !this._nghiLoai(j.tkMuon, j.loai)) return [j.tkMuon];
+      delete j.tkMuon;
+    }
     return hd.taiKhoanChoViecDs(j, this._dsTk(j.duAn, j.nen, j.loai), (id) => this._nghi(id) || this._nghiLoai(id, j.loai), this._soSong(j.duAn, j.nen, false, j.loai));
   }
   _nghiLoai(id, loai) {
@@ -919,6 +929,95 @@ class DieuPhoi {
     if (n) this.log('warning', `⏹ Đã dừng ${n} việc — bấm Chạy ở việc đó để chạy tiếp.`);
     this.luu();
     return n;
+  }
+
+  /** Luồng đang chạy việc j (Flow: mẻ có j). */
+  _luongCuaViec(j) {
+    return this.luong.find((y) => y.luong.nen === 'flow' ? (y.luong.dsViec || []).includes(j) : y.luong.viec === j);
+  }
+
+  /**
+   * 1.4.9: tháo việc đang chạy khỏi luồng của nó NGAY, không đợi luồng trả lời (luồng có thể đang treo): kết quả về
+   * sau của lần giao này bị bỏ (lanGiao). Muse / Suno: luồng (cửa sổ ngầm) bị huỷ, _vong mở luồng mới. Flow: việc
+   * rời mẻ; mẻ không còn việc nào chạy thì dừng mẻ.
+   */
+  _thaoViec(j) {
+    const x = this._luongCuaViec(j);
+    j.lanGiao = (j.lanGiao || 0) + 1;
+    if (!x) return;
+    if (x.luong.nen === 'flow') {
+      if ((x.luong.dsViec || []).every((v) => v === j || v.trangThai !== 'chay')) x.luong.dung();
+      return;
+    }
+    x.luong.dung();
+    this.luong.splice(this.luong.indexOf(x), 1);
+    try { this.o.huyLuong(x.luong); } catch (err) { this.log('error', `❌ Đóng luồng treo: ${err.message}`); }
+  }
+
+  /** 1.4.9: hạn CỨNG của một lần giao Muse / Suno: thời gian chờ kết quả + mở trang, gửi prompt, lấy file. */
+  _hanGiaoMs(j) {
+    const c = this.cd(j.duAn);
+    const cho = j.loai === 'nhac' ? c.choNhacGiay : j.loai === 'video' ? c.choVideoGiay : c.choAnhGiay;
+    return (cho + (j.loai === 'nhac' ? HAN_THEM_SUNO_GIAY : HAN_THEM_GIAY)) * 1000;
+  }
+
+  /**
+   * 1.4.9 — CANH TREO (người dùng 11/2026: "chạy ảnh hoặc video hay bị treo ở 99%, treo mãi mà không tự đổi sang tài
+   * khoản khác"). 99% là tiến độ ƯỚC theo giờ: việc vẫn "đang chạy" vì luồng đứng ở một lệnh không bao giờ trả lời
+   * (trang ngầm sập / đứng, tải file đứng giữa chừng). Luồng đã có hạn từng bước; đây là lưới cuối: lần giao quá hạn
+   * cứng → bỏ, tính một lỗi của tài khoản (như "Quá … giây chưa thấy kết quả") → việc sang tài khoản kế tiếp.
+   */
+  _canhTreo() {
+    const bay = Date.now();
+    for (const x of [...this.luong]) {
+      if (x.luong.nen === 'flow' || x.luong.ranh || !x.giaoLuc) continue;
+      const j = x.luong.viec;
+      if (!j || x.viecGiao !== j || !this.viec.includes(j) || j.trangThai !== 'chay') continue;
+      const han = this._hanGiaoMs(j);
+      if (bay - x.giaoLuc < han) continue;
+      const tk = this.o.taiKhoan.tim(x.taiKhoanId);
+      const loi = `Treo quá ${Math.round(han / 60000)} phút${j.buoc ? ` ở bước "${j.buoc}"` : ''} — bỏ lần chạy này`;
+      this.log('error', `⏱ [${x.luong.id || this._tenTk(x.taiKhoanId)}] #${j.so}: ${loi}, đổi tài khoản.`);
+      this._thaoViec(j);
+      this._ketThuc(j, { ok: false, loi }, tk);
+    }
+  }
+
+  /**
+   * 1.4.9 — nút "Đổi tài khoản": việc đang chạy (hoặc đang chờ lấy tiếp chat dở) bỏ tài khoản hiện tại và chạy NGAY ở
+   * tài khoản KẾ TIẾP của dự án cùng nền tảng (Muse 1 → Muse 2 …, quay vòng; bỏ qua tài khoản đang nghỉ / chưa đăng nhập).
+   * Không tính là lỗi của tài khoản cũ, không tính lần thử. Gửi prompt mới ở tài khoản mới (chat cũ bỏ).
+   * @returns {ok, doi:[{so, tu, den}], loi?}
+   */
+  doiTaiKhoan(ids) {
+    const doi = [], khong = [];
+    for (const j of this.viec) {
+      if (!ids.includes(j.id)) continue;
+      const cu = j.taiKhoan;
+      if (!(j.trangThai === 'chay' || (j.trangThai === 'cho' && cu))) continue;
+      const ds = this._dsTk(j.duAn, j.nen, j.loai);
+      const i = ds.indexOf(cu);
+      const sau = i < 0 ? ds : [...ds.slice(i + 1), ...ds.slice(0, i)];
+      const den = sau.find((id) => id !== cu && !this._nghi(id) && !this._nghiLoai(id, j.loai));
+      if (!den) { khong.push(j); continue; }
+      if (j.trangThai === 'chay') this._thaoViec(j);
+      Object.assign(j, { trangThai: 'cho', buoc: '', thread: '', taiKhoan: '', loi: '', tkMuon: den });
+      j.sunoBai = null;
+      delete j.flowAnh;
+      delete j.dungTay;
+      this._chayRieng([j]);
+      doi.push({ so: j.so, tu: cu, den });
+      this.log('warning', `⇄ #${j.so}: đổi tài khoản tay "${this._tenTk(cu)}" → "${this._tenTk(den)}" — gửi lại prompt ở tài khoản mới.`);
+    }
+    let loi = '';
+    if (khong.length) {
+      const nen = TEN_NEN[khong[0].nen] || khong[0].nen;
+      loi = `Không có tài khoản ${nen} nào khác dùng được cho #${khong.map((j) => j.so).join(', #')} — thêm / đăng nhập tài khoản ${nen} khác, hoặc chọn thêm trong hộp tài khoản của dự án.`;
+      this.log('warning', `⇄ ${loi}`);
+    }
+    if (doi.length) { this.luu(); this._vong(); }
+    this.o.bao();
+    return { ok: doi.length > 0, doi: doi.map((d) => ({ ...d, tu: this._tenTk(d.tu), den: this._tenTk(d.den) })), loi };
   }
 
   /**
@@ -1502,6 +1601,7 @@ class DieuPhoi {
     // Mỗi việc chờ (của dự án đang chạy, hoặc được bấm Chạy riêng) nhắm tới các tài khoản được chạy nó NGAY
     // BÂY GIỜ: nhóm chạy cùng lúc của dự án, tài khoản nào trong nhóm lỗi việc này thì dự phòng kế tiếp.
     // Bên nào thiếu tài khoản chạy được (so với số tài khoản Chạy của dự án) → mượn tài khoản bên kia cho đủ.
+    this._canhTreo();
     this._canBang();
     const nhamToi = new Map();
     for (const j of this.viec) {
@@ -1682,6 +1782,8 @@ class DieuPhoi {
   async _giao(x, j) {
     const tk = this.o.taiKhoan.tim(x.taiKhoanId);
     const lan = j.lanGiao = (j.lanGiao || 0) + 1;   // 1.4.0: lần giao này — kết quả của lần giao cũ (việc đã đổi bên) bị bỏ
+    x.giaoLuc = Date.now(); x.viecGiao = j;          // 1.4.9: canh treo (_canhTreo)
+    delete j.tkMuon;
     Object.assign(j, { trangThai: 'chay', taiKhoan: x.taiKhoanId, batDauLuc: j.thread ? (j.batDauLuc || Date.now()) : Date.now(), loi: '' });
     this.luu();
     const nv = j.nhanVat.map((id) => this.nhanVat.find((n) => n.id === id)).filter(Boolean);
@@ -1712,7 +1814,7 @@ class DieuPhoi {
   /** Giao một MẺ việc cho luồng Flow; mỗi việc xong / lỗi là báo về _ketThuc ngay, không đợi cả mẻ. */
   async _giaoMe(x, ds) {
     const tk = this.o.taiKhoan.tim(x.taiKhoanId);
-    for (const j of ds) Object.assign(j, { trangThai: 'chay', taiKhoan: x.taiKhoanId, batDauLuc: Date.now(), loi: '', buoc: 'Chờ Flow' });
+    for (const j of ds) { Object.assign(j, { trangThai: 'chay', taiKhoan: x.taiKhoanId, batDauLuc: Date.now(), loi: '', buoc: 'Chờ Flow' }); delete j.tkMuon; }
     // 1.4.0: việc tách khỏi mẻ (đổi sang Muse, dừng rồi chạy lại ở mẻ khác…) → kết quả về sau của mẻ NÀY không ghi vào nó nữa.
     const lan = new Map(ds.map((j) => [j, (j.lanGiao = (j.lanGiao || 0) + 1)]));
     const cuaMe = (j) => lan.get(j) === j.lanGiao;

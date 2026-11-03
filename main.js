@@ -783,6 +783,7 @@ const LENH = {
   taoLai: ({ ids, chay }) => dieuPhoi.taoLai(ids, chay),
   dungViec: ({ ids }) => dieuPhoi.dungViec(ids),
   chayViec: ({ ids }) => dieuPhoi.chayViec(ids),
+  doiTaiKhoan: ({ ids }) => dieuPhoi.doiTaiKhoan(ids || []),   // 1.4.9: nút "Đổi tài khoản" ở việc đang chạy / treo
   xoaViec: ({ ids }) => dieuPhoi.xoaViec(ids),
   suaViec: ({ id, thay }) => dieuPhoi.suaViec(id, thay),
   // 1.4.0: đổi prompt nhiều việc, đổi ngay sang Muse / Flow, đưa lên Google Drive, chạy lại tài khoản đang nghỉ.
