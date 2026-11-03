@@ -152,7 +152,7 @@ function dungDieuPhoi(o = {}) {
   const nhatKy = [];
   const dp = new DieuPhoi({
     store, taiKhoan: tk, log: (m, c) => nhatKy.push(`[${m}] ${c}`), bao: () => {},
-    taoLuong: o.taoLuong || (() => ({ ranh: true, dung() {} })), huyLuong: () => {},
+    taoLuong: o.taoLuong || (() => ({ ranh: true, dung() {} })), huyLuong: o.huyLuong || (() => {}),
     docFile: (p) => ({ ten: path.basename(p), mime: 'image/png', b64: 'AA==' }),
     ghiFile: o.ghiFile || (() => {}), chuyenFile: o.chuyenFile || (() => {}), thuMucRaMacDinh: '/ra', thuMucTam: '/tam',
     tonTai: o.tonTai || (() => false), donDep: o.donDep, hetLuot: o.hetLuot, bayGio: o.bayGio,
@@ -494,6 +494,132 @@ testAsync('một tài khoản: lỗi thì thử lại như cũ (không tạm ngh
   await chayHet(dp);
   assert.strictEqual(daChay.length, 4, 'mỗi việc 1 lần + 1 lần thử lại');
   assert.ok(dp.viec.every((j) => j.trangThai === 'loi'));
+});
+// 1.4.9: luồng giả — tài khoản trong `treo` đứng mãi (như trang ngầm sập / tải file đứng), trả lời khi bài kiểm gọi `tha`.
+const luongTreo = (daChay, treo, tha) => (a, stt) => ({
+  id: `${a.id}-${stt}`, ranh: true, viec: null, dungLan: 0, dung() { this.dungLan++; },
+  async chay(j) {
+    this.ranh = false; this.viec = j; daChay.push([a.id, j.so]);
+    if (treo.has(a.id)) await new Promise((r) => tha.push(r));      // không bao giờ tự trả lời — dung() cũng không cắt được
+    else await new Promise((r) => setTimeout(r, 10));
+    this.ranh = true; this.viec = null;
+    return { ok: true, files: [{ mime: 'image/png', b64: treo.has(a.id) ? 'TUFOR0hJ' : 'AA==' }] };
+  }
+});
+testAsync('1.4.9 canh treo: việc đứng mãi (99%) quá hạn → bỏ, đóng luồng treo, chạy ở tài khoản kế tiếp; kết quả muộn của luồng treo bị bỏ', async () => {
+  const daChay = [], tha = [], huy = [];
+  const { dp, tk, nhatKy } = dungDieuPhoi({ taoLuong: luongTreo(daChay, new Set(['tk-1']), tha), huyLuong: (l) => huy.push(l) });
+  tk.them('Hai');
+  dp.datCaiDat({ luongMoiTK: 1, nghiGiuaLanGui: 0, tuThuLai: 1, tuChayLaiLoi: 0, choAnhGiay: 180 });
+  const d = dp.taoDuAn('P', ['tk-1', 'hai']);
+  dp.them({ duAn: d.id, prompts: ['một'] });
+  dp.chayTatCa();
+  for (let i = 0; i < 20 && !tha.length; i++) { dp._vong(); await new Promise((r) => setTimeout(r, 10)); }
+  const j = dp.viec[0];
+  assert.deepStrictEqual([j.trangThai, j.taiKhoan, tha.length], ['chay', 'tk-1', 1]);
+  // Chưa quá hạn (180 s + 600 s) → vẫn chờ.
+  const x = dp.luong.find((y) => y.taiKhoanId === 'tk-1');
+  x.giaoLuc = Date.now() - (180 + 590) * 1000;
+  dp._vong();
+  assert.deepStrictEqual([j.trangThai, huy.length], ['chay', 0], 'chưa tới hạn cứng thì không bỏ');
+  x.giaoLuc = Date.now() - (180 + 601) * 1000;
+  await chayHet(dp);
+  assert.deepStrictEqual([j.trangThai, j.taiKhoan], ['xong', 'hai'], JSON.stringify([j.trangThai, j.taiKhoan, j.loi]));
+  assert.strictEqual(huy.filter((l) => /^tk-1-/.test(l.id)).length, 1, 'luồng treo bị đóng (cửa sổ ngầm huỷ, mở luồng mới)');
+  assert.ok(huy[0].id.startsWith('tk-1-') && huy[0].dungLan >= 1 && !dp.luong.some((y) => y.luong === huy[0]), huy.map((l) => l.id).join());
+  assert.ok(nhatKy.some((t) => /⏱ .*#1: Treo quá 13 phút.*đổi tài khoản/.test(t)), nhatKy.join('\n'));
+  assert.ok(nhatKy.some((t) => /↪ #1 Treo quá 13 phút.*\(ở "Muse 1"\) — chuyển sang "Hai"/.test(t)), nhatKy.join('\n'));
+  assert.strictEqual(dp.loiLienTiep['tk-1'], 1, 'treo tính là một lỗi của tài khoản treo');
+  // Luồng treo trả lời muộn → bỏ, không ghi đè kết quả ở "Hai".
+  const files = j.files.slice();
+  tha.forEach((r) => r());
+  await new Promise((r) => setTimeout(r, 20));
+  assert.deepStrictEqual([j.trangThai, j.taiKhoan, j.files], ['xong', 'hai', files]);
+  // Flow không qua canh treo của điều phối (luồng Flow tự có hạn treo theo từng việc).
+  const f = dungDieuPhoi().dp;
+  f.luong = [{ taiKhoanId: 'f', giaoLuc: 1, viecGiao: {}, luong: { nen: 'flow', ranh: false, viec: {} } }];
+  f._canhTreo();
+  assert.strictEqual(f.luong.length, 1);
+});
+testAsync('1.4.9 nút "Đổi tài khoản": việc đang chạy (kể cả đang treo) chuyển NGAY sang tài khoản kế tiếp, không tính lỗi; một tài khoản → báo không đổi được', async () => {
+  const daChay = [], tha = [], huy = [];
+  const { dp, tk, nhatKy } = dungDieuPhoi({ taoLuong: luongTreo(daChay, new Set(['tk-1', 'hai']), tha), huyLuong: (l) => huy.push(l) });
+  tk.them('Hai'); tk.them('Ba');
+  dp.datCaiDat({ luongMoiTK: 1, nghiGiuaLanGui: 0, tuThuLai: 0, tuChayLaiLoi: 0 });
+  const d = dp.taoDuAn('P', ['tk-1', 'hai', 'ba']);
+  dp.them({ duAn: d.id, prompts: ['một'] });
+  dp.chayTatCa();
+  for (let i = 0; i < 20 && !tha.length; i++) { dp._vong(); await new Promise((r) => setTimeout(r, 10)); }
+  const j = dp.viec[0];
+  assert.strictEqual(j.taiKhoan, 'tk-1');
+  // Muse 1 → Hai (kế tiếp trong thứ tự của dự án).
+  let r = dp.doiTaiKhoan([j.id]);
+  assert.deepStrictEqual(r.doi, [{ so: 1, tu: 'Muse 1', den: 'Hai' }]);
+  for (let i = 0; i < 20 && tha.length < 2; i++) { dp._vong(); await new Promise((r2) => setTimeout(r2, 10)); }
+  assert.deepStrictEqual([j.trangThai, j.taiKhoan], ['chay', 'hai']);
+  assert.deepStrictEqual(huy.map((l) => l.id), ['tk-1-1'], 'luồng cũ (đang treo) bị đóng');
+  // Hai cũng treo; Ba đang nghỉ → bỏ qua Ba, quay vòng về Muse 1.
+  dp.nghiDen.ba = Date.now() + 60000;
+  r = dp.doiTaiKhoan([j.id]);
+  assert.deepStrictEqual(r.doi.map((x) => x.den), ['Muse 1']);
+  delete dp.nghiDen.ba;
+  // Thứ tự quay vòng tk-1 → hai → ba: từ Muse 1 lại sang Hai, từ Hai sang Ba.
+  for (let i = 0; i < 20 && tha.length < 3; i++) { dp._vong(); await new Promise((r2) => setTimeout(r2, 10)); }
+  r = dp.doiTaiKhoan([j.id]);
+  assert.deepStrictEqual(r.doi.map((x) => x.den), ['Hai']);
+  for (let i = 0; i < 20 && tha.length < 4; i++) { dp._vong(); await new Promise((r2) => setTimeout(r2, 10)); }
+  r = dp.doiTaiKhoan([j.id]);
+  assert.deepStrictEqual(r.doi.map((x) => x.den), ['Ba']);
+  await chayHet(dp);
+  assert.deepStrictEqual([j.trangThai, j.taiKhoan], ['xong', 'ba'], JSON.stringify([j.trangThai, j.taiKhoan, j.loi]));
+  assert.deepStrictEqual([dp.loiLienTiep['tk-1'] || 0, dp.loiLienTiep.hai || 0, j.thu || 0], [0, 0, 0], 'đổi tay không tính lỗi / lần thử');
+  assert.ok(nhatKy.some((t) => /⇄ #1: đổi tài khoản tay "Muse 1" → "Hai"/.test(t)), nhatKy.join('\n'));
+  tha.forEach((f) => f());
+  await new Promise((r2) => setTimeout(r2, 20));
+  assert.deepStrictEqual([j.trangThai, j.taiKhoan, j.files.length], ['xong', 'ba', 1], 'kết quả muộn của luồng cũ bị bỏ');
+  // Việc đã xong / chờ chưa có tài khoản → không đổi; dự án một tài khoản → báo lỗi rõ.
+  assert.strictEqual(dp.doiTaiKhoan([j.id]).doi.length, 0);
+  const m = dungDieuPhoi({ taoLuong: luongTreo([], new Set(['tk-1']), []) });
+  m.dp.datCaiDat({ luongMoiTK: 1, nghiGiuaLanGui: 0 });
+  m.dp.them({ prompts: ['x'] });
+  m.dp.chayTatCa();
+  for (let i = 0; i < 10; i++) { m.dp._vong(); await new Promise((r2) => setTimeout(r2, 10)); }
+  const k = m.dp.doiTaiKhoan([m.dp.viec[0].id]);
+  assert.ok(!k.ok && /Không có tài khoản Muse nào khác dùng được cho #1/.test(k.loi), JSON.stringify(k));
+  assert.strictEqual(m.dp.viec[0].trangThai, 'chay', 'không đổi được thì việc vẫn chạy như cũ');
+});
+test('1.4.9 luồng Muse: hạn từng bước — lấy file / hỏi trang / mở trang đứng mãi thì luồng vẫn trả lời (không treo)', () => {
+  const { execFileSync } = require('child_process');
+  const ma = `
+    const { Luong } = require(${JSON.stringify(path.join(__dirname, '../src/main/luong'))});
+    const cach = process.argv[1];
+    const wc = { isDestroyed: () => false,
+      loadURL: () => (cach === 'mo' ? new Promise(() => {}) : Promise.resolve()),
+      executeJavaScript: (c) => {
+        if (/phienBan/.test(c)) return Promise.resolve(true);
+        if (/trangThai\\(\\)/.test(c)) return Promise.resolve({ coONhap: true });
+        if (/gui\\(/.test(c)) return Promise.resolve({ ok: true, thread: 'https://muse/thread/1' });
+        if (/ketQua\\(\\)/.test(c)) return cach === 'hoi' ? new Promise(() => {}) : Promise.resolve({ soAnh: 1, soVideo: 0 });
+        if (/layFile/.test(c)) return cach === 'mo' ? Promise.resolve([{ loai: 'anh', mime: 'image/png', b64: 'AA==' }]) : new Promise(() => {});
+        return Promise.resolve(0);
+      } };
+    const l = new Luong({ id: 'L', wc, nguon: '', goc: 'https://muse' });
+    const t = Date.now();
+    l.chay({ so: 7, loai: 'anh' }, { tinNhan: 'x', choToiDaGiay: 60, choChuGiay: 30, choGui: async () => {}, capNhat: () => {} })
+      .then((r) => { console.log(JSON.stringify({ r, ms: Date.now() - t })); process.exit(0); });
+    setTimeout(() => { console.log('TREO'); process.exit(0); }, 30000);`;
+  const env = { ...process.env, MUSE_HAN_GOI_MS: '300', MUSE_HAN_LAY_FILE_MS: '400', MUSE_HAN_MO_TRANG_MS: '300', MUSE_HAN_GUI_MS: '300' };
+  const chay = (cach) => { const o = execFileSync(process.execPath, ['-e', ma, cach], { env, encoding: 'utf8' }).trim(); assert.notStrictEqual(o, 'TREO', cach); return JSON.parse(o); };
+  const lay = chay('lay');
+  assert.ok(!lay.r.ok && /Muse đã trả kết quả nhưng không lấy được file \(trang Muse không trả lời quá 0 giây\)/.test(lay.r.loi) && !lay.r.giuThread, JSON.stringify(lay));
+  const hoi = chay('hoi');
+  assert.ok(!hoi.r.ok && /Trang Muse hỏng: trang Muse không trả lời/.test(hoi.r.loi), JSON.stringify(hoi));
+  const mo = chay('mo');
+  assert.ok(mo.r.ok, 'mở trang đứng (loadURL không xong) vẫn chạy tiếp tới lấy kết quả: ' + JSON.stringify(mo));
+  // Trong trang: tải file gốc có hạn (AbortController), lấy file truyền hạn xuống.
+  const m = docNguon('src/inject/muse-trang.js'), l = docNguon('src/main/luong.js');
+  assert.ok(/async function taiBlob\(url, hanMs\)/.test(m) && /ac\.abort\(\)/.test(m) && !/await fetch\(img\.src\)|await fetch\(v\.currentSrc/.test(m));
+  assert.ok(/hanMs: HAN_LAY_FILE_MS - 15000/.test(l));
 });
 // Lần thử thứ n (đếm chung mọi tài khoản) hỏng nếu nằm trong `hongLan`.
 const luongTheoLan = (daChay, hongLan) => (a, stt) => ({
