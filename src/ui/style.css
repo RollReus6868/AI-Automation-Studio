@@ -405,7 +405,12 @@ img[data-vthumb]:not([src]), img[data-vthumb].vthumb-loi { visibility: hidden; }
   /* 1.4.9: thêm nút Đổi tài khoản → nút dòng nhỏ lại, thẻ nhỏ xuống dòng thay vì tràn sang cột trạng thái. */
   .dong-viec { grid-template-columns: 18px 50px minmax(0, 1fr) 108px 78px; gap: 8px; }
   .nut-dk, .dong-viec .ba-cham { width: 24px; height: 26px; }
-  .the-nho { flex-wrap: wrap; row-gap: 4px; }
+  /* Thẻ nhỏ giữ MỘT hàng (dòng việc cao như cũ — xuống dòng làm dòng cao 72 → 88 px, ít dòng video hiện trên màn hình):
+     thẻ gọn lại, phần thừa bị cắt chứ không đè sang cột trạng thái. */
+  .the-nho { flex-wrap: nowrap; overflow: hidden; gap: 4px; min-width: 0; }
+  .the-nho .tag { padding: 2px 5px; font-size: 10px; letter-spacing: 0; flex: 0 1 auto; min-width: 0; overflow: hidden; white-space: nowrap; }
+  .the-nho .thanh-tien { flex: 1 1 12px; min-width: 12px; }
+  .the-nho .phan-tram { flex: 0 0 auto; }   /* % tiến độ (vd 99%) không bao giờ bị cắt */
   .trang-thai small { max-width: 108px; }
   .dong-viec .so { display: none; }
   .thumb { width: 50px; height: 50px; }
