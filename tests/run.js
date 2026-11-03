@@ -158,7 +158,7 @@ function dungDieuPhoi(o = {}) {
     tonTai: o.tonTai || (() => false), donDep: o.donDep, hetLuot: o.hetLuot, bayGio: o.bayGio,
     lenDrive: o.lenDrive, lenDriveWeb: o.lenDriveWeb, chayLaiFlow: o.chayLaiFlow, dsFile: o.dsFile
   });
-  clearInterval(dp.hen);
+  clearInterval(dp.hen); clearInterval(dp.henTheoDoi);
   return { dp, tk, store, nhatKy };
 }
 test('thêm: số bản, ảnh theo dòng, tự nhận nhân vật, số thứ tự liên tục theo dự án', () => {
@@ -3005,6 +3005,146 @@ console.log('\n── 1.4.0 ─────────────────�
     dp.datCaiDat({ driveBat: true, thuMucDrive: 'G:\\My Drive', nheMay: false }, d.id);
     assert.deepStrictEqual([dp.cd(d.id).driveBat, dp.cd(d.id).thuMucDrive, dp.cd('mac-dinh').driveBat], [true, 'G:\\My Drive', false]);
     assert.strictEqual(dp.caiDat.nheMay, false, 'nhẹ máy lưu vào cài đặt chung');
+  });
+}
+
+// ── 1.4.9: "Tạo video từ thư mục ảnh" theo dõi thư mục ─────────────────────
+{
+  const os = require('os');
+  const TD = require('../src/main/theo-doi-thu-muc');
+  const thuMucTam = () => fs.mkdtempSync(path.join(os.tmpdir(), 'theo-doi-'));
+  // Ghi ảnh với mtime đặt sẵn (giây) — đồng hồ của DieuPhoi là đồng hồ giả.
+  const ghiAnh = (dir, ten, mtimeS, noiDung = 'anh') => {
+    const f = path.join(dir, ten);
+    fs.writeFileSync(f, noiDung);
+    fs.utimesSync(f, mtimeS, mtimeS);
+    return f;
+  };
+
+  test('1.4.9 theo dõi thư mục: chỉ nhận ảnh đã ghi xong (đứng yên 2 lần quét, cũ hơn 3 s), không nhận lại ảnh đã có', () => {
+    const dir = thuMucTam();
+    const a = ghiAnh(dir, '2.png', 1000), b = ghiAnh(dir, '10.jpg', 1000);
+    ghiAnh(dir, 'ghi-chu.txt', 1000);
+    const daCo = new Set([a]);
+    const l1 = TD.docThuMuc(dir, daCo);
+    assert.deepStrictEqual(l1.ds, [a, b], 'xếp tên tự nhiên, chỉ ảnh');
+    assert.deepStrictEqual([...l1.ung.keys()], [b], 'ảnh đã nhận không stat lại');
+    // Lần quét đầu: chưa có lần trước → chưa nhận.
+    let r = TD.chonAnhMoi(l1.ung, new Map(), 1010 * 1000);
+    assert.deepStrictEqual(r.moi, []);
+    // Lần sau, đứng yên → nhận.
+    r = TD.chonAnhMoi(TD.docThuMuc(dir, daCo).ung, r.truoc, 1015 * 1000);
+    assert.deepStrictEqual(r.moi, [b]);
+    // Ảnh đang ghi dở: size đổi giữa 2 lần quét → chưa nhận; mtime quá mới (< 3 s) → chưa nhận.
+    const c = ghiAnh(dir, '11.png', 2000, 'x');
+    const t1 = TD.docThuMuc(dir, new Set([a, b])).ung;
+    ghiAnh(dir, '11.png', 2000, 'xxxxx');
+    r = TD.chonAnhMoi(TD.docThuMuc(dir, new Set([a, b])).ung, t1, 2010 * 1000);
+    assert.deepStrictEqual(r.moi, [], 'size đổi → còn đang ghi');
+    r = TD.chonAnhMoi(TD.docThuMuc(dir, new Set([a, b])).ung, r.truoc, 2001 * 1000);
+    assert.deepStrictEqual(r.moi, [], 'mtime mới hơn 3 s → chưa nhận');
+    r = TD.chonAnhMoi(TD.docThuMuc(dir, new Set([a, b])).ung, r.truoc, 2004 * 1000);
+    assert.deepStrictEqual(r.moi, [c]);
+    assert.strictEqual(TD.docThuMuc(path.join(dir, 'khong-co'), new Set()), null, 'thư mục không còn → null');
+    assert.strictEqual(TD.promptCho(1, 'chung', ['', '  ', 'r3']), 'chung');
+    assert.strictEqual(TD.promptCho(2, 'chung', ['', '', 'r3']), 'r3');
+    assert.strictEqual(TD.promptCho(5, '', null), HD.PROMPT_VIDEO_MAC_DINH);
+  });
+
+  test('1.4.9 theo dõi thư mục: ảnh mới → việc video đúng ảnh, prompt riêng theo vị trí, số tiếp nối; ảnh đã có không làm lại', () => {
+    const dir = thuMucTam();
+    let gio = 5000 * 1000;
+    const { dp, nhatKy } = dungDieuPhoi({ bayGio: () => gio });
+    const a1 = ghiAnh(dir, '1.png', 4000), a2 = ghiAnh(dir, '2.png', 4000);
+    // Như lúc bấm Tạo: 2 ảnh có sẵn thành 2 video.
+    dp.them({ duAn: 'mac-dinh', loai: 'video', nen: 'muse', prompts: ['r1', 'r2'], thamChieuTheoDong: [[a1], [a2]] });
+    const k = dp.theoDoiThuMuc({ duAn: 'mac-dinh', thuMuc: dir, anhDaCo: [a1, a2], prompt: 'chung', prompts: ['r1', 'r2', '', 'r4'],
+      thamSo: { nen: 'muse', tyLe: '16:9' }, tuChay: false });
+    assert.ok(k.ok && k.theoDoi.soAnhDaCo === 2, JSON.stringify(k));
+    gio += 6000; assert.strictEqual(dp.quetTheoDoi(), 0, 'không có ảnh mới');
+    const a3 = ghiAnh(dir, '3.png', 5005), a4 = ghiAnh(dir, '4.png', 5005);
+    gio += 5000; assert.strictEqual(dp.quetTheoDoi(), 0, 'ảnh mới mới thấy lần đầu — chờ lần sau');
+    gio += 5000; assert.strictEqual(dp.quetTheoDoi(), 2);
+    const moi = dp.viec.slice(2);
+    assert.deepStrictEqual(moi.map((j) => [j.loai, j.nen, j.thamChieu, j.prompt, j.so, j.stt, j.tyLe]),
+      [['video', 'muse', [a3], 'chung', 3, 3, '16:9'], ['video', 'muse', [a4], 'r4', 4, 4, '16:9']]);
+    assert.ok(nhatKy.some((x) => /📂 Thư mục ".+": thêm 2 ảnh mới → 2 video \(#3–4\)/.test(x)), nhatKy.join('\n'));
+    gio += 5000; assert.strictEqual(dp.quetTheoDoi(), 0, 'ảnh đã nhận không thêm lại');
+    assert.strictEqual(dp.trangThai().duAn[0].theoDoi.soDaThem, 2);
+    assert.strictEqual(dp.trangThai().duAn[0].theoDoi.daCo, undefined, 'giao diện không nhận cả danh sách ảnh');
+    assert.ok(!dp.duAnChay.has('mac-dinh'), 'tuChay tắt → không tự chạy');
+    // Thư mục mất rồi có lại: ghi nhật ký một lần, giữ theo dõi.
+    const tam = `${dir}-doi`;
+    fs.renameSync(dir, tam);
+    gio += 5000; dp.quetTheoDoi(); gio += 5000; dp.quetTheoDoi();
+    assert.strictEqual(nhatKy.filter((x) => /không thấy thư mục theo dõi/.test(x)).length, 1);
+    assert.ok(dp.trangThai().duAn[0].theoDoi.mat);
+    fs.renameSync(tam, dir);
+    gio += 5000; dp.quetTheoDoi();
+    assert.ok(!dp.trangThai().duAn[0].theoDoi.mat && nhatKy.some((x) => /đã có lại/.test(x)));
+    assert.ok(dp.boTheoDoiThuMuc('mac-dinh').ok && !dp.duAn[0].theoDoi);
+    ghiAnh(dir, '5.png', 5000);
+    gio += 5000; dp.quetTheoDoi(); gio += 5000;
+    assert.strictEqual(dp.quetTheoDoi(), 0, 'dừng theo dõi → không thêm');
+    dp.dong();
+  });
+
+  test('1.4.9 theo dõi thư mục: Tạo & chạy → ảnh mới tự chạy lại dự án đã hết hàng chờ; Dừng → chỉ thêm việc; mở lại app vẫn theo dõi', () => {
+    const dir = thuMucTam();
+    let gio = 9000 * 1000;
+    const tao = () => ({ ranh: true, dung() {}, chay: () => new Promise(() => {}) });
+    const { dp, store, nhatKy } = dungDieuPhoi({ bayGio: () => gio, taoLuong: tao });
+    const a1 = ghiAnh(dir, 'a1.png', 8000);
+    dp.theoDoiThuMuc({ duAn: 'mac-dinh', thuMuc: dir, prompt: 'p', thamSo: { nen: 'muse' }, tuChay: true });
+    assert.deepStrictEqual(dp.duAn[0].theoDoi.daCo, [a1], 'không gửi anhDaCo → mọi ảnh đang có');
+    ghiAnh(dir, 'a2.png', 9000);
+    gio += 5000; dp.quetTheoDoi(); gio += 5000;
+    assert.strictEqual(dp.quetTheoDoi(), 1);
+    assert.ok(dp.duAnChay.has('mac-dinh'), 'tuChay → tự chạy dự án');
+    assert.ok(nhatKy.some((x) => /tự chạy lại dự án/.test(x)));
+    // Hết hàng chờ (như _xetXong) rồi ảnh mới → chạy lại.
+    for (const j of dp.viec) Object.assign(j, { trangThai: 'xong' });
+    dp.duAnChay.delete('mac-dinh');
+    ghiAnh(dir, 'a3.png', 9005);
+    gio += 5000; dp.quetTheoDoi(); gio += 5000; dp.quetTheoDoi();
+    assert.ok(dp.duAnChay.has('mac-dinh'), 'dự án đã chạy hết hàng chờ → ảnh mới chạy lại');
+    assert.ok(dp.coTheoDoiTuChay());
+    // Dừng dự án → ảnh mới vẫn thành việc nhưng không tự chạy.
+    dp.dungDuAn('mac-dinh');
+    assert.strictEqual(dp.duAn[0].theoDoi.tuChay, false);
+    assert.ok(!dp.coTheoDoiTuChay());
+    for (const j of dp.viec) Object.assign(j, { trangThai: 'xong' });
+    ghiAnh(dir, 'a4.png', 9020);
+    gio += 5000; dp.quetTheoDoi(); gio += 5000;
+    assert.strictEqual(dp.quetTheoDoi(), 1);
+    assert.ok(!dp.duAnChay.has('mac-dinh'), 'đã Dừng → không tự chạy');
+    // Bấm Chạy (kể cả khi không còn việc chờ) → ảnh mới lại tự chạy.
+    dp.chayDuAn('mac-dinh');
+    assert.strictEqual(dp.duAn[0].theoDoi.tuChay, true);
+    dp.dong();
+    // Mở lại app (DieuPhoi mới, cùng dữ liệu): vẫn theo dõi, ảnh đã nhận không làm lại, ảnh mới vẫn nhận.
+    const b = dungDieuPhoi({ duLieu: store.data, bayGio: () => gio, taoLuong: tao });
+    assert.ok(b.dp.duAn[0].theoDoi && b.dp.duAn[0].theoDoi.daCo.length === 4);
+    gio += 5000; b.dp.quetTheoDoi(); gio += 5000;
+    assert.strictEqual(b.dp.quetTheoDoi(), 0);
+    ghiAnh(dir, 'a5.png', 9030);
+    gio += 5000; b.dp.quetTheoDoi(); gio += 5000;
+    assert.strictEqual(b.dp.quetTheoDoi(), 1);
+    assert.strictEqual(b.dp.viec[b.dp.viec.length - 1].thamChieu[0], path.join(dir, 'a5.png'));
+    // Xoá dự án → bỏ theo dõi.
+    const d2 = b.dp.taoDuAn('B');
+    b.dp.theoDoiThuMuc({ duAn: d2.id, thuMuc: dir, thamSo: {} });
+    assert.ok(b.dp._gac.has(d2.id));
+    assert.ok(b.dp.xoaDuAn(d2.id).ok && !b.dp._gac.has(d2.id));
+    b.dp.dong();
+  });
+
+  test('1.4.9 theo dõi thư mục: "Tắt máy khi xong" không tắt khi còn theo dõi tự chạy; giao diện có công tắc + gọi lệnh có trong LENH', () => {
+    const m = docNguon('main.js'), ui = docNguon('src/ui/app.js'), html = docNguon('src/ui/index.html');
+    assert.ok(/if \(dieuPhoi\.coTheoDoiTuChay\(\)\) log\('warning'/.test(m) && /else mayFlow\.handleEngineMessage\(\{ action: 'TRIGGER_SHUTDOWN'/.test(m));
+    assert.ok(/theoDoiThuMuc: \(p\) => dieuPhoi\.theoDoiThuMuc\(p\)/.test(m) && /boTheoDoiThuMuc: \(\{ duAn \}\) => dieuPhoi\.boTheoDoiThuMuc\(duAn\)/.test(m));
+    assert.ok(/id="theoDoiThuMuc"/.test(html) && /id="nutBoTheoDoi"/.test(html) && /Theo dõi thư mục/.test(html));
+    assert.ok(/api\.call\('theoDoiThuMuc', td\)/.test(ui) && /U\.theoDoiTm \? thamSoTheoDoi\(ts, chay\)/.test(ui));
   });
 }
 
