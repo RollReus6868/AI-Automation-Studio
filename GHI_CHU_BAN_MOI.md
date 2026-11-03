@@ -9,6 +9,16 @@
   - Cũng có ở menu ⋯ của dòng, ô chi tiết bên phải, và thanh chọn nhiều dòng (*Đổi tài khoản*).
   - Đổi tay không tính là lỗi của tài khoản cũ.
   - Dự án chỉ có một tài khoản của nền tảng đó → app báo không có tài khoản khác để đổi.
+- **Tạo video từ thư mục ảnh: theo dõi thư mục.** Trang Tạo video → *Tạo video từ thư mục ảnh* có công tắc mới **Theo dõi thư mục — ảnh mới thêm vào tự tạo video** (mặc định tắt; tắt thì quét một lần như cũ).
+  - Bật, chọn thư mục rồi bấm **Tạo & chạy**: ảnh đang có thành video như trước. Sau đó app quét lại thư mục khoảng 5 giây một lần; ảnh mới bạn thêm vào (đã ghi xong) tự thành việc video và chạy luôn.
+  - Prompt: có file .txt prompt riêng thì ảnh thứ N (xếp theo tên) dùng dòng N; không có dòng thì dùng prompt dùng chung, trống nữa thì dùng prompt mặc định.
+  - Dự án đã chạy hết hàng chờ mà có ảnh mới → app tự chạy lại dự án. Bấm **Dừng** dự án thì ảnh mới vẫn được thêm vào hàng chờ nhưng không tự chạy; bấm **Chạy** lại thì chạy tiếp.
+  - Dòng trạng thái ghi thư mục đang theo dõi, số video đã thêm, lần quét gần nhất, kèm nút **Dừng theo dõi**. Đóng app mở lại vẫn theo dõi tiếp. Xoá dự án thì thôi theo dõi.
+  - Đang theo dõi (tự chạy) thì *Tắt máy khi xong* không tắt máy, nhật ký ghi lý do.
+  - Nên đặt tên ảnh tăng dần (001, 002…). Ảnh mới mà tên xếp chen trước ảnh cũ sẽ lệch số thứ tự ↔ dòng prompt riêng.
+- Mọi thứ khác giữ nguyên như 1.4.8.
+
+Lưu ý: đã kiểm bằng bài kiểm tự động trên trang Muse / Flow giả (gồm việc treo giả, ảnh thêm dần vào thư mục), chưa chạy trên Muse / Flow thật. Gặp việc treo, bạn gửi giúp nhật ký .txt để xem app đã tự đổi tài khoản sau bao lâu.
 
 ## Bản 1.4.8
 
