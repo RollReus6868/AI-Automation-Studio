@@ -614,14 +614,19 @@
   }
   /** 1.3.0: nút Dừng (việc đang chạy / đang chờ) hoặc Chạy (việc đã dừng / lỗi / còn chờ khi dự án chưa chạy) của riêng một việc. */
   function nutDieuKhien(j) {
+    // 1.4.9: việc đang chạy (vd treo ở 99%) / chờ lấy tiếp chat dở ở một tài khoản → nút Đổi tài khoản cạnh nút Dừng.
+    const doiTk = coTheDoiTk(j)
+      ? `<button class="nut-dk doi-tk" data-dk="doiTaiKhoan" title="Đổi sang tài khoản kế tiếp — bỏ tài khoản đang chạy (vd treo ở 99%), gửi lại prompt ở tài khoản tiếp theo">${ic('users')}</button>` : '';
     if (j.trangThai === 'chay' || (j.trangThai === 'cho' && (duAnDangChay(j.duAn) || j.chayRieng || theoHen(j)))) {
-      return `<button class="nut-dk dung" data-dk="dungViec" title="Dừng riêng việc này — việc khác vẫn chạy">${ic('square')}</button>`;
+      return doiTk + `<button class="nut-dk dung" data-dk="dungViec" title="Dừng riêng việc này — việc khác vẫn chạy">${ic('square')}</button>`;
     }
     if (j.trangThai === 'cho' || j.trangThai === 'dung' || j.trangThai === 'loi') {
-      return `<button class="nut-dk chay" data-dk="chayViec" title="${j.trangThai === 'loi' ? 'Tạo lại và chạy ngay việc này' : 'Chạy ngay việc này'}">${ic('play')}</button>`;
+      return doiTk + `<button class="nut-dk chay" data-dk="chayViec" title="${j.trangThai === 'loi' ? 'Tạo lại và chạy ngay việc này' : 'Chạy ngay việc này'}">${ic('play')}</button>`;
     }
     return '';
   }
+  /** 1.4.9: đổi tài khoản được — việc đang chạy, hoặc đang chờ lấy tiếp chat dở ở một tài khoản. */
+  function coTheDoiTk(j) { return j.trangThai === 'chay' || (j.trangThai === 'cho' && !!j.taiKhoan); }
 
   function capNhatTienDo() {
     if (!S) return;
@@ -664,6 +669,7 @@
         <button class="nut-vien" data-ct="chayViec" ${['cho', 'dung', 'loi'].includes(j.trangThai) ? '' : 'disabled'}>${ic('play')}Chạy ngay</button>
         <button class="nut-vien" data-ct="dungViec" ${j.trangThai === 'chay' || j.trangThai === 'cho' ? '' : 'disabled'}>${ic('square')}Dừng</button>
       </div>` : ''}
+      ${coTheDoiTk(j) ? `<div class="ct-nut" style="grid-template-columns:1fr"><button class="nut-vien" data-ct="doiTaiKhoan" title="Bỏ tài khoản đang chạy (vd treo ở 99%), gửi lại prompt ở tài khoản tiếp theo">${ic('users')}Đổi sang tài khoản kế tiếp</button></div>` : ''}
       <div class="ct-dau"><span>Prompt</span><button class="nut-icon" data-ct="chep" title="Sao chép prompt">${ic('copy')}</button></div>
       <div class="ct-text">${esc(j.prompt)}</div>
       ${j.thamChieu && j.thamChieu.length ? `<div class="ct-dau"><span>Ảnh đính kèm</span></div><div class="ds-tham-chieu">${j.thamChieu.map((p) => `<div class="anh-nho"><img src="${esc(fileUrl(p))}"></div>`).join('')}</div>` : ''}
@@ -688,7 +694,7 @@
       if (j.trangThai === 'xong' && !(await xacNhan('Tạo lại?', `Việc #${so3(j.so)} sẽ chạy lại từ đầu (gửi prompt mới), kết quả mới ghi đè file cũ.`, 'Tạo lại'))) return;
       await api.call('taoLai', { ids: [j.id], chay: true });
       toast(`Đã tạo lại #${so3(j.so)} và chạy ngay`);
-    } else if (lenh === 'dungViec' || lenh === 'chayViec') {
+    } else if (lenh === 'dungViec' || lenh === 'chayViec' || lenh === 'doiTaiKhoan') {
       dieuKhienViec(lenh, [j.id]);
     } else if (lenh === 'doiNen') {
       doiNen([j.id], nenTk(j) === 'flow' ? 'muse' : 'flow');
@@ -728,9 +734,22 @@
   /** Dừng / chạy riêng các việc (nút ở dòng việc, thanh chọn, chi tiết, menu ⋯). */
   async function dieuKhienViec(lenh, ids) {
     if (!ids.length) return;
+    if (lenh === 'doiTaiKhoan') { doiTaiKhoan(ids); return; }
     const n = await api.call(lenh, { ids });
     if (lenh === 'dungViec') toast(n ? `Đã dừng ${n} việc — việc khác vẫn chạy` : 'Không có việc nào đang chạy / chờ để dừng', !n);
     else toast(n ? `Đang chạy ngay ${n} việc` : 'Không có việc nào chạy được (việc đã xong thì dùng Tạo lại)', !n);
+  }
+
+  /** 1.4.9: nút "Đổi tài khoản" — việc đang chạy / treo bỏ tài khoản hiện tại, chạy ngay ở tài khoản kế tiếp cùng nền tảng. */
+  async function doiTaiKhoan(ids) {
+    const ds = ids.map(viecTheoId).filter((j) => j && coTheDoiTk(j));
+    if (!ds.length) { toast('Chỉ đổi được tài khoản của việc đang chạy (hoặc đang chờ lấy tiếp chat dở)', true); return; }
+    const r = await api.call('doiTaiKhoan', { ids: ds.map((j) => j.id) });
+    const doi = (r && r.doi) || [];
+    if (doi.length === 1) toast(`#${so3(doi[0].so)}: ${doi[0].tu} → ${doi[0].den}`);
+    else if (doi.length) toast(`Đã đổi tài khoản ${doi.length} việc`);
+    if (r && r.loi) setTimeout(() => toast(r.loi, true), doi.length ? 2500 : 0);
+    else if (!doi.length) toast('Không đổi được tài khoản nào', true);
   }
 
   /** 1.4.0: đổi ngay các việc sang Muse / Flow rồi chạy luôn (việc đang chạy dừng ở bên cũ, việc đã xong tạo lại). */
@@ -783,6 +802,7 @@
     m.innerHTML = [
       f ? `<button data-l="xem">${ic('eye')}Xem</button><button data-l="thuMuc">${ic('folder-open')}Mở thư mục</button>` : '',
       j.trangThai === 'chay' || j.trangThai === 'cho' ? `<button data-l="dungViec">${ic('square')}Dừng việc này</button>` : '',
+      coTheDoiTk(j) ? `<button data-l="doiTaiKhoan">${ic('users')}Đổi sang tài khoản kế tiếp</button>` : '',
       ['cho', 'dung', 'loi'].includes(j.trangThai) ? `<button data-l="chayViec">${ic('play')}Chạy ngay việc này</button>` : '',
       j.trangThai !== 'chay' ? `<button data-l="taoLai">${ic('rotate-ccw')}Tạo lại</button><button data-l="sua">${ic('pencil')}${f && j.loai === 'anh' ? 'Chỉnh sửa ảnh' : 'Sửa prompt'}</button>` : '',
       f && j.loai === 'anh' ? `<button data-l="video">${ic('film')}Tạo video từ ảnh này</button>` : '',
@@ -1269,7 +1289,8 @@
   const O_FLOW = [['fTab', 'tabMoiTK'], ['fMe', 'meToiDa'], ['fSoLuong', 'outputCount'], ['fChoMin', 'delayMin'], ['fChoMax', 'delayMax'],
     ['fThuLai', 'maxRetries'], ['fGian', 'multiTabStagger'], ['fChatAnh', 'chatLuongAnh'], ['fChatVideo', 'chatLuongVideo'], ['fMang', 'networkGuard'],
     ['fSoThuTu', 'addIndex'], ['fGoAnh', 'goAnhThamChieu'], ['fDoiTen', 'doiTenTrenFlow'], ['fDongY', 'dongYQuyenAnh'],
-    ['fModelAnh', 'modelAnh'], ['fNghiTT', 'nghiThaoTacBat'], ['fNghiTTMin', 'nghiThaoTacMin'], ['fNghiTTMax', 'nghiThaoTacMax']];
+    ['fModelAnh', 'modelAnh'], ['fNghiTT', 'nghiThaoTacBat'], ['fNghiTTMin', 'nghiThaoTacMin'], ['fNghiTTMax', 'nghiThaoTacMax'],
+    ['fTreo', 'treoPhut']];   // 1.4.9: việc Flow đứng yên (vd "Flow đang tạo 99%") quá chừng này phút → đổi tài khoản
   const O_FLOW_MODEL = [['fModelChinh', 'chinh'], ['fModelPhu', 'phu'], ['fXenKe', 'xenKeMoi']];
   // Nhận diện tài khoản lỗi (1.2.0, luôn bật) — khớp chuanHoaCaiDat của src/flow/main/an-toan.js.
   // 1.4.7: công tắc + số phút "Cả máy nghỉ Flow" (caMayBat / caMayPhut).
@@ -1643,6 +1664,7 @@
     $('#chonSangFlow').onclick = () => doiNen([...U.chon], 'flow');
     $('#chonDrive').onclick = () => lenDrive([...U.chon]);
     $('#chonDung').onclick = () => { dieuKhienViec('dungViec', [...U.chon]); U.chon.clear(); };
+    $('#chonDoiTk').onclick = () => { doiTaiKhoan([...U.chon]); U.chon.clear(); };
 
     // Chi tiết
     $('#chiTiet').addEventListener('click', (e) => {
