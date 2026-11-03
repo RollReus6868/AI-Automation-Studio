@@ -220,6 +220,7 @@
           <button class="nut-vien nho" id="chonTai" title="Chép file kết quả của các việc đã chọn vào một thư mục"><i data-icon="download"></i>Tải về</button>
           <button class="nut-vien nho" id="chonChay" title="Chạy ngay các việc đã chọn (việc đã dừng / đang chờ / lỗi)"><i data-icon="play"></i>Chạy</button>
           <button class="nut-vien nho" id="chonDung" title="Dừng riêng các việc đã chọn — việc khác vẫn chạy"><i data-icon="square"></i>Dừng</button>
+          <button class="nut-vien nho" id="chonDoiTk" title="Việc đang chạy / treo (vd đứng ở 99%): bỏ tài khoản hiện tại, chạy ngay ở tài khoản kế tiếp cùng nền tảng"><i data-icon="users"></i>Đổi tài khoản</button>
           <button class="nut-vien nho" id="chonChayLai"><i data-icon="rotate-ccw"></i>Tạo lại</button>
           <button class="nut-vien nho" id="chonDoiPrompt" title="Đổi prompt của mọi việc đã chọn (thay hẳn, hoặc tìm và thay một đoạn chữ)"><i data-icon="pencil"></i>Đổi prompt</button>
           <button class="nut-vien nho khong-nhac" id="chonSangMuse" title="Chuyển các việc đã chọn sang chạy ở Muse ngay"><i data-icon="arrow-left-right"></i>Sang Muse</button>
@@ -318,6 +319,7 @@
           <li><b>Cài đặt mặc định:</b> ở trang Cài đặt chỉnh xong bấm <i>Lưu làm cài đặt mặc định</i> (thanh dưới đáy trang): mọi dự án đang có và dự án mới dùng bộ đó; thư mục lưu, mẫu tên file vẫn riêng từng dự án. <i>Lưu cài đặt</i> chỉ đổi dự án đang mở.</li>
           <li><b>Hẹn giờ chạy:</b> mục <i>Hẹn giờ</i> có thẻ riêng cho Tạo ảnh, Tạo video, Tạo nhạc. Bật thẻ, chọn giờ bắt đầu (và giờ dừng nếu muốn), mỗi ngày hay một lần, mọi dự án hay một dự án → <i>Lưu hẹn giờ</i>. Tới giờ app chạy các việc <b>đang chờ</b> của đúng chức năng đó; thêm việc trước bằng <i>Chỉ thêm vào hàng đợi</i>. App phải đang mở, máy đang bật.</li>
           <li><b>Dừng / chạy từng việc:</b> mỗi dòng đang chạy có nút <i>Dừng</i>; việc đã dừng có nút <i>Chạy</i> (chạy ngay, kể cả khi dự án đang dừng). Chọn nhiều dòng rồi bấm <i>Chạy</i> / <i>Dừng</i> / <i>Tạo lại</i> ở thanh chọn.</li>
+          <li><b>Việc treo (vd đứng ở 99%):</b> app tự bỏ và chạy ở tài khoản khác sau thời gian chờ tối đa (Muse: <i>Chờ tối đa 1 ảnh / 1 video</i> ở Cài đặt → <i>Muse — khi chạy</i>) / <i>Treo quá … phút</i> (Flow: Cài đặt → <i>Google Flow — khi chạy</i> → <i>Tài khoản lỗi</i>). Muốn đổi ngay: bấm nút <i>Đổi tài khoản</i> (biểu tượng hai người) ở dòng việc, hoặc chọn nhiều dòng → <i>Đổi tài khoản</i> — việc bỏ tài khoản đang chạy (vd Muse 1) và gửi lại prompt ở tài khoản kế tiếp (Muse 2…).</li>
           <li><b>Dự án Flow mới:</b> mỗi dự án của tool chạy trên một dự án Flow MỚI riêng ở từng tài khoản Flow, không dùng chung dự án Flow cũ.</li>
           <li><b>Video từ ảnh có sẵn:</b> trang Tạo video → <i>Tạo video từ thư mục ảnh</i> → chọn thư mục; gõ prompt vào ô <i>Prompt dùng chung</i> rồi Tạo &amp; chạy — mỗi ảnh một video. Mỗi ảnh một prompt riêng: bấm <i>Nhập file .txt — prompt riêng từng ảnh</i> — ảnh thứ 1 (thư mục xếp theo tên) dùng dòng 1, ảnh 2 dùng dòng 2… Đặt tên video <code>{tenAnh}</code> để video trùng tên ảnh.</li>
           <li><b>Ảnh trước, video sau:</b> mặc định app tạo xong hết ảnh (mọi dự án, cả Muse và Flow) rồi mới tạo video, cho ít trang chạy cùng lúc, bớt ngốn CPU. Muốn ảnh và video chạy song song (ảnh nào xong là video của nó chạy ngay ở luồng rảnh kế tiếp, không chờ hết mẻ ảnh): Cài đặt → <i>Cả app</i> → tắt <i>Tạo ảnh xong hết rồi mới tạo video</i>. Video bạn bấm nút ▶ <i>Chạy ngay việc này</i> ở dòng việc thì vẫn chạy luôn.</li>
@@ -410,8 +412,8 @@
             <label>Nghỉ giữa 2 lần gửi Muse (giây, mỗi tài khoản)<span class="ap ap-anh-video">Ảnh · Video</span><input type="number" id="cdNghi" min="0" max="120"><small class="ghi-o">Flow dùng "Chờ giữa 2 prompt", Suno có ô nghỉ riêng ở thẻ của mình.</small></label>
             <label>Lỗi ở mọi tài khoản Muse thì thử thêm (vòng)<span class="ap ap-anh-video">Ảnh · Video</span><input type="number" id="cdThuLai" min="0" max="10"></label>
             <label>Hết lượt → tự chạy lại việc lỗi Muse (số lượt)<span class="ap ap-anh-video">Ảnh · Video</span><input type="number" id="cdChayLaiLoi" min="0" max="10"></label>
-            <label>Chờ tối đa 1 ảnh (giây) — quá thì chuyển tài khoản dự phòng<span class="ap ap-anh">Chỉ ảnh</span><input type="number" id="cdChoAnh" min="60" max="1800"></label>
-            <label>Chờ tối đa 1 video (giây) — quá thì chuyển tài khoản dự phòng<span class="ap ap-video">Chỉ video</span><input type="number" id="cdChoVideo" min="120" max="3600"></label>
+            <label>Chờ tối đa 1 ảnh (giây) — quá thì chuyển tài khoản dự phòng<span class="ap ap-anh">Chỉ ảnh</span><input type="number" id="cdChoAnh" min="60" max="1800"><small class="ghi-o">Quá hạn mà chưa có kết quả (kể cả kẹt lúc tải file) thì đổi sang tài khoản khác.</small></label>
+            <label>Chờ tối đa 1 video (giây) — quá thì chuyển tài khoản dự phòng<span class="ap ap-video">Chỉ video</span><input type="number" id="cdChoVideo" min="120" max="3600"><small class="ghi-o">Quá hạn mà chưa có kết quả (kể cả kẹt lúc tải file) thì đổi sang tài khoản khác.</small></label>
             <label>Muse trả chữ bao lâu thì coi là lỗi (giây)<span class="ap ap-anh-video">Ảnh · Video</span><input type="number" id="cdChoChu" min="15" max="600"></label>
           </div>
           <small class="mo">Lỗi → chuyển lần lượt sang các tài khoản dự phòng → hết dự phòng thì quay về tài khoản chính thử lại, cứ thế theo vòng. Việc chỉ báo Lỗi khi đã hỏng ở mọi tài khoản thêm số vòng trên; tài khoản lỗi liên tiếp được cho nghỉ 15 phút, mọi tài khoản đều nghỉ thì hàng chờ tạm dừng. Flow và Suno làm y như vậy, theo số vòng / số lượt ở thẻ của mình.</small>
@@ -462,6 +464,7 @@
           <div class="luoi-3">
             <label>Mấy prompt khác nhau hỏng liền nhau thì đổi tài khoản<span class="ap ap-anh-video">Ảnh · Video</span><input type="number" id="fNguong" min="1" max="10"></label>
             <label>Tài khoản lỗi nghỉ (phút)<span class="ap ap-anh-video">Ảnh · Video</span><input type="number" id="fNghi" min="1" max="240"></label>
+            <label>Treo quá … phút thì đổi tài khoản<span class="ap ap-anh-video">Ảnh · Video</span><input type="number" id="fTreo" min="2" max="60"><small class="ghi-o">Một việc đứng ở cùng bước / cùng % (vd "Flow đang tạo 99%") quá chừng này phút thì bỏ và chạy lại ở tài khoản khác.</small></label>
           </div>
           <div class="dong-cong-tac"><div><b>Cả máy nghỉ Flow khi 2 tài khoản bị báo bất thường trong 30 phút</b><span class="ap ap-anh-video">Ảnh · Video</span><small>2 tài khoản Flow khác nhau bị báo "hoạt động bất thường" trong 30 phút → mọi tài khoản Flow trên máy (chung mạng) cùng nghỉ theo số phút dưới.</small></div><label class="cong-tac"><input type="checkbox" id="fCaMayBat"><span></span></label></div>
           <div class="luoi-3" id="khuCaMay">
