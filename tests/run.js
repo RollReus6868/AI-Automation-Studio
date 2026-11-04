@@ -3215,6 +3215,45 @@ console.log('\n── 1.4.0 ─────────────────�
     dp.dong();
   });
 
+  test('1.4.10 số video + prompt theo SỐ trong tên ảnh (001, 006, 016… ảnh tạo không theo thứ tự), không theo vị trí trong thư mục', () => {
+    // Hàm dùng chung (giao diện + tiến trình chính).
+    assert.deepStrictEqual(HD.soTheoTenAnh(['C:\\anh\\001.jpg', '/a/016.jpg', '/a/anh_061.png']), [1, 16, 61]);
+    assert.strictEqual(HD.soTheoTenAnh(['/a/001.jpg', '/a/bia.jpg']), null, 'có ảnh không mang số → ghép theo vị trí như cũ');
+    assert.strictEqual(HD.soTheoTenAnh(['/a/016.jpg', '/a/16.png']), null, 'trùng số → ghép theo vị trí như cũ');
+    assert.strictEqual(HD.soTheoTenAnh([]), null);
+    const g = HD.ghepThuMucAnh(['/a/001.jpg', '/a/002.jpg', '/a/016.jpg', '/a/061.jpg'], (n) => `p${n}`);
+    assert.deepStrictEqual([g.theoTen, g.so, g.prompts.length, g.prompts[15], g.theoDong[15], g.theoDong[2]], [true, [1, 2, 16, 61], 61, 'p16', ['/a/016.jpg'], []]);
+    const v = HD.ghepThuMucAnh(['/a/bia.jpg', '/a/cuoi.jpg'], (n) => `p${n}`);
+    assert.deepStrictEqual([v.theoTen, v.so, v.prompts, v.theoDong], [false, [1, 2], ['p1', 'p2'], [['/a/bia.jpg'], ['/a/cuoi.jpg']]]);
+
+    // Tạo (như giao diện gửi): ảnh 016 → việc #16, prompt số 16 (dòng 16 của file riêng), khung đầu = 016.jpg.
+    const dir = thuMucTam();
+    const anh = ['001.jpg', '006.jpg', '016.jpg', '061.jpg'].map((f) => ghiAnh(dir, f, 100));
+    const rieng = Array.from({ length: 61 }, (_, i) => `animation ${i + 1}`);
+    const t = HD.ghepThuMucAnh(anh, (n) => rieng[n - 1]);
+    const { dp } = dungDieuPhoi();
+    const r = dp.them({ duAn: 'mac-dinh', loai: 'video', nen: 'muse', prompts: t.prompts, thamChieuTheoDong: t.theoDong, chonSo: t.so.join(', '), soTheoAnh: true });
+    assert.ok(r.ok && r.so === 4, JSON.stringify(r));
+    assert.deepStrictEqual(dp.viec.map((j) => [j.so, j.stt, j.prompt, path.basename(j.thamChieu[0])]),
+      [[1, 1, 'animation 1', '001.jpg'], [6, 6, 'animation 6', '006.jpg'], [16, 16, 'animation 16', '016.jpg'], [61, 61, 'animation 61', '061.jpg']]);
+    // Tên file video theo mẫu {stt} / {so} / {tenAnh} đều ra đúng số ảnh.
+    const j16 = dp.viec[2];
+    assert.deepStrictEqual(['{stt}', '{so}', '{tenAnh}'].map((m) => HD.tenFile(dp.duAn[0], j16, 'video/mp4', 0, m)), ['016.mp4', '016.mp4', '016.mp4']);
+
+    // Theo dõi thư mục: ảnh 018 rồi 017 thêm vào sau (không theo thứ tự) → việc #18, #17 với prompt số 18, 17.
+    let gio = 7000 * 1000;
+    const b = dungDieuPhoi({ bayGio: () => gio });
+    const d2 = thuMucTam();
+    const c = ['001.jpg', '006.jpg'].map((f) => ghiAnh(d2, f, 100));
+    b.dp.theoDoiThuMuc({ duAn: 'mac-dinh', thuMuc: d2, anhDaCo: c, prompt: 'chung', prompts: rieng.slice(0, 17), thamSo: { nen: 'muse' }, tuChay: false });
+    const a18 = ghiAnh(d2, '018.jpg', 6990), a17 = ghiAnh(d2, '017.jpg', 6990);
+    gio += 5000; b.dp.quetTheoDoi(); gio += 5000;
+    assert.strictEqual(b.dp.quetTheoDoi(), 2);
+    assert.deepStrictEqual(b.dp.viec.map((j) => [j.so, j.stt, j.prompt, j.thamChieu[0]]).sort((x, y) => x[0] - y[0]),
+      [[17, 17, 'animation 17', a17], [18, 18, 'chung', a18]], 'dòng 18 không có trong file riêng → prompt dùng chung');
+    b.dp.dong();
+  });
+
   test('1.4.9 theo dõi thư mục: Tạo & chạy → ảnh mới tự chạy lại dự án đã hết hàng chờ; Dừng → chỉ thêm việc; mở lại app vẫn theo dõi', () => {
     const dir = thuMucTam();
     let gio = 9000 * 1000;

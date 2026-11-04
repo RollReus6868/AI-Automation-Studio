@@ -865,15 +865,17 @@ class DieuPhoi {
     return moi.length ? this._themTuTheoDoi(d, doc.ds, moi) : 0;
   }
 
-  /** Ảnh mới → việc video, đi ĐÚNG đường thêm việc của "Tạo video từ thư mục ảnh" (them + thamChieuTheoDong):
-   *  ảnh thứ i (thư mục xếp theo tên) ↔ prompt số i (dòng riêng i → dùng chung → mặc định). */
+  /** Ảnh mới → việc video, đi ĐÚNG đường thêm việc của "Tạo video từ thư mục ảnh" (them + thamChieuTheoDong).
+   *  1.4.10: ảnh đặt tên theo số ("016.jpg") → việc số 16, prompt số 16 (dòng riêng 16 → dùng chung → mặc định) — ảnh tạo
+   *  không theo thứ tự cũng không lệch. Tên ảnh không có số → ảnh thứ i (xếp theo tên) ↔ số i như trước. */
   _themTuTheoDoi(d, ds, moi) {
     const td = d.theoDoi;
-    const viTri = moi.map((a) => ds.indexOf(a) + 1).filter((x) => x > 0).sort((a, b) => a - b);
+    const g = hd.ghepThuMucAnh(ds, (n) => TD.promptCho(n - 1, td.prompt, td.prompts));
+    const viTri = moi.map((a) => g.so[ds.indexOf(a)]).filter((x) => x > 0).sort((a, b) => a - b);
     td.daCo = [...td.daCo, ...moi];
     const truoc = this.viec.length;
-    const r = this.them({ ...td.thamSo, duAn: d.id, loai: 'video', prompts: ds.map((_, i) => TD.promptCho(i, td.prompt, td.prompts)),
-      thamChieu: [], thamChieuTheoDong: ds.map((a) => [a]), chonSo: viTri.join(', '), boQuaDaCo: false, chuoiVideo: null, chay: false });
+    const r = this.them({ ...td.thamSo, duAn: d.id, loai: 'video', prompts: g.prompts, soTheoAnh: g.theoTen,
+      thamChieu: [], thamChieuTheoDong: g.theoDong, chonSo: viTri.join(', '), boQuaDaCo: false, chuoiVideo: null, chay: false });
     if (!r.ok) {
       this.log('error', `❌ 📂 "${d.ten}": không thêm được video cho ${moi.length} ảnh mới: ${r.loi}`);
       this.luu();
@@ -923,7 +925,8 @@ class DieuPhoi {
       if (!nv.length && p.tuNhanVat) nv = hd.timNhanVat(pr, this.nhanVat).map((n) => n.id);
       const thamChieu = [...(p.thamChieu || []), ...((p.thamChieuTheoDong && p.thamChieuTheoDong[stt - 1]) || [])];
       for (let b = 0; b < soBan; b++) {
-        moi.push(this._viecMoi(d, { nen, loai, prompt: text, stt, tyLe: p.tyLe, thamChieu, nhanVat: nv, chuoi: this._chuoiCho(cv, stt) }));
+        // 1.4.10: video từ thư mục ảnh đặt tên theo số ("016.jpg") → số việc trong hàng đợi = số ảnh (#016), như video nối từ ảnh.
+        moi.push(this._viecMoi(d, { nen, loai, prompt: text, stt, ...(p.soTheoAnh && b === 0 ? { so: stt } : {}), tyLe: p.tyLe, thamChieu, nhanVat: nv, chuoi: this._chuoiCho(cv, stt) }));
       }
     }
     this.viec.push(...moi);

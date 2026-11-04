@@ -1,4 +1,14 @@
-# AI Automation Studio 1.4.9
+# AI Automation Studio 1.4.10
+
+- **Tạo video từ thư mục ảnh: số video và prompt theo SỐ trong tên ảnh.** Bản trước đánh số theo vị trí ảnh trong thư mục, nên thư mục thiếu số (001–006 rồi 016, 017…) bị lệch: ảnh 016 thành video số 7 và lấy prompt dòng 7.
+  - Giờ ảnh **016.jpg** → video **#016**, dùng **dòng 16** của file prompt animation (.txt), lưu thành **016.mp4** (mẫu tên `{stt}` / `{tenAnh}`). Ảnh nào thiếu số thì bỏ trống số đó, không dồn số.
+  - Áp cho cả lần bấm **Tạo / Tạo & chạy**, **Quét thư mục**, và ảnh mới vào khi bật **Theo dõi thư mục**.
+  - Sau khi chọn thư mục, dòng dưới nút ghi *"số video + prompt theo tên ảnh (#1–6, 16–18…)"*. Ảnh có số mà file .txt không có dòng đó thì app hỏi trước, rồi dùng prompt dùng chung (trống thì prompt mặc định).
+  - Ô *Chạy prompt số* vẫn dùng được: chỉ chạy các số bạn ghi mà có ảnh.
+  - Thư mục có ảnh không mang số trong tên (vd *bia.jpg*), hoặc hai ảnh trùng số → ghép theo vị trí như trước.
+- Mọi thứ khác giữ nguyên như 1.4.9.
+
+## Bản 1.4.9
 
 - **Sửa lỗi việc treo ở 99% mà không đổi tài khoản.**
   - 99% là tiến độ app ƯỚC theo thời gian. Việc đứng ở đó mãi vì luồng chờ một thứ không bao giờ trả lời: trang Muse chạy ngầm bị đứng / sập, tải file kết quả đứng giữa chừng, hoặc trên Flow việc kẹt ở *"Flow đang tạo 99%"*.

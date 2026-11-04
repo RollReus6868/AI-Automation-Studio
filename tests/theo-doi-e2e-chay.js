@@ -3,6 +3,8 @@
 // Đi đúng đường người dùng bấm trên giao diện: trang Tạo video → Chọn thư mục ảnh (2 ảnh) → bật "Theo dõi thư mục" →
 // Tạo & chạy → 2 video xong; chép thêm 2 ảnh vào thư mục (dự án đã chạy hết hàng chờ) → app tự thêm 2 video, tự chạy
 // lại dự án, tải về đủ 4 video; ảnh cũ không làm lại; Dừng theo dõi → ảnh thêm sau không thành việc.
+// 1.4.10: ảnh đặt tên theo số prompt ảnh và NHẢY SỐ (001, 006, rồi 018, 016 — ảnh tạo không theo thứ tự) → video số 1, 6, 16, 18,
+// tên 001/006/016/018.mp4 (bản 1.4.9 đánh theo vị trí: 1, 2, 3, 4 → lệch số và prompt).
 const fs = require('fs');
 const path = require('path');
 const { session, net, dialog } = require('electron');
@@ -32,7 +34,7 @@ module.exports = function e2eTheoDoi({ win, app, LENH, dieuPhoi }) {
         tuThuLaiSuno: 0, tuChayLaiLoiSuno: 0, nghiSuno: 0, doiNenKhiLoi: false });
       const thuMuc = path.join(tam, 'anh-theo-doi'), ra = path.join(tam, 'video-theo-doi');
       fs.mkdirSync(thuMuc, { recursive: true });
-      for (const f of ['01.png', '02.png']) fs.writeFileSync(path.join(thuMuc, f), PNG1);
+      for (const f of ['001.png', '006.png']) fs.writeFileSync(path.join(thuMuc, f), PNG1);
       const d = LENH.taoDuAn({ ten: 'Theo doi', taiKhoan: ['tk-1'] });
       LENH.datCaiDat({ duAn: d.id, thuMucVideo: ra, tenVideo: '{stt}', taiVideo: true, boQuaDaCo: false });
       // Hộp chọn thư mục của hệ điều hành → trả thẳng thư mục ảnh.
@@ -52,6 +54,8 @@ module.exports = function e2eTheoDoi({ win, app, LENH, dieuPhoi }) {
       }, 20000, 'chọn dự án "Theo doi" trên giao diện');
       await js(`document.querySelector('#nutVideoThuMuc').click(); 1`);
       await cho(async () => /2 ảnh/.test(await js(`document.querySelector('#ghiVideoThuMuc').textContent`)), 10000, 'chọn thư mục 2 ảnh');
+      const ghiTm = await js(`document.querySelector('#ghiVideoThuMuc').textContent`);
+      kiem(/theo tên ảnh \(#1, 6\)/.test(ghiTm), `giao diện báo số video theo tên ảnh (${ghiTm})`);
       await js(`(() => { const o = document.querySelector('#promptThuMuc'); o.value = 'theo dõi chuyển động'; o.dispatchEvent(new Event('input')); ` +
         `const c = document.querySelector('#theoDoiThuMuc'); c.checked = true; c.dispatchEvent(new Event('change')); return 1; })()`);
       const gui0 = (await daGui()).length;
@@ -62,6 +66,9 @@ module.exports = function e2eTheoDoi({ win, app, LENH, dieuPhoi }) {
       kiem(td && td.thuMuc === thuMuc && td.tuChay === true && td.daCo.length === 2 && td.prompt === 'theo dõi chuyển động',
         `dự án theo dõi thư mục, tự chạy, 2 ảnh đã có (${JSON.stringify(td && { thuMuc: td.thuMuc, tuChay: td.tuChay, daCo: td.daCo.length, prompt: td.prompt })})`);
       kiem(v().length === 2 && v().every((j) => j.loai === 'video'), `thêm 2 việc video (${v().length})`);
+      kiem(v().map((j) => `${j.so}/${j.stt}:${path.basename(j.thamChieu[0])}`).join() === '6/6:006.png,1/1:001.png' ||
+        v().map((j) => `${j.so}/${j.stt}:${path.basename(j.thamChieu[0])}`).sort().join() === '1/1:001.png,6/6:006.png',
+        `số việc + số prompt theo tên ảnh, không theo vị trí (${v().map((j) => `#${j.so}/${j.stt}:${path.basename(j.thamChieu[0])}`).join(', ')})`);
       await cho(() => v().length === 2 && v().every((j) => j.trangThai === 'xong' || j.trangThai === 'loi'), 240000, '2 video đầu xong');
       kiem(v().every((j) => j.trangThai === 'xong'), `2 video đầu xong (${v().map((j) => j.trangThai).join(',')})`);
       await cho(() => !dieuPhoi.duAnChay.has(d.id), 15000, 'dự án chạy hết hàng chờ');
@@ -70,16 +77,16 @@ module.exports = function e2eTheoDoi({ win, app, LENH, dieuPhoi }) {
       kiem(!dong.an && /Đang theo dõi "anh-theo-doi"/.test(dong.chu) && /quét lúc \d/.test(dong.chu), `giao diện hiện dòng theo dõi (${dong.chu})`);
 
       ghi('-- 21. Làm thêm 2 ảnh vào thư mục → app tự thêm 2 video và tự chạy lại dự án');
-      for (const f of ['03.png', '04.png']) fs.writeFileSync(path.join(thuMuc, f), PNG1);
+      for (const f of ['018.png', '016.png']) fs.writeFileSync(path.join(thuMuc, f), PNG1);
       await cho(() => v().length >= 4, 40000, 'ảnh mới thành việc video');
       const moi = v().slice(2);
-      kiem(moi.length === 2 && moi.map((j) => path.basename(j.thamChieu[0])).join() === '03.png,04.png' && moi.map((j) => j.stt).join() === '3,4',
-        `2 việc video mới đúng ảnh 03, 04 (${moi.map((j) => `${j.stt}:${path.basename((j.thamChieu || [])[0] || '')}`).join(', ')})`);
+      kiem(moi.length === 2 && moi.map((j) => `${j.so}/${j.stt}:${path.basename(j.thamChieu[0])}`).sort().join() === '16/16:016.png,18/18:018.png',
+        `2 việc video mới mang số của ảnh 016, 018 (${moi.map((j) => `#${j.so}/${j.stt}:${path.basename((j.thamChieu || [])[0] || '')}`).join(', ')})`);
       kiem(dieuPhoi.duAnChay.has(d.id) || moi.some((j) => j.trangThai !== 'cho'), 'dự án tự chạy lại');
       await cho(() => v().length === 4 && v().every((j) => j.trangThai === 'xong' || j.trangThai === 'loi'), 240000, '4 video xong');
       const tep = fs.existsSync(ra) ? fs.readdirSync(ra).filter((f) => /\.mp4$/.test(f)).sort() : [];
       ghi(`   thư mục video: ${tep.join(', ')}`);
-      kiem(v().every((j) => j.trangThai === 'xong') && ['001.mp4', '002.mp4', '003.mp4', '004.mp4'].every((f) => tep.includes(f)), 'đủ 4 video tải về (001–004)');
+      kiem(v().every((j) => j.trangThai === 'xong') && ['001.mp4', '006.mp4', '016.mp4', '018.mp4'].every((f) => tep.includes(f)) && tep.length === 4, 'đủ 4 video tải về, tên theo số ảnh (001, 006, 016, 018)');
       const gui = (await daGui()).slice(gui0).map((g) => g.prompt || '');
       kiem(gui.length === 4 && gui.every((x) => /theo dõi chuyển động/.test(x)), `Muse nhận đúng 4 lần gửi, prompt dùng chung (${gui.length})`);
       const nk = LENH.trangThai().nhatKy;
@@ -90,7 +97,7 @@ module.exports = function e2eTheoDoi({ win, app, LENH, dieuPhoi }) {
       ghi('-- 22. Dừng theo dõi → ảnh thêm sau không thành việc');
       await js(`document.querySelector('#nutBoTheoDoi').click(); 1`);
       await cho(() => !dieuPhoi.duAn.find((x) => x.id === d.id).theoDoi, 10000, 'dừng theo dõi');
-      fs.writeFileSync(path.join(thuMuc, '05.png'), PNG1);
+      fs.writeFileSync(path.join(thuMuc, '020.png'), PNG1);
       await ngu(14000);
       kiem(v().length === 4, `không thêm việc cho ảnh sau khi dừng theo dõi (${v().length})`);
       kiem(await js(`document.querySelector('#dongTheoDoi').hidden`), 'dòng theo dõi ẩn');
