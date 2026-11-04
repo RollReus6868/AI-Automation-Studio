@@ -156,6 +156,36 @@ function soTuTen(ten) {
   return ds ? parseInt(ds[ds.length - 1], 10) || 0 : 0;
 }
 
+/**
+ * 1.4.10 — Thư mục ảnh đặt tên theo SỐ PROMPT ảnh ("001.jpg", "016.jpg", "061.jpg"… — có số bị thiếu vì ảnh tạo không theo
+ * thứ tự): số của từng ảnh lấy từ tên file (soTuTen). Mọi ảnh đều có số và không trùng số → [số…] cùng thứ tự `ds`;
+ * không thì null (ghép theo vị trí trong thư mục như trước).
+ */
+function soTheoTenAnh(ds) {
+  const so = (ds || []).map((p) => soTuTen(String(p).split(/[\\/]/).pop().replace(/\.[^.]+$/, '')));
+  return so.length && so.every((n) => n > 0) && new Set(so).size === so.length ? so : null;
+}
+
+/**
+ * 1.4.10 — Ghép "Tạo video từ thư mục ảnh": ảnh ↔ số việc ↔ prompt.
+ *  • Tên ảnh có số (soTheoTenAnh): ảnh "016.jpg" → việc số 16, prompt số 16 (dòng 16 của file prompt riêng), khung đầu = ảnh đó.
+ *  • Không: ảnh thứ i (xếp theo tên) → số i, prompt i (như trước 1.4.10).
+ * @param anh       đường dẫn ảnh (thư mục đã xếp theo tên)
+ * @param promptCua (soN) → prompt của số N (không rỗng)
+ * @returns { theoTen, so:[số của từng ảnh], prompts:[prompt số 1…max], theoDong:[[ảnh] của số 1…max] } — gửi `them` kèm
+ *          chonSo = so (số không có ảnh chỉ là chỗ trống, không thành việc).
+ */
+function ghepThuMucAnh(anh, promptCua) {
+  const ds = anh || [];
+  const theoTen = soTheoTenAnh(ds);
+  const so = theoTen || ds.map((_, i) => i + 1);
+  const max = so.length ? Math.max(...so) : 0;
+  const prompts = Array.from({ length: max }, (_, i) => promptCua(i + 1));
+  const theoDong = Array.from({ length: max }, () => []);
+  so.forEach((n, i) => { theoDong[n - 1] = [ds[i]]; });
+  return { theoTen: !!theoTen, so, prompts, theoDong };
+}
+
 /** Kiểu tệp theo đuôi (file Flow tải về đĩa). */
 function mimeTuDuoi(p) {
   const d = String(p || '').split('.').pop().toLowerCase();
@@ -386,7 +416,7 @@ function keHoachTai(viec, tonTai) {
 }
 
 const HD = {
-  TY_LE, MAU_MAC_DINH, MAU_TEN_MAC_DINH, MAU_TEN_ANH_MAC_DINH, PROMPT_VIDEO_MAC_DINH, slugTen, tachPrompt, timNhanVat, taoTinNhan, tenFile, mimeTuDuoi, chonKhoang, DUOI_LOAI, mauKhopFile, soTuTen,
+  TY_LE, MAU_MAC_DINH, MAU_TEN_MAC_DINH, MAU_TEN_ANH_MAC_DINH, PROMPT_VIDEO_MAC_DINH, slugTen, tachPrompt, timNhanVat, taoTinNhan, tenFile, mimeTuDuoi, chonKhoang, DUOI_LOAI, mauKhopFile, soTuTen, soTheoTenAnh, ghepThuMucAnh,
   docSoChay, chonTheoSo, gonSo,
   viecKeTiep, taiKhoanChoViec, taiKhoanChoViecDs, thoiGianDuKien, duDoanConLai, tienDoUoc, daXong, laTraLoiChu, laChanKhuVuc, laTuChoi, soSanhTuNhien, keHoachTai
 };

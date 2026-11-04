@@ -467,7 +467,9 @@
     $('#khuChuoi').hidden = loaiTrang() !== 'anh';
     $('#khuVideoThuMuc').hidden = loaiTrang() !== 'video';
     const tm = TC().thuMuc;
-    $('#ghiVideoThuMuc').textContent = tm ? `${tm.anh.length} ảnh trong "${tm.thuMuc.split(/[\\/]/).pop()}" → ${tm.anh.length} video` : 'Chưa chọn';
+    const soTen = tm && loaiTrang() === 'video' ? HD.soTheoTenAnh(tm.anh) : null;   // 1.4.10
+    $('#ghiVideoThuMuc').textContent = tm ? `${tm.anh.length} ảnh trong "${tm.thuMuc.split(/[\\/]/).pop()}" → ${tm.anh.length} video` +
+      (soTen ? ` · số video + prompt theo tên ảnh (#${HD.gonSo([...soTen].sort((a, b) => a - b))})` : '') : 'Chưa chọn';
     veTheoDoi();
     $('#batChuoi').checked = U.chuoi.bat;
     $('#khuPromptVideo').hidden = !U.chuoi.bat;
@@ -536,7 +538,13 @@
     if (soAnh && soAnh !== n) lech = soAnh > n
       ? ` · có ${soAnh} ${ten}: ${ten} ${n + 1 === soAnh ? n + 1 : `${n + 1}–${soAnh}`} không có dòng riêng → ${chungTrong ? 'prompt mặc định (ô dùng chung đang trống)' : 'prompt dùng chung'}`
       : ` · có ${soAnh} ${ten}: thừa ${n - soAnh} dòng, bỏ qua`;
-    ghi.textContent = `Đã nhập ${n} prompt từ ${r.ten || 'file'} · ${k === 'chuoi' ? 'ảnh của prompt 1 ↔ dòng 1' : 'ảnh 1 ↔ prompt 1'}…${lech}`;
+    // 1.4.10: thư mục ảnh đặt tên theo số → ảnh 016 ↔ dòng 16 (không theo vị trí ảnh trong thư mục).
+    const soTen = k === 'thuMuc' && TC().thuMuc ? HD.soTheoTenAnh(TC().thuMuc.anh) : null;
+    if (soTen) {
+      const thieu = soTen.filter((x) => !String(r.ds[x - 1] || '').trim()).sort((a, b) => a - b);
+      lech = thieu.length ? ` · ảnh số ${HD.gonSo(thieu)} không có dòng riêng → ${chungTrong ? 'prompt mặc định (ô dùng chung đang trống)' : 'prompt dùng chung'}` : '';
+    }
+    ghi.textContent = `Đã nhập ${n} prompt từ ${r.ten || 'file'} · ${k === 'chuoi' ? 'ảnh của prompt 1 ↔ dòng 1' : soTen ? 'ảnh số N (theo tên file) ↔ dòng N' : 'ảnh 1 ↔ prompt 1'}…${lech}`;
     ghi.title = r.ds.slice(0, 20).map((p, i) => `${i + 1}. ${p}`).join('\n') + (n > 20 ? `\n… còn ${n - 20} dòng` : '');
     nhan.textContent = 'Prompt dùng chung — cho ảnh không có dòng riêng';
     o.placeholder = 'Dùng cho ảnh không có dòng riêng trong file (để trống = prompt mặc định)';
@@ -869,16 +877,35 @@
       }
       chuoi = { prompt: U.chuoi.prompt, ...(rieng ? { prompts: rieng } : {}), tyLe: U.chuoi.tyLe, nen: U.chuoi.nen || nenTrang() };
     }
-    let theoDong = null;
+    let theoDong = null, chonSo = $('#chonSo').value, soTheoAnh = false;
+    // 1.4.10: tên ảnh có số ("016.jpg") → ảnh số N ↔ việc số N ↔ prompt số N (dòng N của file riêng); số không có ảnh bỏ trống.
+    const g = ghepThuMucTrang();
+    if (g && g.theoTen) {
+      const rieng = U.rieng.thuMuc ? U.rieng.thuMuc.ds : null, o = HD.tachPrompt($('#oPrompt').value, $('#tachPrompt').value);
+      const khongDong = rieng ? g.so.filter((n) => !String(rieng[n - 1] || '').trim())
+        : !U.promptThuMuc.trim() && o.length > 1 ? g.so.filter((n) => n > o.length) : [];
+      if (hoiLech && khongDong.length) {
+        const chung = U.promptThuMuc.trim() ? 'prompt dùng chung' : 'prompt video mặc định (ô dùng chung đang trống)';
+        if (!(await xacNhan('Có ảnh không có prompt riêng',
+          `Ảnh số N (theo tên file) dùng prompt số N ${rieng ? `(dòng N của <b>${esc(U.rieng.thuMuc.ten)}</b>)` : 'của ô Prompt'}. ` +
+          `Ảnh số <b>${esc(HD.gonSo([...khongDong].sort((a, b) => a - b)))}</b> không có prompt số đó nên dùng ${chung}.`, 'Vẫn tạo'))) return null;
+      }
+      theoDong = g.theoDong;
+      soTheoAnh = true;
+      // Ô "Chạy prompt số" (nếu có) chỉ lọc trong các số có ảnh.
+      const coAnh = new Set(g.so);
+      const loc = String(chonSo || '').trim() ? HD.chonTheoSo(g.prompts, chonSo).map((x) => x.stt).filter((n) => coAnh.has(n)) : [...g.so];
+      chonSo = loc.sort((a, b) => a - b).join(', ') || '0';
+    }
     // 1.4.6: video từ thư mục ảnh + file prompt riêng — số ảnh lệch số dòng thì hỏi một lần (promptCotTao đã ghép ảnh i ↔ dòng i).
-    const rTm = loai === 'video' && TC().thuMuc && U.rieng.thuMuc;
+    const rTm = !soTheoAnh && loai === 'video' && TC().thuMuc && U.rieng.thuMuc;
     if (rTm && hoiLech && rTm.ds.length !== TC().thuMuc.anh.length) {
       const n = TC().thuMuc.anh.length, m = rTm.ds.length, chung = U.promptThuMuc.trim() ? 'prompt dùng chung' : 'prompt video mặc định (ô dùng chung đang trống)';
       if (!(await xacNhan('Số ảnh và số prompt riêng lệch nhau',
         `Thư mục có <b>${n}</b> ảnh nhưng file <b>${esc(rTm.ten)}</b> có <b>${m}</b> prompt. Ảnh thứ i (xếp theo tên) dùng dòng i của file; ` +
         (n > m ? `ảnh ${m + 1 === n ? m + 1 : `${m + 1}–${n}`} không có dòng riêng nên dùng ${chung}.` : `${m - n} dòng thừa cuối file bị bỏ qua.`), 'Vẫn tạo'))) return null;
     }
-    if (TC().thuMuc) {
+    if (TC().thuMuc && !soTheoAnh) {
       const n = TC().thuMuc.anh.length;
       if (hoiLech && n !== prompts.length && !(await xacNhan('Số ảnh và số prompt lệch nhau',
         `Thư mục có <b>${n}</b> ảnh nhưng có <b>${prompts.length}</b> prompt. Ảnh được gán lần lượt theo thứ tự; ${n < prompts.length ? 'prompt thừa sẽ không có ảnh' : 'ảnh thừa bị bỏ qua'}.`, 'Vẫn tạo'))) return null;
@@ -891,14 +918,31 @@
     return {
       nen, loai, tyLe: U.tyLe[loai], thamChieu: TC().ds, thamChieuTheoDong: theoDong,
       nhanVatIds: U.cheDo === 'nguoimau' ? [...U.nvChon] : [], tuNhanVat: $('#tuNhanVat').checked,
-      soBan: $('#soBan').value, hauTo: $('#hauTo').value, chonSo: $('#chonSo').value,
+      soBan: $('#soBan').value, hauTo: $('#hauTo').value, chonSo, soTheoAnh,
       chuoiVideo: chuoi, boQuaDaCo: $('#boQuaDaCo').checked
     };
+  }
+
+  /**
+   * 1.4.10: trang Tạo video + thư mục ảnh → ghép ảnh ↔ số ↔ prompt (HD.ghepThuMucAnh). Tên ảnh đều có số (lưu theo số prompt
+   * ảnh: 001.jpg, 016.jpg…) → theo SỐ trong tên; không → g.theoTen = false, giữ cách ghép theo vị trí như trước.
+   * Prompt số N: dòng N của file riêng → dùng chung → mặc định; không file riêng mà ô Prompt có nhiều prompt → prompt N.
+   */
+  function ghepThuMucTrang() {
+    if (loaiTrang() !== 'video' || !TC().thuMuc) return null;
+    const chung = U.promptThuMuc.trim(), o = HD.tachPrompt($('#oPrompt').value, $('#tachPrompt').value);
+    const rieng = U.rieng.thuMuc ? U.rieng.thuMuc.ds : null;
+    const p0 = chung || (o.length === 1 ? o[0] : '') || HD.PROMPT_VIDEO_MAC_DINH;
+    const promptCua = rieng ? (n) => String(rieng[n - 1] || '').trim() || chung || HD.PROMPT_VIDEO_MAC_DINH
+      : !chung && o.length > 1 ? (n) => o[n - 1] || HD.PROMPT_VIDEO_MAC_DINH : () => p0;
+    return HD.ghepThuMucAnh(TC().thuMuc.anh, promptCua);
   }
 
   /** Danh sách prompt của cột Tạo (video từ thư mục ảnh: mỗi ảnh một prompt chung). */
   function promptCotTao() {
     const loai = loaiTrang();
+    const g = ghepThuMucTrang();
+    if (g && g.theoTen) return g.prompts;   // 1.4.10: prompt số 1…(số ảnh lớn nhất); chỉ số có ảnh thành việc (thamSoTao → chonSo)
     let prompts = HD.tachPrompt($('#oPrompt').value, $('#tachPrompt').value);
     // Video từ thư mục ảnh: ô prompt dùng chung (hoặc ô Prompt có 0–1 prompt) → mỗi ảnh một video cùng prompt.
     const chung = U.promptThuMuc.trim();
@@ -1581,7 +1625,10 @@
       const boLe = loaiTrang() === 'video' && TC().ds.length;
       if (boLe) TC().ds = [];
       veTao();
-      toast(loaiTrang() === 'video'
+      const soTen = loaiTrang() === 'video' && HD.soTheoTenAnh(r.anh);   // 1.4.10: ảnh 016.jpg → video #016, prompt số 16
+      toast(soTen
+        ? `Thư mục có ${r.anh.length} ảnh — mỗi ảnh một video, số video và prompt theo số trong tên ảnh (ảnh 016 → video #016, ${U.rieng.thuMuc ? `dòng 16 của ${U.rieng.thuMuc.ten}` : 'prompt số 16'})${boLe ? '. Đã bỏ ảnh tham chiếu lẻ.' : ''}`
+        : loaiTrang() === 'video'
         ? `Thư mục có ${r.anh.length} ảnh — mỗi ảnh một video, ${U.rieng.thuMuc
           ? `ảnh 1 ↔ dòng 1 của ${U.rieng.thuMuc.ten} (${U.rieng.thuMuc.ds.length} prompt riêng)${U.rieng.thuMuc.ds.length < r.anh.length ? ', ảnh thiếu dòng dùng prompt dùng chung' : ''}`
           : 'dùng prompt ở ô "Prompt dùng chung"'}${boLe ? '. Đã bỏ ảnh tham chiếu lẻ.' : ''}`
