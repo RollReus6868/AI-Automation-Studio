@@ -380,7 +380,7 @@
       $('#tyLeVideoChuoi').value = U.chuoi.tyLe;
       $('#nenVideoChuoi').value = U.chuoi.nen || '';
     }
-    if (trang === 'caidat') veCaiDat();
+    if (trang === 'caidat') { veCaiDat(); if (!DON) doDungLuong(); }   // 1.4.12: đo dung lượng lần đầu mở Cài đặt
     if (trang === 'hengio') napHenGio();
     luuUi();
     ve();
@@ -1325,6 +1325,58 @@
     const c = $('#cdDriveCach').value;
     for (const el of $$('[data-drive-cach]')) el.hidden = el.dataset.driveCach !== c;
   }
+  // ── 1.4.12: Dung lượng & dọn dẹp ───────────────────────────────────────
+  let DON = null, donDangDo = false;
+  const chuDL = (b) => (b >= 1e9 ? `${(b / 1e9).toFixed(1).replace('.', ',')} GB` : b >= 1e6 ? `${(b / 1e6).toFixed(b >= 1e8 ? 0 : 1).replace('.', ',')} MB`
+    : b >= 1e3 ? `${Math.round(b / 1e3)} KB` : `${b} B`);
+  const donChon = () => [...document.querySelectorAll('#donDs input[data-khoa]:checked')].map((x) => x.dataset.khoa);
+  function veDonTong() {
+    const t = $('#donTongChon');
+    if (!t || !DON) return;
+    const chon = new Set(donChon());
+    t.textContent = chuDL(DON.nhom.filter((n) => chon.has(n.khoa)).reduce((a, n) => a + n.bytes, 0));
+  }
+  function veDon() {
+    if (!DON) return;
+    $('#donTong').textContent = chuDL(DON.tong);
+    $('#donThuMuc').textContent = `(${DON.thuMuc})`;
+    const ds = DON.nhom.map((n) => {
+      const chiTiet = n.chiTiet && n.chiTiet.length ? ` <i>(${esc(n.chiTiet.slice(0, 8).join(', '))}${n.chiTiet.length > 8 ? ', …' : ''})</i>` : '';
+      return `<label class="don-muc${n.bytes ? '' : ' rong'}"><input type="checkbox" data-khoa="${esc(n.khoa)}"${n.bytes && n.macDinh ? ' checked' : ''}${n.bytes ? '' : ' disabled'}>` +
+        `<div><b>${esc(n.ten)}</b><small>${esc(n.moTa)}${chiTiet}</small></div><span class="don-so">${chuDL(n.bytes)}</span></label>`;
+    }).join('');
+    datHtml($('#donDs'), ds + `<div class="don-tong"><span>Sẽ giải phóng khoảng</span><b id="donTongChon"></b></div>`);
+    $('#donChay').disabled = !donChon().length;
+    veDonTong();
+  }
+  async function doDungLuong() {
+    if (donDangDo) return;
+    donDangDo = true;
+    const nut = $('#donDo');
+    nut.classList.add('dang'); nut.disabled = true; nut.querySelector('span').textContent = 'Đang đo…';
+    try { DON = await api.call('docDungLuong'); veDon(); } catch (err) { toast(`Không đo được: ${err.message || err}`, true); }
+    finally { donDangDo = false; nut.classList.remove('dang'); nut.disabled = false; nut.querySelector('span').textContent = 'Xem dung lượng'; }
+  }
+  async function donDuLieu() {
+    const chon = donChon();
+    if (!DON || !chon.length) return;
+    const n = (k) => DON.nhom.find((x) => x.khoa === k);
+    const ds = chon.map((k) => `<li><b>${esc(n(k).ten)}</b> — ${chuDL(n(k).bytes)}${n(k).chiTiet && n(k).chiTiet.length ? `: ${esc(n(k).chiTiet.join(', '))}` : ''}</li>`).join('');
+    const ok = await hoi({ tieuDe: 'Dọn dữ liệu?', ok: 'Dọn', nguyHiem: true,
+      html: `<p>Sẽ xoá:</p><ul>${ds}</ul><p>Đăng nhập các tài khoản đang có trong app, dự án, hàng đợi, cài đặt và file kết quả đã lưu vẫn giữ nguyên.` +
+        `${chon.includes('phienXoa') ? ' Phiên của tài khoản đã xoá thì mất hẳn (cả đăng nhập).' : ''}${chon.includes('toolCu') ? ' Dữ liệu tool cũ mất hẳn — hãy đóng các tool đó trước.' : ''}</p>` });
+    if (!ok) return;
+    const nut = $('#donChay');
+    nut.disabled = true; nut.querySelector('span').textContent = 'Đang dọn…';
+    try {
+      const r = await api.call('donDuLieu', { nhom: chon });
+      if (!r.ok) { toast((r.loi || []).join(' ') || 'Không dọn được.', true); return; }
+      toast(`Đã giải phóng ${chuDL(r.daDon)}${r.loi.length ? ` — ${r.loi.length} mục đang dùng nên bỏ qua (xem nhật ký)` : ''}`);
+    } catch (err) { toast(`Không dọn được: ${err.message || err}`, true); }
+    finally { nut.querySelector('span').textContent = 'Dọn dữ liệu đã chọn'; }
+    await doDungLuong();
+  }
+
   function veCaiDat() {
     if (!S) return;
     const c = S.caiDat;
@@ -1843,6 +1895,11 @@
     $('#ncChonThuMuc').onclick = async () => { const d = await api.call('chonThuMucRa', { loai: loaiTrang(), duAn: (duAnHienTai() || {}).id }); if (d) $('#ncThuMuc').value = d; };
     $('#ncMoThuMuc').onclick = () => api.call('moThuMuc', { dir: S.thuMuc[loaiTrang()] });
     $('#cdMoDuLieu').onclick = () => api.call('moThuMucDuLieu');
+    // 1.4.12: Dung lượng & dọn dẹp.
+    $('#donDo').onclick = () => doDungLuong();
+    $('#donMo').onclick = () => api.call('moThuMucDuLieu');
+    $('#donChay').onclick = () => donDuLieu();
+    $('#donDs').addEventListener('change', () => { $('#donChay').disabled = !donChon().length; veDonTong(); });
     // 1.4.0: Google Drive — thư mục Drive trên máy của dự án đang mở (lưu ngay).
     const idDa = () => (duAnHienTai() || {}).id;
     $('#cdDriveCach').onchange = () => veDriveCach();
