@@ -351,6 +351,48 @@
   const xacNhan = (tieuDe, chu, ok = 'Đồng ý', nguyHiem = false) =>
     hoi({ tieuDe, html: `<p>${chu}</p>`, ok, nguyHiem }).then((v) => !!v);
 
+  // ── 1.4.12: Dọn dữ liệu thừa (Cài đặt → Cả app) ─────────────────────────
+  const docByte = (b) => {
+    const n = Number(b) || 0;
+    const [don, chia] = n >= 1024 ** 3 ? ['GB', 1024 ** 3] : n >= 1024 ** 2 ? ['MB', 1024 ** 2] : n >= 1024 ? ['KB', 1024] : ['byte', 1];
+    const x = n / chia;
+    return `${chia === 1 ? x : x.toFixed(x >= 100 ? 0 : 1).replace('.', ',')} ${don}`;
+  };
+  const tongThua = (kq) => kq.muc.reduce((t, m) => t + m.byte, 0);
+  function ghiDungLuong(kq) {
+    const thua = tongThua(kq);
+    $('#cdDungLuong').textContent = `${docByte(kq.tong)} ở ${kq.userData}` + (thua ? ` · dọn được khoảng ${docByte(thua)}` : ' · không có gì thừa');
+  }
+  let dangDo = null;
+  /** Đo dữ liệu app (chạy nền, không chặn giao diện). */
+  function doDuLieu() {
+    if (dangDo) return dangDo;
+    $('#cdDungLuong').textContent = 'Đang đo…';
+    dangDo = api.call('quetDuLieu').then((kq) => { if (kq) ghiDungLuong(kq); return kq; })
+      .catch(() => { $('#cdDungLuong').textContent = 'Không đo được.'; return null; })
+      .finally(() => { dangDo = null; });
+    return dangDo;
+  }
+  async function hopDonDuLieu() {
+    const kq = await doDuLieu();
+    if (!kq) return;
+    const html = `<p>Chọn phần muốn dọn. <b>Không đăng xuất tài khoản</b>, không xoá ảnh / video / nhạc đã tạo, không xoá nhân vật và dự án.</p>` +
+      `<div class="ds-don">${kq.muc.map((m) => `<label class="muc-don${m.byte ? '' : ' rong'}"><input type="checkbox" name="don_${esc(m.ma)}"${m.byte && m.macDinh ? ' checked' : ''}${m.byte ? '' : ' disabled'}>` +
+        `<div><b>${esc(m.ten)}</b><small>${esc(m.moTa)}</small></div><span class="co">${m.byte ? docByte(m.byte) : 'trống'}</span></label>`).join('')}</div>` +
+      `<p class="ghi-don">Thư mục dữ liệu: ${esc(kq.userData)} — tổng ${docByte(kq.tong)}.<br>` +
+      `Dữ liệu dự án + hàng đợi (du-lieu.json): ${docByte(kq.duLieuJson)} — muốn nhỏ hơn thì xoá bớt dự án cũ trong app.` +
+      (kq.nhanVat ? `<br>Ảnh nhân vật: ${docByte(kq.nhanVat)} (giữ nguyên).` : '') + `</p>`;
+    const v = await hoi({ tieuDe: `Dọn dữ liệu thừa — dọn được khoảng ${docByte(tongThua(kq))}`, html, ok: 'Dọn' });
+    if (!v) return;
+    const muc = Object.keys(v).filter((k) => k.startsWith('don_') && v[k]).map((k) => k.slice(4));
+    if (!muc.length) { toast('Chưa chọn phần nào để dọn'); return; }
+    toast('Đang dọn…');
+    const r = await api.call('donDuLieu', { muc });
+    if (!r || !r.ok) { toast(`Dọn lỗi: ${(r && r.loi) || '?'}`, 'loi'); return; }
+    ghiDungLuong(r);
+    toast(`Đã dọn ${docByte(r.daDon)}` + (r.khongXoa ? ` — ${r.khongXoa} mục đang dùng chưa xoá được (đóng app mở lại rồi dọn tiếp)` : ''));
+  }
+
   // ── Điều hướng ──────────────────────────────────────────────────────────
   const TEN_TRANG = { anh: 'Tạo ảnh', video: 'Tạo video', nhac: 'Tạo nhạc', hengio: 'Hẹn giờ', nhanvat: 'Nhân vật', thuvien: 'Thư viện', taikhoan: 'Tài khoản', huongdan: 'Hướng dẫn', caidat: 'Cài đặt' };
   function diToi(trang) {
@@ -380,7 +422,7 @@
       $('#tyLeVideoChuoi').value = U.chuoi.tyLe;
       $('#nenVideoChuoi').value = U.chuoi.nen || '';
     }
-    if (trang === 'caidat') veCaiDat();
+    if (trang === 'caidat') { veCaiDat(); if (cu !== 'caidat') doDuLieu(); }   // 1.4.12: đo dữ liệu app mỗi lần vào Cài đặt
     if (trang === 'hengio') napHenGio();
     luuUi();
     ve();
@@ -1869,6 +1911,8 @@
     $('#ncChonThuMuc').onclick = async () => { const d = await api.call('chonThuMucRa', { loai: loaiTrang(), duAn: (duAnHienTai() || {}).id }); if (d) $('#ncThuMuc').value = d; };
     $('#ncMoThuMuc').onclick = () => api.call('moThuMuc', { dir: S.thuMuc[loaiTrang()] });
     $('#cdMoDuLieu').onclick = () => api.call('moThuMucDuLieu');
+    $('#cdMoDuLieu2').onclick = () => api.call('moThuMucDuLieu');
+    $('#cdDonDuLieu').onclick = () => hopDonDuLieu();
     // 1.4.0: Google Drive — thư mục Drive trên máy của dự án đang mở (lưu ngay).
     const idDa = () => (duAnHienTai() || {}).id;
     $('#cdDriveCach').onchange = () => veDriveCach();
