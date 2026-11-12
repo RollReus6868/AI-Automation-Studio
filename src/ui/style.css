@@ -245,6 +245,13 @@ select option { background: var(--panel-dac); }
 .tabs-loc button.on b { background: rgba(255, 255, 255, .25); }
 .thanh-chon { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 10px; margin-bottom: 8px; border-radius: 10px; background: var(--tim-nen); font-size: 13px; font-weight: 600; }
 .thanh-chon span { flex: 1; white-space: nowrap; }
+/* 1.4.12: dải báo việc Muse còn chat đang tạo dở. */
+.dong-chat-do { display: flex; align-items: center; gap: 8px; padding: 7px 10px; margin-bottom: 8px; border-radius: 10px;
+  border: 1px dashed var(--tim); background: var(--tim-nen); font-size: 12.5px; }
+.dong-chat-do[hidden] { display: none; }
+.dong-chat-do > svg { width: 15px; height: 15px; flex: 0 0 auto; color: var(--tim); }
+.dong-chat-do span { flex: 1; min-width: 0; }
+.dong-chat-do button { flex: 0 0 auto; }
 .ds-hang { padding-right: 4px; }
 .dong-viec { display: grid; grid-template-columns: 22px 46px 56px minmax(0, 1fr) 150px 88px; align-items: center; gap: 10px; padding: 10px 8px; border-radius: 12px;
   border: 1px solid transparent; cursor: pointer; }

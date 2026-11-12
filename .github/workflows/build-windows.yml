@@ -67,6 +67,11 @@ jobs:
         timeout-minutes: 10
         run: node tests/e2e.js theodoi
 
+      # 1.4.12: kiem tra viec Muse dang tao do (mo lai chat cu, co ket qua thi tai ve, khong gui lai)
+      - name: Kiem thu dau-cuoi (kiem tra viec Muse dang tao do, trang Muse gia)
+        timeout-minutes: 10
+        run: node tests/e2e.js kiemdo
+
       # 1.3.4: giao dien voi 200 video xong khong phinh RAM (anh nho thay <video>, ve theo tung dong)
       - name: Kiem thu RAM giao dien
         timeout-minutes: 6

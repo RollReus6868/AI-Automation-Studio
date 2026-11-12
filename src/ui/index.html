@@ -241,6 +241,11 @@
           <button class="nut-vien nho do" id="chonXoa"><i data-icon="trash-2"></i>Xoá</button>
           <button class="nut-vien nho" id="chonBo"><i data-icon="x"></i>Bỏ chọn</button>
         </div>
+        <!-- 1.4.12: việc Muse còn chat đang tạo dở (tắt app giữa chừng, hết giờ chờ…) → mở lại chat cũ, có kết quả thì tải về -->
+        <div class="dong-chat-do" id="dongChatDo" hidden>
+          <i data-icon="search"></i><span id="chuChatDo"></span>
+          <button class="nut-vien nho" id="nutKiemChatDo" title="Mở lại đúng chat Muse cũ ở tài khoản cũ (không gửi prompt mới): đã có video / ảnh thì tải về; Muse còn đang tạo thì chờ tiếp; không có thì việc giữ trạng thái cũ"><i data-icon="refresh-cw"></i>Kiểm tra &amp; tải về</button>
+        </div>
         <div class="ds-hang cuon" id="dsHang"></div>
       </section>
 

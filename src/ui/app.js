@@ -608,6 +608,7 @@
     for (const id of [...U.chon]) if (!tatCa.some((j) => j.id === id)) U.chon.delete(id);
     $('#thanhChon').hidden = !U.chon.size;
     $('#soChon').textContent = `${U.chon.size} đã chọn`;
+    veChatDo(tatCa);   // 1.4.12
     // "Chọn tất cả" = mọi việc đang hiện theo bộ lọc / ô tìm.
     U.dsLoc = ds.map((j) => j.id);
     const soChonTrongLoc = U.dsLoc.filter((id) => U.chon.has(id)).length;
@@ -670,6 +671,28 @@
   }
   /** 1.4.9: đổi tài khoản được — việc đang chạy, hoặc đang chờ lấy tiếp chat dở ở một tài khoản. */
   function coTheDoiTk(j) { return j.trangThai === 'chay' || (j.trangThai === 'cho' && !!j.taiKhoan); }
+  /** 1.4.12: việc Muse còn chat đang tạo dở (đã gửi prompt, chưa lấy kết quả) mà chưa chạy — như dieuPhoi._coChatDo. */
+  function coChatDo(j) { return (j.nen || 'muse') === 'muse' && !!j.thread && !!j.taiKhoan && !j.chiKiem && ['cho', 'dung', 'loi'].includes(j.trangThai); }
+
+  /** 1.4.12: dải "N việc Muse còn chat đang tạo dở — Kiểm tra & tải về" trên danh sách (theo bộ lọc đang xem). */
+  function veChatDo(tatCa) {
+    const ds = tatCa.filter(coChatDo), dang = tatCa.filter((j) => j.chiKiem).length;
+    const o = $('#dongChatDo');
+    o.hidden = !ds.length && !dang;
+    if (o.hidden) return;
+    o.dataset.ids = ds.map((j) => j.id).join(',');
+    $('#nutKiemChatDo').hidden = !ds.length;
+    const so = HD.gonSo(ds.map((j) => j.so).sort((a, b) => a - b));
+    $('#chuChatDo').textContent = (ds.length
+      ? `${ds.length} việc Muse còn chat đang tạo dở (#${so}) — video / ảnh có thể đã xong trên Muse. Kiểm tra để tải về, không tạo lại.`
+      : '') + (dang ? `${ds.length ? ' · ' : ''}Đang mở lại ${dang} chat Muse cũ…` : '');
+  }
+  async function kiemChatDo(ids) {
+    if (!ids.length) return;
+    const r = await api.call('kiemTraViecDo', { ids });
+    if (r && r.ok) toast(`Đang mở lại ${r.so} chat Muse cũ — có video / ảnh thì tải về, không tạo lại`);
+    else toast((r && r.loi) || 'Không kiểm tra được', true);
+  }
 
   function capNhatTienDo() {
     if (!S) return;
@@ -739,6 +762,8 @@
       toast(`Đã tạo lại #${so3(j.so)} và chạy ngay`);
     } else if (lenh === 'dungViec' || lenh === 'chayViec' || lenh === 'doiTaiKhoan') {
       dieuKhienViec(lenh, [j.id]);
+    } else if (lenh === 'kiemChatDo') {
+      kiemChatDo([j.id]);
     } else if (lenh === 'doiNen') {
       doiNen([j.id], nenTk(j) === 'flow' ? 'muse' : 'flow');
     } else if (lenh === 'lenDrive') {
@@ -846,6 +871,7 @@
       f ? `<button data-l="xem">${ic('eye')}Xem</button><button data-l="thuMuc">${ic('folder-open')}Mở thư mục</button>` : '',
       j.trangThai === 'chay' || j.trangThai === 'cho' ? `<button data-l="dungViec">${ic('square')}Dừng việc này</button>` : '',
       coTheDoiTk(j) ? `<button data-l="doiTaiKhoan">${ic('users')}Đổi sang tài khoản kế tiếp</button>` : '',
+      coChatDo(j) ? `<button data-l="kiemChatDo">${ic('refresh-cw')}Kiểm tra chat Muse cũ &amp; tải về</button>` : '',
       ['cho', 'dung', 'loi'].includes(j.trangThai) ? `<button data-l="chayViec">${ic('play')}Chạy ngay việc này</button>` : '',
       j.trangThai !== 'chay' ? `<button data-l="taoLai">${ic('rotate-ccw')}Tạo lại</button><button data-l="sua">${ic('pencil')}${f && j.loai === 'anh' ? 'Chỉnh sửa ảnh' : 'Sửa prompt'}</button>` : '',
       f && j.loai === 'anh' ? `<button data-l="video">${ic('film')}Tạo video từ ảnh này</button>` : '',
@@ -1775,6 +1801,7 @@
     $('#chonDrive').onclick = () => lenDrive([...U.chon]);
     $('#chonDung').onclick = () => { dieuKhienViec('dungViec', [...U.chon]); U.chon.clear(); };
     $('#chonDoiTk').onclick = () => { doiTaiKhoan([...U.chon]); U.chon.clear(); };
+    $('#nutKiemChatDo').onclick = () => kiemChatDo(($('#dongChatDo').dataset.ids || '').split(',').filter(Boolean).map(Number));   // 1.4.12
 
     // Chi tiết
     $('#chiTiet').addEventListener('click', (e) => {

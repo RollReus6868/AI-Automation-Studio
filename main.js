@@ -783,6 +783,8 @@ const LENH = {
   taoLai: ({ ids, chay }) => dieuPhoi.taoLai(ids, chay),
   dungViec: ({ ids }) => dieuPhoi.dungViec(ids),
   chayViec: ({ ids }) => dieuPhoi.chayViec(ids),
+  // 1.4.12: mở lại chat Muse cũ của việc đang tạo dở (tắt app giữa chừng…) — có kết quả thì tải về, không tạo lại.
+  kiemTraViecDo: ({ ids, duAn } = {}) => dieuPhoi.kiemTraViecDo(ids || [], { duAn: duAn || null }),
   doiTaiKhoan: ({ ids }) => dieuPhoi.doiTaiKhoan(ids || []),   // 1.4.9: nút "Đổi tài khoản" ở việc đang chạy / treo
   xoaViec: ({ ids }) => dieuPhoi.xoaViec(ids),
   suaViec: ({ id, thay }) => dieuPhoi.suaViec(id, thay),
