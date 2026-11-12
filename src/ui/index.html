@@ -219,9 +219,12 @@
           <label class="chon-het" title="Chọn / bỏ chọn mọi việc đang hiện trong danh sách"><input type="checkbox" id="chonHet"><span>Chọn hết</span></label>
           <div class="tabs-loc" id="tabsLoc"></div>
           <div class="gian"></div>
+          <div class="loc-phai">
           <select class="loc-nen khong-nhac" id="locNen" title="Lọc theo nơi chạy"><option value="">Muse + Flow</option><option value="muse">Chỉ Muse</option><option value="flow">Chỉ Flow</option></select>
+          <select class="loc-nen loc-tk" id="locTk" title="Lọc theo tài khoản đã tạo ảnh / video"><option value="">Mọi tài khoản</option></select>
           <button class="nut-vien nho" id="nutDatLai" title="Đưa mọi việc của hàng đợi này về Chờ như lúc mới thêm"><i data-icon="rotate-ccw"></i><span>Đặt lại</span></button>
           <button class="nut-vien nho" id="nutSapXep"><i data-icon="arrow-down-up"></i><span>Mới nhất</span></button>
+          </div>
         </div>
         <div class="thanh-chon" id="thanhChon" hidden>
           <span id="soChon">0 đã chọn</span>
@@ -349,6 +352,7 @@
           <li><b>Suno hết lượt:</b> tài khoản Suno báo hết credit (nút Create ghi <i>Create again in …</i>) / hết lượt tải thì bài đó được tạo lại và tải ở tài khoản Suno dự phòng; tài khoản hết lượt nghỉ 6 giờ (bấm <i>Kiểm tra</i> ở tài khoản đó để cho chạy lại sớm). Suno hỏi captcha thì cửa sổ Suno hiện lên để bạn tự giải — app không giải hộ. Đăng nhập Suno bằng Google mà Google báo <i>Couldn't sign you in</i>: bấm <i>Try again</i>; vẫn không được thì gửi ảnh chụp cho người phát triển.</li>
           <li><b>Google Drive (1.4.0), cách 1 (chép vào thư mục Drive trên máy):</b> cài <i>Google Drive cho máy tính</i>, đăng nhập Drive. Cài đặt → <i>Google Drive</i> → <i>Cách đưa lên: Chép vào thư mục…</i> → <i>Tự tìm</i> (hoặc <i>Chọn…</i> ổ <code>G:\My Drive</code>) → bật <i>tự đưa lên Google Drive</i> → <i>Lưu cài đặt</i>.</li>
           <li><b>Google Drive, cách 2 (tải thẳng lên drive.google.com):</b> Tài khoản → thẻ <i>Drive</i> → <i>Thêm Drive</i> → <i>Đăng nhập</i> Google trong khung bên phải → <i>Xong</i>. Cài đặt → <i>Google Drive</i> → <i>Cách đưa lên: Tải thẳng lên…</i> → chọn tài khoản → bật <i>tự đưa lên</i> → <i>Lưu cài đặt</i>. App mở Drive ở cửa sổ ẩn, tự tạo thư mục và tải từng file. Cả hai cách: ảnh vào <code>Tên dự án/images</code>, video vào <code>Tên dự án/Videos</code>; việc xong từ trước: chọn việc → <i>Lên Drive</i>. Tải lên hỏng thì app lưu trang Drive vào <code>Tài liệu/AI Automation Studio/chan-doan-drive</code> — gửi tệp đó kèm nhật ký.</li>
+          <li><b>Lọc theo tài khoản:</b> ô <i>Mọi tài khoản</i> trên danh sách việc (cạnh <i>Muse + Flow</i>) → chọn vd <i>Muse 3</i> để chỉ xem ảnh / video do Muse 3 tạo (số sau tên là số việc; <i>Chưa chạy</i> = việc chưa chạy ở tài khoản nào). Tab Hoàn tất / Lỗi đếm theo tài khoản đã chọn; <i>Chọn hết</i> chỉ chọn việc của tài khoản đó (để tải về, tạo lại…).</li>
           <li><b>Đổi prompt nhiều việc:</b> tick <i>Chọn hết</i> (hoặc chọn vài dòng) → <i>Đổi prompt</i>: thay hẳn bằng prompt mới, hoặc tìm và thay một đoạn chữ; trang Tạo ảnh đổi được cả prompt video sẽ tự tạo từ ảnh.</li>
           <li><b>Đổi ngay sang Muse / Flow:</b> nút <i>⋮</i> ở mỗi dòng → <i>Đổi sang Flow / Muse &amp; chạy ngay</i>; chọn nhiều dòng → <i>Sang Muse</i> / <i>Sang Flow</i>. Việc đang chạy dừng ở bên cũ rồi chạy ở bên mới; việc đã xong thì được tạo lại ở bên mới.</li>
           <li><b>Đồng hồ dự án:</b> cạnh tên dự án là thời gian dự án đã chạy (lượt này) và dự đoán còn bao lâu nữa (tính theo tốc độ thật của lượt đang chạy).</li>

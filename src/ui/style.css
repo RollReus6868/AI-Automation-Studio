@@ -212,6 +212,8 @@ select option { background: var(--panel-dac); }
 .o-tim i { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; color: var(--chu-mo); }
 .o-tim input { padding-left: 32px; }
 .loc-dong { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 10px; }
+/* 1.4.11: hai hộp lọc (nơi chạy, tài khoản) + Đặt lại + sắp xếp đi thành MỘT cụm — thiếu chỗ thì cả cụm xuống hàng, nằm bên phải. */
+.loc-phai { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 8px; margin-left: auto; min-width: 0; }
 .chon-het { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; color: var(--chu-phu); cursor: pointer; padding: 0 4px; white-space: nowrap; }
 .chon-het input { width: 16px; height: 16px; accent-color: var(--g2); cursor: pointer; }
 #khuVideoThuMuc .dong-o { margin-top: 8px; }
@@ -399,6 +401,9 @@ img[data-vthumb]:not([src]), img[data-vthumb].vthumb-loi { visibility: hidden; }
 .toast.loi { border-color: rgba(248, 113, 113, .5); color: #fecaca; }
 
 @media (max-width: 1280px) {
+  /* 1.4.11: cụm lọc vừa một hàng ở cửa sổ nhỏ — ô lọc gọn hơn, "Đặt lại" chỉ còn biểu tượng (chữ ở gợi ý khi rê chuột). */
+  .loc-phai .loc-nen { min-width: 0; max-width: 112px; }
+  .loc-phai #nutDatLai span { display: none; }
   .ba-cot { grid-template-columns: 280px minmax(380px, 1fr) 250px; }
   #chipHomNay { display: none !important; }
   /* Cửa sổ hẹp: bỏ cột #số (số đã có ở đầu prompt), thu cột trạng thái. */
@@ -425,6 +430,9 @@ img[data-vthumb]:not([src]), img[data-vthumb].vthumb-loi { visibility: hidden; }
 .hang-chon { display: flex; flex-wrap: wrap; gap: 4px 16px; }
 .hang-chon .o-chon.nho select { width: 150px; }
 .loc-nen { width: auto; min-width: 112px; flex: 0 0 auto; padding: 4px 8px; font-size: 12px; height: 30px; }
+/* 1.4.11: lọc theo tài khoản — tên dài thì cắt gọn; đang lọc thì viền nổi để khỏi quên mình đang xem một phần. */
+.loc-tk { max-width: 170px; text-overflow: ellipsis; }
+.loc-tk.dang-loc { border-color: var(--tim); box-shadow: 0 0 0 1px var(--tim) inset; color: var(--chu); }
 select.canh-bao { border-color: #e0a100; }
 .the-cai h4 { margin: 16px 0 8px; font-size: 13px; color: var(--chu-phu); text-transform: uppercase; letter-spacing: .4px; }
 .chon-tk.nhom-nen { padding: 10px 12px; margin-bottom: 10px; border: 1px solid var(--vien); border-radius: var(--bo); background: var(--the); }
