@@ -1,4 +1,24 @@
-# AI Automation Studio 1.4.11
+# AI Automation Studio 1.4.12
+
+- **Sửa: tắt app đột ngột lúc Muse đang tạo video / ảnh thì mở lại dễ bị tạo trùng hoặc lỗi.**
+  - Mở lại app, app **tự kiểm tra** các việc Muse đang tạo dở lúc tắt: mở lại đúng chat cũ ở đúng tài khoản cũ (cửa sổ ngầm). Video / ảnh đã xong thì **tải về luôn, không gửi prompt mới**. Muse còn đang tạo thì chờ tiếp. Chat không có gì thì việc về hàng chờ.
+  - Trước đây, nếu tài khoản cũ đang nghỉ / bị chặn video / ngoài nhóm chạy, việc bị chuyển sang tài khoản khác và **gửi lại prompt** → Muse tạo trùng. Giờ việc còn chat dở luôn được mở lại ở tài khoản cũ trước (chỉ đọc chat, không tạo thêm). Mở lại hỏng 2 lần liền (mất kết nối, trang hỏng…) thì mới gửi lại ở tài khoản khác như trước.
+  - Link chat được lưu xuống máy **ngay khi vừa gửi**, nên tắt app ngay sau lúc gửi vẫn còn chat để mở lại.
+- **Nút Kiểm tra & tải về.** Danh sách việc hiện dải báo *"N việc Muse còn chat đang tạo dở"* khi có việc như vậy, kể cả việc đã báo **Lỗi** vì quá giờ chờ (video có thể đã xong sau đó). Bấm **Kiểm tra & tải về** → app mở lại chat cũ, có kết quả thì tải về, không tạo lại. Không có kết quả thì việc giữ trạng thái cũ. Cũng có trong menu ⋯ của từng dòng (*Kiểm tra chat Muse cũ & tải về*).
+- **Dọn dữ liệu thừa** (Cài đặt → **Dung lượng & dọn dẹp**). Bấm để xem tool đang chiếm bao nhiêu trên ổ C, tick nhóm muốn dọn rồi bấm **Dọn dữ liệu đã chọn**:
+  - **Cache trình duyệt** của các tài khoản Muse / Flow / Suno và của app — phần nặng nhất (vài trăm MB mỗi tài khoản). Đăng nhập các tài khoản **vẫn giữ nguyên**.
+  - **Phiên của tài khoản đã xoá** khỏi app (cả đăng nhập của chúng).
+  - **File tạm**: bộ cài bản cập nhật đã tải, thư mục tải tạm Flow / Suno, nhật ký cũ, báo cáo lỗi trình duyệt.
+  - **Kết quả tạm không còn việc nào dùng** (khi tắt "Tải về máy"); kết quả của việc còn trong danh sách được giữ.
+  - **File chẩn đoán cũ hơn 7 ngày**.
+  - **Dữ liệu tool cũ** (Muse Automation Studio, Flow Automation Studio, Tool-flow-veo3, veo3-ai-studio) — mặc định không chọn, chỉ tick khi không dùng các tool đó nữa.
+  - Phải dừng các dự án trước khi dọn.
+- **Cache trình duyệt không phình lại nữa**: mỗi tài khoản giới hạn khoảng 200 MB cache.
+- Mọi thứ khác giữ nguyên như 1.4.11.
+
+Lưu ý: đã kiểm bằng bài kiểm tự động trên trang Muse giả và thư mục dữ liệu giả, chưa chạy trên muse.ai thật và máy Windows thật. Lần đầu dọn, nên xem số dung lượng từng nhóm trước khi bấm dọn.
+
+## Bản 1.4.11
 
 - **Lọc danh sách việc theo tài khoản.** Trên danh sách Tạo ảnh / Tạo video (và Tạo nhạc) có thêm ô **Mọi tài khoản**, cạnh ô *Muse + Flow*.
   - Chọn vd **Muse 3** → chỉ hiện các ảnh / video do Muse 3 tạo. Mỗi tài khoản ghi kèm số việc (vd *Muse 3 · 50*); chỉ liệt kê tài khoản có việc trong danh sách đang xem.
