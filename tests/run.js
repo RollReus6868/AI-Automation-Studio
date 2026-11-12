@@ -3313,6 +3313,127 @@ console.log('\n── 1.4.0 ─────────────────�
   });
 }
 
+// ── 1.4.12: Dọn dữ liệu thừa (src/main/don-dep.js) ───────────────────────────────────────────────────────────
+{
+  const os = require('os');
+  const DD = require('../src/main/don-dep');
+  const KB = 1024;
+  /** Cây thư mục giả như userData thật (đo bằng Electron 33). */
+  function cayGia() {
+    const ud = fs.mkdtempSync(path.join(os.tmpdir(), 'dd-'));
+    const ghi = (rel, byte, cu = true) => {
+      const p = path.join(ud, rel);
+      fs.mkdirSync(path.dirname(p), { recursive: true });
+      fs.writeFileSync(p, Buffer.alloc(byte, 1));
+      if (cu) { const t = new Date(Date.now() - 2 * 3600e3); fs.utimesSync(p, t, t); }
+      return p;
+    };
+    const P = (tk) => path.join('Partitions', tk);
+    for (const tk of ['muse-tk-1', 'flow-flow-1', 'muse-tk-da-xoa']) {
+      ghi(path.join(P(tk), 'Cache', 'Cache_Data', 'data_1'), 100 * KB);
+      ghi(path.join(P(tk), 'Code Cache', 'js', 'a'), 50 * KB);
+      ghi(path.join(P(tk), 'GPUCache', 'data_0'), 10 * KB);
+      ghi(path.join(P(tk), 'DawnWebGPUCache', 'x'), 10 * KB);
+      ghi(path.join(P(tk), 'Service Worker', 'CacheStorage', 'c', 'x'), 30 * KB);
+      ghi(path.join(P(tk), 'Service Worker', 'ScriptCache', 's'), 1 * KB);
+      ghi(path.join(P(tk), 'Service Worker', 'Database', 'd'), 1 * KB);
+      ghi(path.join(P(tk), 'Cookies'), 2 * KB);
+      ghi(path.join(P(tk), 'Network', 'Cookies'), 2 * KB);
+      ghi(path.join(P(tk), 'Local Storage', 'leveldb', 'l'), 3 * KB);
+      ghi(path.join(P(tk), 'IndexedDB', 'i'), 4 * KB);
+    }
+    ghi(path.join('Cache', 'Cache_Data', 'g'), 20 * KB);   // phiên mặc định (giao diện app)
+    ghi(path.join('Local Storage', 'leveldb', 'ui'), 1 * KB);
+    ghi('du-lieu.json', 5 * KB);
+    ghi('du-lieu.json.hong-1700000000000', 7 * KB);
+    ghi('nhat-ky.txt', 2 * KB);
+    ghi('nhat-ky-cu.txt', 9 * KB);
+    ghi(path.join('suno-tai-tam', 'bai.mp3'), 40 * KB);
+    ghi(path.join('suno-tai-tam', 'dang-tai.mp3'), 40 * KB, false);   // vừa ghi: đang tải → để yên
+    ghi(path.join('flow-tai-tam', 'tk-1-1', 'me-a', 'v.mp4'), 60 * KB);
+    const flowDung = ghi(path.join('flow-tai-tam', 'tk-1-2', 'me-b', 'dung.mp4'), 5 * KB);   // việc còn trỏ tới
+    ghi(path.join('flow-tai-tam', 'tk-1-2', 'me-c', 'rac.mp4'), 5 * KB);
+    ghi(path.join('ket-qua-tam', 'da-xoa', 'x.png'), 8 * KB);           // dự án đã xoá
+    const conDung = ghi(path.join('ket-qua-tam', 'mac-dinh', '001.png'), 8 * KB);   // việc còn trỏ tới (tắt Tải về)
+    ghi(path.join('ket-qua-tam', 'mac-dinh', 'mo-coi.png'), 8 * KB);
+    ghi(path.join('cap-nhat', 'AIAutomationStudio-1.4.10-setup.exe'), 70 * KB);
+    ghi(path.join('cap-nhat', 'AIAutomationStudio-1.4.13-setup.exe'), 70 * KB);   // bản mới đang chờ cài
+    ghi(path.join('Crashpad', 'completed', 'r.dmp'), 6 * KB);
+    ghi(path.join('Crashpad', 'settings.dat'), 1 * KB);
+    ghi(path.join('nhan-vat', 'nv1', 'a.png'), 11 * KB);
+    const cd = path.join(ud, 'chan-doan-flow');
+    ghi(path.join('chan-doan-flow', 'loi-1.html'), 12 * KB);
+    const o = { userData: ud, partitions: ['persist:muse-tk-1', 'persist:flow-flow-1'], dangMo: [path.join(ud, P('flow-flow-1'))],
+      fileViec: [conDung, flowDung], duAnIds: ['mac-dinh'], thuMucChanDoan: [cd], phienBan: '1.4.12' };
+    return { ud, o, conDung, flowDung, P };
+  }
+  const muc = (kq, ma) => kq.muc.find((m) => m.ma === ma);
+
+  testAsync('1.4.12 dọn dữ liệu: quét đúng dung lượng từng mục (giữ đăng nhập, file việc còn dùng, nhân vật, bộ cài bản mới)', async () => {
+    const { ud, o, P } = cayGia();
+    try {
+      const kq = await DD.quet(o);
+      const c = muc(kq, 'cache');
+      // tk-1 (không mở): 200 KB xoá trên đĩa; flow-1 (đang mở): 200 KB qua API phiên; phiên mặc định 20 KB qua API.
+      assert.strictEqual(c.byte, (200 + 200 + 20) * KB);
+      assert.deepStrictEqual(c.api.map((p) => path.relative(ud, p)).sort(), ['', P('flow-flow-1')].sort());
+      assert.ok(c.xoa.every((p) => p.includes(P('muse-tk-1'))) && c.xoa.length === 5, c.xoa.join('\n'));
+      assert.ok(!c.xoa.some((p) => /Cookies|Local Storage|IndexedDB|Network|ScriptCache|Database/.test(p)), 'không đụng đăng nhập');
+      const b = muc(kq, 'phien-cu');
+      assert.deepStrictEqual(b.xoa.map((p) => path.relative(ud, p)), [P('muse-tk-da-xoa')]);
+      assert.strictEqual(b.byte, (200 + 2 + 2 + 3 + 4 + 1 + 1) * KB);
+      const t = muc(kq, 'tam');
+      assert.deepStrictEqual(t.xoa.map((p) => path.relative(ud, p)).sort(),
+        [path.join('flow-tai-tam', 'tk-1-1'), path.join('flow-tai-tam', 'tk-1-2', 'me-c'), path.join('ket-qua-tam', 'da-xoa'), path.join('ket-qua-tam', 'mac-dinh', 'mo-coi.png'), path.join('suno-tai-tam', 'bai.mp3')].sort());
+      assert.deepStrictEqual([muc(kq, 'nhat-ky-cu').byte, muc(kq, 'chan-doan').byte, muc(kq, 'cap-nhat').byte, muc(kq, 'bao-loi').byte], [9 * KB, 12 * KB, 70 * KB, 13 * KB]);
+      assert.deepStrictEqual(muc(kq, 'cap-nhat').xoa.map((p) => path.basename(p)), ['AIAutomationStudio-1.4.10-setup.exe']);
+      assert.deepStrictEqual([kq.duLieuJson, kq.nhanVat], [5 * KB, 11 * KB]);
+      const tt = DD.tomTat(kq);
+      assert.ok(tt.muc.every((m) => !m.xoa && !m.api) && tt.muc.length === 7);
+      assert.deepStrictEqual([DD.docByte(1536), DD.docByte(3.25 * 1024 ** 3), DD.docByte(500)], ['1,5 KB', '3,3 GB', '500 byte']);
+    } finally { fs.rmSync(ud, { recursive: true, force: true }); }
+  });
+
+  testAsync('1.4.12 dọn dữ liệu: dọn xong vẫn còn đăng nhập (Cookies, Local Storage, IndexedDB), file việc còn dùng, nhật ký đang ghi, nhân vật', async () => {
+    const { ud, o, conDung, flowDung, P } = cayGia();
+    try {
+      const kq = await DD.quet(o);
+      const r = await DD.donDep(kq, kq.muc.map((m) => m.ma));
+      assert.strictEqual(r.khongXoa, 0, JSON.stringify(r));
+      const con = (rel) => fs.existsSync(path.join(ud, rel));
+      for (const tk of ['muse-tk-1', 'flow-flow-1']) {
+        for (const rel of ['Cookies', path.join('Network', 'Cookies'), path.join('Local Storage', 'leveldb', 'l'), path.join('IndexedDB', 'i'), path.join('Service Worker', 'Database', 'd')]) {
+          assert.ok(con(path.join(P(tk), rel)), `${tk}/${rel} phải còn`);
+        }
+      }
+      assert.ok(!con(path.join(P('muse-tk-1'), 'Cache')) && !con(path.join(P('muse-tk-1'), 'Service Worker', 'CacheStorage')), 'cache phiên không mở: xoá trên đĩa');
+      assert.ok(con(path.join(P('flow-flow-1'), 'Cache', 'Cache_Data', 'data_1')), 'phiên đang mở: không xoá file trên đĩa (dọn qua API)');
+      assert.ok(!con(P('muse-tk-da-xoa')), 'phiên tài khoản đã xoá: xoá cả thư mục');
+      assert.ok(fs.existsSync(flowDung) && !con(path.join('flow-tai-tam', 'tk-1-2', 'me-c')), 'thư mục tạm có file việc còn dùng: chỉ xoá phần thừa');
+      assert.ok(fs.existsSync(conDung) && con(path.join('suno-tai-tam', 'dang-tai.mp3')) && con('nhat-ky.txt') && con('du-lieu.json') &&
+        con(path.join('nhan-vat', 'nv1', 'a.png')) && con(path.join('cap-nhat', 'AIAutomationStudio-1.4.13-setup.exe')) && con(path.join('Crashpad', 'settings.dat')));
+      assert.ok(!con('nhat-ky-cu.txt') && !con(path.join('chan-doan-flow', 'loi-1.html')) && !con('du-lieu.json.hong-1700000000000') &&
+        !con(path.join('ket-qua-tam', 'mac-dinh', 'mo-coi.png')) && !con(path.join('cap-nhat', 'AIAutomationStudio-1.4.10-setup.exe')));
+      // Chỉ dọn mục đã chọn.
+      const k2 = cayGia();
+      const q2 = await DD.quet(k2.o);
+      await DD.donDep(q2, ['nhat-ky-cu']);
+      assert.ok(!fs.existsSync(path.join(k2.ud, 'nhat-ky-cu.txt')) && fs.existsSync(path.join(k2.ud, k2.P('muse-tk-da-xoa'))) && fs.existsSync(path.join(k2.ud, 'suno-tai-tam', 'bai.mp3')));
+      fs.rmSync(k2.ud, { recursive: true, force: true });
+    } finally { fs.rmSync(ud, { recursive: true, force: true }); }
+  });
+
+  test('1.4.12 dọn dữ liệu: LENH quetDuLieu / donDuLieu, phiên đang mở dọn qua API (giữ đăng nhập), giao diện ở Cài đặt → Cả app', () => {
+    const m = docNguon('main.js'), ui = docNguon('src/ui/app.js'), html = docNguon('src/ui/index.html');
+    assert.ok(/quetDuLieu: async \(\) => DD\.tomTat\(await DD\.quet\(moiTruongDonDep\(\)\)\)/.test(m) && /donDuLieu: \(\{ muc \}\) => donDuLieu\(muc \|\| \[\]\)/.test(m));
+    assert.ok(/await ses\.clearCache\(\);/.test(m) && /clearStorageData\(\{ storages: \['shadercache', 'cachestorage'\] \}\)/.test(m));
+    assert.ok(!/clearStorageData\(\{ storages: \[[^\]]*(cookies|localstorage|indexdb)/.test(m), 'dọn không được xoá cookie / localStorage / IndexedDB');
+    assert.ok(/fileViec: dieuPhoi\.viec\.flatMap\(\(j\) => \[\.\.\.\(j\.files \|\| \[\]\), \.\.\.\(j\.thamChieu \|\| \[\]\)\]\)/.test(m));
+    assert.ok(/id="cdDonDuLieu"/.test(html) && /id="cdDungLuong"/.test(html) && /Dọn dữ liệu thừa/.test(html));
+    assert.ok(/api\.call\('quetDuLieu'\)/.test(ui) && /api\.call\('donDuLieu', \{ muc \}\)/.test(ui));
+  });
+}
+
 Promise.all(choAsync).then(() => {
   console.log('\n──────────────────────────────────────────────');
   console.log(`KẾT QUẢ: ${pass}/${pass + loi.length} PASS`);
