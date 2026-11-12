@@ -55,7 +55,10 @@ module.exports = function e2eKiemDo({ win, LENH, dieuPhoi, taiKhoan }) {
       ghi('-- 1. Dải báo + nút "Kiểm tra việc dở"');
       await js(`window.__diToi('video'); undefined`);
       // Mở dự án "Kiem do" qua menu dự án như người dùng bấm.
-      await js(`(() => { document.querySelector('#nutDuAn').click(); const b = document.querySelector('#menuDuAn [data-du-an="${d.id}"]'); b.click(); return 1; })()`);
+      // Giao diện nhận dự án mới qua bản trạng thái (gom 250 ms) → chờ nút dự án có trong menu rồi mới bấm.
+      const moDuAn = await cho(() => js(`(() => { document.querySelector('#nutDuAn').click(); const b = document.querySelector('#menuDuAn [data-du-an="${d.id}"]');
+        if (!b) { document.querySelector('#nutDuAn').click(); return false; } b.click(); return true; })()`), 10000, 'mở dự án Kiem do');
+      kiem(moDuAn, 'mở dự án "Kiem do" từ menu dự án');
       await ngu(1500);
       ghi(`   dải: ${await js(`JSON.stringify({ an: document.querySelector('#daiViecDo').hidden, chu: document.querySelector('#daiViecDoChu').innerHTML, duAn: document.querySelector('#tenDuAn')?.textContent || '' })`)}`);
       const coDai = await cho(async () => /3<\/b> việc Muse đã gửi prompt/.test(await js(`document.querySelector('#daiViecDo:not([hidden]) #daiViecDoChu')?.innerHTML || ''`)), 10000, 'dải báo 3 việc dở');
