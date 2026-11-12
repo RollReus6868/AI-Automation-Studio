@@ -1,6 +1,6 @@
 'use strict';
 // Kịch bản chạy BÊN TRONG app (MUSE_TEST) cho tests/giao-dien-ram.js — xem giải thích ở file đó.
-module.exports = async ({ win, app, dieuPhoi, docRam, baoRam, nhatKy }) => {
+module.exports = async ({ win, app, dieuPhoi, docRam, baoRam, nhatKy, taiKhoan }) => {
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   const js = (c) => win.webContents.executeJavaScript(c, true);
   const loi = [];
@@ -53,6 +53,37 @@ module.exports = async ({ win, app, dieuPhoi, docRam, baoRam, nhatKy }) => {
     console.log(`  [RAM] giao diện: ${ram0} MB trước → ${ram1} MB sau 15 s trạng thái đổi (bản 1.3.3 với 200 video 720×1280 8 s: 1,8 GB → 3,4 GB)`);
     ok('RAM giao diện dưới 1 GB sau 15 s trạng thái đổi liên tục', ram1 > 0 && ram1 < 1024, `${ram1} MB`);
     ok('ảnh nhỏ đã chụp vẫn còn trên dòng (không bị vẽ lại mất)', conAnh >= da.coSrc, `${conAnh} ≥ ${da.coSrc}`);
+
+    // 1.4.11: lọc theo TÀI KHOẢN đã tạo ("tìm các video được tạo từ tài khoản Muse 3").
+    const tk3 = taiKhoan.them('Muse 3', 'muse');
+    for (const x of dieuPhoi.viec) { if (x.trangThai === 'xong' && x.id % 4 === 0) x.taiKhoan = tk3.id; else if (x.trangThai === 'cho') x.taiKhoan = ''; }
+    const soTk = (id) => dieuPhoi.viec.filter((x) => x.taiKhoan === id).length;
+    dieuPhoi.luu();
+    const nhanTk = `Muse 3 · ${soTk(tk3.id)}`;
+    const coTk = await choDen(() => js(`[...document.querySelectorAll('#locTk option')].some((o) => o.textContent === ${JSON.stringify(nhanTk)})`), 10000);
+    const opt = JSON.parse(await js(`JSON.stringify([...document.querySelectorAll('#locTk option')].map((o) => o.textContent))`));
+    ok('hộp lọc tài khoản liệt kê tài khoản có việc + số việc (Muse 1, Muse 3, Chưa chạy)', coTk &&
+      opt.join('|') === `Mọi tài khoản · 300|Muse 1 · ${soTk('tk-1')}|${nhanTk}|Chưa chạy · ${soTk('')}`, opt.join(' | '));
+    const chonTk = (v) => js(`(() => { const s = document.querySelector('#locTk'); s.value = ${JSON.stringify(v)}; s.dispatchEvent(new Event('change', { bubbles: true })); return 1; })()`);
+    const dsDong = () => js(`JSON.stringify([...document.querySelectorAll('#dsHang .dong-viec')].map((d) => +d.dataset.id))`).then(JSON.parse);
+    await chonTk(tk3.id);
+    await choDen(async () => (await dsDong()).length === soTk(tk3.id), 5000);
+    const loc3 = await dsDong();
+    const tab3 = await js(`[...document.querySelectorAll('#tabsLoc button')].map((b) => b.textContent.trim()).join('|')`);
+    ok('chọn Muse 3 → chỉ hiện video Muse 3 tạo, tab trạng thái đếm theo tài khoản', loc3.length === 50 &&
+      loc3.every((id) => dieuPhoi.viec.find((x) => x.id === id).taiKhoan === tk3.id) && tab3 === 'Tất cả 50|Hoàn tất 50' &&
+      await js(`document.querySelector('#locTk').classList.contains('dang-loc')`), `${loc3.length} dòng · ${tab3}`);
+    await js(`document.querySelector('#chonHet').click(); 1`);
+    const chon = await js(`document.querySelector('#soChon').textContent`);
+    ok('"Chọn hết" khi đang lọc → chọn đúng các việc của tài khoản đó', chon === '50 đã chọn', chon);
+    await js(`document.querySelector('#chonHet').click(); 1`);
+    await chonTk('_');
+    await choDen(async () => (await dsDong()).length === soTk(''), 5000);
+    const chua = await dsDong();
+    ok('chọn "Chưa chạy" → chỉ việc chưa chạy ở tài khoản nào', chua.length === 99 && chua.every((id) => dieuPhoi.viec.find((x) => x.id === id).trangThai === 'cho'), `${chua.length} dòng`);
+    await chonTk('');
+    await choDen(async () => (await dsDong()).length === 300, 5000);
+    ok('chọn "Mọi tài khoản" → hiện lại đủ 300 dòng', (await dsDong()).length === 300 && !(await js(`document.querySelector('#locTk').classList.contains('dang-loc')`)));
 
     // Thư viện: lưới ô vuông, không <video>, hàng không bị co.
     await js(`window.__diToi('thuvien'); undefined`);

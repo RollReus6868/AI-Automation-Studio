@@ -1,4 +1,14 @@
-# AI Automation Studio 1.4.10
+# AI Automation Studio 1.4.11
+
+- **Lọc danh sách việc theo tài khoản.** Trên danh sách Tạo ảnh / Tạo video (và Tạo nhạc) có thêm ô **Mọi tài khoản**, cạnh ô *Muse + Flow*.
+  - Chọn vd **Muse 3** → chỉ hiện các ảnh / video do Muse 3 tạo. Mỗi tài khoản ghi kèm số việc (vd *Muse 3 · 50*); chỉ liệt kê tài khoản có việc trong danh sách đang xem.
+  - **Chưa chạy** = việc chưa chạy ở tài khoản nào.
+  - Các tab *Tất cả / Hoàn tất / Lỗi…* đếm theo tài khoản đã chọn. **Chọn hết** chỉ chọn việc của tài khoản đó, để tải về, tạo lại, đổi tài khoản… cho riêng các việc ấy.
+  - Đang lọc thì ô có viền tím cho khỏi quên. App nhớ lựa chọn khi mở lại. Chọn lại *Mọi tài khoản* để xem hết.
+- Thanh lọc gọn hơn ở cửa sổ nhỏ: các ô lọc và nút nằm cùng một hàng, danh sách việc hiện được nhiều dòng hơn.
+- Mọi thứ khác giữ nguyên như 1.4.10.
+
+## Bản 1.4.10
 
 - **Tạo video từ thư mục ảnh: số video và prompt theo SỐ trong tên ảnh.** Bản trước đánh số theo vị trí ảnh trong thư mục, nên thư mục thiếu số (001–006 rồi 016, 017…) bị lệch: ảnh 016 thành video số 7 và lấy prompt dòng 7.
   - Giờ ảnh **016.jpg** → video **#016**, dùng **dòng 16** của file prompt animation (.txt), lưu thành **016.mp4** (mẫu tên `{stt}` / `{tenAnh}`). Ảnh nào thiếu số thì bỏ trống số đó, không dồn số.

@@ -15,7 +15,7 @@
   const U = Object.assign({
     trang: 'anh', duAn: '', loc: 'tat', tim: '', moiNhat: true, cheDo: 'tudo', tyLe: { anh: '9:16', video: '9:16' },
     nhap: { anh: '', video: '', nhac: '' }, tvLoc: 'tat', tvDuAn: '', chuoi: { bat: false, prompt: '', tyLe: '', nen: '' }, promptThuMuc: '', theoDoiTm: false,
-    nen: { anh: 'muse', video: 'muse' }, locNen: '', nenTk: 'muse'
+    nen: { anh: 'muse', video: 'muse' }, locNen: '', locTk: '', nenTk: 'muse'
   }, docLuu());
   if (!U.nen || typeof U.nen !== 'object') U.nen = { anh: 'muse', video: 'muse' };
   if (!U.nhap || typeof U.nhap !== 'object') U.nhap = { anh: '', video: '', nhac: '' };
@@ -33,7 +33,7 @@
   function luuUi() {
     try {
       localStorage.setItem(KHOA, JSON.stringify({ trang: U.trang, duAn: U.duAn, loc: U.loc, moiNhat: U.moiNhat, cheDo: U.cheDo,
-        tyLe: U.tyLe, nhap: U.nhap, tvLoc: U.tvLoc, tvDuAn: U.tvDuAn, chuoi: U.chuoi, promptThuMuc: U.promptThuMuc, theoDoiTm: U.theoDoiTm, rieng: U.rieng, nen: U.nen, locNen: U.locNen, nenTk: U.nenTk, mauTai: U.mauTai }));
+        tyLe: U.tyLe, nhap: U.nhap, tvLoc: U.tvLoc, tvDuAn: U.tvDuAn, chuoi: U.chuoi, promptThuMuc: U.promptThuMuc, theoDoiTm: U.theoDoiTm, rieng: U.rieng, nen: U.nen, locNen: U.locNen, locTk: U.locTk, nenTk: U.nenTk, mauTai: U.mauTai }));
     } catch (_) {}
   }
 
@@ -570,8 +570,29 @@
     return S.viec.filter((j) => j.duAn === (d && d.id) && j.loai === loai && (loai === 'nhac' || !U.locNen || (j.nen || 'muse') === U.locNen));
   }
 
+  /**
+   * 1.4.11 — lọc theo TÀI KHOẢN đã tạo (người dùng: "tìm các video được tạo từ tài khoản Muse 3"). Hộp chọn chỉ liệt kê
+   * tài khoản có việc trong danh sách đang xem (dự án + ảnh/video + Muse/Flow), kèm số việc; "_" = việc chưa chạy ở
+   * tài khoản nào. Lọc trước tab trạng thái → số Hoàn tất / Lỗi… đếm theo tài khoản đã chọn; "Chọn hết" chọn đúng các
+   * việc của tài khoản đó (tải về, tạo lại… theo tài khoản).
+   */
+  function locTheoTk(goc) {
+    const dem = new Map();
+    for (const j of goc) { const k = j.taiKhoan || '_'; dem.set(k, (dem.get(k) || 0) + 1); }
+    if (U.locTk && !dem.has(U.locTk)) dem.set(U.locTk, 0);   // tài khoản đang chọn mà hết việc → vẫn hiện (0), như tab trạng thái
+    const thuTu = (k) => { const i = S.taiKhoan.findIndex((a) => a.id === k); return k === '_' ? 1e9 : i < 0 ? 1e8 : i; };
+    const ten = (k) => (k === '_' ? 'Chưa chạy' : S.taiKhoan.some((a) => a.id === k) ? tenTk(k) : 'Tài khoản đã xoá');
+    const sel = $('#locTk');
+    // Đang mở hộp chọn (đang chạy thì số đếm đổi liên tục) → không vẽ lại kẻo danh sách đóng ngang; rời ô thì vẽ lại.
+    if (document.activeElement !== sel) datHtml(sel, `<option value="">Mọi tài khoản · ${goc.length}</option>` + [...dem.keys()].sort((a, b) => thuTu(a) - thuTu(b))
+      .map((k) => `<option value="${esc(k)}">${esc(ten(k))} · ${dem.get(k)}</option>`).join(''));
+    sel.value = U.locTk || '';
+    sel.classList.toggle('dang-loc', !!U.locTk);
+    return U.locTk ? goc.filter((j) => (j.taiKhoan || '_') === U.locTk) : goc;
+  }
+
   function veHang() {
-    const tatCa = locViec();
+    const tatCa = locTheoTk(locViec());
     const dem = { tat: tatCa.length, chay: 0, cho: 0, dung: 0, xong: 0, loi: 0 };
     for (const j of tatCa) dem[j.trangThai]++;
     const tabs = [['tat', 'Tất cả'], ['chay', 'Đang chạy'], ['cho', 'Đang chờ'], ['dung', 'Đã dừng'], ['xong', 'Hoàn tất'], ['loi', 'Lỗi']]
@@ -596,7 +617,7 @@
     const hop = $('#dsHang');
     if (!ds.length) {
       datHtmlHop(hop, `<div class="trong">${ic(ICON_LOAI[loaiTrang()])}<div>${tatCa.length
-        ? 'Không có việc nào khớp bộ lọc.' : 'Hàng đợi trống — dán prompt bên trái rồi bấm <b>Tạo &amp; chạy</b>.'}</div></div>`);
+        ? 'Không có việc nào khớp bộ lọc.' : U.locTk ? 'Tài khoản đang lọc chưa có việc nào ở đây — chọn <b>Mọi tài khoản</b> để xem hết.' : 'Hàng đợi trống — dán prompt bên trái rồi bấm <b>Tạo &amp; chạy</b>.'}</div></div>`);
       return;
     }
     const cuon = hop.scrollTop;
@@ -1561,6 +1582,8 @@
     $('#nenTao').onclick = (e) => { const b = e.target.closest('[data-v]'); if (b) { U.nen[loaiTrang()] = b.dataset.v; luuUi(); ve(); } };
     $('#nenVideoChuoi').onchange = (e) => { U.chuoi.nen = e.target.value; luuUi(); };
     $('#locNen').onchange = (e) => { U.locNen = e.target.value; luuUi(); veHang(); };
+    $('#locTk').onchange = (e) => { U.locTk = e.target.value; luuUi(); e.target.blur(); veHang(); };   // 1.4.11
+    $('#locTk').onblur = () => veHang();
     $('#cheDo').onclick = (e) => { const b = e.target.closest('[data-v]'); if (b) { U.cheDo = b.dataset.v; luuUi(); veTao(); } };
     $('#chonNhanVat').onclick = (e) => { const b = e.target.closest('[data-nv]'); if (!b) return; const id = b.dataset.nv; U.nvChon.has(id) ? U.nvChon.delete(id) : U.nvChon.add(id); veTao(); };
     $('#oPrompt').addEventListener('input', () => { U.nhap[loaiTrang()] = $('#oPrompt').value; luuUi(); veTao(); });
