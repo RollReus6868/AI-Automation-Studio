@@ -9,6 +9,7 @@
 //                             tests/drive-e2e-chay.js (ảnh / video xong → tải thẳng lên Drive: thư mục dự án, images, Videos).
 // node tests/e2e.js quet   — 1.4.2: trang Muse giả; kịch bản tests/quet-e2e-chay.js (quét thư mục, chỉ làm số còn thiếu).
 // node tests/e2e.js theodoi — 1.4.9: trang Muse giả; kịch bản tests/theo-doi-e2e-chay.js (theo dõi thư mục ảnh → video mới).
+// node tests/e2e.js kiemdo  — 1.4.12: trang Muse giả; kịch bản tests/kiem-do-e2e-chay.js (việc Muse dở: kiểm chat cũ, hết lượt video).
 const http = require('http');
 const fs = require('fs');
 const os = require('os');
@@ -20,6 +21,7 @@ const SUNO = process.argv[2] === 'suno';
 const DRIVE = process.argv[2] === 'drive';
 const QUET = process.argv[2] === 'quet';
 const THEODOI = process.argv[2] === 'theodoi';
+const KIEMDO = process.argv[2] === 'kiemdo';   // 1.4.12
 const fixture = fs.readFileSync(path.join(__dirname, 'fixture-muse.html'));
 const trangFlow = fs.readFileSync(path.join(__dirname, 'flow-gia', 'trang-flow.html'));
 const trangSuno = fs.readFileSync(path.join(__dirname, 'fixture-suno.html'));
@@ -194,13 +196,13 @@ const sv = http.createServer((req, res) => {
 
 sv.listen(0, '127.0.0.1', () => {
   const url = `http://127.0.0.1:${sv.address().port}`;
-  const tam = fs.mkdtempSync(path.join(os.tmpdir(), FLOW ? 'flow-e2e-' : SUNO ? 'suno-e2e-' : DRIVE ? 'drive-e2e-' : QUET ? 'quet-e2e-' : THEODOI ? 'theodoi-e2e-' : 'muse-e2e-'));
+  const tam = fs.mkdtempSync(path.join(os.tmpdir(), FLOW ? 'flow-e2e-' : SUNO ? 'suno-e2e-' : DRIVE ? 'drive-e2e-' : QUET ? 'quet-e2e-' : THEODOI ? 'theodoi-e2e-' : KIEMDO ? 'kiemdo-e2e-' : 'muse-e2e-'));
   const electron = require('electron');
   const args = ['.'];
   if (process.platform === 'linux') args.push('--no-sandbox');
   const p = spawn(electron, args, {
     cwd: path.join(__dirname, '..'),
-    env: { ...process.env, MUSE_URL: url, MUSE_TEST: FLOW ? 'tests/flow-e2e-chay.js' : SUNO ? 'tests/suno-e2e-chay.js' : DRIVE ? 'tests/drive-e2e-chay.js' : QUET ? 'tests/quet-e2e-chay.js' : THEODOI ? 'tests/theo-doi-e2e-chay.js' : 'tests/e2e-chay.js', DRIVE_URL: url, SUNO_URL: `${url}/suno/create`, MUSE_DATA_DIR: path.join(tam, 'data'),
+    env: { ...process.env, MUSE_URL: url, MUSE_TEST: FLOW ? 'tests/flow-e2e-chay.js' : SUNO ? 'tests/suno-e2e-chay.js' : DRIVE ? 'tests/drive-e2e-chay.js' : QUET ? 'tests/quet-e2e-chay.js' : THEODOI ? 'tests/theo-doi-e2e-chay.js' : KIEMDO ? 'tests/kiem-do-e2e-chay.js' : 'tests/e2e-chay.js', DRIVE_URL: url, SUNO_URL: `${url}/suno/create`, MUSE_DATA_DIR: path.join(tam, 'data'),
       MUSE_E2E_TAM: tam, MUSE_NO_UPDATE_CHECK: '1', MUSE_CHO_KET_NOI_MS: '4000',
       ...(FLOW ? { FLOW_TEST_URL: `${url}/fx/vi/tools/flow`, FLOW_TEST_HOST: '^http://127\\.0\\.0\\.1:\\d+/fx/',
         FLOW_TEST_NGUON: 'tests/flow-gia/nguon.js', FLOW_CHO_SAN_SANG_MS: '30000', FLOW_CHO_TAI_MS: '45000' } : {}) },
@@ -221,7 +223,7 @@ sv.listen(0, '127.0.0.1', () => {
     console.log(code === 0 ? `E2E: PASS (${giay} s / hạn ${hanGiay} s)` : `E2E: FAIL (mã ${code}, ${giay} s / hạn ${hanGiay} s)`);
     if (code !== 0) {
       // Đỏ → chép nhật ký bài kiểm + nhật ký app vào shots/ (CI tải lên thành artifact anh-chup-*, kể cả khi đỏ) để truy.
-      const kieu = FLOW ? 'flow' : SUNO ? 'suno' : DRIVE ? 'drive' : QUET ? 'quet' : THEODOI ? 'theodoi' : 'muse';
+      const kieu = FLOW ? 'flow' : SUNO ? 'suno' : DRIVE ? 'drive' : QUET ? 'quet' : THEODOI ? 'theodoi' : KIEMDO ? 'kiemdo' : 'muse';
       const dich = path.join(__dirname, '..', 'shots', `e2e-${kieu}-${process.platform}`);
       try {
         fs.mkdirSync(dich, { recursive: true });

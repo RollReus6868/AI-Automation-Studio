@@ -550,7 +550,7 @@
     o.placeholder = 'Dùng cho ảnh không có dòng riêng trong file (để trống = prompt mặc định)';
   }
 
-  const NHAN_BUOC = { 'mo-trang': 'Đang mở Muse', 'mo-lai': 'Mở lại chat cũ', gui: 'Đang gửi prompt', tai: 'Đang tải về' };
+  const NHAN_BUOC = { 'mo-trang': 'Đang mở Muse', 'mo-lai': 'Mở lại chat cũ', gui: 'Đang gửi prompt', tai: 'Đang tải về', kiem: 'Đang kiểm chat cũ' };
   function nhanTrangThai(j) {
     if (j.trangThai === 'xong') return ['xong', 'Hoàn tất', gio(j.xongLuc)];
     if (j.trangThai === 'dung') return ['dung', 'Đã dừng', j.thread ? 'Bấm Chạy để lấy tiếp kết quả' : 'Bấm Chạy để chạy tiếp'];
@@ -593,6 +593,15 @@
 
   function veHang() {
     const tatCa = locTheoTk(locViec());
+    // 1.4.12: dải báo việc Muse dở (đã gửi prompt, chưa lấy kết quả) + nút kiểm tra.
+    const viecDo = locViec().filter((j) => laViecDo(j) || j.dangKiem);
+    const dangKiem = viecDo.filter((j) => j.dangKiem).length;
+    $('#daiViecDo').hidden = !viecDo.length;
+    if (viecDo.length) {
+      datHtml($('#daiViecDoChu'), dangKiem ? `Đang kiểm <b>${dangKiem}</b> việc Muse dở (mở lại chat cũ)…`
+        : `<b>${viecDo.length}</b> việc Muse đã gửi prompt nhưng chưa lấy kết quả (vd app tắt giữa chừng)`);
+      $('#nutKiemViecDo').disabled = dangKiem === viecDo.length;
+    }
     const dem = { tat: tatCa.length, chay: 0, cho: 0, dung: 0, xong: 0, loi: 0 };
     for (const j of tatCa) dem[j.trangThai]++;
     const tabs = [['tat', 'Tất cả'], ['chay', 'Đang chạy'], ['cho', 'Đang chờ'], ['dung', 'Đã dừng'], ['xong', 'Hoàn tất'], ['loi', 'Lỗi']]
@@ -739,6 +748,8 @@
       toast(`Đã tạo lại #${so3(j.so)} và chạy ngay`);
     } else if (lenh === 'dungViec' || lenh === 'chayViec' || lenh === 'doiTaiKhoan') {
       dieuKhienViec(lenh, [j.id]);
+    } else if (lenh === 'kiemViecDo') {
+      kiemViecDo([j.id]);
     } else if (lenh === 'doiNen') {
       doiNen([j.id], nenTk(j) === 'flow' ? 'muse' : 'flow');
     } else if (lenh === 'lenDrive') {
@@ -781,6 +792,19 @@
     const n = await api.call(lenh, { ids });
     if (lenh === 'dungViec') toast(n ? `Đã dừng ${n} việc — việc khác vẫn chạy` : 'Không có việc nào đang chạy / chờ để dừng', !n);
     else toast(n ? `Đang chạy ngay ${n} việc` : 'Không có việc nào chạy được (việc đã xong thì dùng Tạo lại)', !n);
+  }
+
+  /** 1.4.12: việc Muse đã gửi prompt (có chat) mà chưa lấy kết quả — kiểm được bằng cách mở lại chat cũ (như điều phối _laViecDo). */
+  function laViecDo(j) {
+    return (j.nen || 'muse') === 'muse' && !!j.thread && !!j.taiKhoan && !/\/thread\/new\b/.test(j.thread) &&
+      ['cho', 'dung', 'loi'].includes(j.trangThai) && !j.dangKiem;
+  }
+
+  /** 1.4.12: nút "Kiểm tra việc dở" — mở lại chat cũ ở Muse, xong rồi thì tải về (không tạo lại). ids rỗng = mọi việc dở. */
+  async function kiemViecDo(ids) {
+    if (!ids || !ids.length) { toast('Không có việc Muse nào đang dở để kiểm', true); return; }
+    const r = await api.call('kiemViecDo', { ids });
+    toast(r && r.so ? `Đang kiểm ${r.so} việc dở — mở lại chat cũ ở Muse, xong rồi thì tải về (xem nhật ký)` : 'Không có việc Muse nào đang dở để kiểm', !(r && r.so));
   }
 
   /** 1.4.9: nút "Đổi tài khoản" — việc đang chạy / treo bỏ tài khoản hiện tại, chạy ngay ở tài khoản kế tiếp cùng nền tảng. */
@@ -846,6 +870,7 @@
       f ? `<button data-l="xem">${ic('eye')}Xem</button><button data-l="thuMuc">${ic('folder-open')}Mở thư mục</button>` : '',
       j.trangThai === 'chay' || j.trangThai === 'cho' ? `<button data-l="dungViec">${ic('square')}Dừng việc này</button>` : '',
       coTheDoiTk(j) ? `<button data-l="doiTaiKhoan">${ic('users')}Đổi sang tài khoản kế tiếp</button>` : '',
+      laViecDo(j) ? `<button data-l="kiemViecDo">${ic('refresh-cw')}Kiểm tra chat cũ (tải về nếu đã xong)</button>` : '',
       ['cho', 'dung', 'loi'].includes(j.trangThai) ? `<button data-l="chayViec">${ic('play')}Chạy ngay việc này</button>` : '',
       j.trangThai !== 'chay' ? `<button data-l="taoLai">${ic('rotate-ccw')}Tạo lại</button><button data-l="sua">${ic('pencil')}${f && j.loai === 'anh' ? 'Chỉnh sửa ảnh' : 'Sửa prompt'}</button>` : '',
       f && j.loai === 'anh' ? `<button data-l="video">${ic('film')}Tạo video từ ảnh này</button>` : '',
@@ -1775,6 +1800,7 @@
     $('#chonDrive').onclick = () => lenDrive([...U.chon]);
     $('#chonDung').onclick = () => { dieuKhienViec('dungViec', [...U.chon]); U.chon.clear(); };
     $('#chonDoiTk').onclick = () => { doiTaiKhoan([...U.chon]); U.chon.clear(); };
+    $('#nutKiemViecDo').onclick = () => kiemViecDo(locViec().filter(laViecDo).map((j) => j.id));   // 1.4.12
 
     // Chi tiết
     $('#chiTiet').addEventListener('click', (e) => {

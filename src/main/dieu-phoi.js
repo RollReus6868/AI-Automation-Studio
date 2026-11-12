@@ -35,6 +35,10 @@ const LOI_LIEN_TIEP_NGHI = 2;
 // hạn từng bước (mở trang 45 s, sẵn sàng 30 s, mất kết nối 60 s, gửi 180 s, lấy file 2 × 240 s) — đây là lưới cuối.
 const HAN_THEM_GIAY = Number(process.env.MUSE_HAN_THEM_GIAY) || 600;
 const HAN_THEM_SUNO_GIAY = 900;
+// 1.4.12: kiểm việc dở — mỗi chat cũ chờ tối đa chừng này giây xem đã có kết quả chưa; Muse còn đang tạo thì hẹn kiểm lại.
+const KIEM_GIAY = Number(process.env.MUSE_KIEM_GIAY) || 40;
+const KIEM_LAI_MS = Number(process.env.MUSE_KIEM_LAI_MS) || 2 * 60000;
+const KIEM_TOI_DA = 6;   // Muse "vẫn đang tạo" quá chừng này lần kiểm (≈ 12 phút) → thôi giữ, chạy như thường
 const CHAN_VIDEO_MS = 24 * 60 * 60 * 1000;  // 1.2.9: Muse chặn video theo khu vực → tài khoản thôi nhận video 24 giờ (nhớ qua lần chạy / mở app)
 const NGHI_CHAN_LOAI_MS = 60 * 60 * 1000;  // Muse chặn tài khoản tạo loại việc khác video → thôi giao loại đó cho nó chừng này
 const TEN_NEN = { muse: 'Muse', flow: 'Flow', suno: 'Suno' };
@@ -228,9 +232,18 @@ class DieuPhoi {
     const moc6 = this.caiDat.moc < 6;
     if (moc6) this.caiDat.moc = 6;
     // Việc đang chạy lúc app tắt → về hàng chờ, GIỮ thread để lấy lại kết quả.
+    // 1.4.12: việc Muse đã gửi prompt (có chat) mà chưa lấy kết quả → KIỂM CHAT CŨ khi mở app (kiemKhiMo): xong rồi
+    // thì tải về, khỏi tạo lại; trong lúc chưa kiểm, việc không được giao cho luồng nào (không gửi lại → không trùng).
+    this.choKiem = new Set();
     for (const j of this.viec) {
-      if (j.trangThai === 'chay') { j.trangThai = 'cho'; j.buoc = ''; }
-      delete j.chayRieng; delete j.dungTay;
+      if (j.trangThai === 'chay') {
+        if ((j.nen || 'muse') === 'muse' && !j.thread && j.guiLuc && j.guiLuc >= (j.batDauLuc || 0)) {
+          j.ghiChuMo = 'Đang bấm Gửi ở Muse lúc app tắt — chat có thể đã có prompt này';
+        }
+        j.trangThai = 'cho'; j.buoc = '';
+      }
+      delete j.chayRieng; delete j.dungTay; delete j.dangKiem; delete j.kiemLai;
+      if (this._laViecDo(j) && j.trangThai === 'cho') this.choKiem.add(j.id);
     }
     for (const d of this.duAn) {
       // 1.3.0: số thứ tự RIÊNG cho ảnh / video / nhạc (trước dùng chung một bộ đếm d.so) — bắt đầu từ số lớn
@@ -341,6 +354,13 @@ class DieuPhoi {
     this.o.store.set({ duAn: this.duAn, viec: this.viec, nhanVat: this.nhanVat,
       caiDat: this.caiDat, mauPrompt: this.mauPrompt, henGio: this.henGio });
     this.o.bao();
+  }
+
+  /** 1.4.12: ghi ra đĩa NGAY (không gom) — mốc quan trọng như đường dẫn chat Muse vừa gửi: app tắt đột ngột ngay sau
+   *  đó vẫn nhớ chat, mở lại thì lấy tiếp kết quả thay vì gửi lại prompt (tạo trùng). */
+  luuNgay() {
+    this.luu();
+    try { if (this.o.store.flushNow) this.o.store.flushNow(); } catch (err) { this.log('error', `❌ Ghi dữ liệu: ${err.message}`); }
   }
 
   /**
@@ -1756,7 +1776,21 @@ class DieuPhoi {
     const nhamToi = new Map();
     for (const j of this.viec) {
       if (j.trangThai !== 'cho' || !this._duocChay(j)) continue;
+      // 1.4.12: việc Muse dở đang chờ / đang kiểm chat cũ, hoặc Muse còn đang tạo (hẹn kiểm lại) → chưa giao cho ai.
+      if (this.choKiem.has(j.id) || (this._dangKiemTk && [...this._dangKiemTk.values()].some((h) => h.includes(j)))) continue;
+      if (j.kiemLai) {
+        if (j.kiemLai > Date.now()) continue;
+        delete j.kiemLai;
+        this.kiemViecDo([j.id], { tuDong: true });
+        continue;
+      }
       let ds = this._tkCho(j);
+      // 1.4.12: chat dở ở tài khoản giờ không chạy được (nghỉ / không dùng / hết lượt…) → KIỂM chat cũ trước khi gửi lại
+      // ở tài khoản khác (bản cũ gửi lại ngay → video trùng nếu Muse vẫn tạo xong ở chat cũ).
+      if (this._laViecDo(j) && !ds.includes(j.taiKhoan) && (j.kiemSo || 0) < KIEM_TOI_DA) {
+        this.kiemViecDo([j.id], { tuDong: true });
+        continue;
+      }
       // Các tài khoản việc này chưa thử đều đang nghỉ / chưa đăng nhập → chỉ còn tài khoản đã lỗi:
       // coi như hết vòng, quay lại từ đầu (tài khoản chính). Hết số vòng → Lỗi luôn.
       if (ds.length && ds.every((t) => (j.tkLoi || []).includes(t)) && !(j.thread && j.taiKhoan === ds[0])) {
@@ -1955,10 +1989,141 @@ class DieuPhoi {
       choToiDaGiay: j.loai === 'nhac' ? cd.choNhacGiay : j.loai === 'video' ? cd.choVideoGiay : cd.choAnhGiay,
       choChuGiay: j.loai === 'video' ? cd.choChuGiay * 2 : cd.choChuGiay,
       choGui: () => this.choGui(x.taiKhoanId, theoNen(cd, j.nen, 'nghiGiuaLanGui')),
-      capNhat: (thay) => { if (j.lanGiao === lan) { Object.assign(j, thay); this._luuBuoc(thay); } }
+      capNhat: (thay) => {
+        if (j.lanGiao !== lan) return;
+        Object.assign(j, thay);
+        if (thay.thread || thay.guiLuc) { delete j.kiemSo; delete j.ghiChuMo; this.luuNgay(); } else this._luuBuoc(thay);
+      }
     });
     if (j.lanGiao !== lan) { this.o.bao(); return; }
     this._ketThuc(j, r, tk);
+  }
+
+  /** 1.4.12: việc Muse đã gửi prompt (có chat thật) mà chưa có kết quả — kiểm được bằng cách mở lại chat. */
+  _laViecDo(j) {
+    return (j.nen || 'muse') === 'muse' && !!j.thread && !!j.taiKhoan && !/\/thread\/new\b/.test(j.thread) &&
+      ['cho', 'dung', 'loi'].includes(j.trangThai) && !j.dangKiem;
+  }
+
+  /** Số việc dở đang chờ kiểm / có thể kiểm (giao diện hiện nút "Kiểm tra việc dở"). */
+  demViecDo(duAnId) {
+    return this.viec.filter((j) => (!duAnId || j.duAn === duAnId) && (this._laViecDo(j) || j.dangKiem)).length;
+  }
+
+  /** 1.4.12: gọi một lần sau khi app sẵn sàng — kiểm các việc Muse dở từ lần chạy trước (mở app sau khi tắt đột ngột). */
+  kiemKhiMo() {
+    const ids = [...this.choKiem];
+    if (!ids.length) return { ok: true, so: 0 };
+    this.log('info', `🔎 Có ${ids.length} việc Muse đã gửi từ lần chạy trước mà chưa lấy kết quả — mở lại chat cũ để kiểm (xong rồi thì tải về, không tạo lại).`);
+    const lech = this.viec.filter((j) => ids.includes(j.id) && j.ghiChuMo);
+    for (const j of lech) this.log('warning', `⚠ #${j.so}: ${j.ghiChuMo} — xem lại chat gần nhất của "${this._tenTk(j.taiKhoan)}" nếu thấy video trùng.`);
+    return this.kiemViecDo(ids, { tuDong: true });
+  }
+
+  /**
+   * 1.4.12 — KIỂM VIỆC DỞ (người dùng 11/2026: "Muse đang tạo video mà bị tắt app đột ngột thì khi app trở lại tạo dễ
+   * bị trùng hoặc lỗi … nếu video đã tạo xong thì tải về luôn chứ không cần tạo mới … có nút kiểm tra thủ công").
+   * Mỗi tài khoản một cửa sổ Muse ngầm, mở lần lượt chat cũ của từng việc (không gửi gì), chờ ≤ KIEM_GIAY:
+   *  • có kết quả → tải về, việc Xong;  • Muse báo hết lượt / chặn / từ chối → xử như lúc chạy (sang tài khoản khác);
+   *  • Muse còn đang tạo → giữ chat, hẹn kiểm lại sau KIEM_LAI_MS (không giao lại cho ai trong lúc đó);
+   *  • chat không có gì → thôi giữ: việc chạy như thường (tài khoản cũ dùng được thì chờ tiếp chat đó, không thì gửi lại).
+   * Trả ngay; kết quả ghi nhật ký + dòng việc.
+   * @param ids  null = mọi việc dở (nút "Kiểm tra việc dở"), hoặc danh sách id
+   */
+  kiemViecDo(ids, { tuDong = false } = {}) {
+    const ds = this.viec.filter((j) => (!ids || ids.includes(j.id)) && this._laViecDo(j) && (tuDong || j.trangThai !== 'chay'));
+    for (const id of ids || []) if (!ds.some((j) => j.id === id)) this.choKiem.delete(id);
+    if (!ds.length) {
+      if (!tuDong) this.log('info', '🔎 Không có việc Muse nào đang dở (đã gửi prompt mà chưa lấy kết quả) để kiểm.');
+      this.o.bao();
+      return { ok: true, so: 0 };
+    }
+    const theoTk = new Map();
+    for (const j of ds) {
+      if (!theoTk.has(j.taiKhoan)) theoTk.set(j.taiKhoan, []);
+      theoTk.get(j.taiKhoan).push(j);
+    }
+    if (!this._dangKiemTk) this._dangKiemTk = new Map();
+    let so = 0;
+    for (const [tkId, jobs] of theoTk) {
+      const hang = this._dangKiemTk.get(tkId);
+      if (hang) { for (const j of jobs) if (!hang.includes(j)) { hang.push(j); so++; } continue; }
+      this._dangKiemTk.set(tkId, jobs.slice());
+      so += jobs.length;
+      this._kiemTk(tkId).catch((err) => this.log('error', `❌ Kiểm việc dở ở "${this._tenTk(tkId)}": ${err.message}`));
+    }
+    if (!tuDong) this.log('info', `🔎 Kiểm ${so} việc Muse dở ở ${theoTk.size} tài khoản — mở lại chat cũ, xong rồi thì tải về.`);
+    this.o.bao();
+    return { ok: true, so };
+  }
+
+  async _kiemTk(tkId) {
+    const hang = this._dangKiemTk.get(tkId);
+    const tk = this.o.taiKhoan.tim(tkId);
+    const kq = { xong: 0, dang: 0, khong: 0, khac: 0 };
+    let l = null;
+    try {
+      while (hang.length) {
+        const j = hang.shift();
+        this.choKiem.delete(j.id);
+        if (!this.viec.includes(j) || !this._laViecDo(j)) continue;
+        if (!tk || tk.trangThai === 'can-dang-nhap') {
+          // Không mở được chat cũ (tài khoản đã xoá / chưa đăng nhập) → không kiểm được: việc chạy như thường.
+          j.kiemSo = KIEM_TOI_DA;
+          kq.khac++;
+          this.log('warning', `⚠ #${j.so}: không kiểm được chat cũ — ${tk ? `"${tk.ten}" chưa đăng nhập Muse` : 'tài khoản đã xoá'}; việc sẽ chạy lại như thường.`);
+          continue;
+        }
+        if (!l) l = this.o.taoLuong(tk, 'kiem', null);
+        const truoc = j.trangThai;
+        const lan = j.lanGiao = (j.lanGiao || 0) + 1;
+        Object.assign(j, { trangThai: 'chay', dangKiem: true, buoc: 'kiem' });
+        this.o.bao();
+        const cd = this.cd(j.duAn);
+        let r;
+        try {
+          r = await l.chay(j, {
+            tinNhan: '', files: [], png: cd.png, chiKiem: true, choToiDaGiay: KIEM_GIAY, choChuGiay: 24 * 3600,
+            choGui: async () => {},
+            capNhat: (thay) => { if (j.lanGiao === lan && thay.buoc) { j.buoc = thay.buoc === 'mo-lai' ? 'kiem' : thay.buoc; this.o.bao(); } }
+          });
+        } catch (err) { r = { ok: false, loi: err.message }; }
+        delete j.dangKiem;
+        // Bị xoá / đổi tài khoản (lanGiao) / bấm Dừng (trạng thái 'dung') giữa lúc kiểm → để nguyên như người dùng đã chọn.
+        if (j.lanGiao !== lan || !this.viec.includes(j) || j.trangThai !== 'chay') continue;
+        if (r.ok || r.chanLoai || r.tuChoi || r.hetLuot) {
+          if (r.ok) kq.xong++; else kq.khac++;
+          j.trangThai = 'chay';
+          this._ketThuc(j, r, tk);
+          if (r.ok) this.log('success', `🔎 #${j.so}: chat cũ ở "${tk.ten}" đã có kết quả — đã tải về, không tạo lại.`);
+          continue;
+        }
+        Object.assign(j, { trangThai: truoc, buoc: '' });
+        if (r.chuaXong && r.dangTao && (j.kiemSo || 0) + 1 < KIEM_TOI_DA) {
+          j.kiemSo = (j.kiemSo || 0) + 1;
+          j.kiemLai = Date.now() + KIEM_LAI_MS;
+          kq.dang++;
+          this.log('info', `🔎 #${j.so}: Muse vẫn đang tạo trong chat cũ ở "${tk.ten}" — giữ chat, kiểm lại sau ${Math.round(KIEM_LAI_MS / 60000)} phút (không tạo lại).`);
+        } else {
+          // Chat không có gì / không mở được / quá số lần → thôi giữ việc lại; tài khoản cũ dùng được thì luồng chạy
+          // vẫn chờ tiếp chat đó, không thì gửi lại ở tài khoản khác.
+          j.kiemSo = KIEM_TOI_DA;
+          delete j.kiemLai;
+          kq.khong++;
+          this.log('warning', `🔎 #${j.so}: chưa thấy kết quả trong chat cũ ở "${tk.ten}"${r.loi && !r.chuaXong ? ` (${rutLoi(r.loi)})` : ''} — việc chạy như thường khi dự án chạy.`);
+        }
+      }
+    } finally {
+      this._dangKiemTk.delete(tkId);
+      if (l) { try { this.o.huyLuong(l); } catch (_) { /* cửa sổ đã đóng */ } }
+      const tong = kq.xong + kq.dang + kq.khong + kq.khac;
+      if (tong) {
+        this.log('info', `🔎 Kiểm việc dở ở "${this._tenTk(tkId)}": ${[kq.xong && `${kq.xong} đã có kết quả (tải về)`, kq.dang && `${kq.dang} Muse vẫn đang tạo`,
+          kq.khong && `${kq.khong} chưa thấy kết quả`, kq.khac && `${kq.khac} chuyển / không kiểm được`].filter(Boolean).join(', ')}.`);
+      }
+      this.luu();
+      this._vong();
+    }
   }
 
   /** Giao một MẺ việc cho luồng Flow; mỗi việc xong / lỗi là báo về _ketThuc ngay, không đợi cả mẻ. */
@@ -2214,10 +2379,15 @@ class DieuPhoi {
           this.o.taiKhoan.sua(tkId, { chanVideoDen: Date.now() + CHAN_VIDEO_MS, lyDoChanVideo: r.loi });
           this.log('warning', `⚠ "${this._tenTk(tkId)}": ${r.loi} — tài khoản này thôi nhận VIDEO 24 giờ (vẫn tạo ảnh); video chuyển sang tài khoản Muse khác, hết tài khoản Muse thì sang Flow. Bấm Kiểm tra ở tài khoản để thử lại sớm.`);
         } else {
-          this.nghiLoai[`${tkId}:${j.loai}`] = Date.now() + NGHI_CHAN_LOAI_MS;
-          this.log('warning', `⚠ "${this._tenTk(tkId)}": ${r.loi} — tài khoản này thôi nhận việc ${TEN_LOAI[j.loai] || j.loai} ${Math.round(NGHI_CHAN_LOAI_MS / 60000)} phút, việc chuyển sang tài khoản khác.`);
+          // 1.4.12: hết lượt tạo ảnh → nghỉ loại ảnh lâu như hết lượt Suno (6 giờ); chặn khác → 60 phút như trước.
+          const ms = r.hetLuotLoai ? NGHI_HET_LUOT_MS : NGHI_CHAN_LOAI_MS;
+          this.nghiLoai[`${tkId}:${j.loai}`] = Date.now() + ms;
+          this.log('warning', `⚠ "${this._tenTk(tkId)}": ${r.loi} — tài khoản này thôi nhận việc ${TEN_LOAI[j.loai] || j.loai} ${ms >= 3600000 ? `${Math.round(ms / 3600000)} giờ` : `${Math.round(ms / 60000)} phút`}, việc chuyển sang tài khoản khác.`);
         }
       }
+      // 1.4.12: nói rõ việc đi đâu (người dùng: "next luôn sang tài khoản tiếp theo để chạy chứ không chờ tạo lại").
+      const sang = this._tkCho(j).find((id) => id !== tkId);
+      this.log('warning', `↪ #${j.so} chuyển ngay sang ${sang ? `"${this._tenTk(sang)}"` : 'tài khoản khác (hiện chưa có tài khoản nào còn lượt — chờ)'} — không tính lỗi.`);
     } else if (r.tuChoi && this._coTheDoiNen(j)) {
       // Muse nói không tạo được video / ảnh từ CHÍNH ảnh này (lỗi của ảnh, không phải của tài khoản —
       // tài khoản Muse khác cũng từ chối) → chỉ riêng việc này sang Flow ngay, việc khác vẫn chạy ở Muse.

@@ -784,6 +784,7 @@ const LENH = {
   dungViec: ({ ids }) => dieuPhoi.dungViec(ids),
   chayViec: ({ ids }) => dieuPhoi.chayViec(ids),
   doiTaiKhoan: ({ ids }) => dieuPhoi.doiTaiKhoan(ids || []),   // 1.4.9: nút "Đổi tài khoản" ở việc đang chạy / treo
+  kiemViecDo: ({ ids } = {}) => dieuPhoi.kiemViecDo(Array.isArray(ids) ? ids : null),   // 1.4.12: nút "Kiểm tra việc dở" (Muse); không có ids = mọi việc dở
   xoaViec: ({ ids }) => dieuPhoi.xoaViec(ids),
   suaViec: ({ id, thay }) => dieuPhoi.suaViec(id, thay),
   // 1.4.0: đổi prompt nhiều việc, đổi ngay sang Muse / Flow, đưa lên Google Drive, chạy lại tài khoản đang nghỉ.
@@ -1213,6 +1214,9 @@ app.whenReady().then(() => {
   xetChanNgu();
   setInterval(xetChanNgu, 15000);
 
+  // 1.4.12: việc Muse đã gửi từ lần chạy trước (app tắt đột ngột) → mở lại chat cũ kiểm, xong rồi thì tải về (không tạo lại).
+  setTimeout(() => { try { dieuPhoi.kiemKhiMo(); } catch (err) { log('error', `❌ Kiểm việc dở: ${err.message}`); } },
+    parseInt(process.env.MUSE_KIEM_KHI_MO_MS, 10) || 8000);
   if (!process.env.MUSE_NO_UPDATE_CHECK) {
     setTimeout(() => capNhat.kiemTra({ imLang: true }), 5000);
     setInterval(() => capNhat.kiemTra({ imLang: true }), 4 * 3600 * 1000);

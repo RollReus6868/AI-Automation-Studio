@@ -378,13 +378,29 @@ function laChanKhuVuc(chu) {
 }
 
 /**
+ * 1.4.12 — Muse báo HẾT LƯỢT tạo (người dùng 11/2026: "video báo chưa tạo được vì đã hết lượt tạo video trong 24 giờ
+ * qua"). Không phải lỗi của việc / của ảnh: tài khoản thôi nhận loại việc đó một ngày, việc sang tài khoản kế tiếp NGAY.
+ * Chữ thật của Muse chưa đo được → khớp rộng cả tiếng Việt lẫn tiếng Anh: (hết / đạt / vượt … lượt / giới hạn / hạn mức)
+ * hoặc (limit / quota reached …), kèm ngữ cảnh tạo / video / ảnh / 24 giờ / hôm nay.
+ */
+function laHetLuot(chu) {
+  const t = String(chu || '').toLowerCase().replace(/\s+/g, ' ').trim();
+  if (!t || t.length > 600) return false;
+  const het = /(hết|dùng hết|sử dụng hết|đạt|đạt tới|đạt đến|chạm|vượt|vượt quá|quá)\s+(?:\S+\s+){0,2}?(lượt|giới hạn|hạn mức|số lượt|hạn ngạch)/.test(t) ||
+    /(lượt|giới hạn|hạn mức)\s+(?:\S+\s+){0,4}?(đã hết|hết rồi|đã đạt|đã dùng hết)/.test(t) ||
+    /\b(reached|hit|exceeded|used up|run out of|ran out of|out of)\b\s+(?:\S+\s+){0,4}?(limit|quota|generations?|credits?)\b/.test(t) ||
+    /\b(limit|quota)\s+(?:has been\s+|was\s+)?(reached|exceeded|hit)\b/.test(t) || /\b(daily|24[- ]?hour)\s+(?:\S+\s+){0,2}?limit\b/.test(t);
+  return het && /(video|ảnh|hình|image|photo|tạo|generat|create|24|ngày|hôm nay|daily|today|hour|giờ)/.test(t);
+}
+
+/**
  * 1.2.1 — Muse TỪ CHỐI tạo từ ảnh / prompt này ("Mình không thể tạo video từ ảnh này."): lỗi của chính
  * việc đó (tài khoản Muse khác cũng từ chối) → chuyển riêng việc này sang Flow. Câu ngắn, có chữ "không
  * thể / can't…" + động từ tạo + video/ảnh. Chặn khu vực / 403 là lỗi tài khoản → laChanKhuVuc, không phải đây.
  */
 function laTuChoi(chu) {
   const t = String(chu || '').toLowerCase().replace(/\s+/g, ' ').trim();
-  if (!t || t.length > 400 || laChanKhuVuc(t)) return false;
+  if (!t || t.length > 400 || laChanKhuVuc(t) || laHetLuot(t)) return false;   // 1.4.12: hết lượt ≠ từ chối ảnh
   return (/(không thể|chưa thể|can['’]?t|cannot|can not|unable to|not able to)\s+(?:\S+\s+){0,4}?(tạo|làm|dựng|create|generate|make|produce|animate|turn)/.test(t) ||
       /không (tạo|làm|dựng) (được|nổi)/.test(t)) &&
     /(video|ảnh|hình|image|photo|picture|clip)/.test(t);
@@ -418,7 +434,7 @@ function keHoachTai(viec, tonTai) {
 const HD = {
   TY_LE, MAU_MAC_DINH, MAU_TEN_MAC_DINH, MAU_TEN_ANH_MAC_DINH, PROMPT_VIDEO_MAC_DINH, slugTen, tachPrompt, timNhanVat, taoTinNhan, tenFile, mimeTuDuoi, chonKhoang, DUOI_LOAI, mauKhopFile, soTuTen, soTheoTenAnh, ghepThuMucAnh,
   docSoChay, chonTheoSo, gonSo,
-  viecKeTiep, taiKhoanChoViec, taiKhoanChoViecDs, thoiGianDuKien, duDoanConLai, tienDoUoc, daXong, laTraLoiChu, laChanKhuVuc, laTuChoi, soSanhTuNhien, keHoachTai
+  viecKeTiep, taiKhoanChoViec, taiKhoanChoViecDs, thoiGianDuKien, duDoanConLai, tienDoUoc, daXong, laTraLoiChu, laChanKhuVuc, laTuChoi, laHetLuot, soSanhTuNhien, keHoachTai
 };
 // Dùng chung cho tiến trình chính (require) và giao diện (<script> → window.HD).
 if (typeof module !== 'undefined' && module.exports) module.exports = HD;
