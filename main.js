@@ -31,10 +31,16 @@ const { xoaChatChuotThat, nenThuChuotThat } = require('./src/main/xoa-chat-muse'
 const { chepLenDrive, timThuMucDrive } = require('./src/main/drive');
 const { DriveWeb } = require('./src/main/drive-web');
 const { ensureDebugger } = require('./src/flow/main/paste');
+const DonDuLieu = require('./src/main/don-du-lieu');
 
 // Thư mục dữ liệu riêng (phiên đăng nhập, cài đặt, hàng đợi) — PHẢI trước whenReady.
 app.setPath('userData', process.env.MUSE_DATA_DIR ||
   path.join(app.getPath('appData'), 'AIAutomationStudio'));
+// 1.4.12: giới hạn cache ĐĨA của mỗi phiên trình duyệt (mỗi tài khoản một phiên). Đo trên máy người dùng: cache
+// phiên Flow ≥310 MB, Muse ≥77 MB, 19 phiên → vài GB trên ổ C. Trang vẫn chạy bình thường, chỉ tải lại tài nguyên
+// cũ nhiều hơn. Biến môi trường chỉ để bài kiểm đo.
+const GIOI_HAN_CACHE_MB = Number(process.env.MUSE_CACHE_MB) || 200;
+app.commandLine.appendSwitch('disk-cache-size', String(GIOI_HAN_CACHE_MB * 1024 * 1024));
 
 const GOC_MUSE = (process.env.MUSE_URL || 'https://muse.ai').replace(/\/$/, '');
 const NGUON_TRANG = fs.readFileSync(path.join(__dirname, 'src/inject/muse-trang.js'), 'utf8');
@@ -169,8 +175,12 @@ function trangThai() {
 
 // ── Phiên theo tài khoản ──────────────────────────────────────────────────
 const daCauHinh = new Set();
+// 1.4.12: phiên đã mở trong lần chạy này — Dọn dữ liệu không xoá file cache của phiên trình duyệt đang giữ (dọn bằng
+// session API), phiên chưa mở thì xoá thẳng thư mục cache.
+const phienDaMo = new Set();
+function moPhien(partition) { phienDaMo.add(partition); return session.fromPartition(partition); }
 function phien(tk) {
-  const ses = session.fromPartition(tk.partition);
+  const ses = moPhien(tk.partition);
   if (!daCauHinh.has(tk.partition)) {
     daCauHinh.add(tk.partition);
     if (tk.nen === 'drive') {
@@ -773,6 +783,26 @@ function chepAnhNhanVat(nvId, ds) {
 }
 
 // ── Lệnh từ giao diện ─────────────────────────────────────────────────────
+// 1.4.12: tham số chung cho đo / dọn dữ liệu.
+const TEN_NHOM_DON = { cache: 'cache', phienXoa: 'phiên tài khoản đã xoá', tam: 'file tạm', ketQuaTam: 'kết quả tạm', chanDoan: 'chẩn đoán', toolCu: 'tool cũ' };
+function thamSoDon() {
+  const ttCn = capNhat ? capNhat.trangThai() : {};
+  const giuCapNhat = ttCn.trangThai === 'dang-tai' || (capNhat && capNhat.dangCai) ? 'het'
+    : ttCn.trangThai === 'da-tai' && capNhat.fileTai ? capNhat.fileTai : null;
+  const thamChieu = [];
+  for (const j of dieuPhoi.viec) thamChieu.push(...(j.files || []), ...(j.thamChieu || []));
+  return {
+    userData: app.getPath('userData'),
+    // Bài kiểm (MUSE_DATA_DIR) không nhìn ra %APPDATA% thật của máy.
+    appData: process.env.MUSE_DATA_DIR ? (process.env.MUSE_APPDATA_THU || '') : app.getPath('appData'),
+    thuMucChanDoan: DonDuLieu.CHAN_DOAN.map((t) => thuMucChanDoan(t)),
+    partitionCon: taiKhoan.ds.map((t) => t.partition),
+    phienMo: (p) => phienDaMo.has(p),
+    giuCapNhat,
+    thamChieu
+  };
+}
+
 const LENH = {
   trangThai: () => ({ ...trangThai(), nhatKy }),
   them: (p) => dieuPhoi.them(p),
@@ -836,14 +866,14 @@ const LENH = {
   xoaTaiKhoan: async ({ id }) => {
     if (dangNhap && dangNhap.id === id) await dongDangNhap(false);
     const r = taiKhoan.xoa(id);
-    if (r.ok) { try { await session.fromPartition(r.taiKhoan.partition).clearStorageData(); } catch (_) {} }
+    if (r.ok) { try { await moPhien(r.taiKhoan.partition).clearStorageData(); } catch (_) {} }
     baoTrangThai();
     return r;
   },
   dangXuat: async ({ id }) => {
     const tk = taiKhoan.tim(id);
     if (!tk) return;
-    await session.fromPartition(tk.partition).clearStorageData();
+    await moPhien(tk.partition).clearStorageData();
     taiKhoan.sua(id, { trangThai: 'can-dang-nhap' });
     log('warning', `🚪 Đã đăng xuất "${tk.ten}"`);
     baoTrangThai();
@@ -940,6 +970,26 @@ const LENH = {
   hienTrongThuMuc: ({ file }) => { if (file && fs.existsSync(file)) shell.showItemInFolder(file); },
   moThuMuc: ({ dir }) => { fs.mkdirSync(dir, { recursive: true }); return shell.openPath(dir); },
   moThuMucDuLieu: () => shell.openPath(app.getPath('userData')),
+  // 1.4.12 — Dung lượng & dọn dẹp (src/main/don-du-lieu.js).
+  docDungLuong: () => DonDuLieu.docDungLuong(thamSoDon()),
+  donDuLieu: async ({ nhom }) => {
+    if (dieuPhoi.dangChay) return { ok: false, loi: ['Đang có dự án chạy (hoặc hẹn giờ / việc chạy riêng) — dừng các dự án trước khi dọn.'] };
+    const chon = (nhom || []).filter((k) => typeof k === 'string');
+    if (!chon.length) return { ok: false, loi: ['Chưa chọn mục nào để dọn.'] };
+    const r = await DonDuLieu.donDuLieu({
+      ...thamSoDon(),
+      donPhien: async (p) => {
+        const ses = p ? moPhien(p) : session.defaultSession;
+        await ses.clearCache();
+        await ses.clearCodeCaches({});
+        await ses.clearStorageData({ storages: ['shadercache', 'cachestorage'] });
+      }
+    }, chon);
+    const chu = Object.entries(r.tungNhom).map(([k, b]) => `${TEN_NHOM_DON[k] || k} ${DonDuLieu.chuDungLuong(b)}`).join(', ');
+    log('success', `🧹 Dọn dữ liệu: đã giải phóng ${DonDuLieu.chuDungLuong(r.daDon)} (${chu})${r.loi.length ? ` — bỏ qua ${r.loi.length} mục đang bị khoá / đang dùng` : ''}.`);
+    for (const l of r.loi.slice(0, 5)) log('warning', `🧹 Không xoá được: ${l}`);
+    return r;
+  },
   moLink: ({ url }) => { if (/^https:\/\//.test(url)) shell.openExternal(url); },
   tonTai: ({ files }) => (files || []).map((f) => fs.existsSync(f)),
   xoaNhatKy: () => { nhatKy.length = 0; },

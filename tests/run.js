@@ -3413,6 +3413,149 @@ console.log('\n── 1.4.0 ─────────────────�
   });
 }
 
+// ── 1.4.12: Dọn dữ liệu thừa (src/main/don-du-lieu.js) ─────────────────────────────────────────────────
+{
+  const DDL = require('../src/main/don-du-lieu');
+  const os = require('os');
+  /** Cây userData giả như máy người dùng (Windows, 11/2026): phiên tài khoản có cache + đăng nhập, phiên của tài khoản
+   *  đã xoá, bộ cài cập nhật, tải tạm Flow / Suno, kết quả tạm, nhật ký, tool cũ cạnh đó trong %APPDATA%. */
+  function dungCay() {
+    const appData = fs.mkdtempSync(path.join(os.tmpdir(), 'don-'));
+    const ud = path.join(appData, 'AIAutomationStudio');
+    const ghi = (p, n) => { const f = path.join(ud, p); fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, Buffer.alloc(n, 1)); return f; };
+    ghi('Partitions/muse-tk-1/Cache/Cache_Data/f_000001', 5000);
+    ghi('Partitions/muse-tk-1/Code Cache/js/abc', 2000);
+    ghi('Partitions/muse-tk-1/GPUCache/data_1', 300);
+    ghi('Partitions/muse-tk-1/Network/Cookies', 111);
+    ghi('Partitions/muse-tk-1/Local Storage/leveldb/000003.log', 222);
+    ghi('Partitions/muse-tk-1/IndexedDB/https_muse.0/x', 33);
+    ghi('Partitions/muse-tk-1/Preferences', 10);
+    ghi('Partitions/flow-flow-1/Cache/Cache_Data/f_000002', 7000);
+    ghi('Partitions/flow-flow-1/Network/Cookies', 100);
+    ghi('Partitions/flow-flow-1/Service Worker/CacheStorage/a/b', 400);
+    ghi('Partitions/flow-da-xoa/Cache/Cache_Data/f_9', 900);
+    ghi('Partitions/flow-da-xoa/Network/Cookies', 100);
+    ghi('Cache/Cache_Data/data_1', 600);
+    ghi('Network/Cookies', 50);
+    ghi('cap-nhat/AIAutomationStudio-1.4.11-setup.exe', 8000);
+    ghi('cap-nhat/AIAutomationStudio-1.4.12-setup.exe', 8100);
+    ghi('flow-tai-tam/flow-1-1/me-abc/video.mp4', 1200);
+    ghi('flow-tai-tam/flow-1-1/me-def/x.png', 300);
+    ghi('suno-tai-tam/bai.mp3', 400);
+    ghi('nhat-ky-cu.txt', 1500);
+    const nk = ghi('nhat-ky.txt', 1600);
+    const dl = ghi('du-lieu.json', 1700);
+    ghi('flow-engine.json', 80);
+    ghi('Crashpad/reports/abc.dmp', 250);
+    const tamCon = ghi('ket-qua-tam/du-an-1/001.jpg', 700);
+    const tamGoc = ghi('ket-qua-tam/258.jpg', 650);
+    ghi('ket-qua-tam/du-an-xoa/009.jpg', 640);
+    ghi('ket-qua-tam/du-an-xoa/010.mp4', 1640);
+    const cd = path.join(appData, 'TaiLieu', 'chan-doan-flow');
+    fs.mkdirSync(cd, { recursive: true });
+    const cdCu = path.join(cd, 'cu.html'), cdMoi = path.join(cd, 'moi.html');
+    fs.writeFileSync(cdCu, Buffer.alloc(3000)); fs.writeFileSync(cdMoi, Buffer.alloc(3100));
+    const tuan = Date.now() / 1000 - 8 * 86400;
+    fs.utimesSync(cdCu, tuan, tuan);
+    const tool = path.join(appData, 'MuseAutomationStudio', 'Partitions', 'muse-1', 'Cache');
+    fs.mkdirSync(tool, { recursive: true }); fs.writeFileSync(path.join(tool, 'x'), Buffer.alloc(4000));
+    const o = {
+      userData: ud, appData, thuMucChanDoan: [cd, path.join(appData, 'TaiLieu', 'chan-doan-muse')],
+      partitionCon: ['persist:muse-tk-1', 'persist:flow-flow-1', 'persist:suno-suno-1'],
+      phienMo: () => false, giuCapNhat: null, thamChieu: [tamCon, tamGoc]
+    };
+    return { appData, ud, o, nk, dl, tamCon, tamGoc, cdCu, cdMoi };
+  }
+  const coFile = (p) => fs.existsSync(p);
+
+  testAsync('1.4.12 dọn dữ liệu: đo đúng từng nhóm; mặc định bật/tắt; tool cũ + phiên tài khoản đã xoá liệt kê tên', async () => {
+    const { o, appData } = dungCay();
+    try {
+      const r = await DDL.docDungLuong(o);
+      const b = Object.fromEntries(r.nhom.map((n) => [n.khoa, n.bytes]));
+      assert.deepStrictEqual(b, {
+        cache: 5000 + 2000 + 300 + 7000 + 400 + 600,          // cache các phiên còn tài khoản + của app (không tính Cookies / Local Storage…)
+        phienXoa: 900 + 100,                                   // cả thư mục phiên của tài khoản đã xoá
+        tam: 8000 + 8100 + 1200 + 300 + 400 + 1500 + 250,      // cập nhật, flow-tai-tam, suno-tai-tam, nhật ký cũ, Crashpad
+        ketQuaTam: 640 + 1640,                                 // chỉ file không việc nào dùng
+        chanDoan: 3000,                                        // chỉ file cũ hơn 7 ngày
+        toolCu: 4000
+      }, JSON.stringify(b));
+      const n = Object.fromEntries(r.nhom.map((x) => [x.khoa, x]));
+      assert.deepStrictEqual(r.nhom.filter((x) => x.macDinh).map((x) => x.khoa), ['cache', 'phienXoa', 'tam', 'ketQuaTam', 'chanDoan']);
+      assert.deepStrictEqual([n.phienXoa.chiTiet, n.toolCu.chiTiet], [['flow-da-xoa'], ['MuseAutomationStudio']]);
+      assert.ok(r.tong > b.cache && r.thuMuc === o.userData);
+    } finally { fs.rmSync(appData, { recursive: true, force: true }); }
+  });
+
+  testAsync('1.4.12 dọn dữ liệu: xoá đúng phần thừa — đăng nhập (Network/Cookies, Local Storage, IndexedDB), du-lieu.json, nhật ký hiện tại, kết quả việc còn dùng VẪN CÒN', async () => {
+    const t = dungCay();
+    const { o, ud } = t;
+    try {
+      const r = await DDL.donDuLieu(o, ['cache', 'phienXoa', 'tam', 'ketQuaTam', 'chanDoan']);
+      // Cache gốc của app (phiên mặc định — luôn đang mở) chỉ dọn qua session API (o.donPhien), bài này không truyền → còn.
+      assert.ok(r.ok && r.daDon === 14700 + 1000 + 19750 + 2280 + 3000, JSON.stringify(r));
+      // Cache mất…
+      for (const p of ['Partitions/muse-tk-1/Cache', 'Partitions/muse-tk-1/Code Cache', 'Partitions/muse-tk-1/GPUCache',
+        'Partitions/flow-flow-1/Cache', 'Partitions/flow-flow-1/Service Worker/CacheStorage']) assert.ok(!coFile(path.join(ud, p)), p);
+      assert.ok(coFile(path.join(ud, 'Cache')), 'phiên mặc định đang mở: không xoá file bằng fs');
+      // …đăng nhập + dữ liệu trang còn nguyên.
+      for (const p of ['Partitions/muse-tk-1/Network/Cookies', 'Partitions/muse-tk-1/Local Storage/leveldb/000003.log',
+        'Partitions/muse-tk-1/IndexedDB/https_muse.0/x', 'Partitions/muse-tk-1/Preferences', 'Partitions/flow-flow-1/Network/Cookies', 'Network/Cookies'])
+        assert.ok(coFile(path.join(ud, p)), `giữ ${p}`);
+      // Phiên của tài khoản đã xoá mất hẳn; phiên còn tài khoản còn thư mục.
+      assert.ok(!coFile(path.join(ud, 'Partitions/flow-da-xoa')) && coFile(path.join(ud, 'Partitions/muse-tk-1')));
+      // File tạm mất; thư mục tải của tab Flow còn (tab đang mở ghi vào đó), thư mục mẻ bên trong mất.
+      assert.ok(!coFile(path.join(ud, 'cap-nhat/AIAutomationStudio-1.4.11-setup.exe')) && !coFile(path.join(ud, 'nhat-ky-cu.txt')) &&
+        !coFile(path.join(ud, 'suno-tai-tam/bai.mp3')) && !coFile(path.join(ud, 'Crashpad/reports/abc.dmp')));
+      assert.ok(coFile(path.join(ud, 'flow-tai-tam/flow-1-1')) && !fs.readdirSync(path.join(ud, 'flow-tai-tam/flow-1-1')).length);
+      // Không đụng: dữ liệu app, nhật ký hiện tại, kết quả việc còn dùng, chẩn đoán mới, tool cũ (nhóm không chọn).
+      assert.ok(coFile(t.dl) && coFile(t.nk) && coFile(path.join(ud, 'flow-engine.json')) && coFile(t.tamCon) && coFile(t.tamGoc));
+      assert.ok(!coFile(path.join(ud, 'ket-qua-tam/du-an-xoa')), 'thư mục kết quả tạm đã trống thì bỏ');
+      assert.ok(!coFile(t.cdCu) && coFile(t.cdMoi));
+      assert.ok(coFile(path.join(t.appData, 'MuseAutomationStudio')), 'nhóm không chọn thì không đụng');
+      // Đo lại: các nhóm đã dọn về 0.
+      const sau = Object.fromEntries((await DDL.docDungLuong(o)).nhom.map((n) => [n.khoa, n.bytes]));
+      assert.deepStrictEqual(sau, { cache: 600, phienXoa: 0, tam: 0, ketQuaTam: 0, chanDoan: 0, toolCu: 4000 });
+      // Tool cũ chỉ xoá khi chọn.
+      const r2 = await DDL.donDuLieu(o, ['toolCu']);
+      assert.ok(r2.tungNhom.toolCu === 4000 && !coFile(path.join(t.appData, 'MuseAutomationStudio')));
+    } finally { fs.rmSync(t.appData, { recursive: true, force: true }); }
+  });
+
+  testAsync('1.4.12 dọn dữ liệu: phiên ĐANG MỞ dọn bằng session API (không xoá file trình duyệt đang giữ); đang tải / chờ cài bản mới thì giữ bộ cài', async () => {
+    const t = dungCay();
+    try {
+      const goi = [];
+      const o = { ...t.o, phienMo: (p) => p === 'persist:muse-tk-1', giuCapNhat: path.join(t.ud, 'cap-nhat/AIAutomationStudio-1.4.12-setup.exe'),
+        donPhien: async (p) => { goi.push(p); if (p === 'persist:muse-tk-1') fs.rmSync(path.join(t.ud, 'Partitions/muse-tk-1/Cache'), { recursive: true }); } };
+      const r = await DDL.donDuLieu(o, ['cache', 'tam']);
+      assert.deepStrictEqual(goi, ['', 'persist:muse-tk-1'], 'phiên mặc định của app + phiên đang mở → session API');
+      assert.ok(coFile(path.join(t.ud, 'Partitions/muse-tk-1/Code Cache')), 'phiên đang mở: không xoá file cache bằng fs');
+      assert.ok(!coFile(path.join(t.ud, 'Partitions/flow-flow-1/Cache')), 'phiên chưa mở: xoá thẳng thư mục cache');
+      assert.ok(r.tungNhom.cache === 5000 + 7000 + 400, `đếm phần thật sự giải phóng: ${r.tungNhom.cache}`);
+      assert.ok(coFile(o.giuCapNhat) && !coFile(path.join(t.ud, 'cap-nhat/AIAutomationStudio-1.4.11-setup.exe')), 'bộ cài đang chờ cài được giữ');
+      const k = await DDL.keHoach({ ...t.o, giuCapNhat: 'het' });
+      assert.ok(!k.find((n) => n.khoa === 'tam').muc.some((m) => /cap-nhat/.test(m.xoa)), 'đang tải bản mới: không đụng cap-nhat');
+      assert.deepStrictEqual([DDL.chuDungLuong(1.26e9), DDL.chuDungLuong(350e6), DDL.chuDungLuong(12.3e6), DDL.chuDungLuong(4000)], ['1,3 GB', '350 MB', '12,3 MB', '4 KB']);
+    } finally { fs.rmSync(t.appData, { recursive: true, force: true }); }
+  });
+
+  test('1.4.12 dọn dữ liệu: main.js — từ chối khi đang chạy, phiên đã mở được ghi nhận, giới hạn cache đĩa; giao diện gọi lệnh có trong LENH', () => {
+    const m = docNguon('main.js'), ui = docNguon('src/ui/app.js'), html = docNguon('src/ui/index.html');
+    assert.ok(/donDuLieu: async \(\{ nhom \}\) => \{\n    if \(dieuPhoi\.dangChay\) return \{ ok: false/.test(m), 'đang chạy → từ chối');
+    assert.ok(/function moPhien\(partition\) \{ phienDaMo\.add\(partition\)/.test(m) && /const ses = moPhien\(tk\.partition\)/.test(m) && /phienMo: \(p\) => phienDaMo\.has\(p\)/.test(m));
+    assert.ok(!/session\.fromPartition\((?!partition\))/.test(m), 'mọi chỗ mở phiên đi qua moPhien (để biết phiên nào đang mở)');
+    assert.ok(/app\.commandLine\.appendSwitch\('disk-cache-size', String\(GIOI_HAN_CACHE_MB \* 1024 \* 1024\)\)/.test(m) && m.indexOf("appendSwitch('disk-cache-size'") < m.indexOf('app.whenReady('));
+    assert.ok(/partitionCon: taiKhoan\.ds\.map\(\(t\) => t\.partition\)/.test(m), 'phiên còn tài khoản lấy từ danh sách tài khoản thật');
+    assert.ok(/docDungLuong: \(\) => DonDuLieu\.docDungLuong\(thamSoDon\(\)\)/.test(m));
+    assert.ok(/id="cdDonThe"/.test(html) && /id="donDo"/.test(html) && /id="donChay"/.test(html));
+    assert.ok(/api\.call\('docDungLuong'\)/.test(ui) && /api\.call\('donDuLieu', \{ nhom: chon \}\)/.test(ui));
+    // Không bao giờ có thư mục đăng nhập trong danh sách cache.
+    for (const k of DDL.KHONG_DUNG) assert.ok(!DDL.THU_MUC_CACHE.some((c) => c.split(path.sep)[0] === k), k);
+  });
+}
+
 Promise.all(choAsync).then(() => {
   console.log('\n──────────────────────────────────────────────');
   console.log(`KẾT QUẢ: ${pass}/${pass + loi.length} PASS`);
