@@ -31,6 +31,7 @@ const { xoaChatChuotThat, nenThuChuotThat } = require('./src/main/xoa-chat-muse'
 const { chepLenDrive, timThuMucDrive } = require('./src/main/drive');
 const { DriveWeb } = require('./src/main/drive-web');
 const { ensureDebugger } = require('./src/flow/main/paste');
+const DD = require('./src/main/don-dep');   // 1.4.12 dọn dữ liệu thừa (khác donDep = dọn chat / dự án Flow)
 
 // Thư mục dữ liệu riêng (phiên đăng nhập, cài đặt, hàng đợi) — PHẢI trước whenReady.
 app.setPath('userData', process.env.MUSE_DATA_DIR ||
@@ -575,6 +576,62 @@ function capNhatToken() {
 let dangXoaChat = false;
 // ── 1.4.0: tải thẳng lên drive.google.com bằng phiên tài khoản Drive (src/main/drive-web.js) ──
 let driveWeb = null;
+// ── 1.4.12: dọn dữ liệu thừa (bộ nhớ đệm phiên, phiên tài khoản đã xoá, file tạm, nhật ký / chẩn đoán / bộ cài cũ) ──
+/** Thư mục phiên đang mở: phiên của mọi trang (cửa sổ, luồng, tab Flow) + phiên đã cấu hình trong lần chạy này. */
+function phienDangMo() {
+  const ra = new Set([session.defaultSession.storagePath]);
+  for (const w of require('electron').webContents.getAllWebContents()) { try { if (w.session.storagePath) ra.add(w.session.storagePath); } catch (_) {} }
+  for (const p of daCauHinh) { try { const s = session.fromPartition(p).storagePath; if (s) ra.add(s); } catch (_) {} }
+  return [...ra].filter(Boolean);
+}
+function moiTruongDonDep() {
+  return {
+    userData: app.getPath('userData'),
+    partitions: taiKhoan.ds.map((a) => a.partition),
+    dangMo: phienDangMo(),
+    fileViec: dieuPhoi.viec.flatMap((j) => [...(j.files || []), ...(j.thamChieu || [])]).filter((f) => typeof f === 'string'),
+    duAnIds: dieuPhoi.duAn.map((d) => d.id),
+    thuMucChanDoan: ['chan-doan-flow', 'chan-doan-muse', 'chan-doan-drive'].map(thuMucChanDoan),
+    phienBan: pkg.version
+  };
+}
+let dangDon = false;
+async function donDuLieu(muc) {
+  if (dangDon) return { ok: false, loi: 'Đang dọn — chờ lần dọn trước xong.' };
+  dangDon = true;
+  try {
+    const truoc = await DD.quet(moiTruongDonDep());
+    // Phiên đang mở (giao diện app, luồng / tab còn chạy): dọn bộ nhớ đệm qua API của phiên — giữ đăng nhập, không
+    // xoá file trên đĩa mà trang đang dùng.
+    if (muc.includes('cache')) {
+      const cache = truoc.muc.find((m) => m.ma === 'cache');
+      for (const goc of cache.api) {
+        const tk = taiKhoan.ds.find((a) => path.resolve(app.getPath('userData'), 'Partitions', DD.tenPhien(a.partition)).toLowerCase() === path.resolve(goc).toLowerCase());
+        const ses = tk ? session.fromPartition(tk.partition) : path.resolve(goc) === path.resolve(app.getPath('userData')) ? session.defaultSession : null;
+        if (!ses) continue;
+        try {
+          await ses.clearCache();
+          await ses.clearCodeCaches({});
+          await ses.clearStorageData({ storages: ['shadercache', 'cachestorage'] });
+        } catch (err) { log('warning', `🧹 Không dọn được bộ nhớ đệm của "${tk ? tk.ten : 'giao diện app'}": ${err.message}`); }
+      }
+    }
+    const r = await DD.donDep(truoc, muc);
+    const sau = await DD.quet(moiTruongDonDep());
+    const theoMuc = truoc.muc.filter((m) => muc.includes(m.ma)).map((m) => {
+      const s = sau.muc.find((x) => x.ma === m.ma);
+      return { ten: m.ten, byte: Math.max(0, m.byte - (s ? s.byte : 0)) };
+    });
+    const daDon = theoMuc.reduce((t, m) => t + m.byte, 0);
+    log('success', `🧹 Đã dọn ${DD.docByte(daDon)}: ${theoMuc.filter((m) => m.byte).map((m) => `${m.ten.toLowerCase()} ${DD.docByte(m.byte)}`).join(', ') || 'không có gì để dọn'}` +
+      (r.khongXoa ? ` — ${r.khongXoa} mục đang được dùng chưa xoá được (đóng app mở lại rồi dọn tiếp)` : '') + '.');
+    return { ok: true, daDon, khongXoa: r.khongXoa, loi: r.loi, ...DD.tomTat(sau) };
+  } catch (err) {
+    log('error', `🧹 Dọn dữ liệu lỗi: ${err.message}`);
+    return { ok: false, loi: err.message };
+  } finally { dangDon = false; }
+}
+
 function thuMucChanDoan(ten) {
   return process.env.MUSE_DATA_DIR ? path.join(app.getPath('userData'), ten) : path.join(app.getPath('documents'), 'AI Automation Studio', ten);
 }
@@ -784,6 +841,7 @@ const LENH = {
   dungViec: ({ ids }) => dieuPhoi.dungViec(ids),
   chayViec: ({ ids }) => dieuPhoi.chayViec(ids),
   doiTaiKhoan: ({ ids }) => dieuPhoi.doiTaiKhoan(ids || []),   // 1.4.9: nút "Đổi tài khoản" ở việc đang chạy / treo
+  kiemViecDo: ({ ids } = {}) => dieuPhoi.kiemViecDo(Array.isArray(ids) ? ids : null),   // 1.4.12: nút "Kiểm tra việc dở" (Muse); không có ids = mọi việc dở
   xoaViec: ({ ids }) => dieuPhoi.xoaViec(ids),
   suaViec: ({ id, thay }) => dieuPhoi.suaViec(id, thay),
   // 1.4.0: đổi prompt nhiều việc, đổi ngay sang Muse / Flow, đưa lên Google Drive, chạy lại tài khoản đang nghỉ.
@@ -938,6 +996,9 @@ const LENH = {
   hienTrongThuMuc: ({ file }) => { if (file && fs.existsSync(file)) shell.showItemInFolder(file); },
   moThuMuc: ({ dir }) => { fs.mkdirSync(dir, { recursive: true }); return shell.openPath(dir); },
   moThuMucDuLieu: () => shell.openPath(app.getPath('userData')),
+  // 1.4.12: Cài đặt → Cả app → "Dọn dữ liệu thừa…" (src/main/don-dep.js).
+  quetDuLieu: async () => DD.tomTat(await DD.quet(moiTruongDonDep())),
+  donDuLieu: ({ muc }) => donDuLieu(muc || []),
   moLink: ({ url }) => { if (/^https:\/\//.test(url)) shell.openExternal(url); },
   tonTai: ({ files }) => (files || []).map((f) => fs.existsSync(f)),
   xoaNhatKy: () => { nhatKy.length = 0; },
@@ -1213,6 +1274,9 @@ app.whenReady().then(() => {
   xetChanNgu();
   setInterval(xetChanNgu, 15000);
 
+  // 1.4.12: việc Muse đã gửi từ lần chạy trước (app tắt đột ngột) → mở lại chat cũ kiểm, xong rồi thì tải về (không tạo lại).
+  setTimeout(() => { try { dieuPhoi.kiemKhiMo(); } catch (err) { log('error', `❌ Kiểm việc dở: ${err.message}`); } },
+    parseInt(process.env.MUSE_KIEM_KHI_MO_MS, 10) || 8000);
   if (!process.env.MUSE_NO_UPDATE_CHECK) {
     setTimeout(() => capNhat.kiemTra({ imLang: true }), 5000);
     setInterval(() => capNhat.kiemTra({ imLang: true }), 4 * 3600 * 1000);

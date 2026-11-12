@@ -351,6 +351,48 @@
   const xacNhan = (tieuDe, chu, ok = 'Đồng ý', nguyHiem = false) =>
     hoi({ tieuDe, html: `<p>${chu}</p>`, ok, nguyHiem }).then((v) => !!v);
 
+  // ── 1.4.12: Dọn dữ liệu thừa (Cài đặt → Cả app) ─────────────────────────
+  const docByte = (b) => {
+    const n = Number(b) || 0;
+    const [don, chia] = n >= 1024 ** 3 ? ['GB', 1024 ** 3] : n >= 1024 ** 2 ? ['MB', 1024 ** 2] : n >= 1024 ? ['KB', 1024] : ['byte', 1];
+    const x = n / chia;
+    return `${chia === 1 ? x : x.toFixed(x >= 100 ? 0 : 1).replace('.', ',')} ${don}`;
+  };
+  const tongThua = (kq) => kq.muc.reduce((t, m) => t + m.byte, 0);
+  function ghiDungLuong(kq) {
+    const thua = tongThua(kq);
+    $('#cdDungLuong').textContent = `${docByte(kq.tong)} ở ${kq.userData}` + (thua ? ` · dọn được khoảng ${docByte(thua)}` : ' · không có gì thừa');
+  }
+  let dangDo = null;
+  /** Đo dữ liệu app (chạy nền, không chặn giao diện). */
+  function doDuLieu() {
+    if (dangDo) return dangDo;
+    $('#cdDungLuong').textContent = 'Đang đo…';
+    dangDo = api.call('quetDuLieu').then((kq) => { if (kq) ghiDungLuong(kq); return kq; })
+      .catch(() => { $('#cdDungLuong').textContent = 'Không đo được.'; return null; })
+      .finally(() => { dangDo = null; });
+    return dangDo;
+  }
+  async function hopDonDuLieu() {
+    const kq = await doDuLieu();
+    if (!kq) return;
+    const html = `<p>Chọn phần muốn dọn. <b>Không đăng xuất tài khoản</b>, không xoá ảnh / video / nhạc đã tạo, không xoá nhân vật và dự án.</p>` +
+      `<div class="ds-don">${kq.muc.map((m) => `<label class="muc-don${m.byte ? '' : ' rong'}"><input type="checkbox" name="don_${esc(m.ma)}"${m.byte && m.macDinh ? ' checked' : ''}${m.byte ? '' : ' disabled'}>` +
+        `<div><b>${esc(m.ten)}</b><small>${esc(m.moTa)}</small></div><span class="co">${m.byte ? docByte(m.byte) : 'trống'}</span></label>`).join('')}</div>` +
+      `<p class="ghi-don">Thư mục dữ liệu: ${esc(kq.userData)} — tổng ${docByte(kq.tong)}.<br>` +
+      `Dữ liệu dự án + hàng đợi (du-lieu.json): ${docByte(kq.duLieuJson)} — muốn nhỏ hơn thì xoá bớt dự án cũ trong app.` +
+      (kq.nhanVat ? `<br>Ảnh nhân vật: ${docByte(kq.nhanVat)} (giữ nguyên).` : '') + `</p>`;
+    const v = await hoi({ tieuDe: `Dọn dữ liệu thừa — dọn được khoảng ${docByte(tongThua(kq))}`, html, ok: 'Dọn' });
+    if (!v) return;
+    const muc = Object.keys(v).filter((k) => k.startsWith('don_') && v[k]).map((k) => k.slice(4));
+    if (!muc.length) { toast('Chưa chọn phần nào để dọn'); return; }
+    toast('Đang dọn…');
+    const r = await api.call('donDuLieu', { muc });
+    if (!r || !r.ok) { toast(`Dọn lỗi: ${(r && r.loi) || '?'}`, 'loi'); return; }
+    ghiDungLuong(r);
+    toast(`Đã dọn ${docByte(r.daDon)}` + (r.khongXoa ? ` — ${r.khongXoa} mục đang dùng chưa xoá được (đóng app mở lại rồi dọn tiếp)` : ''));
+  }
+
   // ── Điều hướng ──────────────────────────────────────────────────────────
   const TEN_TRANG = { anh: 'Tạo ảnh', video: 'Tạo video', nhac: 'Tạo nhạc', hengio: 'Hẹn giờ', nhanvat: 'Nhân vật', thuvien: 'Thư viện', taikhoan: 'Tài khoản', huongdan: 'Hướng dẫn', caidat: 'Cài đặt' };
   function diToi(trang) {
@@ -380,7 +422,7 @@
       $('#tyLeVideoChuoi').value = U.chuoi.tyLe;
       $('#nenVideoChuoi').value = U.chuoi.nen || '';
     }
-    if (trang === 'caidat') veCaiDat();
+    if (trang === 'caidat') { veCaiDat(); if (cu !== 'caidat') doDuLieu(); }   // 1.4.12: đo dữ liệu app mỗi lần vào Cài đặt
     if (trang === 'hengio') napHenGio();
     luuUi();
     ve();
@@ -550,7 +592,7 @@
     o.placeholder = 'Dùng cho ảnh không có dòng riêng trong file (để trống = prompt mặc định)';
   }
 
-  const NHAN_BUOC = { 'mo-trang': 'Đang mở Muse', 'mo-lai': 'Mở lại chat cũ', gui: 'Đang gửi prompt', tai: 'Đang tải về' };
+  const NHAN_BUOC = { 'mo-trang': 'Đang mở Muse', 'mo-lai': 'Mở lại chat cũ', gui: 'Đang gửi prompt', tai: 'Đang tải về', kiem: 'Đang kiểm chat cũ' };
   function nhanTrangThai(j) {
     if (j.trangThai === 'xong') return ['xong', 'Hoàn tất', gio(j.xongLuc)];
     if (j.trangThai === 'dung') return ['dung', 'Đã dừng', j.thread ? 'Bấm Chạy để lấy tiếp kết quả' : 'Bấm Chạy để chạy tiếp'];
@@ -593,6 +635,15 @@
 
   function veHang() {
     const tatCa = locTheoTk(locViec());
+    // 1.4.12: dải báo việc Muse dở (đã gửi prompt, chưa lấy kết quả) + nút kiểm tra.
+    const viecDo = locViec().filter((j) => laViecDo(j) || j.dangKiem);
+    const dangKiem = viecDo.filter((j) => j.dangKiem).length;
+    $('#daiViecDo').hidden = !viecDo.length;
+    if (viecDo.length) {
+      datHtml($('#daiViecDoChu'), dangKiem ? `Đang kiểm <b>${dangKiem}</b> việc Muse dở (mở lại chat cũ)…`
+        : `<b>${viecDo.length}</b> việc Muse đã gửi prompt nhưng chưa lấy kết quả (vd app tắt giữa chừng)`);
+      $('#nutKiemViecDo').disabled = dangKiem === viecDo.length;
+    }
     const dem = { tat: tatCa.length, chay: 0, cho: 0, dung: 0, xong: 0, loi: 0 };
     for (const j of tatCa) dem[j.trangThai]++;
     const tabs = [['tat', 'Tất cả'], ['chay', 'Đang chạy'], ['cho', 'Đang chờ'], ['dung', 'Đã dừng'], ['xong', 'Hoàn tất'], ['loi', 'Lỗi']]
@@ -739,6 +790,8 @@
       toast(`Đã tạo lại #${so3(j.so)} và chạy ngay`);
     } else if (lenh === 'dungViec' || lenh === 'chayViec' || lenh === 'doiTaiKhoan') {
       dieuKhienViec(lenh, [j.id]);
+    } else if (lenh === 'kiemViecDo') {
+      kiemViecDo([j.id]);
     } else if (lenh === 'doiNen') {
       doiNen([j.id], nenTk(j) === 'flow' ? 'muse' : 'flow');
     } else if (lenh === 'lenDrive') {
@@ -781,6 +834,19 @@
     const n = await api.call(lenh, { ids });
     if (lenh === 'dungViec') toast(n ? `Đã dừng ${n} việc — việc khác vẫn chạy` : 'Không có việc nào đang chạy / chờ để dừng', !n);
     else toast(n ? `Đang chạy ngay ${n} việc` : 'Không có việc nào chạy được (việc đã xong thì dùng Tạo lại)', !n);
+  }
+
+  /** 1.4.12: việc Muse đã gửi prompt (có chat) mà chưa lấy kết quả — kiểm được bằng cách mở lại chat cũ (như điều phối _laViecDo). */
+  function laViecDo(j) {
+    return (j.nen || 'muse') === 'muse' && !!j.thread && !!j.taiKhoan && !/\/thread\/new\b/.test(j.thread) &&
+      ['cho', 'dung', 'loi'].includes(j.trangThai) && !j.dangKiem;
+  }
+
+  /** 1.4.12: nút "Kiểm tra việc dở" — mở lại chat cũ ở Muse, xong rồi thì tải về (không tạo lại). ids rỗng = mọi việc dở. */
+  async function kiemViecDo(ids) {
+    if (!ids || !ids.length) { toast('Không có việc Muse nào đang dở để kiểm', true); return; }
+    const r = await api.call('kiemViecDo', { ids });
+    toast(r && r.so ? `Đang kiểm ${r.so} việc dở — mở lại chat cũ ở Muse, xong rồi thì tải về (xem nhật ký)` : 'Không có việc Muse nào đang dở để kiểm', !(r && r.so));
   }
 
   /** 1.4.9: nút "Đổi tài khoản" — việc đang chạy / treo bỏ tài khoản hiện tại, chạy ngay ở tài khoản kế tiếp cùng nền tảng. */
@@ -846,6 +912,7 @@
       f ? `<button data-l="xem">${ic('eye')}Xem</button><button data-l="thuMuc">${ic('folder-open')}Mở thư mục</button>` : '',
       j.trangThai === 'chay' || j.trangThai === 'cho' ? `<button data-l="dungViec">${ic('square')}Dừng việc này</button>` : '',
       coTheDoiTk(j) ? `<button data-l="doiTaiKhoan">${ic('users')}Đổi sang tài khoản kế tiếp</button>` : '',
+      laViecDo(j) ? `<button data-l="kiemViecDo">${ic('refresh-cw')}Kiểm tra chat cũ (tải về nếu đã xong)</button>` : '',
       ['cho', 'dung', 'loi'].includes(j.trangThai) ? `<button data-l="chayViec">${ic('play')}Chạy ngay việc này</button>` : '',
       j.trangThai !== 'chay' ? `<button data-l="taoLai">${ic('rotate-ccw')}Tạo lại</button><button data-l="sua">${ic('pencil')}${f && j.loai === 'anh' ? 'Chỉnh sửa ảnh' : 'Sửa prompt'}</button>` : '',
       f && j.loai === 'anh' ? `<button data-l="video">${ic('film')}Tạo video từ ảnh này</button>` : '',
@@ -1775,6 +1842,7 @@
     $('#chonDrive').onclick = () => lenDrive([...U.chon]);
     $('#chonDung').onclick = () => { dieuKhienViec('dungViec', [...U.chon]); U.chon.clear(); };
     $('#chonDoiTk').onclick = () => { doiTaiKhoan([...U.chon]); U.chon.clear(); };
+    $('#nutKiemViecDo').onclick = () => kiemViecDo(locViec().filter(laViecDo).map((j) => j.id));   // 1.4.12
 
     // Chi tiết
     $('#chiTiet').addEventListener('click', (e) => {
@@ -1843,6 +1911,8 @@
     $('#ncChonThuMuc').onclick = async () => { const d = await api.call('chonThuMucRa', { loai: loaiTrang(), duAn: (duAnHienTai() || {}).id }); if (d) $('#ncThuMuc').value = d; };
     $('#ncMoThuMuc').onclick = () => api.call('moThuMuc', { dir: S.thuMuc[loaiTrang()] });
     $('#cdMoDuLieu').onclick = () => api.call('moThuMucDuLieu');
+    $('#cdMoDuLieu2').onclick = () => api.call('moThuMucDuLieu');
+    $('#cdDonDuLieu').onclick = () => hopDonDuLieu();
     // 1.4.0: Google Drive — thư mục Drive trên máy của dự án đang mở (lưu ngay).
     const idDa = () => (duAnHienTai() || {}).id;
     $('#cdDriveCach').onchange = () => veDriveCach();

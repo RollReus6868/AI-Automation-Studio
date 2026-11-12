@@ -66,6 +66,14 @@ jobs:
       - name: Kiem thu dau-cuoi (theo doi thu muc anh, trang Muse gia)
         timeout-minutes: 10
         run: node tests/e2e.js theodoi
+      # 1.4.12: viec Muse do (tat app giua chung) -> kiem chat cu, xong thi tai ve; het luot video 24h -> sang tai khoan ke tiep
+      - name: Kiem thu dau-cuoi (kiem viec do, trang Muse gia)
+        timeout-minutes: 10
+        run: node tests/e2e.js kiemdo
+      # 1.4.12: don du lieu thua (bo nho dem phien, phien tai khoan da xoa, nhat ky cu…) — giu dang nhap
+      - name: Kiem thu dau-cuoi (don du lieu thua, trang Muse gia)
+        timeout-minutes: 10
+        run: node tests/e2e.js dondep
 
       # 1.3.4: giao dien voi 200 video xong khong phinh RAM (anh nho thay <video>, ve theo tung dong)
       - name: Kiem thu RAM giao dien

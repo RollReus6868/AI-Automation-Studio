@@ -123,7 +123,7 @@ class Luong {
     if (!tiepTuc) {
       await ctx.choGui();
       if (this.huy !== huyLuc) return { ok: false, dung: true };
-      ctx.capNhat({ buoc: 'gui' });
+      ctx.capNhat({ buoc: 'gui', guiLuc: Date.now() });   // 1.4.12: ghi ngay — tắt app lúc này thì biết prompt có thể đã gửi
       const r = await this.goi(`window.__muse.gui(${JSON.stringify({ text: ctx.tinNhan, files: ctx.files || [] })})`, HAN_GUI_MS);
       if (!r || !r.ok) {
         if (r && r.loi === 'can-dang-nhap') return { ok: false, canDangNhap: true, loi: 'Tài khoản chưa đăng nhập Muse' };
@@ -149,11 +149,12 @@ class Luong {
     let lanLoiTrang = 0;
     let lanLayHong = 0;
     let matTu = 0;
+    let kqCuoi = null;   // 1.4.12: lần hỏi kết quả gần nhất (chế độ kiểm chat cũ: Muse còn đang tạo không)
     while (Date.now() < het) {
       if (!(await this.ngu(3000, huyLuc))) return { ok: false, dung: true, giuThread: true };
       let kq;
       try {
-        kq = await this.goi('window.__muse.ketQua()');
+        kq = kqCuoi = await this.goi('window.__muse.ketQua()');
         lanLoiTrang = 0;
       } catch (err) {
         // Trang sập / đang nạp lại: mở lại chat rồi chờ tiếp, tối đa 3 lần liền.
@@ -187,6 +188,11 @@ class Luong {
       }
 
       if (kq.chu && !coChuLuc) coChuLuc = Date.now();
+      // 1.4.12: Muse báo HẾT LƯỢT (vd "đã hết lượt tạo video trong 24 giờ qua") → báo ngay: tài khoản thôi nhận loại
+      // việc này, việc sang tài khoản kế tiếp — không chờ đủ thời gian "trả chữ", không tính lỗi, không sang Flow.
+      if (kq.chu && !kq.dangGo && !kq.soKhungAnh && !kq.soKhungVideo && hd.laHetLuot(kq.chu)) {
+        return { ok: false, chanLoai: true, hetLuotLoai: true, loi: `Muse báo hết lượt tạo ${job.loai === 'video' ? 'video' : 'ảnh'}: "${kq.chu.slice(0, 200)}"` };
+      }
       // Muse nói tài khoản bị chặn khu vực / 403 → báo ngay, khỏi chờ đủ thời gian "trả chữ".
       if (kq.chu && !kq.dangGo && !kq.soKhungAnh && !kq.soKhungVideo && hd.laChanKhuVuc(kq.chu)) {
         return { ok: false, chanLoai: true, loi: `Muse báo tài khoản bị chặn tạo ${job.loai === 'video' ? 'video' : 'ảnh'}: "${kq.chu.slice(0, 200)}"` };
@@ -200,6 +206,11 @@ class Luong {
       if (hd.laTraLoiChu(kq, giay, ctx.choChuGiay)) {
         return { ok: false, loi: `Muse trả lời chữ, không có ${job.loai === 'video' ? 'video' : 'ảnh'}: "${kq.chu.slice(0, 200)}"` };
       }
+    }
+    // 1.4.12: chỉ KIỂM chat cũ (việc dở sau khi tắt app) → báo "chưa xong" kèm Muse còn đang tạo hay không.
+    if (ctx.chiKiem) {
+      const dangTao = !!(kqCuoi && (kqCuoi.dangGo || kqCuoi.soKhungAnh || kqCuoi.soKhungVideo || !kqCuoi.chu));
+      return { ok: false, chuaXong: true, dangTao, loi: `Chưa thấy kết quả sau ${ctx.choToiDaGiay} giây`, giuThread: true };
     }
     return { ok: false, loi: `Quá ${ctx.choToiDaGiay} giây chưa thấy kết quả`, giuThread: true };
   }

@@ -226,6 +226,10 @@
           <button class="nut-vien nho" id="nutSapXep"><i data-icon="arrow-down-up"></i><span>Mới nhất</span></button>
           </div>
         </div>
+        <div class="dai-viec-do" id="daiViecDo" hidden>
+          <i data-icon="clock"></i><span id="daiViecDoChu"></span>
+          <button class="nut-vien nho" id="nutKiemViecDo" title="Mở lại chat cũ ở Muse của từng việc: video / ảnh đã xong thì tải về luôn, không tạo lại; Muse còn đang tạo thì giữ chat và kiểm lại sau"><i data-icon="refresh-cw"></i>Kiểm tra việc dở</button>
+        </div>
         <div class="thanh-chon" id="thanhChon" hidden>
           <span id="soChon">0 đã chọn</span>
           <button class="nut-vien nho" id="chonTai" title="Chép file kết quả của các việc đã chọn vào một thư mục"><i data-icon="download"></i>Tải về</button>
@@ -330,6 +334,8 @@
           <li><b>Cài đặt mặc định:</b> ở trang Cài đặt chỉnh xong bấm <i>Lưu làm cài đặt mặc định</i> (thanh dưới đáy trang): mọi dự án đang có và dự án mới dùng bộ đó; thư mục lưu, mẫu tên file vẫn riêng từng dự án. <i>Lưu cài đặt</i> chỉ đổi dự án đang mở.</li>
           <li><b>Hẹn giờ chạy:</b> mục <i>Hẹn giờ</i> có thẻ riêng cho Tạo ảnh, Tạo video, Tạo nhạc. Bật thẻ, chọn giờ bắt đầu (và giờ dừng nếu muốn), mỗi ngày hay một lần, mọi dự án hay một dự án → <i>Lưu hẹn giờ</i>. Tới giờ app chạy các việc <b>đang chờ</b> của đúng chức năng đó; thêm việc trước bằng <i>Chỉ thêm vào hàng đợi</i>. App phải đang mở, máy đang bật.</li>
           <li><b>Dừng / chạy từng việc:</b> mỗi dòng đang chạy có nút <i>Dừng</i>; việc đã dừng có nút <i>Chạy</i> (chạy ngay, kể cả khi dự án đang dừng). Chọn nhiều dòng rồi bấm <i>Chạy</i> / <i>Dừng</i> / <i>Tạo lại</i> ở thanh chọn.</li>
+          <li><b>Tắt app giữa chừng (Muse):</b> mở lại app, các video / ảnh đã gửi Muse mà chưa lấy kết quả được tự kiểm: app mở lại chat cũ, Muse làm xong rồi thì tải về luôn (không tạo lại, không trùng); Muse còn đang tạo thì giữ chat và kiểm lại sau. Muốn kiểm ngay: bấm <i>Kiểm tra việc dở</i> trên danh sách việc (hoặc ⋯ ở dòng việc → <i>Kiểm tra chat cũ</i>).</li>
+          <li><b>Hết lượt video 24 giờ (Muse):</b> Muse báo hết lượt tạo video → tài khoản đó thôi nhận video 24 giờ (vẫn tạo ảnh), việc sang ngay tài khoản kế tiếp, không chờ. Bấm <i>Kiểm tra</i> ở thẻ tài khoản để thử lại sớm.</li>
           <li><b>Việc treo (vd đứng ở 99%):</b> app tự bỏ và chạy ở tài khoản khác sau thời gian chờ tối đa (Muse: <i>Chờ tối đa 1 ảnh / 1 video</i> ở Cài đặt → <i>Muse — khi chạy</i>) / <i>Treo quá … phút</i> (Flow: Cài đặt → <i>Google Flow — khi chạy</i> → <i>Tài khoản lỗi</i>). Muốn đổi ngay: bấm nút <i>Đổi tài khoản</i> (biểu tượng hai người) ở dòng việc, hoặc chọn nhiều dòng → <i>Đổi tài khoản</i> — việc bỏ tài khoản đang chạy (vd Muse 1) và gửi lại prompt ở tài khoản kế tiếp (Muse 2…).</li>
           <li><b>Dự án Flow mới:</b> mỗi dự án của tool chạy trên một dự án Flow MỚI riêng ở từng tài khoản Flow, không dùng chung dự án Flow cũ.</li>
           <li><b>Video từ ảnh có sẵn:</b> trang Tạo video → <i>Tạo video từ thư mục ảnh</i> → chọn thư mục; gõ prompt vào ô <i>Prompt dùng chung</i> rồi Tạo &amp; chạy — mỗi ảnh một video. Mỗi ảnh một prompt riêng: bấm <i>Nhập file .txt — prompt riêng từng ảnh</i> — ảnh <b>016.jpg</b> thành video số 16, dùng dòng 16 của file (số lấy từ tên ảnh, nên ảnh tạo không theo thứ tự, thư mục thiếu số vẫn không lệch); tên ảnh không có số thì ảnh thứ 1 (xếp theo tên) dùng dòng 1, ảnh 2 dùng dòng 2… Đặt tên video <code>{tenAnh}</code> để video trùng tên ảnh. Bật <i>Theo dõi thư mục</i> trước khi bấm Tạo: ảnh bạn làm thêm vào thư mục đó về sau (ghi xong) cũng tự thành video, không cần chọn lại thư mục; bấm <i>Dừng theo dõi</i> khi đủ.</li>
@@ -357,6 +363,7 @@
           <li><b>Đổi ngay sang Muse / Flow:</b> nút <i>⋮</i> ở mỗi dòng → <i>Đổi sang Flow / Muse &amp; chạy ngay</i>; chọn nhiều dòng → <i>Sang Muse</i> / <i>Sang Flow</i>. Việc đang chạy dừng ở bên cũ rồi chạy ở bên mới; việc đã xong thì được tạo lại ở bên mới.</li>
           <li><b>Đồng hồ dự án:</b> cạnh tên dự án là thời gian dự án đã chạy (lượt này) và dự đoán còn bao lâu nữa (tính theo tốc độ thật của lượt đang chạy).</li>
           <li><b>Chạy lại tài khoản đang nghỉ:</b> tài khoản đỏ vì lỗi mà bạn đã sửa được (đăng nhập lại, đổi mạng…) → bấm <i>Chạy lại ngay</i> ở thẻ tài khoản (hoặc <i>Chạy lại TK đang nghỉ</i> cho mọi tài khoản): tài khoản nhận việc lại luôn, dự án đã tự tạm dừng thì chạy tiếp.</li>
+          <li><b>Ổ C đầy / app nặng:</b> Cài đặt → <i>Cả app</i> → <i>Dọn dữ liệu thừa…</i>: xoá bộ nhớ đệm trang web của các tài khoản, dữ liệu của tài khoản đã xoá, file tạm, nhật ký / file chẩn đoán / bộ cài cũ. Không đăng xuất tài khoản, không xoá ảnh / video đã tạo, nhân vật hay dự án. Trang chạy lâu ngày lại đầy dần — thỉnh thoảng dọn lại. Muốn file dữ liệu dự án (du-lieu.json) nhỏ đi thì xoá bớt dự án cũ.</li>
           <li><b>Lỗi lạ:</b> Cài đặt → <i>Cả app</i> → bật <i>Hiện các luồng chạy ngầm</i> để nhìn thấy trang Muse / Flow của từng luồng; nhật ký đầy đủ ở thư mục dữ liệu (<code>nhat-ky.txt</code>).</li>
         </ol>
       </section>
@@ -517,6 +524,9 @@
           <div class="dong-cong-tac"><div><b>Tắt máy khi chạy hết hàng chờ</b><span class="ap ap-app">Cả app</span><small>Chung cho mọi dự án: tắt khi MỌI dự án đang chạy đều xong. Windows, macOS. Tắt sau 60 giây; Windows huỷ bằng lệnh <code>shutdown /a</code>.</small></div><label class="cong-tac"><input type="checkbox" id="cdTatMay"><span></span></label></div>
           <div class="dong-cong-tac"><div><b>Máy mượt: ưu tiên máy của bạn hơn các trang chạy ngầm</b><span class="ap ap-app">Cả app</span><small>Chung cho mọi dự án. Hạ ưu tiên CPU của các trang Muse / Flow / Suno chạy ngầm và tắt hiệu ứng động trên các trang đó (vòng xoay chờ, ánh lấp lánh lúc đang tạo) cho bớt ngốn CPU. Riêng trang Muse còn cho hoạt hình chạy chậm lại (khoảng 5 khung hình/giây) và dừng video / nhạc ngay khi chúng tự phát (kết quả vẫn tải về bình thường). Máy rảnh thì vẫn chạy đủ nhanh, máy bận thì giao diện app và phần mềm bạn đang dùng không bị giật. Cách chạy không đổi.</small></div><label class="cong-tac"><input type="checkbox" id="cdNheMay"><span></span></label></div>
           <div class="dong-cong-tac"><div><b>Tạo ảnh xong hết rồi mới tạo video</b><span class="ap ap-app">Cả app</span><small>Chung cho mọi dự án, cả Muse và Flow. Còn ảnh đang tạo (hoặc đang chờ mà có tài khoản chạy được) thì video chờ; hết ảnh mới bắt đầu tạo video. Ít trang chạy cùng lúc hơn nên bớt ngốn CPU. Nhạc Suno không bị ảnh hưởng; video bạn bấm nút ▶ <i>Chạy ngay việc này</i> thì vẫn chạy luôn. Tắt: ảnh và video chạy song song như trước.</small></div><label class="cong-tac"><input type="checkbox" id="cdAnhTruocVideo"><span></span></label></div>
+          <!-- 1.4.12: dọn dữ liệu thừa -->
+          <div class="dong-du-lieu"><div><b>Dữ liệu app trên máy</b><span class="ap ap-app">Cả app</span><small id="cdDungLuong">Đang đo…</small></div>
+            <div class="nut-du-lieu"><button class="nut-vien" id="cdDonDuLieu" title="Xoá bộ nhớ đệm, file tạm, nhật ký / chẩn đoán / bộ cài cũ — không đăng xuất tài khoản, không xoá kết quả"><i data-icon="trash-2"></i>Dọn dữ liệu thừa…</button><button class="nut-vien" id="cdMoDuLieu2"><i data-icon="folder-open"></i>Mở thư mục dữ liệu</button></div></div>
         </div>
         <div class="the-cai">
           <h3><i data-icon="refresh-cw"></i>Cập nhật</h3>

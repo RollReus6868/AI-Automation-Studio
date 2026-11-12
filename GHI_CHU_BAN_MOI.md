@@ -1,4 +1,25 @@
-# AI Automation Studio 1.4.11
+# AI Automation Studio 1.4.12
+
+- **Tắt app giữa chừng không còn tạo trùng (Muse).** Mở lại app, mọi video / ảnh đã gửi Muse mà chưa lấy được kết quả sẽ được kiểm trước khi chạy tiếp:
+  - App mở lại **chat cũ** ở đúng tài khoản cũ (chạy ngầm, không gửi gì). Muse làm xong rồi → **tải về luôn**, việc thành Hoàn tất, không tạo lại.
+  - Muse còn đang tạo → giữ chat, khoảng 2 phút sau kiểm lại; trong lúc đó việc không bị gửi sang tài khoản khác.
+  - Chat không có gì → việc chạy như thường.
+  - Tài khoản cũ đang nghỉ / hết lượt / không dùng nữa → app cũng kiểm chat cũ trước, chỉ khi chat chưa có kết quả mới gửi lại ở tài khoản khác (bản cũ gửi lại ngay → dễ ra hai video).
+  - Vừa gửi prompt là app ghi đường dẫn chat ra đĩa ngay, tắt đột ngột (mất điện, tắt ngang) cũng không mất.
+- **Nút "Kiểm tra việc dở".** Có việc Muse đã gửi mà chưa lấy kết quả thì trên danh sách việc hiện dòng báo kèm nút **Kiểm tra việc dở**; từng việc: ⋯ → **Kiểm tra chat cũ (tải về nếu đã xong)**. Kết quả ghi ở nhật ký (dòng 🔎).
+- **Hết lượt tạo video 24 giờ → sang tài khoản kế tiếp ngay.** Muse báo hết lượt (vd *"đã hết lượt tạo video trong 24 giờ qua"*) thì:
+  - việc chuyển **ngay** sang tài khoản Muse kế tiếp, không chờ 2 phút như trước, không tính là lỗi;
+  - tài khoản đó thôi nhận video 24 giờ (vẫn tạo ảnh); hết lượt ảnh thì thôi nhận ảnh 6 giờ. Bấm **Kiểm tra** ở thẻ tài khoản để thử lại sớm.
+  - Trước đây câu này có thể bị hiểu là "Muse từ chối ảnh" và đẩy việc sang Flow — đã sửa.
+- **Dọn dữ liệu thừa** (Cài đặt → *Cả app* → **Dọn dữ liệu thừa…**): xem app đang chiếm bao nhiêu ở `AppData\Roaming\AIAutomationStudio` và dọn:
+  - bộ nhớ đệm trang web của các tài khoản (**không đăng xuất** tài khoản nào);
+  - dữ liệu của tài khoản đã xoá; file tạm Suno / Flow / Drive (giữ kết quả của các việc trong app); nhật ký cũ; file chẩn đoán lỗi; bộ cài bản cập nhật cũ; báo lỗi cũ.
+  - Mỗi mục ghi dung lượng, tick chọn rồi bấm **Dọn**. Nút **Mở thư mục dữ liệu** mở đúng thư mục đó.
+- Mọi thứ khác giữ nguyên như 1.4.11.
+
+Lưu ý: chữ báo hết lượt thật của Muse app chưa đo được — app nhận các câu kiểu "hết lượt / đạt giới hạn … 24 giờ / hôm nay" (tiếng Việt và tiếng Anh). Nếu vẫn thấy việc chờ ~2 phút rồi mới đổi tài khoản, gửi giúp ảnh chụp câu Muse báo để bổ sung.
+
+## Bản 1.4.11
 
 - **Lọc danh sách việc theo tài khoản.** Trên danh sách Tạo ảnh / Tạo video (và Tạo nhạc) có thêm ô **Mọi tài khoản**, cạnh ô *Muse + Flow*.
   - Chọn vd **Muse 3** → chỉ hiện các ảnh / video do Muse 3 tạo. Mỗi tài khoản ghi kèm số việc (vd *Muse 3 · 50*); chỉ liệt kê tài khoản có việc trong danh sách đang xem.

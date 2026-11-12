@@ -213,6 +213,12 @@ select option { background: var(--panel-dac); }
 .o-tim input { padding-left: 32px; }
 .loc-dong { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 10px; }
 /* 1.4.11: hai hộp lọc (nơi chạy, tài khoản) + Đặt lại + sắp xếp đi thành MỘT cụm — thiếu chỗ thì cả cụm xuống hàng, nằm bên phải. */
+/* 1.4.12: dải báo việc Muse dở (đã gửi prompt, chưa lấy kết quả) — chỉ hiện khi có. */
+.dai-viec-do { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; padding: 6px 10px; border: 1px solid var(--vien); border-radius: 10px; font-size: 12px; color: var(--chu-mo); }
+.dai-viec-do > i { width: 14px; height: 14px; flex: 0 0 auto; }
+.dai-viec-do span { flex: 1; min-width: 0; }
+.dai-viec-do b { color: var(--chu); }
+.dai-viec-do[hidden] { display: none; }
 .loc-phai { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 8px; margin-left: auto; min-width: 0; }
 .chon-het { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; color: var(--chu-phu); cursor: pointer; padding: 0 4px; white-space: nowrap; }
 .chon-het input { width: 16px; height: 16px; accent-color: var(--g2); cursor: pointer; }
@@ -567,3 +573,17 @@ label > .ap { margin-left: 6px; }
 @media (max-width: 1250px) { .thanh-luu-cd .mo { display: none; } }
 /* Ghi chú nhỏ ngay dưới một ô số (vd "Nghỉ giữa 2 lần gửi Muse / Suno") */
 .the-cai label .ghi-o { display: block; margin-top: 4px; font-size: 11.5px; color: var(--chu-mo); line-height: 1.4; }
+
+/* 1.4.12: Cài đặt → Cả app → Dữ liệu app trên máy + hộp thoại Dọn dữ liệu thừa */
+.dong-du-lieu { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 0 2px; border-top: 1px solid var(--vien); margin-top: 6px; }
+.dong-du-lieu > div:first-child { min-width: 0; flex: 1 1 260px; }
+.dong-du-lieu small { display: block; color: var(--chu-phu); margin-top: 2px; overflow-wrap: anywhere; }
+.nut-du-lieu { display: flex; flex-wrap: wrap; gap: 8px; }
+.ds-don { display: flex; flex-direction: column; gap: 6px; margin: 6px 0 4px; }
+.hop label.muc-don { display: grid; margin: 0; color: var(--chu); font-size: 13px; grid-template-columns: 20px minmax(0, 1fr) auto; gap: 10px; align-items: start; padding: 9px 10px; border: 1px solid var(--vien); border-radius: 10px; cursor: pointer; }
+.muc-don.rong { opacity: .55; cursor: default; }
+.hop label.muc-don input { margin: 2px 0 0; width: 16px; height: 16px; accent-color: var(--g2); }
+.muc-don b { display: block; font-size: 13px; }
+.muc-don small { display: block; color: var(--chu-phu); font-size: 12px; margin-top: 2px; }
+.muc-don .co { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
+.ghi-don { color: var(--chu-phu); font-size: 12px; margin: 8px 0 0; overflow-wrap: anywhere; }

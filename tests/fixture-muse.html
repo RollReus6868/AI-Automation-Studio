@@ -12,6 +12,7 @@
     LUOI     → khung ảnh không có <img>, phải bấm "Open generated image" mới thấy
     CHAM     → tạo mất 6 giây (mặc định 2 giây)
     TU_CHOI  → Muse từ chối: "Mình không thể tạo video từ ảnh này." (ảnh chụp người dùng 16/10/2026)
+    HET_LUOT → 1.4.12: Muse báo hết lượt: "Bạn đã hết lượt tạo video trong 24 giờ qua…" (chữ thật chưa đo — theo lời người dùng)
   Nút dock [data-testid=hatch-dock-more] mở menu bằng POINTERDOWN (như Radix, click() trơn không mở);
   mục cuối menu mở Cài đặt có mức dùng token ([role=progressbar], như Muse 11/10/2026).
   Chưa có cookie muse_login=1 → hiện màn đăng nhập.
@@ -236,6 +237,10 @@ async function veThread(id) {
     return;
   }
   const video = /^Tạo 1 video/.test(t.prompt);
+  if (/HET_LUOT/.test(t.prompt)) {
+    veKhung(user + '<div data-message-item="true" data-message-role="assistant"><div aria-busy="false"><div data-hatch-assistant-message-body="true">Bạn đã hết lượt tạo video trong 24 giờ qua. Vui lòng thử lại sau.</div></div></div>');
+    return;
+  }
   if (/TU_CHOI/.test(t.prompt)) {
     veKhung(user + '<div data-message-item="true" data-message-role="assistant"><div aria-busy="false"><div data-hatch-assistant-message-body="true">Mình không thể tạo video từ ảnh này.</div></div></div>');
     return;
