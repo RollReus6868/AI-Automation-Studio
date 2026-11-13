@@ -163,6 +163,7 @@ function trangThai() {
     taiKhoan: taiKhoan.list(),
     capNhat: capNhat ? capNhat.trangThai() : null,
     phienBan: pkg.version,
+    ramMayGB: Math.round(os.totalmem() / 1073741824 * 10) / 10,   // 1.4.13: gợi ý ô RAM tối đa
     nenTang: process.platform,
     dangNhap: dangNhap ? { id: dangNhap.id, khung: dangNhap.view.getBounds() } : null
   };
@@ -418,6 +419,19 @@ function taoLuong(tk, stt, duAnId) {
   const l = new Luong({ id, taiKhoan: tk, wc: w.webContents, nguon: NGUON_TRANG, goc: GOC_MUSE, log });
   viewCuaLuong.set(l, w);
   return l;
+}
+
+/** 1.4.13: RAM (MB) trang của một luồng Muse / Suno — để làm mới luồng khi trang phình quá ngưỡng. */
+function ramLuong(l) {
+  const w = viewCuaLuong.get(l);
+  if (!w || w.isDestroyed()) return 0;
+  const pid = w.webContents.getOSProcessId();
+  const m = app.getAppMetrics().find((x) => x.pid === pid);
+  return m && m.memory ? m.memory.workingSetSize / 1024 : 0;
+}
+/** 1.4.13: RAM cả app (byte) — mọi tiến trình: giao diện, lõi, GPU, trang Muse / Flow / Suno. */
+function ramApp() {
+  return app.getAppMetrics().reduce((t, m) => t + ((m.memory && m.memory.workingSetSize) || 0), 0) * 1024;
 }
 
 function huyLuong(l) {
@@ -1205,7 +1219,7 @@ app.whenReady().then(() => {
   });
 
   dieuPhoi = new DieuPhoi({
-    store, taiKhoan, taoLuong, huyLuong, docFile, ghiFile, chuyenFile, log, bao: baoTrangThai,
+    store, taiKhoan, taoLuong, huyLuong, docFile, ghiFile, chuyenFile, log, bao: baoTrangThai, ramLuong, ramApp,   // 1.4.13: RAM
     thuMucRaMacDinh: path.join(app.getPath('documents'), 'AI Automation Studio'),
     thuMucTam: path.join(app.getPath('userData'), 'ket-qua-tam'),
     tonTai: (p) => fs.existsSync(p),

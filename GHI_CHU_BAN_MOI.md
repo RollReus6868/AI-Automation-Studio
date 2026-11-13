@@ -1,4 +1,13 @@
-# AI Automation Studio 1.4.12
+# AI Automation Studio 1.4.13
+
+- **Bớt RAM khi chạy Muse.** Vì sao tốn: mỗi *luồng* Muse là một trang muse.ai chạy ngầm (một trình duyệt riêng, thường 0,3–1,5 GB). App giữ trang đó suốt lượt chạy, mỗi việc chỉ chuyển trang trong cùng trình duyệt nên RAM phình dần theo số việc và không được trả lại tới khi hết lượt. Tổng RAM ≈ số tài khoản Muse đang chạy × số luồng mỗi tài khoản (mặc định 3).
+  - **Làm mới luồng** (Cài đặt → Muse): luồng chạy xong **10 việc**, hoặc trang Muse của luồng dùng quá **900 MB**, thì app đóng hẳn trang đó và mở trang mới cho việc sau — RAM trả lại hết. Không làm chậm: việc nào cũng nạp lại trang Muse từ đầu như trước. Nhật ký ghi dòng ♻ kèm số RAM trang đang dùng.
+  - **RAM tối đa cho app** (Cài đặt → Cả app, mặc định 0 = tự động **75% RAM máy**): RAM cả app chạm mức này thì app tạm chưa giao việc Muse mới, đóng luồng Muse đang rảnh, luồng nào chạy xong thì làm mới — máy không bị đơ vì hết RAM. Còn dưới 90% mức đó thì chạy đủ luồng lại. Nhật ký ghi ⏸ / ▶.
+  - Trang Muse xoá bộ đệm hình ảnh của trang trước mỗi lần nạp trang mới.
+  - Máy ít RAM (8 GB): nên để *Số luồng mỗi tài khoản Muse* 2 và 1–2 tài khoản vai Chạy.
+- Mọi thứ khác giữ nguyên như 1.4.12.
+
+## Bản 1.4.12
 
 - **Tắt app giữa chừng không còn tạo trùng (Muse).** Mở lại app, mọi video / ảnh đã gửi Muse mà chưa lấy được kết quả sẽ được kiểm trước khi chạy tiếp:
   - App mở lại **chat cũ** ở đúng tài khoản cũ (chạy ngầm, không gửi gì). Muse làm xong rồi → **tải về luôn**, việc thành Hoàn tất, không tạo lại.

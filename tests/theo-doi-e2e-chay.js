@@ -31,7 +31,8 @@ module.exports = function e2eTheoDoi({ win, app, LENH, dieuPhoi }) {
       ghi('== E2E Theo dõi thư mục ảnh → video (trang Muse giả) ==');
       await session.fromPartition('persist:muse-tk-1').cookies.set({ url: process.env.MUSE_URL, name: 'muse_login', value: '1' });
       LENH.datCaiDat({ luongMoiTK: 2, nghiGiuaLanGui: 0, choChuGiay: 15, tuThuLai: 0, tuChayLaiLoi: 0, tuThuLaiFlow: 0, tuChayLaiLoiFlow: 0,
-        tuThuLaiSuno: 0, tuChayLaiLoiSuno: 0, nghiSuno: 0, doiNenKhiLoi: false });
+        tuThuLaiSuno: 0, tuChayLaiLoiSuno: 0, nghiSuno: 0, doiNenKhiLoi: false,
+        lamMoiLuongSau: 1 });   // 1.4.13: làm mới luồng Muse sau MỖI việc — trang mới vẫn chạy đúng, RAM đo được thật
       const thuMuc = path.join(tam, 'anh-theo-doi'), ra = path.join(tam, 'video-theo-doi');
       fs.mkdirSync(thuMuc, { recursive: true });
       for (const f of ['001.png', '006.png']) fs.writeFileSync(path.join(thuMuc, f), PNG1);
@@ -91,6 +92,10 @@ module.exports = function e2eTheoDoi({ win, app, LENH, dieuPhoi }) {
       kiem(gui.length === 4 && gui.every((x) => /theo dõi chuyển động/.test(x)), `Muse nhận đúng 4 lần gửi, prompt dùng chung (${gui.length})`);
       const nk = LENH.trangThai().nhatKy;
       kiem(nk.some((x) => /📂 Thư mục "anh-theo-doi": thêm 2 ảnh mới → 2 video/.test(x.chu)), 'nhật ký ghi ảnh mới → video');
+      // 1.4.13: mỗi việc xong → luồng Muse được làm mới (đóng hẳn trang), đo RAM trang thật (> 0 MB); 4 video vẫn đủ.
+      const lamMoi = nk.filter((x) => /♻ Làm mới luồng .*\(đã chạy 1 việc; trang đang dùng \d+ MB\)/.test(x.chu));
+      ghi(`   ${lamMoi.length} lần làm mới luồng — ${lamMoi.slice(0, 2).map((x) => x.chu.replace(/^.*\(/, '(').replace(/\).*$/, ')')).join(' ')}`);
+      kiem(lamMoi.length >= 4, `luồng Muse được làm mới sau mỗi việc, RAM trang đo được (${lamMoi.length} lần)`);
       const dong2 = await js(`document.querySelector('#ghiTheoDoi').textContent`);
       kiem(/đã thêm 2 video/.test(dong2), `giao diện đếm 2 video đã thêm (${dong2})`);
 

@@ -46,3 +46,8 @@ function caiNhe(bat) {
 try {
   webFrame.executeJavaScript(`(${caiNhe.toString()})(${process.argv.includes('--muse-nhe=1')}); undefined`);
 } catch (_) {}
+
+// 1.4.13: luồng Muse giữ một trang suốt nhiều việc; mỗi việc nạp lại trang (/thread/new) nhưng bộ đệm của trình duyệt
+// trong tiến trình (ảnh / video đã giải mã của trang trước) còn giữ → xoá ngay khi trang mới nạp xong phần khung.
+// (Phần còn lại do điều phối "làm mới luồng" — đóng hẳn trang sau một số việc / khi quá ngưỡng RAM.)
+window.addEventListener('DOMContentLoaded', () => { try { webFrame.clearCache(); } catch (_) {} });
