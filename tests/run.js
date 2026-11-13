@@ -155,7 +155,7 @@ function dungDieuPhoi(o = {}) {
     taoLuong: o.taoLuong || (() => ({ ranh: true, dung() {} })), huyLuong: o.huyLuong || (() => {}),
     docFile: (p) => ({ ten: path.basename(p), mime: 'image/png', b64: 'AA==' }),
     ghiFile: o.ghiFile || (() => {}), chuyenFile: o.chuyenFile || (() => {}), thuMucRaMacDinh: '/ra', thuMucTam: '/tam',
-    tonTai: o.tonTai || (() => false), donDep: o.donDep, hetLuot: o.hetLuot, bayGio: o.bayGio,
+    tonTai: o.tonTai || (() => false), donDep: o.donDep, hetLuot: o.hetLuot, bayGio: o.bayGio, ramLuong: o.ramLuong, ramApp: o.ramApp,
     lenDrive: o.lenDrive, lenDriveWeb: o.lenDriveWeb, chayLaiFlow: o.chayLaiFlow, dsFile: o.dsFile
   });
   clearInterval(dp.hen); clearInterval(dp.henTheoDoi);
@@ -786,6 +786,94 @@ testAsync('1.4.12 nút "Kiểm tra việc dở": kiểm việc dừng / lỗi c�
   dp.chayTatCa();
   await chayHet(dp);
   assert.ok(ghiNgay >= truoc + 2 && c.trangThai === 'xong' && c.thread === 'https://muse/thread/tk-1-3', `${ghiNgay - truoc} lần ghi ngay · ${c.thread}`);
+});
+// 1.4.13 — RAM: luồng giả đếm số lần tạo / đóng và số luồng chạy cùng lúc.
+function luongDem() {
+  const tao = [], huy = [];
+  let dang = 0, max = 0;
+  const taoLuong = (a, stt) => {
+    const l = { id: `${a.id}-${stt}-${tao.length + 1}`, ranh: true, viec: null, nen: a.nen === 'muse' ? undefined : a.nen, dung() {},
+      async chay(j) {
+        this.ranh = false; this.viec = j; dang++; max = Math.max(max, dang);
+        await new Promise((r) => setTimeout(r, 15));
+        dang--; this.ranh = true; this.viec = null;
+        return { ok: true, files: [{ mime: 'image/png', b64: 'AA==' }] };
+      } };
+    tao.push(l);
+    return l;
+  };
+  return { tao, huy, taoLuong, huyLuong: (l) => huy.push(l), max: () => max };
+}
+test('1.4.13 cài đặt RAM: mặc định 10 việc / 900 MB / tự động; kẹp khoảng; RAM tối đa là cài đặt chung cả app', () => {
+  const { dp } = dungDieuPhoi();
+  assert.deepStrictEqual([dp.caiDat.lamMoiLuongSau, dp.caiDat.ramLuongToiDa, dp.caiDat.ramAppToiDa], [10, 900, 0]);
+  dp.datCaiDat({ lamMoiLuongSau: 0, ramLuongToiDa: 50, ramAppToiDa: '6,5'.replace(',', '.') });
+  assert.deepStrictEqual([dp.caiDat.lamMoiLuongSau, dp.caiDat.ramLuongToiDa, dp.caiDat.ramAppToiDa], [10, 300, 6.5]);
+  dp.datCaiDat({ lamMoiLuongSau: 9999, ramLuongToiDa: 0, ramAppToiDa: -3 });
+  assert.deepStrictEqual([dp.caiDat.lamMoiLuongSau, dp.caiDat.ramLuongToiDa, dp.caiDat.ramAppToiDa], [500, 0, 0]);
+  assert.ok(dp._ramToiDaGB() > 0 && Math.abs(dp._ramToiDaGB() - Math.round(require('os').totalmem() / 1073741824 * 0.75 * 10) / 10) < 0.11, 'tự động = 75% RAM máy');
+  dp.datCaiDat({ ramAppToiDa: 4 });
+  assert.strictEqual(dp._ramToiDaGB(), 4);
+  const src = docNguon('src/main/dieu-phoi.js');
+  assert.ok(/const KHOA_CHUNG = \[[^\]]*'ramAppToiDa'/.test(src), 'RAM tối đa là cài đặt chung cả app');
+});
+testAsync('1.4.13 làm mới luồng Muse: chạy xong N việc → đóng hẳn trang, mở trang mới; việc vẫn chạy đủ', async () => {
+  const L = luongDem();
+  const { dp, nhatKy } = dungDieuPhoi({ taoLuong: L.taoLuong, huyLuong: L.huyLuong, ramLuong: () => 512 });
+  dp.datCaiDat({ luongMoiTK: 1, nghiGiuaLanGui: 0, lamMoiLuongSau: 2 });
+  dp.them({ prompts: ['a', 'b', 'c', 'd', 'e'] });
+  dp.chayTatCa();
+  await chayHet(dp);
+  assert.ok(dp.viec.every((j) => j.trangThai === 'xong'));
+  assert.strictEqual(L.tao.length, 3, `5 việc, làm mới sau mỗi 2 việc → 3 trang (${L.tao.length})`);
+  assert.deepStrictEqual(L.huy.map((l) => l.id).slice(0, 2), [L.tao[0].id, L.tao[1].id]);
+  assert.ok(nhatKy.some((x) => /♻ Làm mới luồng tk-1-1-1 \(đã chạy 2 việc; trang đang dùng 512 MB\) — đóng trang cũ trả RAM/.test(x)), nhatKy.join('\n'));
+});
+testAsync('1.4.13 làm mới luồng khi trang Muse quá ngưỡng MB (0 = không xét); luồng Flow / Suno không bị làm mới', async () => {
+  for (const [nguong, mong] of [[800, 3], [0, 1]]) {
+    const L = luongDem();
+    const { dp, nhatKy } = dungDieuPhoi({ taoLuong: L.taoLuong, huyLuong: L.huyLuong, ramLuong: () => 1200 });
+    dp.datCaiDat({ luongMoiTK: 1, nghiGiuaLanGui: 0, lamMoiLuongSau: 50, ramLuongToiDa: nguong });
+    dp.them({ prompts: ['a', 'b', 'c'] });
+    dp.chayTatCa();
+    await chayHet(dp);
+    assert.strictEqual(L.tao.length, mong, `ngưỡng ${nguong}: ${L.tao.length} trang`);
+    if (nguong) assert.ok(nhatKy.some((x) => /♻ .*trang Muse dùng quá 800 MB; trang đang dùng 1,2 GB/.test(x)), nhatKy.join('\n'));
+  }
+  const { dp } = dungDieuPhoi({ ramLuong: () => 99999 });
+  dp.datCaiDat({ lamMoiLuongSau: 1 });
+  for (const nen of ['flow', 'suno']) {
+    const x = { taiKhoanId: 'x', duAn: null, luong: { nen, ranh: true, dung() {} } };
+    dp.luong.push(x);
+    dp._lamMoiLuong(x);
+    assert.ok(dp.luong.includes(x), `${nen}: không làm mới`);
+  }
+});
+testAsync('1.4.13 RAM cả app chạm giới hạn: chỉ một luồng Muse chạy, luồng rảnh bị đóng, việc vẫn xong; dưới giới hạn → chạy đủ luồng', async () => {
+  let ram = 9 * 1073741824;
+  const L = luongDem();
+  const { dp, nhatKy } = dungDieuPhoi({ taoLuong: L.taoLuong, huyLuong: L.huyLuong, ramLuong: () => 300, ramApp: () => ram });
+  dp.datCaiDat({ luongMoiTK: 3, nghiGiuaLanGui: 0, lamMoiLuongSau: 100, ramAppToiDa: 8 });
+  dp.them({ prompts: ['a', 'b', 'c', 'd', 'e', 'f'] });
+  dp.chayTatCa();
+  await chayHet(dp);
+  assert.ok(dp.viec.every((j) => j.trangThai === 'xong'));
+  assert.strictEqual(L.max(), 1, `chạm giới hạn → một luồng Muse chạy một lúc (${L.max()})`);
+  assert.ok(nhatKy.some((x) => /⏸ RAM app 9,0 GB — chạm giới hạn 8,0 GB/.test(x)), nhatKy.join('\n'));
+  assert.ok(nhatKy.some((x) => /♻ .*RAM cả app chạm giới hạn/.test(x)), 'luồng chạy xong được làm mới để trả RAM');
+  // Có trễ: 7,5 GB (≥ 90 %) vẫn giữ; 7 GB → mở lại đủ luồng.
+  ram = 7.5 * 1073741824; dp._ram.luc = 0;
+  assert.strictEqual(dp._quaRam(), true);
+  ram = 7 * 1073741824; dp._ram.luc = 0;
+  assert.strictEqual(dp._quaRam(), false);
+  assert.ok(nhatKy.some((x) => /▶ RAM app còn 7,0 GB \(dưới giới hạn 8,0 GB\)/.test(x)));
+  const L2 = luongDem();
+  const b = dungDieuPhoi({ taoLuong: L2.taoLuong, huyLuong: L2.huyLuong, ramApp: () => 2 * 1073741824 });
+  b.dp.datCaiDat({ luongMoiTK: 3, nghiGiuaLanGui: 0, ramAppToiDa: 8 });
+  b.dp.them({ prompts: ['a', 'b', 'c', 'd', 'e', 'f'] });
+  b.dp.chayTatCa();
+  await chayHet(b.dp);
+  assert.strictEqual(L2.max(), 3, `dưới giới hạn → 3 luồng cùng lúc như cũ (${L2.max()})`);
 });
 // Lần thử thứ n (đếm chung mọi tài khoản) hỏng nếu nằm trong `hongLan`.
 const luongTheoLan = (daChay, hongLan) => (a, stt) => ({

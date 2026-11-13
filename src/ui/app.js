@@ -1397,6 +1397,11 @@
     const c = S.caiDat;
     $('#cdLuong').value = c.luongMoiTK; $('#cdNghi').value = c.nghiGiuaLanGui; $('#cdThuLai').value = c.tuThuLai; $('#cdChayLaiLoi').value = c.tuChayLaiLoi;
     $('#cdChoAnh').value = c.choAnhGiay; $('#cdChoVideo').value = c.choVideoGiay; $('#cdChoChu').value = c.choChuGiay; $('#cdChoNhac').value = c.choNhacGiay;
+    // 1.4.13: RAM
+    $('#cdLamMoi').value = c.lamMoiLuongSau; $('#cdRamLuong').value = c.ramLuongToiDa;
+    { const g = (S.caiDatChung || c).ramAppToiDa || 0, may = S.ramMayGB || 0;
+      $('#cdRamApp').value = g;
+      $('#cdRamAppGhi').textContent = may ? `Máy có ${String(may).replace('.', ',')} GB RAM — để 0 là tự động ${String(Math.max(1, Math.round(may * 0.75 * 10) / 10)).replace('.', ',')} GB (75%).` : 'Để 0 là tự động 75% RAM máy.'; }
     // 1.4.6: thử lại / chạy lại lỗi / nghỉ gửi riêng của Flow và Suno (các ô cdThuLai, cdChayLaiLoi, cdNghi giờ chỉ của Muse)
     $('#cdThuLaiFlow').value = c.tuThuLaiFlow; $('#cdChayLaiLoiFlow').value = c.tuChayLaiLoiFlow;
     $('#cdThuLaiSuno').value = c.tuThuLaiSuno; $('#cdChayLaiLoiSuno').value = c.tuChayLaiLoiSuno; $('#cdNghiSuno').value = c.nghiSuno;
@@ -1971,6 +1976,8 @@
         videoCanhAnh: $('#cdVideoCanhAnh').checked, xoaChatKhiXong: $('#cdXoaChat').checked, xoaDuAnFlowKhiXong: $('#cdXoaDuAnFlow').checked,
         driveBat: $('#cdDrive').checked, driveCach: $('#cdDriveCach').value, driveTk: $('#cdDriveTk').value, nheMay: $('#cdNheMay').checked,
         anhTruocVideo: $('#cdAnhTruocVideo').checked,   // 1.4.8: ảnh xong hết rồi mới tạo video (chung cả app)
+        // 1.4.13: RAM — làm mới luồng Muse (riêng dự án), RAM tối đa (chung cả app)
+        lamMoiLuongSau: $('#cdLamMoi').value, ramLuongToiDa: $('#cdRamLuong').value, ramAppToiDa: $('#cdRamApp').value,
         mau: { anh: $('#cdMauAnh').value, video: $('#cdMauVideo').value },
         flow: docCaiDatFlow()
       };

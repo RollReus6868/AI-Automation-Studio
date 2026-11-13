@@ -22,6 +22,7 @@
 // ============================================================================
 
 const path = require('path');
+const os = require('os');
 const hd = require('./hang-doi');
 const { chuanHoaFlow, khoaMe } = require('../flow/cai-dat-flow');
 const { laUrlDuAnFlow } = require('../flow/tab-flow');
@@ -105,11 +106,16 @@ const CAI_DAT_MAC_DINH = {
   nheMay: true,
   // 1.4.8: tạo ảnh xong hết rồi mới tạo video (chung cả app) — ảnh và video không chạy song song, bớt trang chạy cùng lúc.
   anhTruocVideo: true,
+  // 1.4.13 — RAM (người dùng 11/2026: "khi chạy Muse tool chiếm rất nhiều RAM"). Mỗi luồng Muse là MỘT trang Muse chạy
+  // ngầm (một tiến trình Chromium), giữ suốt lượt; mỗi việc chỉ chuyển trang trong cùng tiến trình nên RAM phình dần.
+  lamMoiLuongSau: 10,     // luồng Muse chạy xong chừng này việc → đóng hẳn trang, việc sau mở trang mới (trả lại RAM)
+  ramLuongToiDa: 900,     // … hoặc trang Muse của luồng dùng quá chừng này MB (0 = không xét)
+  ramAppToiDa: 0,         // Cả app: RAM tối đa (GB) — chạm thì chờ luồng Muse xong mới giao việc mới; 0 = tự động 75% RAM máy
   mau: { ...hd.MAU_MAC_DINH },
   flow: chuanHoaFlow({})  // cài đặt Google Flow (src/flow/cai-dat-flow.js)
 };
 // 1.3.0: cài đặt của CẢ APP (không theo dự án) — còn lại mỗi dự án một bộ riêng (d.caiDat).
-const KHOA_CHUNG = ['tatMayKhiXong', 'moc', 'nheMay', 'anhTruocVideo'];
+const KHOA_CHUNG = ['tatMayKhiXong', 'moc', 'nheMay', 'anhTruocVideo', 'ramAppToiDa'];
 // 1.4.5: khoá luôn riêng từng dự án — "Lưu làm cài đặt mặc định" không chép sang dự án khác.
 const KHOA_RIENG_DU_AN = ['thuMucAnh', 'thuMucVideo', 'thuMucNhac', 'thuMucVideoAnh', 'tenAnh', 'tenVideo', 'tenNhac', 'boQuaDaCo'];
 const TRANG_XONG = new Set(['xong', 'loi', 'dung']);
@@ -130,6 +136,9 @@ function tachTheoNen(goc, dich) {
   for (const [k, ...moi] of KHOA_THEO_NEN) for (const m of moi) if (m && goc[m] === undefined && goc[k] !== undefined) dich[m] = goc[k];
 }
 
+const docMB = (mb) => (mb >= 1024 ? `${(mb / 1024).toFixed(1).replace('.', ',')} GB` : `${Math.round(mb)} MB`);
+const docGB = (gb) => `${gb.toFixed(1).replace('.', ',')} GB`;
+
 /** Kẹp mọi giá trị cài đặt về khoảng an toàn (dùng chung cho cài đặt chung và cài đặt riêng của dự án). */
 function chuanCaiDat(c, flowGoc, flowMoi) {
   const so = (v, min, max, md) => Math.max(min, Math.min(max, parseInt(v, 10) || md));
@@ -148,6 +157,9 @@ function chuanCaiDat(c, flowGoc, flowMoi) {
   m.driveBat = !!m.driveBat; m.thuMucDrive = String(m.thuMucDrive || '').trim();
   m.driveCach = m.driveCach === 'web' ? 'web' : 'may'; m.driveTk = String(m.driveTk || ''); m.nheMay = m.nheMay !== false;
   m.anhTruocVideo = m.anhTruocVideo !== false;
+  m.lamMoiLuongSau = so(m.lamMoiLuongSau, 1, 500, 10);
+  { const r = parseInt(m.ramLuongToiDa, 10); m.ramLuongToiDa = r === 0 ? 0 : Math.max(300, Math.min(8000, r || 900)); }
+  { const r = parseFloat(m.ramAppToiDa); m.ramAppToiDa = r > 0 ? Math.max(1, Math.min(512, Math.round(r * 10) / 10)) : 0; }
   m.tenNhac = String(m.tenNhac || '').trim() || hd.MAU_TEN_ANH_MAC_DINH;
   m.choNhacGiay = so(m.choNhacGiay, 120, 3600, 600);
   // 1.4.6: ô nghỉ cho phép 0 (không nghỉ) — so() coi 0 là "trống" nên trước đây nhập 0 thành 3.
@@ -1692,6 +1704,12 @@ class DieuPhoi {
 
   /** Luồng cho đúng các (tài khoản, dự án) đang CẦN (có việc chờ nhắm tới, hoặc đang chạy việc). Tài khoản
    *  dự phòng chưa cần thì không mở luồng — khỏi tốn máy, khỏi đụng token. */
+  /** 1.4.13: khoá luồng (tài khoản|dự án) là của tài khoản Muse? */
+  _laKhoaMuse(k) {
+    const a = this.o.taiKhoan.tim(k.slice(0, k.lastIndexOf('|')));
+    return !!a && (a.nen || 'muse') === 'muse';
+  }
+
   _canLuong(can) {
     // Muse: N luồng mỗi tài khoản mỗi dự án; Flow: N tab mỗi tài khoản mỗi dự án (mỗi tab chạy một mẻ, trên dự án
     // Flow riêng của dự án đó). N lấy theo cài đặt của dự án.
@@ -1817,10 +1835,29 @@ class DieuPhoi {
     const can = new Set();
     for (const [j, ds] of nhamToi) for (const t of ds) can.add(this._khoa(t, j.duAn));
     for (const x of this.luong) if (!x.luong.ranh) can.add(this._khoaLuong(x));
+    // 1.4.13: RAM cả app chạm giới hạn → không mở thêm / đóng luồng Muse đang rảnh (việc chờ luồng đang chạy xong).
+    // Không còn luồng Muse nào chạy thì vẫn để một luồng chạy (khỏi đứng hẳn khi phần khác — Flow, giao diện — đã nặng).
+    if ([...can].some((k) => this._laKhoaMuse(k)) && this._quaRam()) {
+      const dangChayMuse = this.luong.some((x) => !x.luong.ranh && !(x.luong.nen && x.luong.nen !== 'muse'));
+      let chua1 = !dangChayMuse;
+      for (const k of [...can]) {
+        if (!this._laKhoaMuse(k) || this.luong.some((x) => !x.luong.ranh && this._khoaLuong(x) === k)) continue;
+        if (chua1) { chua1 = false; continue; }
+        can.delete(k);
+      }
+    }
     this._canLuong(can);
     const nham = (v, tkId) => (nhamToi.get(v) || []).includes(tkId);
-    for (const x of this.luong) {
+    const laMuse = (x) => !(x.luong.nen && x.luong.nen !== 'muse');
+    const ramDay = this._ram && this._ram.qua;
+    for (const x of [...this.luong]) {
       if (!x.luong.ranh) continue;
+      // 1.4.13: RAM chạm giới hạn mà đã có luồng Muse đang chạy → luồng Muse rảnh không nhận việc mới, đóng để trả RAM.
+      if (ramDay && laMuse(x) && this.luong.some((y) => y !== x && !y.luong.ranh && laMuse(y))) {
+        this.luong.splice(this.luong.indexOf(x), 1);
+        try { this.o.huyLuong(x.luong); } catch (_) { /* đã đóng */ }
+        continue;
+      }
       // Luồng riêng của dự án chỉ nhận việc của dự án đó; luồng dùng chung (Suno) chia lượt đều giữa các dự án.
       const boQua = (v) => !nham(v, x.taiKhoanId) || (!!x.duAn && v.duAn !== x.duAn);
       const j = x.duAn ? hd.viecKeTiep(this.viec, (v) => v.thread && v.taiKhoan === x.taiKhoanId, boQua) : this._viecChung(x, boQua);
@@ -1996,7 +2033,56 @@ class DieuPhoi {
       }
     });
     if (j.lanGiao !== lan) { this.o.bao(); return; }
+    this._lamMoiLuong(x);
     this._ketThuc(j, r, tk);
+  }
+
+  /**
+   * 1.4.13 — LÀM MỚI LUỒNG MUSE: luồng là một trang Muse chạy ngầm giữ suốt lượt; mỗi việc chỉ chuyển trang trong cùng
+   * tiến trình nên RAM của trang phình dần (ảnh, video, bộ nhớ của trang Muse — thường 0,3 → 1,5 GB / trang). Chạy xong
+   * `lamMoiLuongSau` việc, hoặc trang dùng quá `ramLuongToiDa` MB, hoặc RAM cả app chạm giới hạn → đóng hẳn cửa sổ (tiến
+   * trình chết = trả hết RAM); _vong mở luồng mới khi cần. Gần như không tốn thêm: việc nào cũng nạp lại trang Muse từ đầu.
+   */
+  _lamMoiLuong(x) {
+    if ((x.luong.nen && x.luong.nen !== 'muse') || !this.luong.includes(x) || !x.luong.ranh) return;
+    x.soViec = (x.soViec || 0) + 1;
+    const c = this.cd(x.duAn);
+    let mb = 0;
+    try { mb = (this.o.ramLuong && this.o.ramLuong(x.luong)) || 0; } catch (_) { /* luồng vừa đóng */ }
+    const lyDo = this._quaRam() ? 'RAM cả app chạm giới hạn' : x.soViec >= c.lamMoiLuongSau ? `đã chạy ${x.soViec} việc`
+      : c.ramLuongToiDa && mb >= c.ramLuongToiDa ? `trang Muse dùng quá ${c.ramLuongToiDa} MB` : '';
+    if (!lyDo) return;
+    this.luong.splice(this.luong.indexOf(x), 1);
+    try { this.o.huyLuong(x.luong); } catch (err) { this.log('error', `❌ Đóng luồng: ${err.message}`); }
+    this.log('info', `♻ Làm mới luồng ${x.luong.id || this._tenTk(x.taiKhoanId)} (${lyDo}${mb ? `; trang đang dùng ${docMB(mb)}` : ''}) — đóng trang cũ trả RAM, việc sau mở trang mới.`);
+  }
+
+  /** 1.4.13: giới hạn RAM cả app (GB; 0 = tự động 75% RAM máy). */
+  _ramToiDaGB() {
+    const g = parseFloat(this.caiDat.ramAppToiDa) || 0;
+    return g > 0 ? g : Math.max(1, Math.round((os.totalmem() / 1073741824) * 0.75 * 10) / 10);
+  }
+
+  /**
+   * 1.4.13: RAM cả app (mọi trang Muse / Flow / Suno + giao diện) đang ≥ giới hạn? Có trễ: vào khi ≥ 100 %, ra khi < 90 %
+   * (khỏi bật / tắt liên tục). Đọc RAM tối đa mỗi 5 giây.
+   */
+  _quaRam() {
+    if (!this.o.ramApp) return false;
+    const bay = Date.now();
+    if (!this._ram || bay - this._ram.luc >= 5000) {
+      let gb = 0;
+      try { gb = (this.o.ramApp() || 0) / 1073741824; } catch (_) { gb = 0; }
+      const max = this._ramToiDaGB();
+      const qua = this._ram && this._ram.qua ? gb >= max * 0.9 : gb >= max;
+      if (qua && !(this._ram && this._ram.qua)) {
+        this.log('warning', `⏸ RAM app ${docGB(gb)} — chạm giới hạn ${docGB(max)} (Cài đặt → Cả app → RAM tối đa): tạm chưa giao việc Muse mới, đóng luồng Muse đang rảnh; luồng đang chạy xong thì làm mới để trả RAM.`);
+      } else if (!qua && this._ram && this._ram.qua) {
+        this.log('info', `▶ RAM app còn ${docGB(gb)} (dưới giới hạn ${docGB(max)}) — giao việc Muse tiếp.`);
+      }
+      this._ram = { luc: bay, gb, qua };
+    }
+    return this._ram.qua;
   }
 
   /** 1.4.12: việc Muse đã gửi prompt (có chat thật) mà chưa có kết quả — kiểm được bằng cách mở lại chat. */
