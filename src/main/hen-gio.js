@@ -2,9 +2,11 @@
 // ============================================================================
 //  hen-gio.js — 1.3.6 HẸN GIỜ CHẠY, RIÊNG cho từng chức năng (Tạo ảnh / Tạo video / Tạo nhạc).
 //
-//  Mỗi chức năng một hẹn: { bat, batDau 'HH:MM', ketThuc 'HH:MM' | '' , lap 'ngay' | 'mot', duAn '' | id,
-//  datLuc, daChay }. Đến giờ bắt đầu → điều phối chạy MỌI việc đang chờ của loại đó (của mọi dự án, hoặc một
-//  dự án); có giờ dừng → tới giờ đó thì dừng (việc đang chạy về hàng chờ); không có giờ dừng → chạy tới hết.
+//  1.4.14: DANH SÁCH hẹn (trước: mỗi chức năng đúng một hẹn, một dự án). Mỗi hẹn: { id, loai 'anh'|'video'|'nhac',
+//  bat, batDau 'HH:MM', ketThuc 'HH:MM' | '', lap 'ngay' | 'mot', duAnDs [id…] ([] = mọi dự án), datLuc, daChay }.
+//  Một chức năng có thể có nhiều hẹn (vd dự án A lúc 22:00, dự án B, C lúc 02:00). Đến giờ bắt đầu → điều phối chạy
+//  MỌI việc đang chờ của loại đó trong các dự án của hẹn; có giờ dừng → tới giờ đó thì dừng (việc đang chạy về hàng
+//  chờ); không có giờ dừng → chạy tới hết.
 //  Logic thuần (giờ máy), không đụng Electron — tests/run.js kiểm với đồng hồ giả.
 // ============================================================================
 
@@ -15,7 +17,7 @@ const NGAY_MS = 24 * 60 * 60 * 1000;
 // thì vẫn chạy), quá thì để hôm sau — tránh mở app buổi trưa mà hàng chờ tự chạy vì hẹn lúc 2 giờ sáng.
 const TRE_TOI_DA_MS = 10 * 60 * 1000;
 
-const HEN_MAC_DINH = { bat: false, batDau: '22:00', ketThuc: '', lap: 'ngay', duAn: '', datLuc: 0, daChay: '' };
+const HEN_MAC_DINH = { bat: false, batDau: '22:00', ketThuc: '', lap: 'ngay', duAnDs: [], datLuc: 0, daChay: '' };
 
 /** 'H:MM' / 'HH:MM' hợp lệ → 'HH:MM', không thì ''. */
 function chuanGio(s) {
@@ -25,23 +27,45 @@ function chuanGio(s) {
   return h < 24 && p < 60 ? `${String(h).padStart(2, '0')}:${String(p).padStart(2, '0')}` : '';
 }
 
-function chuanHen(h) {
+/** @param loai  loại mặc định khi hẹn chưa có (dữ liệu cũ lưu theo khoá loại). */
+function chuanHen(h, loai) {
   const m = { ...HEN_MAC_DINH, ...(h || {}) };
+  m.id = String(m.id || '');
+  m.loai = LOAI_HEN.includes(m.loai) ? m.loai : LOAI_HEN.includes(loai) ? loai : 'anh';
+  // Dữ liệu cũ (≤ 1.4.13): duAn '' | id → duAnDs.
+  const ds = Array.isArray(m.duAnDs) && !(h && 'duAn' in h && !('duAnDs' in h)) ? m.duAnDs : m.duAn ? [m.duAn] : [];
+  m.duAnDs = [...new Set(ds.map((x) => String(x || '')).filter(Boolean))];
+  delete m.duAn;
   m.bat = !!m.bat;
   m.batDau = chuanGio(m.batDau) || HEN_MAC_DINH.batDau;
   m.ketThuc = chuanGio(m.ketThuc);
   if (m.ketThuc === m.batDau) m.ketThuc = '';
   m.lap = m.lap === 'mot' ? 'mot' : 'ngay';
-  m.duAn = String(m.duAn || '');
   m.datLuc = Number(m.datLuc) || 0;
   m.daChay = String(m.daChay || '');
   return m;
 }
 
-/** { anh, video, nhac } đã chuẩn hoá. */
+/** Hẹn cũ chưa từng đổi (mặc định của bản ≤ 1.4.13) — không chuyển sang danh sách mới. */
+const laHenTrong = (h) => !h.bat && h.batDau === HEN_MAC_DINH.batDau && !h.ketThuc && h.lap === 'ngay' && !h.duAnDs.length && !h.daChay;
+
+/**
+ * Danh sách hẹn đã chuẩn hoá, id không trùng. Nhận cả dữ liệu cũ { anh, video, nhac } (mỗi chức năng một hẹn) →
+ * mỗi hẹn đã đặt thành một mục id "<loai>-1" (hẹn mặc định chưa từng đổi thì bỏ).
+ */
 function chuanBoHen(b) {
-  return Object.fromEntries(LOAI_HEN.map((l) => [l, chuanHen(b && b[l])]));
+  let ds;
+  if (Array.isArray(b)) ds = b.filter((h) => h && LOAI_HEN.includes(h.loai)).map((h) => chuanHen(h));
+  else ds = LOAI_HEN.filter((l) => b && b[l]).map((l) => chuanHen({ ...b[l], id: b[l].id || `${l}-1` }, l)).filter((h) => !laHenTrong(h));
+  const da = new Set();
+  for (const h of ds) {
+    if (!h.id || da.has(h.id)) { let n = 1; while (da.has(`${h.loai}-${n}`) || ds.some((x) => x !== h && x.id === `${h.loai}-${n}`)) n++; h.id = `${h.loai}-${n}`; }
+    da.add(h.id);
+  }
+  return ds;
 }
+/** Id mới chưa dùng cho một hẹn của chức năng `loai`. */
+function idHenMoi(ds, loai) { let n = 1; while (ds.some((h) => h.id === `${loai}-${n}`)) n++; return `${loai}-${n}`; }
 
 /** Mốc giờ 'HH:MM' của NGÀY chứa `luc` (giờ máy). */
 function mocTrongNgay(luc, gio) {
@@ -100,4 +124,4 @@ const gioToiSau = (gio, luc) => { const t = mocTrongNgay(luc, gio); return t > l
 
 const gioPhut = (t) => { const d = new Date(t); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
 
-module.exports = { LOAI_HEN, TEN_CHUC_NANG, HEN_MAC_DINH, TRE_TOI_DA_MS, chuanGio, chuanHen, chuanBoHen, lanGanNhat, denGioChay, lanChayToi, gioToiSau, gioPhut };
+module.exports = { LOAI_HEN, TEN_CHUC_NANG, HEN_MAC_DINH, TRE_TOI_DA_MS, chuanGio, chuanHen, chuanBoHen, idHenMoi, lanGanNhat, denGioChay, lanChayToi, gioToiSau, gioPhut };

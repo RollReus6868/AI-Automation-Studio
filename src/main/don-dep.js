@@ -205,6 +205,54 @@ async function donDep(kq, maDs) {
   return { daXoa, khongXoa, loi: loi.slice(0, 20) };
 }
 
+/** Như slugThuMuc ở main.js (tên thư mục tải tạm của tab Flow: `${tk.id}-${duAnId}-${stt}`). */
+const slugThuMuc = (x) => String(x).replace(/[^A-Za-z0-9_-]+/g, '_').slice(0, 60);
+const escRe = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * 1.4.14 — dữ liệu tạm của MỘT dự án vừa xoá (người dùng: "khi xoá dự án thì tự dọn dữ liệu thừa của dự án đó luôn").
+ *   a. ket-qua-tam/<dự án>   kết quả giữ tạm khi tắt "Tải về" (đã lên Drive) — bản duy nhất trên máy → báo số file
+ *   b. flow-tai-tam/<tk>-<dự án>-<số tab>   file Flow tải dở của các tab chạy dự án này (khớp đúng mẫu tên, không khớp
+ *      nhầm dự án "du-an-1" khi xoá "du-an")
+ *   c. file của các việc trong dự án nằm trong thư mục tạm của app (suno-tai-tam, drive-tam…)
+ * File mà việc của dự án KHÁC còn trỏ tới (o.fileConDung) không bao giờ xoá. Không đụng thư mục kết quả của người dùng.
+ * @param o.userData, o.duAnId, o.tkIds (id mọi tài khoản), o.fileDuAn (j.files + j.thamChieu của việc trong dự án),
+ *        o.fileConDung (của việc còn lại)
+ * @returns {{xoa:string[], byte:number, soKetQua:number}}
+ */
+async function thuDuAn(o) {
+  const ud = o.userData, giu = new Set((o.fileConDung || []).filter(Boolean).map(chuan));
+  const ra = { xoa: [], byte: 0, soKetQua: 0 };
+  const daCo = (p) => { const c = chuan(p); return ra.xoa.some((x) => { const g = chuan(x); return c === g || c.startsWith(g + path.sep); }); };
+  const them = async (p) => { if (daCo(p)) return; ra.byte += await dungLuong(p); ra.xoa.push(p); };
+  /** Thư mục: xoá cả thư mục nếu không chứa file còn dùng, không thì từng file không dùng. Trả số file sẽ xoá. */
+  const themThuMuc = async (dir) => {
+    const files = await moiFile(dir);
+    const bo = files.filter((f) => !giu.has(chuan(f)));
+    if (bo.length === files.length) { if (fs.existsSync(dir)) await them(dir); } else for (const f of bo) await them(f);
+    return bo.length;
+  };
+  ra.soKetQua = await themThuMuc(path.join(ud, 'ket-qua-tam', slugDuAn(o.duAnId)));
+  const mau = new RegExp(`^(${(o.tkIds || []).map((t) => escRe(slugThuMuc(t))).join('|') || '\\0'})-${escRe(slugThuMuc(o.duAnId))}-\\d+$`);
+  for (const t of await lsDs(path.join(ud, 'flow-tai-tam'))) if (mau.test(t)) await themThuMuc(path.join(ud, 'flow-tai-tam', t));
+  const goc = [...TAM, 'ket-qua-tam'].map((t) => chuan(path.join(ud, t)) + path.sep);
+  for (const f of new Set((o.fileDuAn || []).filter((x) => typeof x === 'string' && x))) {
+    const c = chuan(f);
+    if (goc.some((g) => c.startsWith(g)) && !giu.has(c) && fs.existsSync(f)) await them(f);
+  }
+  return ra;
+}
+
+/** Xoá danh sách đường dẫn (file khoá → bỏ qua). */
+async function xoaDs(ds) {
+  let daXoa = 0, khongXoa = 0;
+  for (const p of ds || []) {
+    try { await fs.promises.rm(p, { recursive: true, force: true, maxRetries: 2 }); } catch (_) {}
+    if (fs.existsSync(p)) khongXoa++; else daXoa++;
+  }
+  return { daXoa, khongXoa };
+}
+
 /** Bản gửi giao diện: bỏ danh sách đường dẫn. */
 const tomTat = (kq) => ({ userData: kq.userData, tong: kq.tong, duLieuJson: kq.duLieuJson, nhanVat: kq.nhanVat,
   muc: kq.muc.map(({ ma, ten, moTa, byte, soMuc, macDinh }) => ({ ma, ten, moTa, byte, soMuc, macDinh })) });
@@ -217,4 +265,4 @@ function docByte(b) {
   return `${chia === 1 ? x : x.toFixed(x >= 100 ? 0 : 1).replace('.', ',')} ${don}`;
 }
 
-module.exports = { quet, donDep, tomTat, docByte, dungLuong, CACHE_PHIEN, tenPhien };
+module.exports = { quet, donDep, tomTat, docByte, dungLuong, CACHE_PHIEN, tenPhien, thuDuAn, xoaDs, slugThuMuc };

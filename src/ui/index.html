@@ -214,6 +214,7 @@
         <div class="panel-dau">
           <h2><i data-icon="list"></i><span id="tieuDeHang">Hàng đợi ảnh</span></h2>
           <div class="o-tim"><i data-icon="search"></i><input id="oTim" placeholder="Tìm prompt hoặc số thứ tự…"></div>
+          <button class="nut-vien nho nut-chon-so" id="nutChonSo" title="Chọn việc theo số thứ tự, vd 1, 3, 4, 8, 6, 10-50 (trong danh sách đang hiện)"><i data-icon="list"></i><span>Chọn số</span></button>
         </div>
         <div class="loc-dong">
           <label class="chon-het" title="Chọn / bỏ chọn mọi việc đang hiện trong danh sách"><input type="checkbox" id="chonHet"><span>Chọn hết</span></label>
@@ -332,7 +333,7 @@
           <li><b>Chạy một số prompt:</b> <i>Cài đặt nâng cao → Chỉ chạy prompt số</i>, ghi ví dụ <code>98, 303, 305-350</code> (để trống = chạy hết). Đặt tên file bằng <code>{stt}</code> để số trong tên khớp số dòng prompt.</li>
           <li><b>Nhiều dự án chạy song song:</b> mỗi dự án có <i>Cài đặt</i> riêng và luồng riêng. Bấm <i>Chạy dự án</i> ở dự án 1, chuyển sang dự án 2 bấm <i>Chạy dự án</i> nữa — hai dự án chạy cùng lúc, kể cả khi dùng chung tài khoản. Menu dự án có <i>Chạy tất cả dự án</i> / <i>Dừng tất cả dự án</i>. Số thứ tự ảnh và video đếm riêng (350 ảnh → video cũng số 1–350).</li>
           <li><b>Cài đặt mặc định:</b> ở trang Cài đặt chỉnh xong bấm <i>Lưu làm cài đặt mặc định</i> (thanh dưới đáy trang): mọi dự án đang có và dự án mới dùng bộ đó; thư mục lưu, mẫu tên file vẫn riêng từng dự án. <i>Lưu cài đặt</i> chỉ đổi dự án đang mở.</li>
-          <li><b>Hẹn giờ chạy:</b> mục <i>Hẹn giờ</i> có thẻ riêng cho Tạo ảnh, Tạo video, Tạo nhạc. Bật thẻ, chọn giờ bắt đầu (và giờ dừng nếu muốn), mỗi ngày hay một lần, mọi dự án hay một dự án → <i>Lưu hẹn giờ</i>. Tới giờ app chạy các việc <b>đang chờ</b> của đúng chức năng đó; thêm việc trước bằng <i>Chỉ thêm vào hàng đợi</i>. App phải đang mở, máy đang bật.</li>
+          <li><b>Hẹn giờ chạy:</b> mục <i>Hẹn giờ</i> có thẻ riêng cho Tạo ảnh, Tạo video, Tạo nhạc. Bấm <i>Thêm hẹn giờ</i> (thêm được nhiều hẹn, vd dự án A lúc 22:00, dự án B + C lúc 02:00), chọn giờ bắt đầu (và giờ dừng nếu muốn), mỗi ngày hay một lần, tick các dự án (hoặc <i>Mọi dự án</i>) → <i>Lưu hẹn giờ</i>; <i>Xoá hẹn</i> để bỏ. Tới giờ app chạy các việc <b>đang chờ</b> của đúng chức năng đó; thêm việc trước bằng <i>Chỉ thêm vào hàng đợi</i>. App phải đang mở, máy đang bật.</li>
           <li><b>Dừng / chạy từng việc:</b> mỗi dòng đang chạy có nút <i>Dừng</i>; việc đã dừng có nút <i>Chạy</i> (chạy ngay, kể cả khi dự án đang dừng). Chọn nhiều dòng rồi bấm <i>Chạy</i> / <i>Dừng</i> / <i>Tạo lại</i> ở thanh chọn.</li>
           <li><b>Tắt app giữa chừng (Muse):</b> mở lại app, các video / ảnh đã gửi Muse mà chưa lấy kết quả được tự kiểm: app mở lại chat cũ, Muse làm xong rồi thì tải về luôn (không tạo lại, không trùng); Muse còn đang tạo thì giữ chat và kiểm lại sau. Muốn kiểm ngay: bấm <i>Kiểm tra việc dở</i> trên danh sách việc (hoặc ⋯ ở dòng việc → <i>Kiểm tra chat cũ</i>).</li>
           <li><b>Hết lượt video 24 giờ (Muse):</b> Muse báo hết lượt tạo video → tài khoản đó thôi nhận video 24 giờ (vẫn tạo ảnh), việc sang ngay tài khoản kế tiếp, không chờ. Bấm <i>Kiểm tra</i> ở thẻ tài khoản để thử lại sớm.</li>
@@ -359,6 +360,8 @@
           <li><b>Google Drive (1.4.0), cách 1 (chép vào thư mục Drive trên máy):</b> cài <i>Google Drive cho máy tính</i>, đăng nhập Drive. Cài đặt → <i>Google Drive</i> → <i>Cách đưa lên: Chép vào thư mục…</i> → <i>Tự tìm</i> (hoặc <i>Chọn…</i> ổ <code>G:\My Drive</code>) → bật <i>tự đưa lên Google Drive</i> → <i>Lưu cài đặt</i>.</li>
           <li><b>Google Drive, cách 2 (tải thẳng lên drive.google.com):</b> Tài khoản → thẻ <i>Drive</i> → <i>Thêm Drive</i> → <i>Đăng nhập</i> Google trong khung bên phải → <i>Xong</i>. Cài đặt → <i>Google Drive</i> → <i>Cách đưa lên: Tải thẳng lên…</i> → chọn tài khoản → bật <i>tự đưa lên</i> → <i>Lưu cài đặt</i>. App mở Drive ở cửa sổ ẩn, tự tạo thư mục và tải từng file. Cả hai cách: ảnh vào <code>Tên dự án/images</code>, video vào <code>Tên dự án/Videos</code>; việc xong từ trước: chọn việc → <i>Lên Drive</i>. Tải lên hỏng thì app lưu trang Drive vào <code>Tài liệu/AI Automation Studio/chan-doan-drive</code> — gửi tệp đó kèm nhật ký.</li>
           <li><b>Lọc theo tài khoản:</b> ô <i>Mọi tài khoản</i> trên danh sách việc (cạnh <i>Muse + Flow</i>) → chọn vd <i>Muse 3</i> để chỉ xem ảnh / video do Muse 3 tạo (số sau tên là số việc; <i>Chưa chạy</i> = việc chưa chạy ở tài khoản nào). Tab Hoàn tất / Lỗi đếm theo tài khoản đã chọn; <i>Chọn hết</i> chỉ chọn việc của tài khoản đó (để tải về, tạo lại…).</li>
+          <li><b>Chọn theo số:</b> nút <i>Chọn số</i> cạnh ô tìm → gõ vd <i>1, 3, 4, 8, 6, 10-50</i> → tick đúng các việc mang số đó (trong danh sách đang hiện); tick <i>Giữ các việc đang chọn</i> để chọn thêm. Rồi Tải về / Tạo lại / Xoá… như thường.</li>
+          <li><b>Xoá dự án:</b> ⋯ cạnh tên dự án → <i>Xoá dự án</i>. App dọn luôn dữ liệu tạm của dự án trong thư mục dữ liệu (file Flow tải dở, kết quả giữ tạm khi tắt Tải về) — hộp xác nhận ghi trước dung lượng; file trong thư mục kết quả của bạn vẫn giữ.</li>
           <li><b>Đổi prompt nhiều việc:</b> tick <i>Chọn hết</i> (hoặc chọn vài dòng) → <i>Đổi prompt</i>: thay hẳn bằng prompt mới, hoặc tìm và thay một đoạn chữ; trang Tạo ảnh đổi được cả prompt video sẽ tự tạo từ ảnh.</li>
           <li><b>Đổi ngay sang Muse / Flow:</b> nút <i>⋮</i> ở mỗi dòng → <i>Đổi sang Flow / Muse &amp; chạy ngay</i>; chọn nhiều dòng → <i>Sang Muse</i> / <i>Sang Flow</i>. Việc đang chạy dừng ở bên cũ rồi chạy ở bên mới; việc đã xong thì được tạo lại ở bên mới.</li>
           <li><b>Đồng hồ dự án:</b> cạnh tên dự án là thời gian dự án đã chạy (lượt này) và dự đoán còn bao lâu nữa (tính theo tốc độ thật của lượt đang chạy).</li>
@@ -374,39 +377,21 @@
     <main class="trang" id="trang-hengio" hidden>
       <section class="panel trang-don cuon">
         <div class="panel-dau"><h2><i data-icon="clock"></i>Hẹn giờ chạy</h2></div>
-        <p class="ghi-cai-dat-du-an">Mỗi chức năng hẹn giờ riêng. Đến giờ bắt đầu, app tự chạy mọi việc <b>đang chờ</b> của chức năng đó (của mọi dự án, hoặc một dự án bạn chọn) — như bấm Chạy, chỉ khác là chỉ chạy loại việc đó. Có giờ dừng thì tới giờ app dừng, việc dở về hàng chờ; không có thì chạy tới hết. Ảnh có bật "Ảnh xong → tự tạo video" thì video nối từ ảnh chạy tiếp theo hẹn của Tạo ảnh. App phải đang mở (thu nhỏ được) và máy đang bật: khi có hẹn, app giữ máy không tự ngủ.</p>
+        <p class="ghi-cai-dat-du-an">Mỗi chức năng hẹn giờ riêng, và có thể <b>thêm nhiều hẹn</b> (vd dự án A lúc 22:00, dự án B và C lúc 02:00). Đến giờ bắt đầu, app tự chạy mọi việc <b>đang chờ</b> của chức năng đó trong các dự án đã tick (hoặc mọi dự án) — như bấm Chạy, chỉ khác là chỉ chạy loại việc đó. Có giờ dừng thì tới giờ app dừng, việc dở về hàng chờ; không có thì chạy tới hết. Ảnh có bật "Ảnh xong → tự tạo video" thì video nối từ ảnh chạy tiếp theo hẹn của Tạo ảnh. App phải đang mở (thu nhỏ được) và máy đang bật: khi có hẹn, app giữ máy không tự ngủ.</p>
         <div class="the-cai the-hen" data-loai="anh">
-          <h3><i data-icon="image"></i>Tạo ảnh<span class="trang-hen" data-hen="trang"></span></h3>
-          <div class="dong-cong-tac"><div><b>Bật hẹn giờ Tạo ảnh</b><small data-hen="ghi"></small></div><label class="cong-tac"><input type="checkbox" data-hen="bat"><span></span></label></div>
-          <div class="luoi-3">
-            <label>Giờ bắt đầu<input type="time" data-hen="batDau" value="22:00"></label>
-            <label>Giờ dừng <small>(trống = chạy tới hết hàng chờ)</small><span class="o-gio"><input type="time" data-hen="ketThuc"><button class="lien-ket" data-hen="boKetThuc" title="Bỏ giờ dừng">Bỏ</button></span></label>
-            <label>Lặp lại<select data-hen="lap"><option value="ngay">Mỗi ngày</option><option value="mot">Chỉ một lần</option></select></label>
-          </div>
-          <label>Chạy việc của<select data-hen="duAn"></select></label>
-          <div class="dong-o"><button class="nut-gradient nho" data-hen="luu"><i data-icon="check"></i>Lưu hẹn giờ</button><button class="nut-vien nho" data-hen="dung" hidden><i data-icon="pause"></i>Dừng lượt đang chạy</button></div>
+          <h3><i data-icon="image"></i>Tạo ảnh<span class="trang-hen" data-hen="tong"></span></h3>
+          <div class="ds-hen"></div>
+          <button class="nut-vien nho" data-hen="them"><i data-icon="plus"></i>Thêm hẹn giờ Tạo ảnh</button>
         </div>
         <div class="the-cai the-hen" data-loai="video">
-          <h3><i data-icon="video"></i>Tạo video<span class="trang-hen" data-hen="trang"></span></h3>
-          <div class="dong-cong-tac"><div><b>Bật hẹn giờ Tạo video</b><small data-hen="ghi"></small></div><label class="cong-tac"><input type="checkbox" data-hen="bat"><span></span></label></div>
-          <div class="luoi-3">
-            <label>Giờ bắt đầu<input type="time" data-hen="batDau" value="22:00"></label>
-            <label>Giờ dừng <small>(trống = chạy tới hết hàng chờ)</small><span class="o-gio"><input type="time" data-hen="ketThuc"><button class="lien-ket" data-hen="boKetThuc" title="Bỏ giờ dừng">Bỏ</button></span></label>
-            <label>Lặp lại<select data-hen="lap"><option value="ngay">Mỗi ngày</option><option value="mot">Chỉ một lần</option></select></label>
-          </div>
-          <label>Chạy việc của<select data-hen="duAn"></select></label>
-          <div class="dong-o"><button class="nut-gradient nho" data-hen="luu"><i data-icon="check"></i>Lưu hẹn giờ</button><button class="nut-vien nho" data-hen="dung" hidden><i data-icon="pause"></i>Dừng lượt đang chạy</button></div>
+          <h3><i data-icon="video"></i>Tạo video<span class="trang-hen" data-hen="tong"></span></h3>
+          <div class="ds-hen"></div>
+          <button class="nut-vien nho" data-hen="them"><i data-icon="plus"></i>Thêm hẹn giờ Tạo video</button>
         </div>
         <div class="the-cai the-hen" data-loai="nhac">
-          <h3><i data-icon="music"></i>Tạo nhạc<span class="trang-hen" data-hen="trang"></span></h3>
-          <div class="dong-cong-tac"><div><b>Bật hẹn giờ Tạo nhạc</b><small data-hen="ghi"></small></div><label class="cong-tac"><input type="checkbox" data-hen="bat"><span></span></label></div>
-          <div class="luoi-3">
-            <label>Giờ bắt đầu<input type="time" data-hen="batDau" value="22:00"></label>
-            <label>Giờ dừng <small>(trống = chạy tới hết hàng chờ)</small><span class="o-gio"><input type="time" data-hen="ketThuc"><button class="lien-ket" data-hen="boKetThuc" title="Bỏ giờ dừng">Bỏ</button></span></label>
-            <label>Lặp lại<select data-hen="lap"><option value="ngay">Mỗi ngày</option><option value="mot">Chỉ một lần</option></select></label>
-          </div>
-          <label>Chạy việc của<select data-hen="duAn"></select></label>
-          <div class="dong-o"><button class="nut-gradient nho" data-hen="luu"><i data-icon="check"></i>Lưu hẹn giờ</button><button class="nut-vien nho" data-hen="dung" hidden><i data-icon="pause"></i>Dừng lượt đang chạy</button></div>
+          <h3><i data-icon="music"></i>Tạo nhạc<span class="trang-hen" data-hen="tong"></span></h3>
+          <div class="ds-hen"></div>
+          <button class="nut-vien nho" data-hen="them"><i data-icon="plus"></i>Thêm hẹn giờ Tạo nhạc</button>
         </div>
       </section>
     </main>

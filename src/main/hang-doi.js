@@ -431,9 +431,61 @@ function keHoachTai(viec, tonTai) {
   return kq;
 }
 
+/**
+ * 1.4.14 — chọn việc trong hàng đợi theo SỐ ("1,3,4,8,6,10-50"; người dùng muốn tick theo số thay vì từng dòng).
+ * @param ds     việc đang hiện (theo bộ lọc / tab / ô tìm)
+ * @returns {{ids:number[], so:number[], thieu:number[], loi:string[]}}  thieu = số gõ mà không có việc nào đang hiện
+ */
+function chonViecTheoSo(ds, chuoi) {
+  const max = ds.reduce((m, j) => Math.max(m, j.so || 0), 0);
+  const doc = docSoChay(chuoi, max);
+  const can = new Set(doc.so), co = new Set();
+  const ids = [];
+  for (const j of ds) if (can.has(j.so)) { ids.push(j.id); co.add(j.so); }
+  const thieu = doc.so.filter((n) => !co.has(n)).concat(doc.ngoai.length > 50 ? [] : doc.ngoai);
+  return { ids, so: [...co].sort((a, b) => a - b), thieu, loi: doc.loi };
+}
+
+/**
+ * 1.4.14 — gửi hàng đợi cho giao diện THEO PHẦN ĐỔI. Trước: mỗi lần báo gửi CẢ hàng đợi (8.000 việc ≈ 7 MB) → giao
+ * diện chép lại + dựng lại hết, đo 16% một nhân chỉ để đứng xem. Giờ: tiến trình chính nhớ bản JSON từng việc đã gửi,
+ * lần sau chỉ gửi việc khác đi; `thuTu` (danh sách id) chỉ gửi khi thêm / xoá / đổi chỗ. Mỗi gói có số `ban`; giao diện
+ * thấy gói không nối tiếp bản đang có (`tu` ≠ ban của nó) thì xin lại bản đủ.
+ */
+function taoGoiViec() {
+  let ban = 0, daGui = new Map(), khoaThuTu = '';
+  return {
+    lay(viec, du) {
+      const moi = new Map(), doi = [];
+      for (const j of viec) {
+        const s = JSON.stringify(j);
+        moi.set(j.id, s);
+        if (du || daGui.get(j.id) !== s) doi.push(j);
+      }
+      const ids = viec.map((j) => j.id), k = ids.join(',');
+      const g = { ban: ++ban, tu: du ? 0 : ban - 1, du: !!du, doi, thuTu: du || k !== khoaThuTu ? ids : null };
+      daGui = moi; khoaThuTu = k;
+      return g;
+    }
+  };
+}
+/** Giao diện ghép gói vào bản đang có {ban, map, ds}. Gói không nối tiếp → null (xin lại bản đủ). */
+function ghepGoiViec(kho, g) {
+  if (!g) return null;
+  if (!g.du && (!kho || kho.ban !== g.tu)) return null;
+  const map = g.du ? new Map() : kho.map;
+  for (const j of g.doi) map.set(j.id, j);
+  let ds;
+  if (g.thuTu) {
+    ds = g.thuTu.map((id) => map.get(id)).filter(Boolean);
+    if (!g.du && map.size !== ds.length) { const giu = new Set(g.thuTu); for (const id of [...map.keys()]) if (!giu.has(id)) map.delete(id); }
+  } else ds = g.doi.length ? kho.ds.map((j) => map.get(j.id)) : kho.ds;
+  return { ban: g.ban, map, ds };
+}
+
 const HD = {
   TY_LE, MAU_MAC_DINH, MAU_TEN_MAC_DINH, MAU_TEN_ANH_MAC_DINH, PROMPT_VIDEO_MAC_DINH, slugTen, tachPrompt, timNhanVat, taoTinNhan, tenFile, mimeTuDuoi, chonKhoang, DUOI_LOAI, mauKhopFile, soTuTen, soTheoTenAnh, ghepThuMucAnh,
-  docSoChay, chonTheoSo, gonSo,
+  docSoChay, chonTheoSo, gonSo, chonViecTheoSo, taoGoiViec, ghepGoiViec,
   viecKeTiep, taiKhoanChoViec, taiKhoanChoViecDs, thoiGianDuKien, duDoanConLai, tienDoUoc, daXong, laTraLoiChu, laChanKhuVuc, laTuChoi, laHetLuot, soSanhTuNhien, keHoachTai
 };
 // Dùng chung cho tiến trình chính (require) và giao diện (<script> → window.HD).

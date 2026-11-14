@@ -106,7 +106,7 @@ function baoTrangThai() {
     if (!win || win.isDestroyed() || !dieuPhoi) return;
     if (win.isMinimized()) { boLoBao = true; return; }
     boLoBao = false;
-    win.webContents.send('state', trangThai());
+    win.webContents.send('state', trangThaiGui());
   }, win && !win.isDestroyed() && !win.isFocused() ? Math.max(2000, nhipBao()) : nhipBao());
 }
 /** 1.4.4: cửa sổ app quay lại tiêu điểm → báo ngay (lúc không dùng app thì chỉ báo 2 giây một lần, bớt CPU). */
@@ -114,7 +114,7 @@ function baoNgay() {
   if (henBao) { clearTimeout(henBao); henBao = null; }
   if (!win || win.isDestroyed() || !dieuPhoi || win.isMinimized()) return;
   boLoBao = false;
-  win.webContents.send('state', trangThai());
+  win.webContents.send('state', trangThaiGui());
 }
 
 /**
@@ -157,6 +157,14 @@ function baoRam() {
     (cpu > 70 && soTrang > 1 ? ` — ${soTrang} trang Muse/Flow chạy cùng lúc: máy nóng / chậm thì giảm "Chạy cùng lúc" hoặc số luồng / tab mỗi tài khoản.` : ''));
 }
 
+/** 1.4.14: hàng đợi gửi giao diện theo phần đổi (HD.taoGoiViec); `du` = gửi bản đủ (giao diện mới mở / xin lại). */
+const goiViec = hd.taoGoiViec();
+function trangThaiGui(du) {
+  const s = trangThai();
+  s.goiViec = goiViec.lay(s.viec, du);
+  delete s.viec;
+  return s;
+}
 function trangThai() {
   return {
     ...dieuPhoi.trangThai(),
@@ -609,6 +617,30 @@ function moiTruongDonDep() {
     phienBan: pkg.version
   };
 }
+/** 1.4.14: môi trường dọn dữ liệu tạm của MỘT dự án (DD.thuDuAn). `fileDuAn` mặc định = file các việc hiện có của dự án. */
+function moiTruongDuAn(id, fileDuAn) {
+  return {
+    userData: app.getPath('userData'), duAnId: id, tkIds: taiKhoan.ds.map((a) => a.id),
+    fileDuAn: fileDuAn || dieuPhoi.viec.filter((j) => j.duAn === id).flatMap((j) => [...(j.files || []), ...(j.thamChieu || [])]),
+    fileConDung: dieuPhoi.viec.filter((j) => j.duAn !== id).flatMap((j) => [...(j.files || []), ...(j.thamChieu || [])]).filter((f) => typeof f === 'string')
+  };
+}
+/** 1.4.14: xoá dự án rồi dọn luôn dữ liệu tạm của nó (kết quả tạm, file Flow tải dở, file tạm của việc). */
+async function xoaDuAnVaDon(id) {
+  const ten = (dieuPhoi.duAn.find((d) => d.id === id) || {}).ten || id;
+  const r = dieuPhoi.xoaDuAn(id);
+  if (!r.ok) return r;
+  try {
+    const kq = await DD.thuDuAn(moiTruongDuAn(id, r.fileDuAn));
+    const x = await DD.xoaDs(kq.xoa);
+    log('success', `🗑 Đã xoá dự án "${ten}"` + (kq.xoa.length ? ` — dọn ${DD.docByte(kq.byte)} dữ liệu tạm của dự án` +
+      (x.khongXoa ? ` (${x.khongXoa} mục đang được dùng chưa xoá được)` : '') : ' — không có dữ liệu tạm nào phải dọn') + '.');
+    return { ok: true, daDon: kq.byte, khongXoa: x.khongXoa };
+  } catch (err) {
+    log('warning', `🗑 Đã xoá dự án "${ten}" — dọn dữ liệu tạm lỗi: ${err.message}`);
+    return { ok: true, daDon: 0 };
+  }
+}
 let dangDon = false;
 async function donDuLieu(muc) {
   if (dangDon) return { ok: false, loi: 'Đang dọn — chờ lần dọn trước xong.' };
@@ -846,6 +878,7 @@ function chepAnhNhanVat(nvId, ds) {
 // ── Lệnh từ giao diện ─────────────────────────────────────────────────────
 const LENH = {
   trangThai: () => ({ ...trangThai(), nhatKy }),
+  trangThaiDu: () => ({ ...trangThaiGui(true), nhatKy }),   // 1.4.14: giao diện xin bản đủ (mở lần đầu / gói lệch)
   them: (p) => dieuPhoi.them(p),
   quetDaCo: (p) => dieuPhoi.quetDaCo(p),   // 1.4.2
   // 1.3.0: Chạy / Dừng theo dự án (có duAn) — không có duAn = mọi dự án như bản cũ.
@@ -882,7 +915,8 @@ const LENH = {
   taoDuAn: ({ ten, taiKhoan: ds, chaySong, tuDuAn, boLoai }) => dieuPhoi.taoDuAn(ten, ds, chaySong, tuDuAn, boLoai),
   datTaiKhoanDuAn: ({ id, taiKhoan: ds, chaySong, boLoai }) => dieuPhoi.datTaiKhoanDuAn(id, ds, chaySong, boLoai),
   doiTenDuAn: ({ id, ten }) => dieuPhoi.doiTenDuAn(id, ten),
-  xoaDuAn: ({ id }) => dieuPhoi.xoaDuAn(id),
+  xoaDuAn: ({ id }) => xoaDuAnVaDon(id),
+  thuDuLieuDuAn: async ({ id }) => { const r = await DD.thuDuAn(moiTruongDuAn(id)); return { byte: r.byte, soKetQua: r.soKetQua }; },
   luuNhanVat: (nv) => {
     const id = nv.id || `nv-${Date.now().toString(36)}`;
     dieuPhoi.luuNhanVat({ id, ten: String(nv.ten || '').trim() || 'Nhân vật', moTa: nv.moTa || '',
@@ -896,7 +930,8 @@ const LENH = {
   luuMauPrompt: ({ ds }) => dieuPhoi.luuMauPrompt(ds),
   // 1.3.0: { duAn, ...cài đặt } → lưu vào cài đặt RIÊNG của dự án đó.
   datHenGio: ({ loai, hen }) => dieuPhoi.datHenGio(loai, hen),
-  dungHen: ({ loai }) => dieuPhoi.dungHen(loai),
+  dungHen: ({ loai, id }) => dieuPhoi.dungHen(id || loai),
+  xoaHenGio: ({ id }) => dieuPhoi.xoaHenGio(id),   // 1.4.14
   datCaiDat: (c) => { const { duAn, ...m } = c || {}; const r = dieuPhoi.datCaiDat(m, duAn); if ('nheMay' in m) datUuTienMoiLuong(); return r; },
   /** 1.4.5: "Lưu làm cài đặt mặc định" — áp cho dự án mới và mọi dự án đang có (giữ thư mục / mẫu tên riêng). */
   datCaiDatMacDinh: (c) => { const { duAn, ...m } = c || {}; const r = dieuPhoi.datMacDinh(m, duAn); if ('nheMay' in m) datUuTienMoiLuong(); return r; },
@@ -1280,7 +1315,7 @@ app.whenReady().then(() => {
   let chanNgu = -1;
   const xetChanNgu = () => {
     try {
-      const can = Object.values(dieuPhoi.henGio).some((h) => h.bat) || dieuPhoi.loaiChay.size > 0;
+      const can = dieuPhoi.henGio.some((h) => h.bat) || dieuPhoi.henDangChay.size > 0;
       if (can && chanNgu < 0) { chanNgu = powerSaveBlocker.start('prevent-app-suspension'); log('info', '⏰ Có hẹn giờ chạy: giữ máy không tự ngủ để tới giờ app chạy được.'); }
       else if (!can && chanNgu >= 0) { powerSaveBlocker.stop(chanNgu); chanNgu = -1; }
     } catch (_) {}
