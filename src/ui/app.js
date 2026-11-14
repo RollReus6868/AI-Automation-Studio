@@ -24,7 +24,7 @@
   const chuanRieng = (x) => (x && typeof x === 'object' && Array.isArray(x.ds) && x.ds.length
     ? { ten: String(x.ten || ''), ds: x.ds.map((p) => String(p || '')) } : null);
   U.rieng = { chuoi: chuanRieng(U.rieng && U.rieng.chuoi), thuMuc: chuanRieng(U.rieng && U.rieng.thuMuc) };
-  U.chon = new Set(); U.chiTiet = null; U.nvChon = new Set(); U.log = []; U.dangNhapMo = false;
+  U.chon = new Set(); U.chiTiet = null; U.dongNho = new WeakMap(); U.nvChon = new Set(); U.log = []; U.dangNhapMo = false;
   // Ảnh tham chiếu / thư mục ảnh RIÊNG cho từng trang: ảnh gắn ở trang video không được dính sang trang ảnh.
   U.tc = { anh: { ds: [], thuMuc: null }, video: { ds: [], thuMuc: null }, nhac: { ds: [], thuMuc: null } };
   const TC = () => U.tc[loaiTrang()];
@@ -258,7 +258,7 @@
   }
   const duAnDangChay = (id) => !!(S && (S.duAnChay || []).includes(id));
   /** 1.3.6: việc đang chờ thuộc lượt hẹn giờ đang chạy (theo loại việc; video nối từ ảnh theo hẹn của ảnh). */
-  const theoHen = (j) => !!(S && [j.loai, j.henLoai].some((l) => { const x = l && (S.henChay || {})[l]; return x && (!x.duAn || x.duAn === j.duAn); }));
+  const theoHen = (j) => !!(S && Object.values(S.henChay || {}).some((x) => (x.loai === j.loai || x.loai === j.henLoai) && (!(x.duAnDs || []).length || x.duAnDs.includes(j.duAn))));
   /**
    * Tài khoản chạy dự án trên MỘT nơi chạy, theo thứ tự [chính, dự phòng…]; chưa chọn tài khoản nào
    * của nơi đó = mọi tài khoản của nơi đó (giống điều phối).
@@ -316,7 +316,8 @@
   /** 1.3.7: {anh: [id…], video: [id…]} — tài khoản bỏ chọn ô Ảnh / Video (không dùng cho loại đó). */
   const layBoLoai = (v) => Object.fromEntries(LOAI_TK.map(([l]) => [l,
     Object.keys(v).filter((k) => k.startsWith(`loai_${l}_`) && v[k] === false).map((k) => k.slice(`loai_${l}_`.length))]));
-  const viecTheoId = (id) => S && S.viec.find((j) => j.id === id);
+  // 1.4.14: tra theo bảng id (capNhatTienDo gọi cho 600 dòng mỗi giây — dò cả hàng đợi 8.000 việc mỗi dòng là thừa).
+  const viecTheoId = (id) => (U.khoViec && U.khoViec.map.get(id)) || (S && S.viec.find((j) => j.id === id));
   /** Khoá cài đặt Tải về / Tên file của từng trang Tạo (nhạc luôn tải về: không có khoá công tắc). */
   const khoaTai = (loai = loaiTrang()) => ({ video: { tai: 'taiVideo', ten: 'tenVideo' }, nhac: { tai: '', ten: 'tenNhac' } }[loai] || { tai: 'taiAnh', ten: 'tenAnh' });
 
@@ -468,15 +469,16 @@
     n.classList.toggle('dung', chayDa);
     n.innerHTML = chayDa ? `${ic('pause')}<span>Dừng dự án</span>` : `${ic('play')}<span>Chạy dự án</span>`;
     // 1.3.6: chip hẹn giờ — chức năng đang chạy theo hẹn, hoặc lần hẹn gần nhất sắp tới.
-    const hg = S.henGio || {}, hc = S.henChay || {};
-    const bat = ['anh', 'video', 'nhac'].filter((l) => hg[l] && hg[l].bat && hg[l].lanToi);
+    // 1.4.14: henGio là danh sách (nhiều hẹn mỗi chức năng), henChay theo id hẹn.
+    const hg = S.henGio || [], hc = Object.values(S.henChay || {});
+    const bat = hg.filter((h) => h.bat && h.lanToi);
     const chH = $('#chipHen');
-    chH.hidden = !bat.length && !Object.keys(hc).length;
-    chH.classList.toggle('chay', !!Object.keys(hc).length);
+    chH.hidden = !bat.length && !hc.length;
+    chH.classList.toggle('chay', !!hc.length);
     if (!chH.hidden) {
-      chH.lastElementChild.textContent = Object.keys(hc).length
-        ? `Đang chạy hẹn: ${Object.keys(hc).map((l) => TEN_LOAI[l]).join(', ')}`
-        : bat.sort((a, b) => hg[a].lanToi - hg[b].lanToi).slice(0, 2).map((l) => `${TEN_LOAI[l]} ${gioHen(hg[l].lanToi)}`).join(' · ');
+      chH.lastElementChild.textContent = hc.length
+        ? `Đang chạy hẹn: ${[...new Set(hc.map((x) => x.loai))].map((l) => TEN_LOAI[l]).join(', ')}`
+        : [...bat].sort((a, b) => a.lanToi - b.lanToi).slice(0, 2).map((h) => `${TEN_LOAI[h.loai]} ${gioHen(h.lanToi)}`).join(' · ');
     }
     const cn = S.capNhat, c = $('#chipCapNhat');
     const coMoi = cn && ['co-ban-moi', 'dang-tai', 'da-tai'].includes(cn.trangThai) && cn.phienBanMoi;
@@ -634,9 +636,9 @@
   }
 
   function veHang() {
-    const tatCa = locTheoTk(locViec());
+    const goc = locViec(), tatCa = locTheoTk(goc);
     // 1.4.12: dải báo việc Muse dở (đã gửi prompt, chưa lấy kết quả) + nút kiểm tra.
-    const viecDo = locViec().filter((j) => laViecDo(j) || j.dangKiem);
+    const viecDo = goc.filter((j) => laViecDo(j) || j.dangKiem);
     const dangKiem = viecDo.filter((j) => j.dangKiem).length;
     $('#daiViecDo').hidden = !viecDo.length;
     if (viecDo.length) {
@@ -656,7 +658,7 @@
     let ds = tatCa.filter((j) => (U.loc === 'tat' || j.trangThai === U.loc) &&
       (!tim || String(j.so) === tim.replace(/^0+/, '') || j.prompt.toLowerCase().includes(tim)));
     ds.sort((a, b) => (U.moiNhat ? b.so - a.so : a.so - b.so));
-    for (const id of [...U.chon]) if (!tatCa.some((j) => j.id === id)) U.chon.delete(id);
+    { const co = new Set(tatCa.map((j) => j.id)); for (const id of [...U.chon]) if (!co.has(id)) U.chon.delete(id); }
     $('#thanhChon').hidden = !U.chon.size;
     $('#soChon').textContent = `${U.chon.size} đã chọn`;
     // "Chọn tất cả" = mọi việc đang hiện theo bộ lọc / ô tìm.
@@ -673,7 +675,18 @@
     }
     const cuon = hop.scrollTop;
     const MAX = 600;   // vẽ tối đa 600 dòng; nhiều hơn thì dùng ô tìm
-    if (veTheoDong(hop, ds.slice(0, MAX).map((j) => ({ khoa: j.id, html: dongViec(j) })),
+    // 1.4.14: HTML từng dòng nhớ theo ĐỐI TƯỢNG việc (gói theo phần đổi giữ nguyên đối tượng của việc không đổi) +
+    // những gì ngoài việc mà dòng phụ thuộc (dự án đang chạy, hẹn giờ đang chạy, ngày, dòng đang xem / đã chọn).
+    // Trước: dựng lại HTML 600 dòng mỗi lần báo (~80 ms/lần với hàng đợi 8.000 việc).
+    const sig = `${(S.duAnChay || []).join(',')}|${JSON.stringify(S.henChay || {})}|${new Date().toDateString()}`;
+    const dongHtml = (j) => {
+      const k = `${sig}|${U.chiTiet === j.id ? 1 : 0}${U.chon.has(j.id) ? 1 : 0}`, c = U.dongNho.get(j);
+      if (c && c.k === k) return c.html;
+      const html = dongViec(j);
+      U.dongNho.set(j, { k, html });
+      return html;
+    };
+    if (veTheoDong(hop, ds.slice(0, MAX).map((j) => ({ khoa: j.id, html: dongHtml(j) })),
       ds.length > MAX ? `<div class="trong" style="min-height:60px">Còn ${ds.length - MAX} việc nữa — dùng ô tìm để lọc.</div>` : '')) hop.scrollTop = cuon;
     capNhatTienDo();
   }
@@ -725,7 +738,9 @@
   function capNhatTienDo() {
     if (!S) return;
     const now = Date.now();
-    for (const el of $$('#dsHang .dong-viec')) {
+    // 1.4.14: chỉ dòng có thanh tiến độ (việc đang chạy), không duyệt cả 600 dòng mỗi giây.
+    for (const bar0 of $$('#dsHang .dong-viec .thanh-tien')) {
+      const el = bar0.closest('.dong-viec');
       const j = viecTheoId(+el.dataset.id);
       if (!j || j.trangThai !== 'chay') continue;
       const p = HD.tienDoUoc(j, now, S.duKien[j.loai] || 40);
@@ -1356,34 +1371,60 @@
     const lech = Math.round((new Date(d).setHours(0, 0, 0, 0) - hom.getTime()) / 86400000);
     return `${gioHen(t)} ${lech === 0 ? 'hôm nay' : lech === 1 ? 'ngày mai' : d.toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit' })}`;
   }
-  /** Điền ô của các thẻ hẹn giờ từ trạng thái (khi vào trang / sau khi lưu) — không điền lại lúc đang gõ. */
+  /** 1.4.14: một hẹn giờ (đã lưu, hoặc hẹn mới chưa lưu: id ''). Dự án tick nhiều; không tick dự án nào = mọi dự án. */
+  function htmlHen(h) {
+    const ds = h.duAnDs || [], id = h.id || '';
+    const lap = (v, t) => `<option value="${v}"${(h.lap || 'ngay') === v ? ' selected' : ''}>${t}</option>`;
+    return `<div class="hen${h.bat ? '' : ' tat'}" data-id="${esc(id)}">
+      <div class="dong-cong-tac"><div><b>${id ? 'Bật hẹn giờ' : 'Hẹn mới (chưa lưu)'}</b><span class="trang-hen" data-hen="trang"></span><small data-hen="ghi"></small></div>
+        <label class="cong-tac"><input type="checkbox" data-hen="bat"${h.bat ? ' checked' : ''}><span></span></label></div>
+      <div class="luoi-3">
+        <label>Giờ bắt đầu<input type="time" data-hen="batDau" value="${esc(h.batDau || '22:00')}"></label>
+        <label>Giờ dừng <small>(trống = chạy tới hết hàng chờ)</small><span class="o-gio"><input type="time" data-hen="ketThuc" value="${esc(h.ketThuc || '')}"><button class="lien-ket" data-hen="boKetThuc" title="Bỏ giờ dừng">Bỏ</button></span></label>
+        <label>Lặp lại<select data-hen="lap">${lap('ngay', 'Mỗi ngày')}${lap('mot', 'Chỉ một lần')}</select></label>
+      </div>
+      <div class="chon-du-an-hen"><span>Chạy việc của</span>
+        <label><input type="checkbox" data-hen="moi"${ds.length ? '' : ' checked'}>Mọi dự án</label>
+        ${S.duAn.map((d) => `<label><input type="checkbox" data-da="${esc(d.id)}"${ds.includes(d.id) ? ' checked' : ''}>${esc(d.ten)}</label>`).join('')}
+      </div>
+      <div class="dong-o"><button class="nut-gradient nho" data-hen="luu"><i data-icon="check"></i>Lưu hẹn giờ</button><button class="nut-vien nho" data-hen="dung" hidden><i data-icon="pause"></i>Dừng lượt đang chạy</button><button class="nut-vien nho" data-hen="xoa"><i data-icon="trash-2"></i>Xoá hẹn</button></div>
+    </div>`;
+  }
+  /** Dự án đang tick của một hẹn trên giao diện ([] = mọi dự án). */
+  const duAnDsHen = (el) => ($('[data-hen="moi"]', el).checked ? [] : $$('[data-da]', el).filter((x) => x.checked).map((x) => x.dataset.da));
+  /** Dựng lại danh sách hẹn của các thẻ (khi vào trang / sau khi lưu, thêm, xoá) — không dựng lại lúc đang gõ. */
   function napHenGio(chiLoai) {
     if (!S) return;
     for (const the of $$('#trang-hengio .the-hen')) {
-      const l = the.dataset.loai, h = (S.henGio || {})[l] || {};
+      const l = the.dataset.loai;
       if (chiLoai && chiLoai !== l) continue;
-      const o = (k) => $(`[data-hen="${k}"]`, the);
-      o('bat').checked = !!h.bat;
-      o('batDau').value = h.batDau || '22:00';
-      o('ketThuc').value = h.ketThuc || '';
-      o('lap').value = h.lap || 'ngay';
-      o('duAn').innerHTML = `<option value="">Mọi dự án</option>` + S.duAn.map((d) => `<option value="${esc(d.id)}">Dự án "${esc(d.ten)}"</option>`).join('');
-      o('duAn').value = S.duAn.some((d) => d.id === h.duAn) ? h.duAn : '';
+      const ds = (S.henGio || []).filter((h) => h.loai === l);
+      $('.ds-hen', the).innerHTML = ds.map(htmlHen).join('');
+      veIcon(the);
     }
     veHenGio();
   }
   function veHenGio() {
+    const hg = S.henGio || [], hc = S.henChay || {};
     for (const the of $$('#trang-hengio .the-hen')) {
-      const l = the.dataset.loai, h = (S.henGio || {})[l] || {}, chay = (S.henChay || {})[l];
-      const o = (k) => $(`[data-hen="${k}"]`, the);
-      const tr = o('trang');
-      tr.className = `trang-hen${chay ? ' chay' : h.bat ? ' bat' : ''}`;
-      tr.textContent = chay ? `Đang chạy theo hẹn${chay.den ? ` · dừng ${gioHen(chay.den)}` : ' · tới hết hàng chờ'}` : h.bat && h.lanToi ? `Lần tới: ${ngayHen(h.lanToi)}` : 'Đang tắt';
-      the.classList.toggle('tat', !o('bat').checked);
-      o('dung').hidden = !chay;
-      const cho = S.viec.filter((j) => j.loai === l && j.trangThai === 'cho' && (!o('duAn').value || j.duAn === o('duAn').value)).length;
-      o('ghi').textContent = `Hiện có ${cho} việc ${TEN_LOAI[l]} đang chờ${o('duAn').value ? ' trong dự án này' : ''}. ` +
-        (l === 'nhac' ? 'Chạy trên các tài khoản Suno.' : 'Chạy trên Muse / Google Flow theo nơi đã chọn của từng việc.');
+      const l = the.dataset.loai;
+      const cua = hg.filter((h) => h.loai === l), dangChay = cua.filter((h) => hc[h.id]).length, bat = cua.filter((h) => h.bat).length;
+      const tong = $('[data-hen="tong"]', the);
+      tong.className = `trang-hen${dangChay ? ' chay' : bat ? ' bat' : ''}`;
+      tong.textContent = cua.length ? `${cua.length} hẹn${bat ? ` · ${bat} đang bật` : ''}${dangChay ? ` · ${dangChay} đang chạy` : ''}` : '';
+      for (const el of $$('.hen', the)) {
+        const id = el.dataset.id, h = hg.find((x) => x.id === id) || {}, chay = id && hc[id];
+        const o = (k) => $(`[data-hen="${k}"]`, el);
+        const tr = o('trang');
+        tr.className = `trang-hen${chay ? ' chay' : h.bat ? ' bat' : ''}`;
+        tr.textContent = !id ? '' : chay ? `Đang chạy theo hẹn${chay.den ? ` · dừng ${gioHen(chay.den)}` : ' · tới hết hàng chờ'}` : h.bat && h.lanToi ? `Lần tới: ${ngayHen(h.lanToi)}` : 'Đang tắt';
+        el.classList.toggle('tat', !o('bat').checked);
+        o('dung').hidden = !chay;
+        const da = duAnDsHen(el);
+        const cho = S.viec.filter((j) => j.loai === l && j.trangThai === 'cho' && (!da.length || da.includes(j.duAn))).length;
+        o('ghi').textContent = `Hiện có ${cho} việc ${TEN_LOAI[l]} đang chờ ${da.length ? (da.length === 1 ? 'trong dự án đã chọn' : `trong ${da.length} dự án đã chọn`) : 'ở mọi dự án'}. ` +
+          (l === 'nhac' ? 'Chạy trên các tài khoản Suno.' : 'Chạy trên Muse / Google Flow theo nơi đã chọn của từng việc.');
+      }
     }
   }
 
@@ -1642,9 +1683,13 @@
         const ids = S.viec.filter((j) => j.duAn === d.id && j.loai === loaiTrang() && j.trangThai === 'xong').map((j) => j.id);
         if (ids.length && await xacNhan('Dọn danh sách?', `Bỏ ${ids.length} việc đã xong khỏi danh sách (file vẫn giữ trong thư mục).`, 'Dọn')) api.call('xoaViec', { ids });
       } else if (b.dataset.lenh === 'xoaDuAn') {
-        if (await xacNhan('Xoá dự án?', `Xoá dự án "${esc(d.ten)}" và toàn bộ hàng đợi của nó. File đã tải về vẫn giữ.`, 'Xoá', true)) {
+        // 1.4.14: xoá dự án là dọn luôn dữ liệu tạm của nó trong thư mục dữ liệu app — báo trước dung lượng sẽ dọn.
+        const th = await api.call('thuDuLieuDuAn', { id: d.id }).catch(() => null);
+        const don = th && th.byte ? `<p>App dọn luôn <b>${docByte(th.byte)}</b> dữ liệu tạm của dự án này (file Flow tải dở, kết quả giữ tạm${th.soKetQua ? ` — <b>${th.soKetQua} file kết quả</b> chỉ nằm trong bộ nhớ tạm của app vì đã tắt "Tải về"; bản trên Google Drive không bị ảnh hưởng` : ''}).</p>` : '';
+        if (await hoi({ tieuDe: 'Xoá dự án?', html: `<p>Xoá dự án "${esc(d.ten)}" và toàn bộ hàng đợi của nó. File đã tải về thư mục kết quả vẫn giữ.</p>${don}`, ok: 'Xoá', nguyHiem: true })) {
           const r = await api.call('xoaDuAn', { id: d.id });
-          if (r && !r.ok) toast(r.loi, true); else { U.duAn = ''; luuUi(); }
+          if (r && !r.ok) toast(r.loi, true);
+          else { U.duAn = ''; luuUi(); toast(r && r.daDon ? `Đã xoá dự án, dọn ${docByte(r.daDon)} dữ liệu tạm` : 'Đã xoá dự án'); }
         }
       }
     };
@@ -1734,6 +1779,23 @@
     $('#chonHet').onchange = (e) => {
       for (const id of U.dsLoc || []) e.target.checked ? U.chon.add(id) : U.chon.delete(id);
       veHang();
+    };
+    // 1.4.14: chọn theo số ("1,3,4,8,6,10-50") trong danh sách đang hiện (theo bộ lọc / tab / ô tìm).
+    $('#nutChonSo').onclick = async () => {
+      const v = await hoi({ tieuDe: 'Chọn việc theo số', ok: 'Chọn',
+        html: `<label>Số thứ tự<input name="so" value="${esc(U.chonSoCu || '')}" placeholder="vd 1, 3, 4, 8, 6, 10-50"></label>
+          <label class="hang-tk"><input type="checkbox" name="them" ${U.chon.size ? 'checked' : ''}> Giữ các việc đang chọn (chọn thêm)</label>
+          <small>Chỉ chọn trong danh sách đang hiện (dự án, tab trạng thái, bộ lọc, ô tìm). Dùng dấu phẩy và gạch nối cho khoảng.</small>` });
+      if (!v || !v.so.trim()) return;
+      U.chonSoCu = v.so.trim();
+      const hien = new Set(U.dsLoc || []);
+      const r = HD.chonViecTheoSo(S.viec.filter((j) => hien.has(j.id)), v.so);
+      if (r.loi.length && !r.ids.length) { toast(`Không đọc được: ${r.loi.join(', ')}`, true); return; }
+      if (!v.them) U.chon.clear();
+      for (const id of r.ids) U.chon.add(id);
+      veHang();
+      const thieu = r.thieu.length ? ` — không có trong danh sách: ${HD.gonSo(r.thieu.slice(0, 200))}` : '';
+      toast(r.ids.length ? `Đã chọn ${r.ids.length} việc (số ${HD.gonSo(r.so)})${thieu}` : `Không có việc nào mang các số đó${thieu}`, !r.ids.length);
     };
     const tha = $('#thaAnh');
     tha.addEventListener('dragover', (e) => { e.preventDefault(); tha.classList.add('keo'); });
@@ -1939,23 +2001,48 @@
     };
     // Hẹn giờ
     $('#chipHen').onclick = () => diToi('hengio');
-    for (const the of $$('#trang-hengio .the-hen')) {
-      const l = the.dataset.loai, o = (k) => $(`[data-hen="${k}"]`, the);
-      o('bat').onchange = () => veHenGio();
-      o('duAn').onchange = () => veHenGio();
-      o('boKetThuc').onclick = () => { o('ketThuc').value = ''; };
-      o('luu').onclick = async () => {
-        const hen = { bat: o('bat').checked, batDau: o('batDau').value, ketThuc: o('ketThuc').value, lap: o('lap').value, duAn: o('duAn').value };
-        if (!hen.batDau) { toast('Chọn giờ bắt đầu', true); return; }
-        const r = await api.call('datHenGio', { loai: l, hen });
-        if (!r || !r.ok) { toast((r && r.loi) || 'Không lưu được hẹn giờ', true); return; }
-        S.henGio = S.henGio || {};
-        S.henGio[l] = { ...r.henGio, lanToi: (S.henGio[l] || {}).lanToi };
+    // 1.4.14: nhiều hẹn mỗi thẻ — bắt sự kiện chung cho cả trang.
+    const trangHen = $('#trang-hengio');
+    trangHen.addEventListener('change', (e) => {
+      const el = e.target.closest('.hen');
+      if (!el) return;
+      if (e.target.matches('[data-hen="moi"]') && e.target.checked) for (const x of $$('[data-da]', el)) x.checked = false;
+      if (e.target.matches('[data-da]')) $('[data-hen="moi"]', el).checked = !$$('[data-da]', el).some((x) => x.checked);
+      if (e.target.matches('[data-hen="moi"]') && !e.target.checked && !$$('[data-da]', el).some((x) => x.checked)) e.target.checked = true;
+      veHenGio();
+    });
+    trangHen.addEventListener('click', async (e) => {
+      const b = e.target.closest('[data-hen]');
+      if (!b || !['them', 'luu', 'dung', 'xoa', 'boKetThuc'].includes(b.dataset.hen)) return;
+      const the = b.closest('.the-hen'), l = the.dataset.loai, el = b.closest('.hen'), id = el ? el.dataset.id : '';
+      const o = (k) => $(`[data-hen="${k}"]`, el);
+      if (b.dataset.hen === 'them') {
+        $('.ds-hen', the).insertAdjacentHTML('beforeend', htmlHen({ bat: true, batDau: '22:00', lap: 'ngay', duAnDs: [] }));
+        veIcon(the); veHenGio();
+        return;
+      }
+      if (b.dataset.hen === 'boKetThuc') { o('ketThuc').value = ''; return; }
+      if (b.dataset.hen === 'dung') { api.call('dungHen', { id }); return; }
+      if (b.dataset.hen === 'xoa') {
+        if (!id) { el.remove(); veHenGio(); return; }
+        if (!await xacNhan('Xoá hẹn giờ?', `Xoá hẹn ${TEN_TRANG[l]} lúc ${esc(o('batDau').value)}${S.henChay && S.henChay[id] ? ' — lượt đang chạy theo hẹn này sẽ dừng' : ''}.`, 'Xoá', true)) return;
+        const r = await api.call('xoaHenGio', { id });
+        if (!r || !r.ok) { toast((r && r.loi) || 'Không xoá được hẹn giờ', true); return; }
+        S.henGio = (S.henGio || []).filter((h) => h.id !== id);
         napHenGio(l);
-        toast(hen.bat ? `Đã hẹn ${TEN_TRANG[l]} lúc ${r.henGio.batDau}${r.henGio.ketThuc ? `, dừng ${r.henGio.ketThuc}` : ''}` : `Đã tắt hẹn giờ ${TEN_TRANG[l]}`);
-      };
-      o('dung').onclick = () => api.call('dungHen', { loai: l });
-    }
+        toast(`Đã xoá hẹn giờ ${TEN_TRANG[l]}`);
+        return;
+      }
+      const hen = { bat: o('bat').checked, batDau: o('batDau').value, ketThuc: o('ketThuc').value, lap: o('lap').value, duAnDs: duAnDsHen(el) };
+      if (!hen.batDau) { toast('Chọn giờ bắt đầu', true); return; }
+      if (id) hen.id = id; else hen.moi = true;
+      const r = await api.call('datHenGio', { loai: l, hen });
+      if (!r || !r.ok) { toast((r && r.loi) || 'Không lưu được hẹn giờ', true); return; }
+      const cu = (S.henGio || []).find((h) => h.id === r.henGio.id), moi = { ...r.henGio, lanToi: cu && cu.lanToi };
+      S.henGio = cu ? S.henGio.map((h) => (h === cu ? moi : h)) : [...(S.henGio || []), moi];
+      napHenGio(l);
+      toast(hen.bat ? `Đã hẹn ${TEN_TRANG[l]} lúc ${r.henGio.batDau}${r.henGio.ketThuc ? `, dừng ${r.henGio.ketThuc}` : ''}` : `Đã tắt hẹn giờ ${TEN_TRANG[l]} lúc ${r.henGio.batDau}`);
+    });
     $('#cdKiemCapNhat').onclick = () => api.call('kiemCapNhat');
     $('#cdXemLuong').onchange = (e) => api.call('xemLuong', { bat: e.target.checked });
     $('#cdMauGoc').onclick = () => { $('#cdMauAnh').value = HD.MAU_MAC_DINH.anh; $('#cdMauVideo').value = HD.MAU_MAC_DINH.video; };
@@ -2024,21 +2111,33 @@
   // ── Khởi động ────────────────────────────────────────────────────────────
   veIcon(document);
   ganSuKien();
-  api.onState((s) => {
+  // 1.4.14: hàng đợi tới theo phần đổi (s.goiViec) — ghép vào bản đang có; gói lệch bản thì xin lại bản đủ.
+  let xinDu = null;
+  const nhanGoi = (s) => {
+    const k = HD.ghepGoiViec(U.khoViec, s.goiViec);
+    if (!k) { xinBanDu(); return false; }
+    U.khoViec = k;
+    s.viec = k.ds; delete s.goiViec;
     S = s;
     S.nhanLuc = s.luc || Date.now();
+    return true;
+  };
+  const xinBanDu = () => xinDu || (xinDu = api.call('trangThaiDu').then((s) => {
+    xinDu = null;
+    const dau = !S;
+    if (!nhanGoi(s)) return;
+    apDuAn();
+    if (dau) { for (const d of s.nhatKy || []) themLog(d); diToi(TEN_TRANG[U.trang] ? U.trang : 'anh'); } else ve();
+  }));
+  api.onState((s) => {
+    if (!S) return;   // chưa có bản đủ đầu tiên
+    if (!nhanGoi(s)) return;
     apDuAn();
     ve();
     if (U.trang === 'caidat') veCapNhat();
   });
   api.onLog(themLog);
-  api.call('trangThai').then((s) => {
-    S = s;
-    S.nhanLuc = s.luc || Date.now();
-    apDuAn();
-    for (const d of s.nhatKy || []) themLog(d);
-    diToi(TEN_TRANG[U.trang] ? U.trang : 'anh');
-  });
+  xinBanDu();
   // Thanh tiến độ + đồng hồ dự án mỗi giây. 1.4.5: cửa sổ thu nhỏ / bị che hết (document.hidden) thì bỏ qua cho
   // đỡ CPU, hiện lại thì vẽ ngay một lần.
   const moiGiay = () => { capNhatTienDo(); if (S) veDongHo(); };

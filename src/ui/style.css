@@ -211,6 +211,11 @@ select option { background: var(--panel-dac); }
 .o-tim { position: relative; flex: 0 1 260px; min-width: 160px; }
 .o-tim i { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; color: var(--chu-mo); }
 .o-tim input { padding-left: 32px; }
+/* 1.4.14: nút Chọn số cạnh ô tìm — đầu cột hàng đợi giữ MỘT hàng (ô tìm co lại), không đẩy danh sách xuống. */
+.cot-hang .panel-dau { flex-wrap: nowrap; }
+.cot-hang .panel-dau h2 { white-space: nowrap; flex: none; }
+.cot-hang .panel-dau .o-tim { min-width: 120px; margin-left: auto; }
+.nut-chon-so { flex: none; }
 .loc-dong { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 10px; }
 /* 1.4.11: hai hộp lọc (nơi chạy, tài khoản) + Đặt lại + sắp xếp đi thành MỘT cụm — thiếu chỗ thì cả cụm xuống hàng, nằm bên phải. */
 /* 1.4.12: dải báo việc Muse dở (đã gửi prompt, chưa lấy kết quả) — chỉ hiện khi có. */
@@ -254,6 +259,9 @@ select option { background: var(--panel-dac); }
 .ds-hang { padding-right: 4px; }
 .dong-viec { display: grid; grid-template-columns: 22px 46px 56px minmax(0, 1fr) 150px 88px; align-items: center; gap: 10px; padding: 10px 8px; border-radius: 12px;
   border: 1px solid transparent; cursor: pointer; }
+/* 1.4.14: cô lập bố cục / vẽ từng dòng — một dòng đổi (đang chạy) không kéo cả 600 dòng dựng lại (đo: giao diện 14,7% → 12% một nhân).
+   Đừng dùng content-visibility:auto ở đây: Electron 33 cộng contain-intrinsic-size vào cả dòng đang hiện (72 → 94 px). */
+#dsHang .dong-viec { contain: layout paint style; }
 .dong-viec + .dong-viec { border-top-color: var(--vien); border-radius: 0; }
 .dong-viec:hover { background: var(--the); border-radius: 12px; }
 .dong-viec.chon { background: var(--tim-nen); border-color: rgba(179, 140, 255, .5) !important; border-radius: 12px; box-shadow: 0 0 0 1px rgba(179, 140, 255, .2); }
@@ -275,7 +283,8 @@ img[data-vthumb]:not([src]), img[data-vthumb].vthumb-loi { visibility: hidden; }
 .tag { font-size: 10.5px; font-weight: 700; padding: 2px 7px; border-radius: 6px; background: rgba(179, 140, 255, .14); color: #cdb6ff; letter-spacing: .3px; }
 .tag.nv { background: rgba(52, 211, 153, .12); color: var(--xanh); }
 .thanh-tien { flex: 1; height: 5px; border-radius: 5px; background: rgba(255, 255, 255, .08); overflow: hidden; margin-left: 4px; }
-.thanh-tien div { height: 100%; background: var(--gradient); border-radius: 5px; transition: width .8s linear; }
+/* 1.4.14: KHÔNG transition width — thanh cập nhật mỗi giây, trượt 0,8 s là vẽ lại gần như liên tục (đo: ~35% một nhân mỗi dòng đang chạy). */
+.thanh-tien div { height: 100%; background: var(--gradient); border-radius: 5px; }
 .phan-tram { font-size: 11px; color: var(--chu-phu); width: 30px; text-align: right; }
 .trang-thai { text-align: left; min-width: 0; }
 .pill { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
@@ -409,7 +418,7 @@ img[data-vthumb]:not([src]), img[data-vthumb].vthumb-loi { visibility: hidden; }
 @media (max-width: 1280px) {
   /* 1.4.11: cụm lọc vừa một hàng ở cửa sổ nhỏ — ô lọc gọn hơn, "Đặt lại" chỉ còn biểu tượng (chữ ở gợi ý khi rê chuột). */
   .loc-phai .loc-nen { min-width: 0; max-width: 112px; }
-  .loc-phai #nutDatLai span { display: none; }
+  .loc-phai #nutDatLai span, #nutChonSo span { display: none; }
   .ba-cot { grid-template-columns: 280px minmax(380px, 1fr) 250px; }
   #chipHomNay { display: none !important; }
   /* Cửa sổ hẹp: bỏ cột #số (số đã có ở đầu prompt), thu cột trạng thái. */
@@ -518,7 +527,16 @@ body.trang-nhac .khong-nhac { display: none !important; }
 .the-hen .o-gio { display: flex; align-items: center; gap: 8px; margin-top: 5px; }
 .the-hen .o-gio input { margin-top: 0; flex: 1; min-width: 0; }
 .the-hen .dong-o { flex-wrap: wrap; }
-.the-hen.tat .luoi-3, .the-hen.tat > label { opacity: .55; }
+.the-hen .hen.tat .luoi-3, .the-hen .hen.tat .chon-du-an-hen { opacity: .55; }
+/* 1.4.14: nhiều hẹn mỗi chức năng, mỗi hẹn tick nhiều dự án. */
+.the-hen .hen { padding: 12px 0 2px; }
+.the-hen > [data-hen="them"] { margin-top: 8px; }
+.the-hen .hen + .hen { border-top: 1px solid var(--vien); margin-top: 6px; }
+.the-hen .hen .trang-hen { margin-left: 8px; }
+.the-hen .ds-hen:empty::after { content: 'Chưa có hẹn giờ nào.'; display: block; padding: 6px 0 12px; font-size: 12.5px; color: var(--chu-mo); }
+.chon-du-an-hen { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; margin: 2px 0 12px; font-size: 12.5px; color: var(--chu-phu); }
+.chon-du-an-hen label { display: inline-flex; align-items: center; gap: 6px; color: var(--chu); font-size: 13px; cursor: pointer; }
+.chon-du-an-hen input { width: 16px; height: 16px; margin: 0; accent-color: var(--g2); }
 /* 1.4.0: đồng hồ dự án (đã chạy · còn ≈ …), nút Chạy lại ngay của tài khoản đang nghỉ */
 .chip-dong-ho { font-variant-numeric: tabular-nums; white-space: nowrap; cursor: default; min-width: 0; flex-shrink: 1; overflow: hidden; }
 .chip-dong-ho > span { overflow: hidden; text-overflow: ellipsis; }

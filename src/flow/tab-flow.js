@@ -72,7 +72,6 @@ class QuanLyTabFlow {
   findByWcId(wcId) {
     return this.tabs.find((t) => { try { return t.view.webContents.id === wcId; } catch (_) { return false; } }) || null;
   }
-  ofAccount(accountId) { return this.tabs.filter((t) => t.accountId === accountId); }
 
   /**
    * Mở một tab Flow ẩn cho tài khoản `acc` ({id, ten}).
@@ -191,25 +190,6 @@ try {
       this.log('error', `❌ [${tab.id}] Không tiêm được engine Flow — ${err.message}`);
     } finally {
       tab.injecting = khoaTruocDo;
-    }
-  }
-
-  async diagnose(tabId) {
-    const tab = this.find(tabId);
-    if (!tab) return { ok: false, error: 'Không tìm thấy tab' };
-    try {
-      const p = await tab.view.webContents.executeJavaScript(`({
-        url: location.href,
-        coBridge: !!window.__flowBridge,
-        coStorage: !!(window.chrome && window.chrome.storage && window.chrome.storage.local),
-        coDispatch: typeof window.__flowShimDispatch === 'function',
-        coEngine: !!window.__flowEngineLoaded,
-        coClickCreate: typeof window.__flowClickCreate === 'function',
-        coONhapPrompt: !!document.querySelector('.ProseMirror[contenteditable="true"], div[data-slate-editor="true"][contenteditable="true"]')
-      })`, true);
-      return { ok: true, tabId, urlKhop: FLOW_HOST_RE.test(p.url), ...p };
-    } catch (err) {
-      return { ok: false, error: err.message };
     }
   }
 

@@ -1,4 +1,15 @@
-# AI Automation Studio 1.4.13
+# AI Automation Studio 1.4.14
+
+- **Xoá dự án là dọn luôn dữ liệu thừa của dự án.** Xoá dự án (⋯ cạnh tên dự án → *Xoá dự án*) thì app xoá luôn trong thư mục dữ liệu (`AppData\Roaming\AIAutomationStudio`): kết quả giữ tạm của dự án (khi tắt *Tải về*), file Flow tải dở của các tab chạy dự án đó, file tạm Suno / Drive của các việc trong dự án. Hộp xác nhận ghi trước sẽ dọn bao nhiêu; file trong thư mục kết quả của bạn và file dự án khác còn dùng thì giữ nguyên. Nhật ký ghi dòng 🗑.
+- **Hẹn giờ cho nhiều dự án, nhiều hẹn mỗi chức năng.** Trang *Hẹn giờ*: mỗi thẻ Tạo ảnh / Tạo video / Tạo nhạc có nút **Thêm hẹn giờ** — thêm bao nhiêu hẹn cũng được, mỗi hẹn giờ bắt đầu / dừng riêng và **tick nhiều dự án** (hoặc *Mọi dự án*). Ví dụ: Tạo ảnh 22:00 cho dự án A, Tạo ảnh 02:00 cho dự án B + C. Mỗi hẹn có nút *Dừng lượt đang chạy* / *Xoá hẹn* riêng. Hẹn đã đặt ở bản cũ được giữ nguyên.
+- **Chọn việc theo số.** Nút **Chọn số** cạnh ô tìm ở danh sách việc → gõ vd `1, 3, 4, 8, 6, 10-50` → tick đúng các việc mang số đó (trong danh sách đang hiện); số không có trong danh sách được báo lại. Tick *Giữ các việc đang chọn* để chọn thêm.
+- **App nhẹ hơn khi hàng đợi dài.** Đo với 8.300 việc, một việc đang chạy: giao diện từ **~50%** một nhân CPU xuống **~12%**.
+  - Thanh tiến độ của việc đang chạy bỏ hiệu ứng trượt (vẽ lại liên tục — đây là phần tốn nhất).
+  - App chỉ gửi cho giao diện những việc vừa đổi thay vì cả hàng đợi mỗi giây; dòng không đổi không dựng lại.
+  - Bỏ vài đoạn code cũ không còn dùng.
+- Mọi thứ khác giữ nguyên như 1.4.13.
+
+## Bản 1.4.13
 
 - **Bớt RAM khi chạy Muse.** Vì sao tốn: mỗi *luồng* Muse là một trang muse.ai chạy ngầm (một trình duyệt riêng, thường 0,3–1,5 GB). App giữ trang đó suốt lượt chạy, mỗi việc chỉ chuyển trang trong cùng trình duyệt nên RAM phình dần theo số việc và không được trả lại tới khi hết lượt. Tổng RAM ≈ số tài khoản Muse đang chạy × số luồng mỗi tài khoản (mặc định 3).
   - **Làm mới luồng** (Cài đặt → Muse): luồng chạy xong **10 việc**, hoặc trang Muse của luồng dùng quá **900 MB**, thì app đóng hẳn trang đó và mở trang mới cho việc sau — RAM trả lại hết. Không làm chậm: việc nào cũng nạp lại trang Muse từ đầu như trước. Nhật ký ghi dòng ♻ kèm số RAM trang đang dùng.
