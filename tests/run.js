@@ -1159,10 +1159,14 @@ test('nâng cấp: thời gian chờ mặc định cũ (240/600 s) → mới (18
 testAsync('giãn nhịp gửi theo tài khoản: hai luồng cùng tài khoản không gửi cùng lúc', async () => {
   const { dp } = dungDieuPhoi();
   dp.datCaiDat({ nghiGiuaLanGui: 1 });
+  // 1.4.14: đo bằng MỐC GỬI của từng tài khoản (lanGui), không đo tổng thời gian — các bài đồng bộ chạy sau chặn vòng
+  // sự kiện, máy Windows CI chậm thì tổng thời gian vượt 1,8 s dù giãn nhịp đúng (đỏ giả lúc phát hành 1.4.14).
   const t0 = Date.now();
-  await Promise.all([dp.choGui('A'), dp.choGui('A'), dp.choGui('B')]);
-  const ms = Date.now() - t0;
-  assert.ok(ms >= 950 && ms < 1800, `mất ${ms}ms`);
+  const cho = [dp.choGui('A'), dp.choGui('A'), dp.choGui('B')];
+  const a1 = dp.lanGui.A, b = dp.lanGui.B;   // lần gửi đầu của A và của B được đi ngay (đặt mốc trong lúc gọi)
+  await Promise.all(cho);
+  assert.ok(a1 - t0 < 50 && b - t0 < 50, 'A lần đầu và B (tài khoản khác) không phải chờ');
+  assert.ok(dp.lanGui.A - a1 >= 950, `hai lần gửi của A cách ${dp.lanGui.A - a1}ms (phải ≥ 1 s)`);
 });
 
 console.log('\n── kiểm tĩnh ─────────────────────────────────');
