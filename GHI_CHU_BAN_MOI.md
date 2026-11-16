@@ -1,4 +1,16 @@
-# AI Automation Studio 1.4.14
+# AI Automation Studio 1.5.0
+
+- **Tạo nhạc chuyển từ Suno sang Google Flow Music (flowmusic.app).** Mọi thứ của Suno đã bỏ khỏi app (tài khoản Suno, thẻ cài đặt Suno, nút Thêm Suno).
+  - **Không cần thêm tài khoản mới:** mỗi tài khoản **Google Flow** có sẵn một tài khoản **Flow Music** dùng chung đăng nhập Google (thẻ *Flow Music* ở mục Tài khoản). Lần đầu, nếu thẻ Flow Music báo *Chưa đăng nhập*: bấm **Đăng nhập** trên thẻ đó, ở trang flowmusic.app bấm đăng nhập và chọn tài khoản Google (đã đăng nhập sẵn trong app, không nhập lại mật khẩu), rồi bấm **Xong**. Đăng xuất một bên là đăng xuất cả hai.
+  - **Nhập prompt như cũ:** trang *Tạo nhạc* — mỗi dòng (hoặc mỗi đoạn) một prompt, hoặc *Nhập file .txt* / *Nhập nhiều file .txt* (mỗi file một dự án). Prompt gửi **nguyên văn** vào ô chat của Producer — muốn nhạc không lời thì ghi `instrumental` trong prompt.
+  - **Theo thứ tự, tên theo số:** app gửi theo đúng thứ tự prompt, mỗi prompt một phiên chat mới. Flow Music ra 2 bài, app tải **MP3 của bài dài hơn** và đặt tên theo số prompt (`001.mp3`, `002.mp3`…). Mỗi tài khoản tạo **2 bài cùng lúc** (gói Free cho 2; đổi ở Cài đặt → *Flow Music — khi chạy*); bài xong lệch nhau thì tên file vẫn đúng số prompt.
+  - Producer chỉ hỏi lại mà chưa tạo bài → app nhắn thêm một lần "tạo bài luôn". Tải hỏng → app mở lại đúng phiên và tải lại bài đó (tối đa 3 lần), **không gửi lại prompt** (không tốn thêm credit).
+  - Hết credit → bài tạo lại ở tài khoản dự phòng; tài khoản hết credit nghỉ 6 giờ (bấm *Kiểm tra* ở thẻ Flow Music để dùng lại sớm). Tài khoản Google Flow cùng tên vẫn tạo ảnh / video bình thường.
+  - Cửa sổ Flow Music chạy ngầm **tắt tiếng** (trang tự phát bài vừa tạo xong).
+  - Việc nhạc còn chờ của bản cũ tự chuyển sang Flow Music; số thử lại / nghỉ đã chỉnh cho Suno được giữ cho Flow Music. Việc nhạc đã xong giữ nguyên file.
+- Mọi thứ khác giữ nguyên như 1.4.14.
+
+## Bản 1.4.14
 
 - **Xoá dự án là dọn luôn dữ liệu thừa của dự án.** Xoá dự án (⋯ cạnh tên dự án → *Xoá dự án*) thì app xoá luôn trong thư mục dữ liệu (`AppData\Roaming\AIAutomationStudio`): kết quả giữ tạm của dự án (khi tắt *Tải về*), file Flow tải dở của các tab chạy dự án đó, file tạm Suno / Drive của các việc trong dự án. Hộp xác nhận ghi trước sẽ dọn bao nhiêu; file trong thư mục kết quả của bạn và file dự án khác còn dùng thì giữ nguyên. Nhật ký ghi dòng 🗑.
 - **Hẹn giờ cho nhiều dự án, nhiều hẹn mỗi chức năng.** Trang *Hẹn giờ*: mỗi thẻ Tạo ảnh / Tạo video / Tạo nhạc có nút **Thêm hẹn giờ** — thêm bao nhiêu hẹn cũng được, mỗi hẹn giờ bắt đầu / dừng riêng và **tick nhiều dự án** (hoặc *Mọi dự án*). Ví dụ: Tạo ảnh 22:00 cho dự án A, Tạo ảnh 02:00 cho dự án B + C. Mỗi hẹn có nút *Dừng lượt đang chạy* / *Xoá hẹn* riêng. Hẹn đã đặt ở bản cũ được giữ nguyên.

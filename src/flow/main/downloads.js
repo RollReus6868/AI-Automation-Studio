@@ -28,8 +28,9 @@ class DownloadManager {
    * @param {(tabId:string, payload:object) => void} notifyTab
    * @param {(level:string, msg:string, tabId?:string) => void} log
    */
-  constructor({ getSettings, findTabByWcId, notifyTab, log, dirForTab }) {
+  constructor({ getSettings, findTabByWcId, notifyTab, log, dirForTab, boQuaWc }) {
     this.getSettings = getSettings;
+    this.boQuaWc = boQuaWc || null;
     this.findTabByWcId = findTabByWcId;
     this.notifyTab = notifyTab;
     this.log = log;
@@ -90,6 +91,8 @@ class DownloadManager {
    */
   attach(ses) {
     ses.on('will-download', (event, item, webContents) => {
+      // AI Automation Studio 1.5.0: phiên Flow dùng chung với cửa sổ Flow Music — tải của cửa sổ đó do app tự lo.
+      if (webContents && this.boQuaWc && this.boQuaWc(webContents.id)) return;
       // ── Đây là mấu chốt: biết ngay tab nào đang tải ──
       const tab = this.findTabByWcId(webContents.id);
       const tabId = tab ? tab.id : null;

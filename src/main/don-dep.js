@@ -12,7 +12,7 @@
 //    Cache, Code Cache, GPUCache, Dawn*Cache          bộ nhớ đệm của phiên mặc định (giao diện app)
 //    Crashpad/{completed,pending,new}                 báo lỗi (crash) cũ
 //    du-lieu.json (+ .hong-<giờ> = bản hỏng app đã thay), flow-engine.json, nhat-ky.txt, nhat-ky-cu.txt
-//    suno-tai-tam, flow-tai-tam, drive-tam, ket-qua-tam/<duAn>  file tạm (ket-qua-tam: khi tắt "Tải về" đây là
+//    nhac-tai-tam (bản cũ: suno-tai-tam), flow-tai-tam, drive-tam, ket-qua-tam/<duAn>  file tạm (ket-qua-tam: khi tắt "Tải về" đây là
 //                                                     bản DUY NHẤT của kết quả → chỉ xoá file không việc nào trỏ tới)
 //    cap-nhat/                                        bộ cài bản mới đã tải
 //    nhan-vat/                                        ảnh nhân vật của người dùng — KHÔNG dọn
@@ -29,7 +29,8 @@ const path = require('path');
 /** Thư mục bộ nhớ đệm trong một phiên (tương đối). Đăng nhập (Cookies, Local Storage, IndexedDB…) không nằm đây. */
 const CACHE_PHIEN = ['Cache', 'Code Cache', 'GPUCache', 'DawnGraphiteCache', 'DawnWebGPUCache', 'GrShaderCache',
   'ShaderCache', path.join('Service Worker', 'CacheStorage')];
-const TAM = ['suno-tai-tam', 'flow-tai-tam', 'drive-tam'];
+// 1.5.0: suno-tai-tam là thư mục tạm của bản cũ (Suno) — còn sót thì vẫn dọn.
+const TAM = ['nhac-tai-tam', 'flow-tai-tam', 'drive-tam', 'suno-tai-tam'];
 const MOI_MS = 30 * 60000;   // file / thư mục tạm mới đổi trong 30 phút: có thể đang dùng (đang tải) → để yên
 
 const chuan = (p) => (process.platform === 'win32' ? path.resolve(p).toLowerCase() : path.resolve(p));
@@ -104,7 +105,7 @@ async function quet(o) {
 
   // a. Bộ nhớ đệm của các phiên còn dùng (tài khoản còn trong danh sách + phiên mặc định).
   const cache = them({ ma: 'cache', ten: 'Bộ nhớ đệm trang web của các tài khoản',
-    moTa: 'Ảnh, script, video các trang Muse / Flow / Suno đã mở được lưu tạm. Không đăng xuất tài khoản — trang tự tải lại khi cần.',
+    moTa: 'Ảnh, script, video các trang Muse / Flow / Flow Music đã mở được lưu tạm. Không đăng xuất tài khoản — trang tự tải lại khi cần.',
     macDinh: true, xoa: [], api: [], soMuc: 0 });
   const phienDir = path.join(ud, 'Partitions');
   const dsPhien = (await lsDs(phienDir)).map((t) => path.join(phienDir, t));
@@ -129,7 +130,7 @@ async function quet(o) {
   }
 
   // c. File tạm — bỏ qua thứ vừa đổi (đang tải) và file việc còn trỏ tới.
-  const tam = them({ ma: 'tam', ten: 'File tạm', moTa: 'File tải tạm của Suno / Flow / Drive và kết quả tạm không còn việc nào dùng (giữ nguyên kết quả của các việc trong app).',
+  const tam = them({ ma: 'tam', ten: 'File tạm', moTa: 'File tải tạm của Flow Music / Flow / Drive và kết quả tạm không còn việc nào dùng (giữ nguyên kết quả của các việc trong app).',
     macDinh: true, xoa: [], soMuc: 0 });
   const themTam = async (p) => {
     if (bay - (await moiDoi(p)) < moiMs) return;
@@ -214,7 +215,7 @@ const escRe = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
  *   a. ket-qua-tam/<dự án>   kết quả giữ tạm khi tắt "Tải về" (đã lên Drive) — bản duy nhất trên máy → báo số file
  *   b. flow-tai-tam/<tk>-<dự án>-<số tab>   file Flow tải dở của các tab chạy dự án này (khớp đúng mẫu tên, không khớp
  *      nhầm dự án "du-an-1" khi xoá "du-an")
- *   c. file của các việc trong dự án nằm trong thư mục tạm của app (suno-tai-tam, drive-tam…)
+ *   c. file của các việc trong dự án nằm trong thư mục tạm của app (nhac-tai-tam, drive-tam…)
  * File mà việc của dự án KHÁC còn trỏ tới (o.fileConDung) không bao giờ xoá. Không đụng thư mục kết quả của người dùng.
  * @param o.userData, o.duAnId, o.tkIds (id mọi tài khoản), o.fileDuAn (j.files + j.thamChieu của việc trong dự án),
  *        o.fileConDung (của việc còn lại)

@@ -497,11 +497,11 @@ select.canh-bao { border-color: #e0a100; }
 /* 1.4.7: công tắc "Cả máy nghỉ Flow" tắt → ô số phút mờ */
 .luoi-3.tat label { opacity: .5; }
 
-/* ── Trang Tạo nhạc (Suno): dùng chung cột Tạo, ẩn phần chỉ dành cho ảnh / video ── */
+/* ── Trang Tạo nhạc (Flow Music): dùng chung cột Tạo, ẩn phần chỉ dành cho ảnh / video ── */
 .chi-nhac { display: none; }
 body.trang-nhac .chi-nhac { display: inline; }
 body.trang-nhac .khong-nhac { display: none !important; }
-.tag.nen-suno { background: rgba(255, 170, 60, .16); color: #ffc98a; }
+.tag.nen-fmusic { background: rgba(255, 170, 60, .16); color: #ffc98a; }
 .tag.nen-drive { background: rgba(66, 133, 244, .16); color: #9cc0ff; }
 .xem-truoc .nhac { display: grid; place-items: center; gap: 14px; padding: 28px 16px; width: 100%; color: var(--chu-mo); }
 .xem-truoc .nhac > i { width: 46px; height: 46px; }
@@ -509,7 +509,7 @@ body.trang-nhac .khong-nhac { display: none !important; }
 .o-tv .nhac-tv { width: 100%; height: 100%; display: grid; place-items: center; color: var(--chu-mo); }
 .o-tv .nhac-tv i { width: 34px; height: 34px; }
 .het-luot { color: #ffc98a; }
-/* 1.2.0: mục Tài khoản tách thẻ Muse / Google Flow / Suno */
+/* 1.2.0: mục Tài khoản tách thẻ Muse / Google Flow / Flow Music / Drive */
 #nenTk { grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 4px 0 10px; }
 #nenTk button { padding: 8px 4px; }
 #nenTk .dem-nen { display: inline-block; min-width: 18px; padding: 0 5px; margin-left: 4px; border-radius: 9px; background: rgba(255, 255, 255, .12); font-size: 11px; }
@@ -561,16 +561,16 @@ body.trang-nhac .khong-nhac { display: none !important; }
 .ap-nhac { background: rgba(255, 196, 77, .16); color: #ffd27a; }
 .ap-tat-ca { background: rgba(110, 220, 160, .14); color: #8fe6b6; }
 .ap-app { background: rgba(255, 255, 255, .08); color: var(--chu-phu, #b9b9c6); }
-/* 1.4.6: nhãn NƠI CHẠY (Muse / Google Flow / Suno) ở tiêu đề thẻ Cài đặt — viền để khác nhãn loại việc */
+/* 1.4.6: nhãn NƠI CHẠY (Muse / Google Flow / Flow Music) ở tiêu đề thẻ Cài đặt — viền để khác nhãn loại việc */
 .ap-muse { background: rgba(129, 140, 248, .14); color: #b4bcff; box-shadow: inset 0 0 0 1px rgba(129, 140, 248, .5); }
 .ap-flow { background: rgba(45, 212, 191, .12); color: #7eeadb; box-shadow: inset 0 0 0 1px rgba(45, 212, 191, .45); }
-.ap-suno { background: rgba(251, 146, 60, .13); color: #ffc08f; box-shadow: inset 0 0 0 1px rgba(251, 146, 60, .45); }
+.ap-nhac-noi { background: rgba(251, 146, 60, .13); color: #ffc08f; box-shadow: inset 0 0 0 1px rgba(251, 146, 60, .45); }
 .the-cai h3 { flex-wrap: wrap; }
 .the-cai h3 .ap { margin: 0; font-size: 11px; }
 .the-cai h3 .ap:first-of-type { margin-left: 4px; }
 .the-cai.noi-muse { border-left: 3px solid rgba(129, 140, 248, .7); }
 .the-cai.noi-flow { border-left: 3px solid rgba(45, 212, 191, .65); }
-.the-cai.noi-suno { border-left: 3px solid rgba(251, 146, 60, .65); }
+.the-cai.noi-nhac { border-left: 3px solid rgba(251, 146, 60, .65); }
 .the-cai.noi-chung { border-left: 3px solid rgba(179, 140, 255, .55); }
 .the-cai.noi-app { border-left: 3px solid rgba(255, 255, 255, .22); }
 label > .ap { margin-left: 6px; }
@@ -589,7 +589,7 @@ label > .ap { margin-left: 6px; }
 .thanh-luu-cd .mo { flex: 1; min-width: 0; font-size: 12.5px; }
 .thanh-luu-cd .nut-gradient, .thanh-luu-cd .nut-vien { padding: 9px 16px; }
 @media (max-width: 1250px) { .thanh-luu-cd .mo { display: none; } }
-/* Ghi chú nhỏ ngay dưới một ô số (vd "Nghỉ giữa 2 lần gửi Muse / Suno") */
+/* Ghi chú nhỏ ngay dưới một ô số (vd "Nghỉ giữa 2 lần gửi Muse / Flow Music") */
 .the-cai label .ghi-o { display: block; margin-top: 4px; font-size: 11.5px; color: var(--chu-mo); line-height: 1.4; }
 
 /* 1.4.12: Cài đặt → Cả app → Dữ liệu app trên máy + hộp thoại Dọn dữ liệu thừa */

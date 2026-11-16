@@ -21,7 +21,7 @@ const duAn = [], viec = [];
 let id = 0;
 for (let k = 0; k < SO_DA; k++) {
   const da = `da-${k}`;
-  duAn.push({ id: da, ten: `Dự án ${k + 1}`, so: MOI_DA, taoLuc: 1792217727436, taiKhoan: ['tk-1'], chaySong: { muse: 1, flow: 1, suno: 1 }, soLoai: { anh: MOI_DA, video: 0, nhac: 0 } });
+  duAn.push({ id: da, ten: `Dự án ${k + 1}`, so: MOI_DA, taoLuc: 1792217727436, taiKhoan: ['tk-1'], chaySong: { muse: 1, flow: 1, fmusic: 1 }, soLoai: { anh: MOI_DA, video: 0, nhac: 0 } });
   for (let n = 1; n <= MOI_DA; n++) {
     const xong = n % 3 !== 0;
     viec.push({ id: ++id, nen: 'muse', duAn: da, so: n, stt: n, loai: 'anh', prompt: `${n}. ${p}${p}`, tyLe: '16:9', thamChieu: [], nhanVat: [],

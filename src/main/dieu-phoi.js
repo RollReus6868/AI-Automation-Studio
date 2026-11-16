@@ -12,7 +12,7 @@
 //  riêng (d.caiDat), luồng riêng (luồng Muse / tab Flow gắn với một dự án — dự án sau
 //  không phải xếp sau cả hàng việc của dự án trước), dự án Flow riêng trên mỗi tài khoản
 //  (d.flowUrl[tk]). Từng việc cũng dừng / chạy riêng được (trạng thái 'dung', chayRieng).
-//  Luồng Suno vẫn một luồng mỗi tài khoản, dùng chung cho mọi dự án (chia lượt đều).
+//  Luồng Flow Music (nhạc, 1.5.0) dùng chung cho mọi dự án (chia lượt đều), luongNhacMoiTK luồng mỗi tài khoản.
 //
 //  1.3.6 — HẸN GIỜ CHẠY riêng cho từng chức năng (ảnh / video / nhạc, src/main/hen-gio.js): đến giờ thì
 //  chạy mọi việc đang chờ của loại đó (henDangChay), có giờ dừng thì tới giờ dừng — độc lập với nút Chạy dự án.
@@ -36,27 +36,28 @@ const LOI_LIEN_TIEP_NGHI = 2;
 // 1.4.9: canh treo — lần giao Muse quá (thời gian chờ kết quả + chừng này giây) thì bỏ, đổi tài khoản. Luồng Muse tự có
 // hạn từng bước (mở trang 45 s, sẵn sàng 30 s, mất kết nối 60 s, gửi 180 s, lấy file 2 × 240 s) — đây là lưới cuối.
 const HAN_THEM_GIAY = Number(process.env.MUSE_HAN_THEM_GIAY) || 600;
-const HAN_THEM_SUNO_GIAY = 900;
+const HAN_THEM_NHAC_GIAY = 900;
 // 1.4.12: kiểm việc dở — mỗi chat cũ chờ tối đa chừng này giây xem đã có kết quả chưa; Muse còn đang tạo thì hẹn kiểm lại.
 const KIEM_GIAY = Number(process.env.MUSE_KIEM_GIAY) || 40;
 const KIEM_LAI_MS = Number(process.env.MUSE_KIEM_LAI_MS) || 2 * 60000;
 const KIEM_TOI_DA = 6;   // Muse "vẫn đang tạo" quá chừng này lần kiểm (≈ 12 phút) → thôi giữ, chạy như thường
 const CHAN_VIDEO_MS = 24 * 60 * 60 * 1000;  // 1.2.9: Muse chặn video theo khu vực → tài khoản thôi nhận video 24 giờ (nhớ qua lần chạy / mở app)
 const NGHI_CHAN_LOAI_MS = 60 * 60 * 1000;  // Muse chặn tài khoản tạo loại việc khác video → thôi giao loại đó cho nó chừng này
-const TEN_NEN = { muse: 'Muse', flow: 'Flow', suno: 'Suno' };
-// Suno báo hết lượt (tạo / tải về) → tài khoản nghỉ lâu, việc tạo lại ở tài khoản dự phòng.
+const TEN_NEN = { muse: 'Muse', flow: 'Flow', fmusic: 'Flow Music' };
+// Flow Music báo hết credit / chạm giới hạn → tài khoản nghỉ lâu, việc tạo lại ở tài khoản dự phòng.
 const NGHI_HET_LUOT_MS = 6 * 60 * 60 * 1000;
-const chuanNen = (n) => (n === 'flow' || n === 'suno' ? n : 'muse');
+// 1.5.0: việc nhạc của bản cũ (Suno) chuyển sang Flow Music.
+const chuanNen = (n) => (n === 'flow' || n === 'fmusic' ? n : n === 'suno' ? 'fmusic' : 'muse');
 const TEN_LOAI = { anh: 'ảnh', video: 'video', nhac: 'nhạc' };
 const KHOA_THU_MUC = { anh: 'thuMucAnh', video: 'thuMucVideo', nhac: 'thuMucNhac' };
 /** 1.3.8: lỗi của tài khoản để ghi lên thẻ / nhật ký — giữ nguyên chữ trang báo (một dòng, tối đa 200 ký tự). */
 const rutLoi = (s) => { const t = String(s || 'lỗi không rõ').replace(/\s+/g, ' ').trim(); return t.length > 200 ? `${t.slice(0, 199)}…` : t; };
 const SONG_TOI_DA = 50;
-/** {muse, flow, suno}: số tài khoản chạy cùng lúc mỗi nền tảng, 1–50 (1.3.0: chọn đích danh từng tài khoản "Chạy"). */
+/** {muse, flow, fmusic}: số tài khoản chạy cùng lúc mỗi nền tảng, 1–50 (1.3.0: chọn đích danh từng tài khoản "Chạy"). */
 /** 1.3.7: tài khoản dự án KHÔNG dùng cho từng loại việc: {anh: [id…], video: [id…]} (thiếu = dùng cho mọi loại). */
 const chuanBoLoai = (b) => Object.fromEntries(['anh', 'video'].map((l) => [l, [...new Set(((b && b[l]) || []).map(String).filter(Boolean))]]));
-const chuanSong = (c) => Object.fromEntries(['muse', 'flow', 'suno'].map((n) =>
-  [n, Math.max(1, Math.min(SONG_TOI_DA, parseInt(c && c[n], 10) || 1))]));
+const chuanSong = (c) => Object.fromEntries(['muse', 'flow', 'fmusic'].map((n) =>
+  [n, Math.max(1, Math.min(SONG_TOI_DA, parseInt(c && (c[n] !== undefined ? c[n] : n === 'fmusic' ? c.suno : undefined), 10) || 1))]));
 
 const CAI_DAT_MAC_DINH = {
   thuMucAnh: '',          // trống = Tài liệu/AI Automation Studio (thư mục chung của Muse và Flow)
@@ -67,9 +68,9 @@ const CAI_DAT_MAC_DINH = {
   tenVideo: hd.MAU_TEN_MAC_DINH,
   videoCanhAnh: true,     // video nối từ ảnh: lưu cạnh ảnh nguồn, cùng tên (325.jpg → 325.mp4)
   thuMucVideoAnh: '',     // 1.0.4: tắt "cạnh ảnh" + chọn thư mục này → video nối từ ảnh lưu ở đây, vẫn cùng tên ảnh
-  thuMucNhac: '',         // 1.1.0: mục Tạo nhạc (Suno) — trống = Tài liệu/AI Automation Studio
+  thuMucNhac: '',         // 1.1.0: mục Tạo nhạc (1.5.0: Flow Music) — trống = Tài liệu/AI Automation Studio
   tenNhac: hd.MAU_TEN_ANH_MAC_DINH,   // {stt}: bài của prompt 12 → 012.mp3
-  choNhacGiay: 600,       // chờ tối đa Suno tạo xong một bài (bình thường 1–3 phút)
+  choNhacGiay: 600,       // chờ tối đa Flow Music tạo xong một lần gửi (bình thường 40–150 giây)
   xoaChatKhiXong: false,  // chạy hết hàng chờ → xoá chat Muse của các việc đã xong
   xoaDuAnFlowKhiXong: false, // chạy hết hàng chờ → xoá dự án Flow đã dùng (lần sau app tự mở dự án mới)
   luongMoiTK: 3,          // số luồng chạy song song mỗi tài khoản
@@ -82,13 +83,14 @@ const CAI_DAT_MAC_DINH = {
   // của dự án). Việc lỗi ở MỌI tài khoản thêm chừng này vòng nữa thì mới đánh Lỗi.
   tuThuLai: 2,
   tuChayLaiLoi: 2,        // hết hàng chờ mà còn việc lỗi → tự đưa về chạy lại, tối đa mấy lượt
-  // 1.4.6: hai số trên là của Muse; Flow và Suno có bộ riêng (Muse và Flow chạy khác nhau). Bản cũ chưa có thì chép
+  // 1.4.6: hai số trên là của Muse; Flow và Flow Music có bộ riêng (Muse và Flow chạy khác nhau). Bản cũ chưa có thì chép
   // từ số của Muse (tachTheoNen) để người đã chỉnh không bị đổi.
   tuThuLaiFlow: 2,
   tuChayLaiLoiFlow: 2,
-  tuThuLaiSuno: 2,
-  tuChayLaiLoiSuno: 2,
-  nghiSuno: 3,            // 1.4.6: giây nghỉ giữa 2 lần gửi Suno (nghiGiuaLanGui giờ chỉ của Muse)
+  tuThuLaiNhac: 2,        // 1.5.0: khoá của Flow Music (bản cũ: tuThuLaiSuno… — chuyển trong chuanCaiDat)
+  tuChayLaiLoiNhac: 2,
+  nghiNhac: 3,            // giây nghỉ giữa 2 lần gửi Flow Music (mỗi tài khoản)
+  luongNhacMoiTK: 2,      // 1.5.0: số bài tạo cùng lúc mỗi tài khoản Flow Music (gói Free cho 2, Starter 8)
   tatMayKhiXong: false,   // chạy hết hàng chờ thì tắt máy (Windows, macOS) — như Flow Automation Studio
   png: true,              // đổi ảnh webp của Muse sang png
   // 1.2.1: bên này (Muse / Flow) hỏng thì việc tự chuyển sang bên kia: hết tài khoản dùng được, hỏng ở mọi
@@ -103,7 +105,7 @@ const CAI_DAT_MAC_DINH = {
   driveCach: 'may',
   thuMucDrive: '',
   driveTk: '',
-  // 1.4.0: máy mượt — hạ ưu tiên CPU của các trang Muse / Flow / Suno chạy ngầm (chung cả app, main.js áp).
+  // 1.4.0: máy mượt — hạ ưu tiên CPU của các trang Muse / Flow / Flow Music chạy ngầm (chung cả app, main.js áp).
   nheMay: true,
   // 1.4.8: tạo ảnh xong hết rồi mới tạo video (chung cả app) — ảnh và video không chạy song song, bớt trang chạy cùng lúc.
   anhTruocVideo: true,
@@ -116,25 +118,29 @@ const CAI_DAT_MAC_DINH = {
   flow: chuanHoaFlow({})  // cài đặt Google Flow (src/flow/cai-dat-flow.js)
 };
 // 1.3.0: cài đặt của CẢ APP (không theo dự án) — còn lại mỗi dự án một bộ riêng (d.caiDat).
-const KHOA_CHUNG = ['tatMayKhiXong', 'moc', 'nheMay', 'anhTruocVideo', 'ramAppToiDa'];
+const KHOA_CHUNG = ['tatMayKhiXong', 'moc', 'nheMay', 'anhTruocVideo', 'ramAppToiDa', 'luongNhacMoiTK'];
 // 1.4.5: khoá luôn riêng từng dự án — "Lưu làm cài đặt mặc định" không chép sang dự án khác.
 const KHOA_RIENG_DU_AN = ['thuMucAnh', 'thuMucVideo', 'thuMucNhac', 'thuMucVideoAnh', 'tenAnh', 'tenVideo', 'tenNhac', 'boQuaDaCo'];
 const TRANG_XONG = new Set(['xong', 'loi', 'dung']);
 const LOAI = ['anh', 'video', 'nhac'];
 
-// 1.4.6: khoá cài đặt chạy tách theo nơi chạy: [khoá Muse, khoá Flow, khoá Suno] (null = nơi đó không dùng).
-const KHOA_THEO_NEN = [['tuThuLai', 'tuThuLaiFlow', 'tuThuLaiSuno'], ['tuChayLaiLoi', 'tuChayLaiLoiFlow', 'tuChayLaiLoiSuno'], ['nghiGiuaLanGui', null, 'nghiSuno']];
+// 1.4.6: khoá cài đặt chạy tách theo nơi chạy: [khoá Muse, khoá Flow, khoá Flow Music] (null = nơi đó không dùng).
+const KHOA_THEO_NEN = [['tuThuLai', 'tuThuLaiFlow', 'tuThuLaiNhac'], ['tuChayLaiLoi', 'tuChayLaiLoiFlow', 'tuChayLaiLoiNhac'], ['nghiGiuaLanGui', null, 'nghiNhac']];
+// 1.5.0: khoá Suno của bản cũ → khoá Flow Music (giữ số người dùng đã chỉnh).
+const KHOA_SUNO_CU = [['tuThuLaiSuno', 'tuThuLaiNhac'], ['tuChayLaiLoiSuno', 'tuChayLaiLoiNhac'], ['nghiSuno', 'nghiNhac']];
 /** Giá trị cài đặt `k` (tên khoá của Muse) cho việc chạy ở `nen`. */
 function theoNen(c, nen, k) {
   const h = KHOA_THEO_NEN.find((x) => x[0] === k);
-  const khoa = h && (nen === 'flow' ? h[1] : nen === 'suno' ? h[2] : h[0]);
+  const khoa = h && (nen === 'flow' ? h[1] : nen === 'fmusic' ? h[2] : h[0]);
   return c[khoa || k];
 }
-/** 1.4.6: cài đặt lưu từ bản cũ chưa có khoá riêng của Flow / Suno → chép từ khoá Muse (đọc trên bản GỐC đã lưu,
+/** 1.4.6: cài đặt lưu từ bản cũ chưa có khoá riêng của Flow / Flow Music → chép từ khoá Muse (đọc trên bản GỐC đã lưu,
  *  trước khi trộn mặc định). */
 function tachTheoNen(goc, dich) {
   if (!goc || typeof goc !== 'object') return;
-  for (const [k, ...moi] of KHOA_THEO_NEN) for (const m of moi) if (m && goc[m] === undefined && goc[k] !== undefined) dich[m] = goc[k];
+  const cuCua = {};
+  for (const [cu, moi] of KHOA_SUNO_CU) if (goc[moi] === undefined && goc[cu] !== undefined) { dich[moi] = goc[cu]; cuCua[moi] = true; }
+  for (const [k, ...moi] of KHOA_THEO_NEN) for (const m of moi) if (m && !cuCua[m] && goc[m] === undefined && goc[k] !== undefined) dich[m] = goc[k];
 }
 
 const docMB = (mb) => (mb >= 1024 ? `${(mb / 1024).toFixed(1).replace('.', ',')} GB` : `${Math.round(mb)} MB`);
@@ -144,7 +150,10 @@ const docGB = (gb) => `${gb.toFixed(1).replace('.', ',')} GB`;
 function chuanCaiDat(c, flowGoc, flowMoi) {
   const so = (v, min, max, md) => Math.max(min, Math.min(max, parseInt(v, 10) || md));
   const m = { ...CAI_DAT_MAC_DINH, ...c };
+  if (c) for (const [cu, moi] of KHOA_SUNO_CU) if (c[moi] === undefined && c[cu] !== undefined) m[moi] = c[cu];
+  for (const [cu] of KHOA_SUNO_CU) delete m[cu];
   m.luongMoiTK = so(m.luongMoiTK, 1, 20, 3);
+  m.luongNhacMoiTK = so(m.luongNhacMoiTK, 1, 16, 2);
   m.tenAnh = String(m.tenAnh || '').trim() || hd.MAU_TEN_ANH_MAC_DINH;
   m.tenVideo = String(m.tenVideo || '').trim() || hd.MAU_TEN_MAC_DINH;
   m.taiAnh = m.taiAnh !== false; m.taiVideo = m.taiVideo !== false; m.tatMayKhiXong = !!m.tatMayKhiXong;
@@ -171,8 +180,8 @@ function chuanCaiDat(c, flowGoc, flowMoi) {
   m.choChuGiay = so(m.choChuGiay, 15, 600, 60);
   m.tuThuLai = Math.max(0, Math.min(10, parseInt(m.tuThuLai, 10) || 0));
   m.tuChayLaiLoi = Math.max(0, Math.min(10, parseInt(m.tuChayLaiLoi, 10) || 0));
-  for (const k of ['tuThuLaiFlow', 'tuThuLaiSuno', 'tuChayLaiLoiFlow', 'tuChayLaiLoiSuno']) m[k] = Math.max(0, Math.min(10, parseInt(m[k], 10) || 0));
-  m.nghiSuno = so0(m.nghiSuno, 120, 3);
+  for (const k of ['tuThuLaiFlow', 'tuThuLaiNhac', 'tuChayLaiLoiFlow', 'tuChayLaiLoiNhac']) m[k] = Math.max(0, Math.min(10, parseInt(m[k], 10) || 0));
+  m.nghiNhac = so0(m.nghiNhac, 120, 3);
   m.mau = { ...hd.MAU_MAC_DINH, ...(m.mau || {}) };
   for (const k of ['anh', 'video']) if (!String(m.mau[k] || '').includes('{prompt}')) m.mau[k] = hd.MAU_MAC_DINH[k];
   m.flow = chuanHoaFlow({ ...(flowGoc || {}), ...(flowMoi || {}) });
@@ -249,6 +258,9 @@ class DieuPhoi {
     // thì tải về, khỏi tạo lại; trong lúc chưa kiểm, việc không được giao cho luồng nào (không gửi lại → không trùng).
     this.choKiem = new Set();
     for (const j of this.viec) {
+      // 1.5.0: việc nhạc của bản cũ (Suno) → Flow Music; bài đã tạo trên Suno không dùng được nữa.
+      if (j.nen === 'suno') j.nen = 'fmusic';
+      delete j.sunoBai;
       if (j.trangThai === 'chay') {
         if ((j.nen || 'muse') === 'muse' && !j.thread && j.guiLuc && j.guiLuc >= (j.batDauLuc || 0)) {
           j.ghiChuMo = 'Đang bấm Gửi ở Muse lúc app tắt — chat có thể đã có prompt này';
@@ -274,10 +286,12 @@ class DieuPhoi {
         if (d.caiDat) d.caiDat.thuMucVideoAnh = '';
       }
       if (!d.flowUrl || typeof d.flowUrl !== 'object') d.flowUrl = {};
+      // 1.5.0: số tài khoản "Chạy" của Suno (bản cũ) → của Flow Music.
+      if (d.chaySong && d.chaySong.suno !== undefined) { if (d.chaySong.fmusic === undefined) d.chaySong.fmusic = d.chaySong.suno; delete d.chaySong.suno; }   // bản cũ
       if (d.dongHo) d.dongHo.dangChay = false;   // 1.4.0: đồng hồ dự án — app vừa mở thì chưa dự án nào chạy
     }
     if (moc6) this.caiDat.thuMucVideoAnh = '';
-    this.luong = [];          // [{luong, taiKhoanId, duAn}] — duAn = null: luồng dùng chung mọi dự án (Suno)
+    this.luong = [];          // [{luong, taiKhoanId, duAn}] — duAn = null: luồng dùng chung mọi dự án (Flow Music)
     this.duAnChay = new Set();   // 1.3.0: dự án đang bấm Chạy (mỗi dự án chạy / dừng riêng)
     // 1.3.6: chức năng đang chạy theo hẹn giờ: loai → { duAn ('' = mọi dự án), den (giờ dừng, 0 = tới hết),
     // bo (dự án bị bấm Dừng trong lượt này), batDauLuc }
@@ -449,7 +463,7 @@ class DieuPhoi {
     this.luu();
     return d;
   }
-  /** Tài khoản chạy dự án, theo thứ tự ưu tiên: [chính, dự phòng…]; chaySong = {muse, flow, suno}: mấy tài khoản chạy cùng lúc. */
+  /** Tài khoản chạy dự án, theo thứ tự ưu tiên: [chính, dự phòng…]; chaySong = {muse, flow, fmusic}: mấy tài khoản chạy cùng lúc. */
   datTaiKhoanDuAn(id, ds, chaySong, boLoai) {
     const d = this.duAn.find((x) => x.id === id);
     if (!d) return false;
@@ -512,8 +526,8 @@ class DieuPhoi {
   }
   _nghi(id) {
     if ((this.nghiDen[id] || 0) > Date.now()) return true;
-    // Hết lượt Suno: nhớ trên tài khoản (qua cả lần tắt app, bấm Chạy lại cũng không xoá — tạo lại ở
-    // tài khoản hết lượt tải chỉ phí credit). "Kiểm tra" tài khoản đó thì xoá.
+    // Hết lượt Flow Music: nhớ trên tài khoản (qua cả lần tắt app, bấm Chạy lại cũng không xoá — gửi lại ở
+    // tài khoản hết credit chỉ phí lượt). "Kiểm tra" tài khoản đó thì xoá.
     const a = this.o.taiKhoan.tim(id);
     return !!(a && (a.hetLuotDen || 0) > Date.now());
   }
@@ -647,9 +661,9 @@ class DieuPhoi {
     const coSo = String(p.chonSo || '').trim();
     const chon = coSo ? hd.chonTheoSo(tatCa, coSo) : hd.chonKhoang(tatCa, p.tuSo, p.denSo);
     if (!chon.length) return { loi: `Số prompt không hợp lệ (chỉ có ${tatCa.length} prompt)` };
-    // Suno chỉ tạo nhạc, và nhạc chỉ tạo ở Suno.
-    const nen = p.loai === 'nhac' ? 'suno' : chuanNen(p.nen) === 'flow' ? 'flow' : 'muse';
-    const loai = nen === 'suno' ? 'nhac' : p.loai === 'video' ? 'video' : 'anh';
+    // Flow Music chỉ tạo nhạc, và nhạc chỉ tạo ở Flow Music.
+    const nen = p.loai === 'nhac' ? 'fmusic' : chuanNen(p.nen) === 'flow' ? 'flow' : 'muse';
+    const loai = nen === 'fmusic' ? 'nhac' : p.loai === 'video' ? 'video' : 'anh';
     // Ảnh xong → tự tạo video, chạy ở Muse hoặc Flow tuỳ người dùng chọn (mặc định cùng nền tảng với ảnh).
     // 1.4.6: chuoiVideo.prompts = prompt video RIÊNG từng ảnh (file .txt): ảnh của prompt số N lấy dòng N; ảnh không
     // có dòng riêng thì dùng prompt dùng chung (trống nữa thì prompt video mặc định).
@@ -1082,8 +1096,8 @@ class DieuPhoi {
     const lai = [];
     for (const j of this.viec) {
       if (!ids.includes(j.id) || j.trangThai === 'chay') continue;
-      // Suno: bỏ luôn bài đã tạo (sunoBai) — Tạo lại là tạo bài mới.
-      Object.assign(j, { trangThai: 'cho', buoc: '', thread: '', sunoBai: null, taiKhoan: '', loi: '', thu: 0, tkLoi: [], vongTk: 0, batDauLuc: 0, xongLuc: 0, vongLai: 0 });
+      // Flow Music: bỏ luôn phiên đã tạo (nhacPhien) — Tạo lại là tạo bài mới.
+      Object.assign(j, { trangThai: 'cho', buoc: '', thread: '', nhacPhien: null, taiKhoan: '', loi: '', thu: 0, tkLoi: [], vongTk: 0, batDauLuc: 0, xongLuc: 0, vongLai: 0 });
       lai.push(j);
       n++;
     }
@@ -1094,7 +1108,7 @@ class DieuPhoi {
 
   /**
    * 1.3.0 — DỪNG RIÊNG từng việc (vd dừng ảnh số 3, 9 ảnh còn lại chạy tiếp): việc đang chờ / đang chạy →
-   * "Đã dừng", không chạy nữa cho tới khi bấm Chạy ở việc đó. Việc Muse / Suno đang chạy: dừng đúng luồng
+   * "Đã dừng", không chạy nữa cho tới khi bấm Chạy ở việc đó. Việc Muse / Flow Music đang chạy: dừng đúng luồng
    * của nó, giữ chat để lúc chạy lại lấy tiếp kết quả. Việc Flow đang chạy trong một mẻ: bỏ kết quả của
    * riêng việc đó (Flow vẫn tạo nốt trên trang Flow), cả mẻ đều dừng thì dừng hẳn tab Flow đó.
    */
@@ -1131,7 +1145,7 @@ class DieuPhoi {
 
   /**
    * 1.4.9: tháo việc đang chạy khỏi luồng của nó NGAY, không đợi luồng trả lời (luồng có thể đang treo): kết quả về
-   * sau của lần giao này bị bỏ (lanGiao). Muse / Suno: luồng (cửa sổ ngầm) bị huỷ, _vong mở luồng mới. Flow: việc
+   * sau của lần giao này bị bỏ (lanGiao). Muse / Flow Music: luồng (cửa sổ ngầm) bị huỷ, _vong mở luồng mới. Flow: việc
    * rời mẻ; mẻ không còn việc nào chạy thì dừng mẻ.
    */
   _thaoViec(j) {
@@ -1147,11 +1161,11 @@ class DieuPhoi {
     try { this.o.huyLuong(x.luong); } catch (err) { this.log('error', `❌ Đóng luồng treo: ${err.message}`); }
   }
 
-  /** 1.4.9: hạn CỨNG của một lần giao Muse / Suno: thời gian chờ kết quả + mở trang, gửi prompt, lấy file. */
+  /** 1.4.9: hạn CỨNG của một lần giao Muse / Flow Music: thời gian chờ kết quả + mở trang, gửi prompt, lấy file. */
   _hanGiaoMs(j) {
     const c = this.cd(j.duAn);
     const cho = j.loai === 'nhac' ? c.choNhacGiay : j.loai === 'video' ? c.choVideoGiay : c.choAnhGiay;
-    return (cho + (j.loai === 'nhac' ? HAN_THEM_SUNO_GIAY : HAN_THEM_GIAY)) * 1000;
+    return (cho + (j.loai === 'nhac' ? HAN_THEM_NHAC_GIAY : HAN_THEM_GIAY)) * 1000;
   }
 
   /**
@@ -1195,7 +1209,7 @@ class DieuPhoi {
       if (!den) { khong.push(j); continue; }
       if (j.trangThai === 'chay') this._thaoViec(j);
       Object.assign(j, { trangThai: 'cho', buoc: '', thread: '', taiKhoan: '', loi: '', tkMuon: den });
-      j.sunoBai = null;
+      j.nhacPhien = null;
       delete j.flowAnh;
       delete j.dungTay;
       this._chayRieng([j]);
@@ -1226,7 +1240,7 @@ class DieuPhoi {
       return 0;
     }
     for (const j of ds) {
-      if (j.trangThai === 'loi') Object.assign(j, { thread: '', sunoBai: null, taiKhoan: '', loi: '', thu: 0, tkLoi: [], vongTk: 0, vongLai: 0, batDauLuc: 0, xongLuc: 0 });
+      if (j.trangThai === 'loi') Object.assign(j, { thread: '', nhacPhien: null, taiKhoan: '', loi: '', thu: 0, tkLoi: [], vongTk: 0, vongLai: 0, batDauLuc: 0, xongLuc: 0 });
       Object.assign(j, { trangThai: 'cho', buoc: '' });
     }
     this._chayRieng(ds);
@@ -1319,7 +1333,7 @@ class DieuPhoi {
     const khongTk = new Set(), lai = [], soDoi = [];
     for (const j of this.viec) {
       if (!ids.includes(j.id)) continue;
-      if (j.loai === 'nhac' || j.nen === 'suno') { nhac++; continue; }
+      if (j.loai === 'nhac' || j.nen === 'fmusic') { nhac++; continue; }
       if ((j.nen || 'muse') === nen) { daO++; continue; }
       if (!this._dsTk(j.duAn, nen, j.loai).length) { khongTk.add(this._tenDuAn(j.duAn)); continue; }
       soDoi.push(j.so);
@@ -1349,7 +1363,7 @@ class DieuPhoi {
     j.daQuaNen = [...new Set([...(j.daQuaNen || []), j.nen || 'muse', nen])];
     delete j.muon; delete j.flowAnh; delete j.chuyenNen;
     Object.assign(j, { nen, trangThai: 'cho', buoc: '', thread: '', taiKhoan: '', tkLoi: [], vongTk: 0, thu: 0, loi: '',
-      batDauLuc: 0, xongLuc: 0, vongLai: 0, sunoBai: null, uuTienLuc: 0 });
+      batDauLuc: 0, xongLuc: 0, vongLai: 0, nhacPhien: null, uuTienLuc: 0 });
     if (nen === 'muse') j.tuFlow = true; else delete j.tuFlow;
   }
 
@@ -1734,10 +1748,10 @@ class DieuPhoi {
     }
   }
 
-  /** Khoá nhóm luồng: luồng Muse / Flow RIÊNG từng dự án (1.3.0); Suno một luồng mỗi tài khoản, dùng chung mọi dự án. */
+  /** Khoá nhóm luồng: luồng Muse / Flow RIÊNG từng dự án (1.3.0); Flow Music dùng chung mọi dự án. */
   _khoa(tkId, duAnId) {
     const a = this.o.taiKhoan.tim(tkId);
-    return `${tkId}|${a && a.nen === 'suno' ? '' : duAnId || ''}`;
+    return `${tkId}|${a && a.nen === 'fmusic' ? '' : duAnId || ''}`;
   }
   _khoaLuong(x) { return `${x.taiKhoanId}|${x.duAn || ''}`; }
 
@@ -1752,12 +1766,12 @@ class DieuPhoi {
   _canLuong(can) {
     // Muse: N luồng mỗi tài khoản mỗi dự án; Flow: N tab mỗi tài khoản mỗi dự án (mỗi tab chạy một mẻ, trên dự án
     // Flow riêng của dự án đó). N lấy theo cài đặt của dự án.
-    // Suno: 1 luồng mỗi tài khoản — các bài mới hiện chung một danh sách, hai luồng cùng tài khoản dễ nhận nhầm bài.
+    // Flow Music: luongNhacMoiTK luồng mỗi tài khoản (mỗi luồng một phiên chat riêng nên không nhận nhầm bài); dùng chung mọi dự án.
     const muon = (id, duAnId) => {
       const a = this.o.taiKhoan.tim(id);
       if (!a) return 0;
       const c = this.cd(duAnId);
-      return a.nen === 'flow' ? c.flow.tabMoiTK : a.nen === 'suno' ? 1 : c.luongMoiTK;
+      return a.nen === 'flow' ? c.flow.tabMoiTK : a.nen === 'fmusic' ? this.caiDat.luongNhacMoiTK || 2 : c.luongMoiTK;
     };
     for (const x of [...this.luong]) {
       const k = this._khoaLuong(x);
@@ -1796,12 +1810,12 @@ class DieuPhoi {
     this._dangGiuVideo = ds.length > 0;
   }
 
-  /** Luồng dùng chung (Suno) chọn việc: chat / bài dở của chính tài khoản trước, rồi việc được bấm Chạy riêng,
+  /** Luồng dùng chung (Flow Music) chọn việc: phiên / bài dở của chính tài khoản trước, rồi việc được bấm Chạy riêng,
    *  rồi CHIA LƯỢT ĐỀU giữa các dự án (dự án đang có ít việc chạy nhất trước) — dự án sau không phải chờ dự án trước. */
   _viecChung(x, boQua) {
     const ung = this.viec.filter((v) => v.trangThai === 'cho' && !boQua(v));
     if (!ung.length) return null;
-    const dang = ung.find((v) => v.thread && v.taiKhoan === x.taiKhoanId);
+    const dang = ung.find((v) => (v.thread || (v.nhacPhien && v.nhacPhien.tk === x.taiKhoanId)) && v.taiKhoan === x.taiKhoanId);
     if (dang) return dang;
     if (ung.some((v) => v.uuTienLuc)) return hd.viecKeTiep(ung);
     const nen = x.luong.nen || 'muse';
@@ -1897,7 +1911,7 @@ class DieuPhoi {
         try { this.o.huyLuong(x.luong); } catch (_) { /* đã đóng */ }
         continue;
       }
-      // Luồng riêng của dự án chỉ nhận việc của dự án đó; luồng dùng chung (Suno) chia lượt đều giữa các dự án.
+      // Luồng riêng của dự án chỉ nhận việc của dự án đó; luồng dùng chung (Flow Music) chia lượt đều giữa các dự án.
       const boQua = (v) => !nham(v, x.taiKhoanId) || (!!x.duAn && v.duAn !== x.duAn);
       const j = x.duAn ? hd.viecKeTiep(this.viec, (v) => v.thread && v.taiKhoan === x.taiKhoanId, boQua) : this._viecChung(x, boQua);
       if (!j) continue;
@@ -2029,14 +2043,14 @@ class DieuPhoi {
         return `"${a.ten}": ${hetLuot || this.lyDoNghi[id] || (a.trangThai === 'can-dang-nhap' ? 'chưa đăng nhập' : kq && !kq.ok ? `lỗi: ${kq.loi}` : 'đang lỗi')}`;
       })
       .filter(Boolean);
-    const coSuno = ds.some((j) => j.nen === 'suno');
+    const coNhac = ds.some((j) => j.nen === 'fmusic');
     // 1.3.7: loại việc bị bỏ ở MỌI tài khoản của nền tảng đó (ô Ảnh / Video trong hộp chọn tài khoản).
     const boHet = [...new Set(ds.filter((j) => !this._dsTkGoc(j.duAn, j.nen, j.loai).length && this._dsTkGoc(j.duAn, j.nen).length)
       .map((j) => `${TEN_LOAI[j.loai] || j.loai} ${TEN_NEN[j.nen] || j.nen}`))];
     if (boHet.length) ly.push(`không tài khoản nào được bật ô ${boHet.join(', ')} — bấm nút tài khoản cạnh tên dự án để bật lại`);
     this.log('error', `⏸ Không còn tài khoản nào chạy được việc đang chờ (${ly.join(' · ') || 'chưa có tài khoản'}) — đã TẠM DỪNG ${ai} (không phí lượt). ` +
       'Kiểm tra Muse / Flow, đăng nhập lại rồi bấm Chạy — việc Muse đã gửi sẽ lấy tiếp kết quả từ chat cũ.' +
-      (coSuno ? ' Suno hết lượt: thêm tài khoản Suno dự phòng, hoặc bấm Kiểm tra ở tài khoản đã có lượt lại.' : ''));
+      (coNhac ? ' Flow Music hết lượt: thêm tài khoản Google Flow (kèm Flow Music) dự phòng, hoặc bấm Kiểm tra ở tài khoản đã có credit lại.' : ''));
     this.o.bao();
   }
 
@@ -2060,7 +2074,7 @@ class DieuPhoi {
     }
     const cd = this.cd(j.duAn);
     const r = await x.luong.chay(j, {
-      tinNhan: j.loai === 'nhac' ? j.prompt : hd.taoTinNhan(j, nv, cd.mau),   // Suno: prompt nguyên văn vào ô Styles
+      tinNhan: j.loai === 'nhac' ? j.prompt : hd.taoTinNhan(j, nv, cd.mau),   // Flow Music: prompt nguyên văn vào ô chat
       files,
       png: cd.png,
       choToiDaGiay: j.loai === 'nhac' ? cd.choNhacGiay : j.loai === 'video' ? cd.choVideoGiay : cd.choAnhGiay,
@@ -2104,7 +2118,7 @@ class DieuPhoi {
   }
 
   /**
-   * 1.4.13: RAM cả app (mọi trang Muse / Flow / Suno + giao diện) đang ≥ giới hạn? Có trễ: vào khi ≥ 100 %, ra khi < 90 %
+   * 1.4.13: RAM cả app (mọi trang Muse / Flow / Flow Music + giao diện) đang ≥ giới hạn? Có trễ: vào khi ≥ 100 %, ra khi < 90 %
    * (khỏi bật / tắt liên tục). Đọc RAM tối đa mỗi 5 giây.
    */
   _quaRam() {
@@ -2501,7 +2515,7 @@ class DieuPhoi {
           this.o.taiKhoan.sua(tkId, { chanVideoDen: Date.now() + CHAN_VIDEO_MS, lyDoChanVideo: r.loi });
           this.log('warning', `⚠ "${this._tenTk(tkId)}": ${r.loi} — tài khoản này thôi nhận VIDEO 24 giờ (vẫn tạo ảnh); video chuyển sang tài khoản Muse khác, hết tài khoản Muse thì sang Flow. Bấm Kiểm tra ở tài khoản để thử lại sớm.`);
         } else {
-          // 1.4.12: hết lượt tạo ảnh → nghỉ loại ảnh lâu như hết lượt Suno (6 giờ); chặn khác → 60 phút như trước.
+          // 1.4.12: hết lượt tạo ảnh → nghỉ loại ảnh lâu như hết lượt Flow Music (6 giờ); chặn khác → 60 phút như trước.
           const ms = r.hetLuotLoai ? NGHI_HET_LUOT_MS : NGHI_CHAN_LOAI_MS;
           this.nghiLoai[`${tkId}:${j.loai}`] = Date.now() + ms;
           this.log('warning', `⚠ "${this._tenTk(tkId)}": ${r.loi} — tài khoản này thôi nhận việc ${TEN_LOAI[j.loai] || j.loai} ${ms >= 3600000 ? `${Math.round(ms / 3600000)} giờ` : `${Math.round(ms / 60000)} phút`}, việc chuyển sang tài khoản khác.`);
@@ -2522,7 +2536,7 @@ class DieuPhoi {
       if (!r.giuThread) j.thread = '';
       if (!r.daNghi) this._choNghi(j.taiKhoan, r.loi);
     } else if (r.hetLuot) {
-      // Suno báo tài khoản hết lượt tạo / tải về: không phải lỗi của việc — tài khoản nghỉ lâu, việc về
+      // Flow Music báo tài khoản hết credit / chạm giới hạn: không phải lỗi của việc — tài khoản nghỉ lâu, việc về
       // hàng chờ và TẠO LẠI ở tài khoản dự phòng kế tiếp (không tính lần thử). Không còn tài khoản nào
       // → _vong tạm dừng hàng chờ.
       const tkId = j.taiKhoan;

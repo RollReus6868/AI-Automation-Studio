@@ -31,7 +31,7 @@ module.exports = function e2eTheoDoi({ win, app, LENH, dieuPhoi }) {
       ghi('== E2E Theo dõi thư mục ảnh → video (trang Muse giả) ==');
       await session.fromPartition('persist:muse-tk-1').cookies.set({ url: process.env.MUSE_URL, name: 'muse_login', value: '1' });
       LENH.datCaiDat({ luongMoiTK: 2, nghiGiuaLanGui: 0, choChuGiay: 15, tuThuLai: 0, tuChayLaiLoi: 0, tuThuLaiFlow: 0, tuChayLaiLoiFlow: 0,
-        tuThuLaiSuno: 0, tuChayLaiLoiSuno: 0, nghiSuno: 0, doiNenKhiLoi: false,
+        tuThuLaiNhac: 0, tuChayLaiLoiNhac: 0, nghiNhac: 0, doiNenKhiLoi: false,
         lamMoiLuongSau: 1 });   // 1.4.13: làm mới luồng Muse sau MỖI việc — trang mới vẫn chạy đúng, RAM đo được thật
       const thuMuc = path.join(tam, 'anh-theo-doi'), ra = path.join(tam, 'video-theo-doi');
       fs.mkdirSync(thuMuc, { recursive: true });

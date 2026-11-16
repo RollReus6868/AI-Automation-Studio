@@ -46,7 +46,7 @@ module.exports = function e2e({ win, app, LENH, dieuPhoi }) {
       // TK hai thấy Muse tiếng Việt: màn đăng nhập không có câu tiếng Anh nào → phải nhận ra qua ô email.
       await session.fromPartition(tk2.partition).cookies.set({ url: process.env.MUSE_URL, name: 'muse_lang', value: 'vi' });
       const ra = path.join(tam, 'ra');
-      datCD({ luongMoiTK: 3, nghiGiuaLanGui: 0, choChuGiay: 15, tuThuLai: 0, tuChayLaiLoi: 0, tuThuLaiFlow: 0, tuChayLaiLoiFlow: 0, tuThuLaiSuno: 0, tuChayLaiLoiSuno: 0, nghiSuno: 0, thuMucAnh: ra, thuMucVideo: ra });
+      datCD({ luongMoiTK: 3, nghiGiuaLanGui: 0, choChuGiay: 15, tuThuLai: 0, tuChayLaiLoi: 0, tuThuLaiFlow: 0, tuChayLaiLoiFlow: 0, tuThuLaiNhac: 0, tuChayLaiLoiNhac: 0, nghiNhac: 0, thuMucAnh: ra, thuMucVideo: ra });
       const anhNV = path.join(tam, 'lan.png'), anhRef = path.join(tam, 'ref.png');
       fs.writeFileSync(anhNV, PNG1); fs.writeFileSync(anhRef, PNG1);
       LENH.luuNhanVat({ ten: 'Lan', moTa: 'tóc ngắn', anh: [anhNV] });
@@ -448,8 +448,8 @@ module.exports = function e2e({ win, app, LENH, dieuPhoi }) {
         document.querySelector('#hopOk').click(); })()`);
       await cho(() => LENH.trangThai().duAn.some((d) => d.ten === 'Du phong'), 5000, 'tạo dự án');
       const d15 = LENH.trangThai().duAn.find((d) => d.ten === 'Du phong');
-      // Hộp có thêm nhóm Google Flow và Suno (tài khoản chính "Flow 1", "Suno 1") — phần Muse phải đúng [chính, dự phòng].
-      kiem(d15 && JSON.stringify(d15.taiKhoan.filter((id) => id !== 'flow-1' && id !== 'suno-1')) === JSON.stringify(['tk-1', tk3.id]), `dự án nhớ [chính, dự phòng] (${d15 && JSON.stringify(d15.taiKhoan)})`);
+      // Hộp có thêm nhóm Google Flow và Flow Music (tài khoản chính "Flow 1", "nhac-flow-1") — phần Muse phải đúng [chính, dự phòng].
+      kiem(d15 && JSON.stringify(d15.taiKhoan.filter((id) => id !== 'flow-1' && id !== 'nhac-flow-1')) === JSON.stringify(['tk-1', tk3.id]), `dự án nhớ [chính, dự phòng] (${d15 && JSON.stringify(d15.taiKhoan)})`);
       kiem(await choJs(`document.querySelector('#chuTkDuAn').textContent === 'Muse 1 +1 dự phòng'`, 5000, 'nút tài khoản dự án'), 'nút cạnh tên dự án hiện tài khoản chính + số dự phòng');
       LENH.xoaViec({ ids: viec().filter((j) => j.trangThai === 'cho').map((j) => j.id) });   // việc chờ sót của các mục trước
       const gui15 = (await daGui()).length, nk15 = LENH.trangThai().nhatKy.length;
