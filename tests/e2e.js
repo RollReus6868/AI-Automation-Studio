@@ -3,8 +3,8 @@
 //                             Kịch bản: tests/e2e-chay.js (chạy bên trong app qua MUSE_TEST).
 // node tests/e2e.js flow   — cùng máy chủ đó, thêm trang Google Flow giả (/fx/…) và engine Flow giả
 //                             (tests/flow-gia/); kịch bản: tests/flow-e2e-chay.js (Flow + nối Flow ⇄ Muse).
-// node tests/e2e.js suno   — thêm trang Suno Create giả (/suno/create, tests/fixture-suno.html);
-//                             kịch bản: tests/suno-e2e-chay.js (tạo nhạc, chọn bài dài hơn, hết lượt → tài khoản phụ).
+// node tests/e2e.js nhac   — 1.5.0: thêm trang Google Flow Music giả (/fmusic/, tests/fixture-flowmusic.html);
+//                             kịch bản: tests/nhac-e2e-chay.js (tạo nhạc, bài dài hơn, hết credit → tài khoản phụ).
 // node tests/e2e.js drive  — 1.4.0: thêm trang Google Drive giả (/drive/…, tests/fixture-drive.html); kịch bản:
 //                             tests/drive-e2e-chay.js (ảnh / video xong → tải thẳng lên Drive: thư mục dự án, images, Videos).
 // node tests/e2e.js quet   — 1.4.2: trang Muse giả; kịch bản tests/quet-e2e-chay.js (quét thư mục, chỉ làm số còn thiếu).
@@ -18,7 +18,7 @@ const path = require('path');
 const { spawn } = require('child_process');
 
 const FLOW = process.argv[2] === 'flow';
-const SUNO = process.argv[2] === 'suno';
+const NHAC = process.argv[2] === 'nhac';
 const DRIVE = process.argv[2] === 'drive';
 const QUET = process.argv[2] === 'quet';
 const THEODOI = process.argv[2] === 'theodoi';
@@ -26,7 +26,7 @@ const KIEMDO = process.argv[2] === 'kiemdo';   // 1.4.12
 const DONDEP = process.argv[2] === 'dondep';
 const fixture = fs.readFileSync(path.join(__dirname, 'fixture-muse.html'));
 const trangFlow = fs.readFileSync(path.join(__dirname, 'flow-gia', 'trang-flow.html'));
-const trangSuno = fs.readFileSync(path.join(__dirname, 'fixture-suno.html'));
+const trangNhac = fs.readFileSync(path.join(__dirname, 'fixture-flowmusic.html'));
 const trangDrive = fs.readFileSync(path.join(__dirname, 'fixture-drive.html'));
 // Drive giả: thư mục + tệp (theo mã thư mục cha, 'root' = Drive của tôi).
 const drive = { thuMuc: {}, tep: [], n: 0, canDangNhap: false, taoThuMuc: [], tai: [] };
@@ -63,48 +63,62 @@ function driveApi(req, res) {
 const daGui = [];
 const flowGhi = [];   // mọi thứ engine Flow giả nhận được (mẻ, kho ảnh, chế độ…)
 let duAnFlow = ['gia-khac'];
-// Suno giả: bài lưu theo tài khoản; mỗi lần Create 4 bài (2 đủ dài, 2 bản nghe thử — bài 3 dài 4:00 làm mồi).
-const suno = { clips: {}, gui: [], tai: [], dinhDang: [], hetTai: [], hetTao: [], lan: 0, treoKiem: 0, treoDs: 0, hongTai: 0, moKhoa: '', daMo: [], tatMs: 0, chuanBiMs: 0, choTaoLai: [] };
-function sunoApi(req, res) {
+// 1.5.0 — Flow Music giả: mỗi lần gửi ra 2 bài sau taoMs; hết credit / chỉ trả lời chữ / thiếu MP3 theo cấu hình.
+const fm = { phien: {}, n: 0, gui: [], tai: [], hetCredit: [], chiChu: 0, hongTai: 0, taoMs: 2500, hoiWav: 0 };
+const GIAY_FM = [[149, 178], [200, 161]];   // bài dài hơn: lần lẻ là bài thứ 2, lần chẵn là bài thứ 1
+function wavGia(giay) {
+  const hz = 8000, n = Math.round(giay * hz), b = Buffer.alloc(44 + n, 128);
+  b.write('RIFF', 0); b.writeUInt32LE(36 + n, 4); b.write('WAVE', 8); b.write('fmt ', 12); b.writeUInt32LE(16, 16);
+  b.writeUInt16LE(1, 20); b.writeUInt16LE(1, 22); b.writeUInt32LE(hz, 24); b.writeUInt32LE(hz, 28); b.writeUInt16LE(1, 32);
+  b.writeUInt16LE(8, 34); b.write('data', 36); b.writeUInt32LE(n, 40);
+  return b;
+}
+const timClip = (id) => Object.values(fm.phien).flatMap((p) => p.tin.flatMap((t) => t.clips || [])).find((c) => c.id === id);
+function fmApi(req, res) {
   const json = (o) => { res.setHeader('content-type', 'application/json'); res.end(JSON.stringify(o)); };
   const body = (fn) => { let b = ''; req.setEncoding('utf8'); req.on('data', (d) => { b += d; }); req.on('end', () => { let o = {}; try { o = JSON.parse(b); } catch (_) {} fn(o); }); };
   const u = new URL(req.url, 'http://x');
-  if (u.pathname === '/__suno-ds') {
-    const tra = () => {
-      const now = Date.now();
-      json({ hetTai: suno.hetTai, hetTao: suno.hetTao, moKhoa: suno.moKhoa, daMo: suno.daMo, tatMs: suno.tatMs, chuanBiMs: suno.chuanBiMs, choTaoLai: suno.choTaoLai, clips: (suno.clips[u.searchParams.get('tk')] || []).map((c) =>
-        ({ ...c, trangThai: now - c.tao > 2500 ? 'complete' : now - c.tao > 800 ? 'streaming' : 'submitted' })) });
-    };
-    // Lần nạp đầu của trang chậm (treoDs ms): danh sách bài hiện SAU form như Suno thật.
-    return u.searchParams.get('dau') && suno.treoDs ? setTimeout(tra, suno.treoDs) : tra();
-  }
-  if (u.pathname === '/__suno-hong') { const hong = suno.hongTai > 0; if (hong) suno.hongTai--; return json({ hong }); }
-  { const mk = u.pathname.match(/^\/__suno-mo-khoa\/([^/]+)$/); if (mk) { suno.daMo.push(mk[1]); return json({ ok: true }); } }
-  if (u.pathname === '/__suno-tao') {
+  if (u.pathname === '/__fm/gui') {
     return body((o) => {
-      suno.gui.push({ ...o, luc: Date.now() });
-      if (!o.tk || suno.hetTao.includes(o.tk)) return json({ loi: 'het-credit' });
-      const n = ++suno.lan;
-      // Lần lẻ: bài 2 dài hơn; lần chẵn: bài 1 dài hơn.
-      const dai = n % 2 ? [125, 161] : [200, 150];
-      const moi = [dai[0], dai[1], 240, 60].map((giay, i) => ({ id: `s${n}-${i + 1}-${o.tk}`, ten: `Bai ${n}.${i + 1}`, giay, thu: i >= 2, tao: Date.now() }));
-      suno.clips[o.tk] = [...moi, ...(suno.clips[o.tk] || [])];
-      json({ ok: true });
+      let p = o.phien && fm.phien[o.phien];
+      if (!p) { p = { id: `ph${++fm.n}`, tk: o.tk, tin: [] }; fm.phien[p.id] = p; }
+      const lan = fm.gui.length + 1;
+      fm.gui.push({ tk: o.tk, prompt: o.prompt, phien: p.id, moi: !o.phien, luc: Date.now() });
+      const t = { chu: o.prompt, luc: Date.now() };
+      if (fm.hetCredit.includes(o.tk)) t.loai = 'het';
+      else if (fm.chiChu > 0) { fm.chiChu--; t.loai = 'chu'; }
+      else {
+        t.loai = 'nhac';
+        const g = GIAY_FM[(lan + 1) % 2];
+        t.clips = ['A', 'B'].map((x, k) => ({ id: `${p.id}-${lan}${x}-${o.tk}`, ten: `Bai ${lan}${x}`, giay: g[k] }));
+      }
+      p.tin.push(t);
+      json({ phien: p.id });
     });
   }
-  if (u.pathname === '/__suno-cau-hinh') return body((o) => { if (o.hetTai) suno.hetTai = o.hetTai; if (o.hetTao) suno.hetTao = o.hetTao; if ('treoKiem' in o) suno.treoKiem = +o.treoKiem || 0; for (const k of ['treoDs', 'hongTai', 'tatMs', 'chuanBiMs']) if (k in o) suno[k] = +o[k] || 0; if ('moKhoa' in o) suno.moKhoa = o.moKhoa; if (o.choTaoLai) suno.choTaoLai = o.choTaoLai; json({ ok: true }); });
-  if (u.pathname === '/__suno-gui') return json({ gui: suno.gui, tai: suno.tai, dinhDang: suno.dinhDang, clips: suno.clips });
-  const m = u.pathname.match(/^\/__suno-mp3\/([^/]+)$/);
-  if (m) {
-    const c = Object.values(suno.clips).flat().find((x) => x.id === m[1]);
-    const dd = (u.searchParams.get('dd') || 'MP3').toUpperCase();
-    const duoi = { MP3: 'mp3', M4A: 'm4a', WAV: 'wav' }[dd] || 'mp4';
-    suno.tai.push(m[1]); suno.dinhDang.push(dd);
-    if (!suno.daMo.includes(m[1])) suno.daMo.push(m[1]);   // Unlock & Download = mở khoá luôn
-    res.setHeader('content-type', duoi === 'mp3' ? 'audio/mpeg' : 'application/octet-stream');
-    res.setHeader('content-disposition', `attachment; filename="${(c ? c.ten : 'bai').replace(/\s+/g, '_')}.${duoi}"`);
-    return res.end(`ID3-gia:${m[1]}:${c ? c.giay : 0}`);
-  }
+  { const m = u.pathname.match(/^\/__fm\/phien\/([^/]+)$/);
+    if (m) {
+      const p = fm.phien[m[1]];
+      if (!p) return json({ tin: [] });
+      return json({ tin: p.tin.map((t) => {
+        const dt = Date.now() - t.luc;
+        if (dt < 1200) return { chu: t.chu, trang: 'nghi' };
+        if (t.loai === 'het') return { chu: t.chu, trang: 'chu', traLoi: "Sorry. You're out of credits for today. Upgrade to keep creating." };
+        if (t.loai === 'chu') return { chu: t.chu, trang: 'chu', traLoi: 'Which genre and mood do you want for this song?' };
+        if (dt < 1200 + fm.taoMs) return { chu: t.chu, trang: 'tao', clips: t.clips.map((c) => ({ ...c, pt: Math.round((dt - 1200) / fm.taoMs * 100) })) };
+        return { chu: t.chu, trang: 'xong', clips: t.clips };
+      }) });
+    } }
+  if (u.pathname === '/__fm/menu') { const hong = fm.hongTai > 0; if (hong) fm.hongTai--; return json({ coMp3: !hong }); }
+  { const m = u.pathname.match(/^\/__fm\/download\/audio\/([^/]+)$/);
+    if (m) {
+      const c = timClip(m[1]);
+      fm.tai.push({ id: m[1], dd: u.searchParams.get('format') });
+      res.setHeader('content-type', 'audio/mpeg');
+      return res.end(`ID3-fm:${m[1]}:${c ? c.giay : 0}`);
+    } }
+  if (u.pathname === '/__fm/cau-hinh') return body((o) => { for (const k of ['chiChu', 'hongTai', 'taoMs']) if (k in o) fm[k] = +o[k] || 0; if (o.hetCredit) fm.hetCredit = o.hetCredit; json({ ok: true }); });
+  if (u.pathname === '/__fm/ghi') return json({ gui: fm.gui, tai: fm.tai, hoiWav: fm.hoiWav });
   json({ loi: 'khong-co' });
 }
 const sv = http.createServer((req, res) => {
@@ -144,7 +158,7 @@ const sv = http.createServer((req, res) => {
     });
     return;
   }
-  if (req.url.startsWith('/__suno-')) { sunoApi(req, res); return; }
+  if (req.url.startsWith('/__fm/')) { fmApi(req, res); return; }
   if (req.url.startsWith('/__drive-')) { driveApi(req, res); return; }
   if (req.url.startsWith('/drive/')) {
     res.setHeader('content-type', 'text/html; charset=utf-8');
@@ -153,11 +167,9 @@ const sv = http.createServer((req, res) => {
     if (id && !drive.thuMuc[id]) return res.end('<!doctype html><meta charset="utf-8"><title>Google Drive</title><p>Rất tiếc, không tìm thấy tệp. Bạn cần có quyền truy cập.</p>');
     return res.end(trangDrive);
   }
-  if (req.url.startsWith('/suno/')) {
-    // treoKiem: trang Suno nạp chậm (bài kiểm khung đăng nhập không được chờ bước kiểm tài khoản).
-    setTimeout(() => { res.setHeader('content-type', 'text/html; charset=utf-8'); res.end(trangSuno); }, suno.treoKiem);
-    return;
-  }
+  { const m = req.url.match(/^\/fmusic\/clips\/([^/?]+)\.m4a/);
+    if (m) { fm.hoiWav++; const c = timClip(decodeURIComponent(m[1])); res.setHeader('content-type', 'audio/wav'); res.end(wavGia(c ? c.giay : 1)); return; } }
+  if (req.url.startsWith('/fmusic/')) { res.setHeader('content-type', 'text/html; charset=utf-8'); res.end(trangNhac); return; }
   // 1.3.2: dự án Flow đã bị xoá bên Flow → Flow chuyển sang trang 404?reason=project (nhật ký người dùng 18/10/2026).
   if (req.url.startsWith('/fx/') && /\/project\/da-xoa/.test(req.url)) { res.writeHead(302, { location: '/fx/vi/tools/flow/404?reason=project' }); res.end(); return; }
   // Trang 404 thật chỉ có "Skip to main content" và "arrow_back Quay lại dự án" — KHÔNG có nút "+ Dự án mới".
@@ -198,13 +210,13 @@ const sv = http.createServer((req, res) => {
 
 sv.listen(0, '127.0.0.1', () => {
   const url = `http://127.0.0.1:${sv.address().port}`;
-  const tam = fs.mkdtempSync(path.join(os.tmpdir(), FLOW ? 'flow-e2e-' : SUNO ? 'suno-e2e-' : DRIVE ? 'drive-e2e-' : QUET ? 'quet-e2e-' : THEODOI ? 'theodoi-e2e-' : KIEMDO ? 'kiemdo-e2e-' : DONDEP ? 'dondep-e2e-' : 'muse-e2e-'));
+  const tam = fs.mkdtempSync(path.join(os.tmpdir(), FLOW ? 'flow-e2e-' : NHAC ? 'nhac-e2e-' : DRIVE ? 'drive-e2e-' : QUET ? 'quet-e2e-' : THEODOI ? 'theodoi-e2e-' : KIEMDO ? 'kiemdo-e2e-' : DONDEP ? 'dondep-e2e-' : 'muse-e2e-'));
   const electron = require('electron');
   const args = ['.'];
   if (process.platform === 'linux') args.push('--no-sandbox');
   const p = spawn(electron, args, {
     cwd: path.join(__dirname, '..'),
-    env: { ...process.env, MUSE_URL: url, MUSE_TEST: FLOW ? 'tests/flow-e2e-chay.js' : SUNO ? 'tests/suno-e2e-chay.js' : DRIVE ? 'tests/drive-e2e-chay.js' : QUET ? 'tests/quet-e2e-chay.js' : THEODOI ? 'tests/theo-doi-e2e-chay.js' : KIEMDO ? 'tests/kiem-do-e2e-chay.js' : DONDEP ? 'tests/don-dep-e2e-chay.js' : 'tests/e2e-chay.js', DRIVE_URL: url, SUNO_URL: `${url}/suno/create`, MUSE_DATA_DIR: path.join(tam, 'data'),
+    env: { ...process.env, MUSE_URL: url, MUSE_TEST: FLOW ? 'tests/flow-e2e-chay.js' : NHAC ? 'tests/nhac-e2e-chay.js' : DRIVE ? 'tests/drive-e2e-chay.js' : QUET ? 'tests/quet-e2e-chay.js' : THEODOI ? 'tests/theo-doi-e2e-chay.js' : KIEMDO ? 'tests/kiem-do-e2e-chay.js' : DONDEP ? 'tests/don-dep-e2e-chay.js' : 'tests/e2e-chay.js', DRIVE_URL: url, NHAC_URL: `${url}/fmusic/`, MUSE_DATA_DIR: path.join(tam, 'data'),
       MUSE_E2E_TAM: tam, MUSE_NO_UPDATE_CHECK: '1', MUSE_CHO_KET_NOI_MS: '4000',
       ...(FLOW ? { FLOW_TEST_URL: `${url}/fx/vi/tools/flow`, FLOW_TEST_HOST: '^http://127\\.0\\.0\\.1:\\d+/fx/',
         FLOW_TEST_NGUON: 'tests/flow-gia/nguon.js', FLOW_CHO_SAN_SANG_MS: '30000', FLOW_CHO_TAI_MS: '45000' } : {}) },
@@ -225,7 +237,7 @@ sv.listen(0, '127.0.0.1', () => {
     console.log(code === 0 ? `E2E: PASS (${giay} s / hạn ${hanGiay} s)` : `E2E: FAIL (mã ${code}, ${giay} s / hạn ${hanGiay} s)`);
     if (code !== 0) {
       // Đỏ → chép nhật ký bài kiểm + nhật ký app vào shots/ (CI tải lên thành artifact anh-chup-*, kể cả khi đỏ) để truy.
-      const kieu = FLOW ? 'flow' : SUNO ? 'suno' : DRIVE ? 'drive' : QUET ? 'quet' : THEODOI ? 'theodoi' : KIEMDO ? 'kiemdo' : DONDEP ? 'dondep' : 'muse';
+      const kieu = FLOW ? 'flow' : NHAC ? 'nhac' : DRIVE ? 'drive' : QUET ? 'quet' : THEODOI ? 'theodoi' : KIEMDO ? 'kiemdo' : DONDEP ? 'dondep' : 'muse';
       const dich = path.join(__dirname, '..', 'shots', `e2e-${kieu}-${process.platform}`);
       try {
         fs.mkdirSync(dich, { recursive: true });
@@ -241,7 +253,7 @@ sv.listen(0, '127.0.0.1', () => {
       // Log của job không tải được từ phiên Claude → đưa các dòng đáng chú ý lên thành annotation.
       const quanTrong = raChu.split('\n').filter((l) => /✘|⏱|ⓘ|kẹt|LỖI|KẾT QUẢ|^--/.test(l)).join('\n').slice(-5000);
       const esc = (x) => x.replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
-      console.log(`::error title=E2E ${FLOW ? 'Flow ' : SUNO ? 'Suno ' : DRIVE ? 'Drive ' : QUET ? 'Quet ' : THEODOI ? 'TheoDoi ' : KIEMDO ? 'KiemDo ' : DONDEP ? 'DonDep ' : ''}${process.platform}::${esc(quanTrong || raChu.slice(-5000))}`);
+      console.log(`::error title=E2E ${FLOW ? 'Flow ' : NHAC ? 'Nhac ' : DRIVE ? 'Drive ' : QUET ? 'Quet ' : THEODOI ? 'TheoDoi ' : KIEMDO ? 'KiemDo ' : DONDEP ? 'DonDep ' : ''}${process.platform}::${esc(quanTrong || raChu.slice(-5000))}`);
     }
     process.exit(code === 0 ? 0 : 1);
   });

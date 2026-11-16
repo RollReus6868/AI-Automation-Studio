@@ -50,10 +50,10 @@ jobs:
         timeout-minutes: 10
         run: node tests/e2e.js flow
 
-      # Muc Tao nhac: trang Suno Create gia (chon bai dai hon, het luot -> tai khoan Suno phu)
-      - name: Kiem thu dau-cuoi (trang Suno gia)
+      # 1.5.0 Muc Tao nhac: trang Google Flow Music gia (2 bai/lan, tai bai dai hon, het credit -> tai khoan phu)
+      - name: Kiem thu dau-cuoi (trang Flow Music gia)
         timeout-minutes: 10
-        run: node tests/e2e.js suno
+        run: node tests/e2e.js nhac
 
       # 1.4.0: anh / video xong -> tai thang len Google Drive (trang Drive gia: thu muc du an, images, Videos)
       - name: Kiem thu dau-cuoi (trang Drive gia)

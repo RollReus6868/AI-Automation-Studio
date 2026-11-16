@@ -1,6 +1,6 @@
 # AI Automation Studio
 
-App máy tính (Windows + macOS) tự động tạo ảnh và video hàng loạt trên **Muse** (muse.ai của Meta) và **Google Flow** (labs.google/fx — Veo / Nano Banana), và tạo nhạc trên **Suno** (suno.com), trong **một hàng đợi chung**. Gộp từ hai tool Muse Automation Studio và Flow Automation Studio.
+App máy tính (Windows + macOS) tự động tạo ảnh và video hàng loạt trên **Muse** (muse.ai của Meta) và **Google Flow** (labs.google/fx — Veo / Nano Banana), và tạo nhạc trên **Google Flow Music** (flowmusic.app), trong **một hàng đợi chung**. Gộp từ hai tool Muse Automation Studio và Flow Automation Studio.
 
 ## Cài đặt
 
@@ -20,7 +20,7 @@ Chạy thẳng từ mã nguồn (Windows): bấm đúp `CHAY_TU_NGUON.bat` (tự
 
 ## Dùng lần đầu
 
-1. **Tài khoản** → **Thêm Muse** / **Thêm Flow** / **Thêm Suno** → **Đăng nhập**. Trang Muse, Google Flow hoặc Suno mở ngay trong app, bạn tự đăng nhập. **App không bao giờ hỏi, nhập hay lưu mật khẩu** — mỗi tài khoản giữ phiên đăng nhập riêng.
+1. **Tài khoản** → **Thêm Muse** / **Thêm Flow** → **Đăng nhập**. Trang Muse hoặc Google Flow mở ngay trong app, bạn tự đăng nhập. **App không bao giờ hỏi, nhập hay lưu mật khẩu** — mỗi tài khoản giữ phiên đăng nhập riêng.
 2. Tài khoản Flow: sau khi đăng nhập Google, mở (hoặc tạo) một **dự án Flow** rồi bấm **Xong** — app nhớ dự án đó để chạy.
 3. **Tạo ảnh** / **Tạo video** → chọn **Chạy trên: Muse** hoặc **Google Flow** → gõ prompt (mỗi dòng một prompt) → **Tạo & chạy**.
 4. **Tạo nhạc** → gõ prompt phong cách nhạc (mỗi dòng một bài) → **Tạo & chạy**. Thư mục lưu và tên file ở **Cài đặt nâng cao** của trang này.
@@ -34,9 +34,10 @@ Chạy thẳng từ mã nguồn (Windows): bấm đúp `CHAY_TU_NGUON.bat` (tự
 - **Nhiều tài khoản, lỗi là đổi ngay**: mỗi dự án chọn đích danh tài khoản **Chạy** (chạy cùng lúc), **Dự phòng** hay **Không dùng** cho từng nơi chạy (nút tài khoản cạnh tên dự án). Mỗi dự án có **cài đặt riêng, luồng riêng** và chạy **song song** với dự án khác; số thứ tự ảnh / video đếm riêng; dừng / chạy / tạo lại **từng việc**; chọn prompt theo số (`98, 303, 305-350`); mỗi dự án chạy trên **dự án Flow mới** riêng. **Muse ⇄ Flow**: Muse từ chối tạo video từ một ảnh → riêng ảnh đó sang Flow; hết tài khoản dự phòng mà một bên còn ít tài khoản chạy được hơn số tài khoản **Chạy** → bên kia chạy thêm cho đủ, bên cũ có lại tài khoản thì việc chưa chạy quay về (tắt ở Cài đặt → Chung). Việc lỗi chuyển lần lượt sang các tài khoản dự phòng, hết dự phòng thì quay về tài khoản chính, cứ thế theo vòng tới khi xong; tài khoản lỗi liên tiếp hoặc bị nhắc thì tạm nghỉ, mọi tài khoản cùng lỗi thì hàng chờ tạm dừng. Flow bị báo "hoạt động bất thường": tài khoản đó nghỉ 3 giờ trở lên; 2 tài khoản bị báo trong 30 phút thì **cả máy nghỉ Flow** (công tắc và số phút ở Cài đặt → Flow → *Tài khoản lỗi*; tắt thì chỉ tài khoản bị báo nghỉ). Tài khoản hay bị báo hiện **cảnh báo vàng** "nghi đã bị Google đánh dấu — không nên dùng" (chỉ cảnh báo, không tự bỏ). Mỗi tài khoản của dự án bật / tắt riêng cho **Ảnh** và **Video** (vd Flow 1 chỉ tạo ảnh); mục Tài khoản tô **xanh** tài khoản chạy được, **đỏ** tài khoản đang lỗi / nghỉ kèm lý do.
 - **Video từ ảnh nằm cạnh ảnh, cùng tên** (`325.jpg` → `325.mp4`). Tên ảnh mặc định `{stt}`.
 - **Tải về hàng loạt** (tick nhiều việc → Tải về: đặt tên mới, chọn thư mục, file đã mất thì lấy lại từ chat Muse cũ không tốn lượt), **xuất Nhật ký ra .txt**, tuỳ chọn **tự xoá chat Muse / dự án Flow** khi chạy xong hàng chờ.
-- **Tạo nhạc (Suno)**: prompt vào ô Styles (Advanced, không lời); mỗi lần Create Suno ra 4 bài, app tải MP3 của bài **dài hơn** trong 2 bài đầu. Mỗi tài khoản Suno làm từng prompt một (chờ bài xong → ⋯ → Download → MP3 → *Unlock & Download*); tải hỏng thì tải lại đúng bài đó, không gửi lại prompt. Tài khoản Suno hết lượt tải / hết credit → bài tạo lại ở tài khoản Suno dự phòng; tài khoản đó nghỉ 6 giờ (bấm Kiểm tra để dùng lại sớm). Captcha: cửa sổ Suno hiện lên để bạn tự giải.
+- **Tạo nhạc (Flow Music)**: mỗi tài khoản Google Flow có sẵn một tài khoản Flow Music dùng chung đăng nhập. Mỗi dòng (hoặc file .txt) một prompt, gửi **nguyên văn** vào ô chat của Producer trên flowmusic.app (muốn không lời thì ghi `instrumental`); mỗi prompt một phiên mới, Flow Music ra 2 bài, app tải MP3 của bài **dài hơn** (More options → Download → MP3) và đặt tên theo số prompt (`001.mp3`…). Gửi theo thứ tự prompt, mỗi tài khoản 2 bài cùng lúc. Producer chỉ hỏi lại → app nhắn thêm một lần "tạo bài luôn"; tải hỏng → tải lại đúng bài, không gửi lại prompt; hết credit → bài tạo lại ở tài khoản dự phòng, tài khoản đó nghỉ 6 giờ (bấm Kiểm tra để dùng lại sớm).
 - **Google Drive (1.4.0)**: ảnh / video xong tự đưa lên Drive vào `Tên dự án/images` và `Tên dự án/Videos`, theo một trong hai cách: chép vào thư mục Google Drive trên máy (Google Drive cho máy tính tự tải lên), hoặc tải thẳng lên drive.google.com bằng trình duyệt trong app (tài khoản ở thẻ **Drive** của mục Tài khoản). Việc xong từ trước: chọn → *Lên Drive*.
 - **1.4.0**: chọn hết → **Đổi prompt** (thay hẳn / tìm và thay chữ); **đổi ngay sang Muse / Flow** ở từng việc hoặc nhiều việc; **đồng hồ dự án** (đã chạy + dự đoán còn bao lâu); **Chạy lại ngay** tài khoản đang nghỉ vì lỗi; chế độ **nhẹ máy** (trang chạy ngầm ưu tiên CPU thấp, giao diện báo thưa hơn khi nhiều việc).
+- **1.5.0**: **tạo nhạc chuyển sang Google Flow Music** (flowmusic.app), bỏ hẳn Suno — dùng chung tài khoản Google Flow, gửi prompt nguyên văn theo thứ tự, tải MP3 bài dài hơn, tên theo số prompt, 2 bài cùng lúc mỗi tài khoản.
 - **1.4.14**: **xoá dự án tự dọn dữ liệu tạm** của dự án; **hẹn giờ nhiều hẹn, mỗi hẹn tick nhiều dự án**; **chọn việc theo số** (`1, 3, 10-50`); giao diện nhẹ hơn khi hàng đợi dài (gửi trạng thái theo phần đổi, bỏ hiệu ứng thanh tiến độ).
 - **1.4.13**: **bớt RAM khi chạy Muse** — tự **làm mới luồng** Muse (đóng hẳn trang, mở trang mới) sau 10 việc / khi trang quá 900 MB; **RAM tối đa cho app** (mặc định 75% RAM máy) — chạm thì chờ luồng xong mới giao việc mới.
 - **1.4.12**: tắt app giữa chừng không tạo trùng — mở lại app tự **kiểm chat Muse cũ**, xong rồi thì tải về (nút **Kiểm tra việc dở**); Muse **hết lượt video 24 giờ** → sang tài khoản kế tiếp ngay; **Dọn dữ liệu thừa** (Cài đặt → Cả app) — cache, file tạm, dữ liệu tài khoản đã xoá… không đăng xuất tài khoản.
@@ -56,8 +57,8 @@ Chạy thẳng từ mã nguồn (Windows): bấm đúp `CHAY_TU_NGUON.bat` (tự
 
 - Google Flow chỉ có tỷ lệ **16:9** và **9:16** (tỷ lệ khác tự đổi về gần nhất).
 - Nhận diện tài khoản lỗi **không qua mặt** được kiểm tra của Google: nó chỉ đổi sang tài khoản khác / cho tài khoản nghỉ khi bị nhắc. App không có proxy / VPN / giả vân tay trình duyệt; cảnh báo tài khoản nghi bị đánh dấu chỉ giúp bạn chọn tài khoản.
-- Suno: chỉ tải bằng nút Download của chính Suno (không lách giới hạn tải), không giải captcha hộ.
-- Các bài kiểm thử tự động chạy trên **trang Muse giả, trang Google Flow giả, trang Suno giả và trang Google Drive giả**; giao diện thật của hai trang có thể đổi bất cứ lúc nào. Lần đầu nên chạy thử vài prompt và xem **Nhật ký**.
+- Flow Music: chỉ tải bằng menu Download của chính trang, không giải captcha hộ; cửa sổ chạy ngầm tắt tiếng.
+- Các bài kiểm thử tự động chạy trên **trang Muse giả, trang Google Flow giả, trang Flow Music giả và trang Google Drive giả**; giao diện thật của hai trang có thể đổi bất cứ lúc nào. Lần đầu nên chạy thử vài prompt và xem **Nhật ký**.
 
 ## Nhật ký và dữ liệu
 
@@ -72,9 +73,9 @@ npm test                                   # logic + bộ cập nhật
 node tests/flow/run.js                     # logic Flow (engine, model, an toàn, tải về…)
 xvfb-run -a node tests/e2e.js              # đầu-cuối Muse (trang Muse giả)
 xvfb-run -a node tests/e2e.js flow         # đầu-cuối Flow + nối Flow ⇄ Muse (trang + engine Flow giả)
-xvfb-run -a node tests/e2e.js suno         # đầu-cuối Tạo nhạc (trang Suno Create giả)
+xvfb-run -a node tests/e2e.js nhac         # đầu-cuối Tạo nhạc (trang Flow Music giả)
 xvfb-run -a node tests/e2e.js drive        # đầu-cuối Google Drive tải thẳng lên (trang Drive giả)
 xvfb-run -a npx electron --no-sandbox tests/flow/<bài>-main.js   # bài DOM Flow: paste, mode, model, bam-tao, bam-tao-that, kiem-truoc, tham-chieu
 ```
 
-Cấu trúc: `main.js` (cửa sổ, luồng, IPC) · `src/main/` (hàng đợi, điều phối, tài khoản, luồng Muse, cập nhật) · `src/flow/` (tab Flow, máy Flow, luồng Flow, engine + trình tiêm của Flow Automation Studio) · `src/inject/muse-trang.js` (mọi selector Muse) · `src/main/luong-suno.js` + `src/inject/suno-trang.js` (luồng và mọi selector Suno) · `src/ui/`.
+Cấu trúc: `main.js` (cửa sổ, luồng, IPC) · `src/main/` (hàng đợi, điều phối, tài khoản, luồng Muse, cập nhật) · `src/flow/` (tab Flow, máy Flow, luồng Flow, engine + trình tiêm của Flow Automation Studio) · `src/inject/muse-trang.js` (mọi selector Muse) · `src/main/luong-nhac.js` + `src/inject/nhac-trang.js` (luồng và mọi selector Flow Music) · `src/ui/`.

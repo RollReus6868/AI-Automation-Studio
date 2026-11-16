@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Google Flow Music</title>
+<!--
+  Trang Google Flow Music GIẢ cho bài kiểm đầu-cuối (node tests/e2e.js nhac). Chép cấu trúc trang thật đo ngày
+  17/11/2026 (tài khoản Free): ô chat textarea[aria-label="Chat message"], nút button[aria-label="Send message"]
+  (disabled khi ô trống, đổi thành nút "Stop" khi Producer đang làm), gửi xong chuyển sang /session/<id>,
+  "Thinking" → hàng đang tạo (<span>27%</span> + h4[role=status] "Generating <tên>...") → thẻ bài
+  [role=button][aria-label="Open details for <tên>"] có a[href="/song/<id>"] và các nút "Play <tên>",
+  "More options for <tên>". Menu (Radix): mở ở pointerdown, mục Download có menu con (ArrowRight) với
+  Download video / Get stems / M4A / MP3 / WAV; bấm MP3 → fetch tải về → blob → <a download="<tên>.mp3">.
+  Đã đăng nhập: thanh bên có button[aria-label="Settings menu"]. Máy chủ giả: tests/e2e.js (/__fm/…).
+-->
+<style>
+  body { font-family: sans-serif; background: #141414; color: #eee; margin: 0; display: flex; min-height: 100vh; }
+  nav { width: 200px; background: #000; padding: 12px; }
+  main { flex: 1; padding: 20px; }
+  .the, .dang-tao { border: 1px solid #333; margin: 6px 0; padding: 8px; display: flex; gap: 8px; align-items: center; }
+  [role=menu] { position: fixed; background: #222; border: 1px solid #444; padding: 4px; }
+  [role=menuitem] { padding: 4px 12px; cursor: pointer; }
+  textarea { width: 400px; height: 60px; }
+</style>
+</head>
+<body>
+<nav>
+  <a href="/fmusic/">Flow Music</a>
+  <button type="button" aria-label="New session" id="moi">New session</button>
+  <div id="tk"></div>
+</nav>
+<main>
+  <div id="phien"></div>
+  <div id="soan">
+    <textarea aria-label="Chat message" placeholder="Cùng sáng tác nào..." maxlength="40000"></textarea>
+    <span id="nut"></span>
+  </div>
+  <div id="toast"></div>
+</main>
+<script>
+(function () {
+  window.__fmusicClip = '/fmusic/clips/';   // thời lượng bài: file nghe thử của máy chủ giả
+  const tk = (document.cookie.match(/(?:^|;\s*)fmusic_tk=([^;]+)/) || [])[1] || '';
+  const $ = (s) => document.querySelector(s);
+  const o = $('textarea');
+  if (tk) $('#tk').innerHTML = '<button type="button" aria-label="Settings menu">Tài khoản FREE</button>';
+  else { $('#tk').innerHTML = '<a href="#" id="dn">Sign in</a>'; $('#soan').hidden = true; }
+  const phienId = () => (location.pathname.match(/\/session\/([^/?#]+)/) || [])[1] || '';
+  let ban = false;
+  function veNut() {
+    $('#nut').innerHTML = ban ? '<button type="button" aria-label="Stop">■</button>'
+      : '<button type="submit" aria-label="Send message"' + (o.value.trim() ? '' : ' disabled') + '>↑</button>';
+    const g = document.querySelector('button[aria-label="Send message"]');
+    if (g) g.addEventListener('click', gui);
+  }
+  o.addEventListener('input', veNut);
+  async function gui() {
+    const prompt = o.value.trim();
+    if (!prompt || ban) return;
+    o.value = '';
+    ban = true; veNut();
+    const r = await (await fetch('/__fm/gui', { method: 'POST', body: JSON.stringify({ tk, prompt, phien: phienId() }) })).json();
+    if (!phienId()) history.pushState({}, '', '/fmusic/session/' + r.phien + '?t=true');
+    hoi();
+  }
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  let henHoi = null;
+  async function hoi() {
+    clearTimeout(henHoi);
+    const id = phienId();
+    if (!id) return;
+    let p = null;
+    try { p = await (await fetch('/__fm/phien/' + id)).json(); } catch (_) {}
+    if (p) ve(p);
+    henHoi = setTimeout(hoi, 400);
+  }
+  let veCuoi = '';
+  function ve(p) {
+    let h = '';
+    for (const t of p.tin) {
+      h += '<div class="nguoi">' + esc(t.chu) + '</div>';
+      if (t.trang === 'nghi') h += '<div><span>Thinking</span></div>';
+      else if (t.trang === 'chu') h += '<p class="tra-loi">' + esc(t.traLoi) + '</p>';
+      else if (t.trang === 'tao') {
+        h += '<div><span>Creating "' + esc(t.clips[0].ten) + '"...</span></div>';
+        for (const c of t.clips) h += '<div class="dang-tao"><div><div></div><span>' + c.pt + '%</span></div><div><h4 role="status" aria-live="polite">Generating ' + esc(c.ten) + '...</h4><span>' + esc(t.chu) + '</span></div></div>';
+      } else if (t.trang === 'xong') {
+        h += '<div>Thoughts</div><div class="sound">Sound ' + esc(t.chu) + '</div>';
+        for (const c of t.clips) {
+          h += '<div role="button" tabindex="0" aria-label="Open details for ' + esc(c.ten) + '" class="the" data-id="' + c.id + '">' +
+            '<button aria-label="Play ' + esc(c.ten) + '">▶</button><div><a href="/song/' + c.id + '">' + esc(c.ten) + '</a><span>' + esc(t.chu) + '</span></div>' +
+            '<button aria-label="Like ' + esc(c.ten) + '">♡</button><button aria-label="More options for ' + esc(c.ten) + '" aria-haspopup="menu">⋯</button></div>';
+        }
+        h += '<p class="tra-loi">Laying down two takes for you right now. Let\'s see which variation hits the mood best.</p>';
+      }
+    }
+    if (veCuoi !== h && !document.querySelector('[role=menu]')) { veCuoi = h; $('#phien').innerHTML = h; }
+    const ban2 = p.tin.some((t) => t.trang === 'nghi' || t.trang === 'tao');
+    if (ban2 !== ban) { ban = ban2; veNut(); }
+  }
+  // ── Menu kiểu Radix: mở ở pointerdown, menu con của Download mở bằng ArrowRight hoặc bấm ──
+  function dongMenu() { for (const m of document.querySelectorAll('[role=menu]')) m.remove(); }
+  function taoMenu(muc, x, y) {
+    const m = document.createElement('div');
+    m.setAttribute('role', 'menu');
+    m.style.left = x + 'px'; m.style.top = y + 'px';
+    for (const [chu, con] of muc) {
+      const i = document.createElement('div');
+      i.setAttribute('role', 'menuitem'); i.tabIndex = -1; i.textContent = chu;
+      if (con) i.setAttribute('aria-haspopup', 'menu');
+      m.appendChild(i);
+    }
+    document.body.appendChild(m);
+    return m;
+  }
+  document.addEventListener('pointerdown', (e) => {
+    const nut = e.target.closest && e.target.closest('button[aria-label^="More options for"]');
+    if (!nut) { if (!(e.target.closest && e.target.closest('[role=menu]'))) dongMenu(); return; }
+    dongMenu();
+    const the = nut.closest('.the');
+    const r = nut.getBoundingClientRect();
+    const m = taoMenu([['Remix', 1], ['Details', 1], ['Download', 1], ['Share...', 1], ['Create video'], ['Split stems'], ['Delete']], r.right, r.top);
+    m.dataset.id = the.dataset.id; m.dataset.ten = the.getAttribute('aria-label').replace('Open details for ', '');
+  }, true);
+  async function moMenuCon(dl) {
+    if (document.querySelectorAll('[role=menu]').length > 1) return;
+    const cha = dl.closest('[role=menu]');
+    const cau = await (await fetch('/__fm/menu')).json();
+    const muc = [['Download video'], ['Get stems'], ['M4A']].concat(cau.coMp3 ? [['MP3']] : []).concat([['WAV']]);
+    const r = dl.getBoundingClientRect();
+    const m = taoMenu(muc, r.right, r.top);
+    m.dataset.id = cha.dataset.id; m.dataset.ten = cha.dataset.ten;
+  }
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { dongMenu(); return; }
+    const i = e.target.closest && e.target.closest('[role=menuitem]');
+    if (i && e.key === 'ArrowRight' && i.textContent === 'Download') moMenuCon(i);
+  }, true);
+  document.addEventListener('click', async (e) => {
+    const i = e.target.closest && e.target.closest('[role=menuitem]');
+    if (!i) return;
+    if (i.textContent === 'Download') { moMenuCon(i); return; }
+    if (i.textContent !== 'MP3') return;
+    const m = i.closest('[role=menu]');
+    const id = m.dataset.id, ten = m.dataset.ten;
+    dongMenu();
+    const blob = await (await fetch('/__fm/download/audio/' + id + '?format=mp3')).blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = ten + '.mp3';
+    document.body.appendChild(a); a.click(); a.remove();
+    $('#toast').textContent = 'Success · Downloaded ' + ten + '.mp3';
+  });
+  $('#moi').addEventListener('click', () => { location.href = '/fmusic/'; });
+  window.addEventListener('popstate', hoi);
+  veNut();
+  hoi();
+})();
+</script>
+</body>
+</html>

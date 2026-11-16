@@ -829,7 +829,7 @@ testAsync('1.4.13 làm mới luồng Muse: chạy xong N việc → đóng hẳn
   assert.deepStrictEqual(L.huy.map((l) => l.id).slice(0, 2), [L.tao[0].id, L.tao[1].id]);
   assert.ok(nhatKy.some((x) => /♻ Làm mới luồng tk-1-1-1 \(đã chạy 2 việc; trang đang dùng 512 MB\) — đóng trang cũ trả RAM/.test(x)), nhatKy.join('\n'));
 });
-testAsync('1.4.13 làm mới luồng khi trang Muse quá ngưỡng MB (0 = không xét); luồng Flow / Suno không bị làm mới', async () => {
+testAsync('1.4.13 làm mới luồng khi trang Muse quá ngưỡng MB (0 = không xét); luồng Flow / Flow Music không bị làm mới', async () => {
   for (const [nguong, mong] of [[800, 3], [0, 1]]) {
     const L = luongDem();
     const { dp, nhatKy } = dungDieuPhoi({ taoLuong: L.taoLuong, huyLuong: L.huyLuong, ramLuong: () => 1200 });
@@ -842,7 +842,7 @@ testAsync('1.4.13 làm mới luồng khi trang Muse quá ngưỡng MB (0 = khôn
   }
   const { dp } = dungDieuPhoi({ ramLuong: () => 99999 });
   dp.datCaiDat({ lamMoiLuongSau: 1 });
-  for (const nen of ['flow', 'suno']) {
+  for (const nen of ['flow', 'fmusic']) {
     const x = { taiKhoanId: 'x', duAn: null, luong: { nen, ranh: true, dung() {} } };
     dp.luong.push(x);
     dp._lamMoiLuong(x);
@@ -1519,7 +1519,7 @@ testAsync('1.2.0 Muse: dự án chạy 2 tài khoản cùng lúc — hai tài kh
   tk.them('Hai'); tk.them('Ba');
   dp.datCaiDat({ luongMoiTK: 1, nghiGiuaLanGui: 0, tuThuLai: 0, tuChayLaiLoi: 0 });
   const d = dp.taoDuAn('P', ['tk-1', 'hai', 'ba'], { muse: 2 });
-  assert.deepStrictEqual(d.chaySong, { muse: 2, flow: 1, suno: 1 });
+  assert.deepStrictEqual(d.chaySong, { muse: 2, flow: 1, fmusic: 1 });
   dp.them({ duAn: d.id, prompts: ['1', '2', '3', '4', '5', '6'] });
   dp.chayTatCa();
   await chayHet(dp);
@@ -1535,8 +1535,8 @@ testAsync('1.2.0 Muse: dự án chạy 2 tài khoản cùng lúc — hai tài kh
   assert.ok(dp._nghi('tk-1'), 'tài khoản hỏng tạm nghỉ');
   assert.ok(daChay.some((x) => x[0] === 'ba'), 'dự phòng vào thay tài khoản hỏng');
   assert.ok(nhatKy.some((x) => /tạm nghỉ tài khoản này/.test(x)));
-  dp.datTaiKhoanDuAn(d.id, ['tk-1'], { muse: 99, flow: '2', suno: 0 });
-  assert.deepStrictEqual(dp.duAn.find((x) => x.id === d.id).chaySong, { muse: 50, flow: 2, suno: 1 }, 'kẹp 1–50');
+  dp.datTaiKhoanDuAn(d.id, ['tk-1'], { muse: 99, flow: '2', fmusic: 0 });
+  assert.deepStrictEqual(dp.duAn.find((x) => x.id === d.id).chaySong, { muse: 50, flow: 2, fmusic: 1 }, 'kẹp 1–50');
 });
 testAsync('1.2.0 Flow: 2 tài khoản cùng lúc chia đều mẻ, chạy song song', async () => {
   const daChay = [];
@@ -1782,8 +1782,8 @@ test('1.3.7 tình trạng tài khoản: xám chưa kiểm → xanh khi xong vi�
   assert.ok(sk('tk-1').muc === 'loi' && /chặn tạo video/.test(sk('tk-1').chu));
   tk.sua('tk-1', { chanVideoDen: 0, trangThai: 'can-dang-nhap' });
   assert.ok(sk('tk-1').muc === 'loi' && /Chưa đăng nhập/.test(sk('tk-1').chu));
-  tk.sua('suno-1', { trangThai: 'da-dang-nhap', hetLuotDen: Date.now() + 60000 });
-  assert.strictEqual(sk('suno-1').muc, 'loi');
+  tk.sua('nhac-flow-1', { trangThai: 'da-dang-nhap', hetLuotDen: Date.now() + 60000 });
+  assert.strictEqual(sk('nhac-flow-1').muc, 'loi');
   // Flow tự cho tài khoản nghỉ (dự án không còn tài khoản Flow nào khác) — máy Flow báo qua o.nghiFlow.
   dp.o.nghiFlow = (id) => (id === 'flow-1' ? { den: Date.now() + 60000, lyDo: 'Flow báo lỗi' } : null);
   tk.sua('flow-1', { trangThai: 'da-dang-nhap' });
@@ -1896,8 +1896,8 @@ test('1.2.1 nâng cấp: tắt "Flow hỏng → Muse" ở 1.2.0 thì công tắc
   assert.strictEqual(daTat.caiDat.doiNenKhiLoi, true);
 });
 // 1.4.6: cài đặt chạy tách theo nơi chạy — thử thêm / chạy lại lỗi / nghỉ gửi riêng Muse, Flow, Suno.
-test('1.4.6 nâng cấp: thử thêm / chạy lại lỗi / nghỉ gửi của bản cũ (dùng chung) → chép sang khoá riêng Flow, Suno (cả chung lẫn từng dự án); đã có khoá mới thì giữ', () => {
-  const k = (c) => [c.tuThuLai, c.tuChayLaiLoi, c.nghiGiuaLanGui, c.tuThuLaiFlow, c.tuChayLaiLoiFlow, c.tuThuLaiSuno, c.tuChayLaiLoiSuno, c.nghiSuno];
+test('1.4.6 nâng cấp: thử thêm / chạy lại lỗi / nghỉ gửi của bản cũ (dùng chung) → chép sang khoá riêng Flow, Flow Music (cả chung lẫn từng dự án); đã có khoá mới thì giữ', () => {
+  const k = (c) => [c.tuThuLai, c.tuChayLaiLoi, c.nghiGiuaLanGui, c.tuThuLaiFlow, c.tuChayLaiLoiFlow, c.tuThuLaiNhac, c.tuChayLaiLoiNhac, c.nghiNhac];
   const cu = { tuThuLai: 4, tuChayLaiLoi: 3, nghiGiuaLanGui: 7, moc: 6 };
   const { dp } = dungDieuPhoi({ duLieu: { caiDat: { ...cu }, duAn: [
     { id: 'mac-dinh', ten: 'Mặc định' },
@@ -1906,56 +1906,56 @@ test('1.4.6 nâng cấp: thử thêm / chạy lại lỗi / nghỉ gửi của b
   assert.deepStrictEqual(k(dp.cd('mac-dinh')), [4, 3, 7, 4, 3, 4, 3, 7], 'dự án chưa có cài đặt riêng theo cài đặt chung');
   assert.deepStrictEqual(k(dp.cd('p2')), [5, 1, 9, 5, 1, 5, 1, 9], 'cài đặt riêng của dự án chép từ số của chính dự án đó');
   // Bản đã có khoá mới (đã lưu ở 1.4.6) → giữ nguyên, kể cả 0.
-  const moi = { tuThuLaiFlow: 0, tuChayLaiLoiFlow: 1, tuThuLaiSuno: 6, tuChayLaiLoiSuno: 0, nghiSuno: 20 };
-  const b = dungDieuPhoi({ duLieu: { caiDat: { ...cu, ...moi }, duAn: [{ id: 'mac-dinh', ten: 'Mặc định', caiDat: { ...cu, ...moi, tuThuLaiFlow: 2, nghiSuno: 0 } }] } }).dp;
+  const moi = { tuThuLaiFlow: 0, tuChayLaiLoiFlow: 1, tuThuLaiNhac: 6, tuChayLaiLoiNhac: 0, nghiNhac: 20 };
+  const b = dungDieuPhoi({ duLieu: { caiDat: { ...cu, ...moi }, duAn: [{ id: 'mac-dinh', ten: 'Mặc định', caiDat: { ...cu, ...moi, tuThuLaiFlow: 2, nghiNhac: 0 } }] } }).dp;
   assert.deepStrictEqual(k(b.caiDat), [4, 3, 7, 0, 1, 6, 0, 20]);
-  assert.deepStrictEqual(k(b.cd('mac-dinh')), [4, 3, 7, 2, 1, 6, 0, 0], 'nghỉ Suno 0 = không nghỉ (không bị đẩy về 3)');
+  assert.deepStrictEqual(k(b.cd('mac-dinh')), [4, 3, 7, 2, 1, 6, 0, 0], 'nghỉ Flow Music 0 = không nghỉ (không bị đẩy về 3)');
   // Lưu từ trang Cài đặt (chuỗi số) → đúng khoá, đúng khoảng; nghỉ 0 giữ 0.
-  b.datCaiDat({ tuThuLaiFlow: '5', tuChayLaiLoiFlow: '99', tuThuLaiSuno: '-1', tuChayLaiLoiSuno: '2', nghiSuno: '9', nghiGiuaLanGui: '0' }, 'mac-dinh');
+  b.datCaiDat({ tuThuLaiFlow: '5', tuChayLaiLoiFlow: '99', tuThuLaiNhac: '-1', tuChayLaiLoiNhac: '2', nghiNhac: '9', nghiGiuaLanGui: '0' }, 'mac-dinh');
   assert.deepStrictEqual(k(b.cd('mac-dinh')), [4, 3, 0, 5, 10, 0, 2, 9]);
 });
-/** Luồng giả ba nơi: Muse "tk-1" lỗi, Flow "flow-1" lỗi, Suno lỗi; đếm số lần chạy từng việc. */
-const luongBaNenHong = (daChay) => (a, stt) => (a.nen === 'suno' ? {
-  id: `${a.id}-${stt}`, nen: 'suno', ranh: true, viec: null, dung() {},
+/** Luồng giả ba nơi: Muse "tk-1" lỗi, Flow "flow-1" lỗi, Flow Music lỗi; đếm số lần chạy từng việc. */
+const luongBaNenHong = (daChay) => (a, stt) => (a.nen === 'fmusic' ? {
+  id: `${a.id}-${stt}`, nen: 'fmusic', ranh: true, viec: null, dung() {},
   async chay(j) {
-    this.ranh = false; this.viec = j; daChay.push(['suno', j.so]);
+    this.ranh = false; this.viec = j; daChay.push(['nhac', j.so]);
     await new Promise((r) => setTimeout(r, 10)); this.ranh = true; this.viec = null;
-    return { ok: false, loi: 'Suno: tạo hỏng' };
+    return { ok: false, loi: 'Flow Music: tạo hỏng' };
   }
 } : luongMuseFlow(daChay, { hong: new Set(['tk-1']), flowHong: new Set(['flow-1']) })(a, stt));
 const demLan = (daChay) => ({
   muse: daChay.filter((x) => Array.isArray(x) && x[0] === 'tk-1').length,
   flow: daChay.filter((x) => x && x.tk === 'flow-1').reduce((n, x) => n + x.so.length, 0),
-  suno: daChay.filter((x) => Array.isArray(x) && x[0] === 'suno').length
+  nhac: daChay.filter((x) => Array.isArray(x) && x[0] === 'nhac').length
 });
-testAsync('1.4.6 thử thêm (vòng) riêng từng nơi: Muse 0 vòng, Flow 2 vòng, Suno 1 vòng → Muse chạy 1 lần, Flow 3 lần, Suno 2 lần', async () => {
+testAsync('1.4.6 thử thêm (vòng) riêng từng nơi: Muse 0 vòng, Flow 2 vòng, Flow Music 1 vòng → Muse chạy 1 lần, Flow 3 lần, Flow Music 2 lần', async () => {
   const daChay = [];
   const { dp, nhatKy } = dungDieuPhoi({ taoLuong: luongBaNenHong(daChay) });
-  dp.datCaiDat({ luongMoiTK: 1, nghiGiuaLanGui: 0, nghiSuno: 0, doiNenKhiLoi: false, tuThuLai: 0, tuChayLaiLoi: 0,
-    tuThuLaiFlow: 2, tuChayLaiLoiFlow: 0, tuThuLaiSuno: 1, tuChayLaiLoiSuno: 0, flow: { meToiDa: 5 } });
+  dp.datCaiDat({ luongMoiTK: 1, nghiGiuaLanGui: 0, nghiNhac: 0, doiNenKhiLoi: false, tuThuLai: 0, tuChayLaiLoi: 0,
+    tuThuLaiFlow: 2, tuChayLaiLoiFlow: 0, tuThuLaiNhac: 1, tuChayLaiLoiNhac: 0, flow: { meToiDa: 5 } });
   dp.them({ nen: 'muse', loai: 'anh', prompts: ['m1'] });
   dp.them({ nen: 'flow', loai: 'anh', tyLe: '16:9', prompts: ['f1'] });
   dp.them({ loai: 'nhac', prompts: ['lofi'] });
   dp.chayTatCa();
   await chayHet(dp);
-  assert.deepStrictEqual(demLan(daChay), { muse: 1, flow: 3, suno: 2 }, JSON.stringify(daChay));
+  assert.deepStrictEqual(demLan(daChay), { muse: 1, flow: 3, nhac: 2 }, JSON.stringify(daChay));
   assert.ok(dp.viec.every((j) => j.trangThai === 'loi'), dp.viec.map((j) => j.nen + j.trangThai).join());
-  assert.deepStrictEqual(dp.viec.map((j) => j.nen), ['muse', 'flow', 'suno'], 'tắt Muse ⇄ Flow thì không chuyển bên');
+  assert.deepStrictEqual(dp.viec.map((j) => j.nen), ['muse', 'flow', 'fmusic'], 'tắt Muse ⇄ Flow thì không chuyển bên');
   assert.ok(nhatKy.some((x) => /thử lại ở "Flow 1" \(2\/2\)/.test(x)), nhatKy.join('\n'));
 });
-testAsync('1.4.6 hết lượt → tự chạy lại việc lỗi theo số RIÊNG từng nơi: Flow 2 lượt, Muse 0, Suno 1', async () => {
+testAsync('1.4.6 hết lượt → tự chạy lại việc lỗi theo số RIÊNG từng nơi: Flow 2 lượt, Muse 0, Flow Music 1', async () => {
   const daChay = [];
   const { dp, nhatKy } = dungDieuPhoi({ taoLuong: luongBaNenHong(daChay) });
-  dp.datCaiDat({ luongMoiTK: 1, nghiGiuaLanGui: 0, nghiSuno: 0, doiNenKhiLoi: false, tuThuLai: 0, tuChayLaiLoi: 0,
-    tuThuLaiFlow: 0, tuChayLaiLoiFlow: 2, tuThuLaiSuno: 0, tuChayLaiLoiSuno: 1, flow: { meToiDa: 5 } });
+  dp.datCaiDat({ luongMoiTK: 1, nghiGiuaLanGui: 0, nghiNhac: 0, doiNenKhiLoi: false, tuThuLai: 0, tuChayLaiLoi: 0,
+    tuThuLaiFlow: 0, tuChayLaiLoiFlow: 2, tuThuLaiNhac: 0, tuChayLaiLoiNhac: 1, flow: { meToiDa: 5 } });
   dp.them({ nen: 'muse', loai: 'anh', prompts: ['m1'] });
   dp.them({ nen: 'flow', loai: 'anh', tyLe: '16:9', prompts: ['f1'] });
   dp.them({ loai: 'nhac', prompts: ['lofi'] });
   dp.chayTatCa();
   await chayHet(dp);
-  assert.deepStrictEqual(demLan(daChay), { muse: 1, flow: 3, suno: 2 }, JSON.stringify(daChay));
-  assert.deepStrictEqual(dp.viec.map((j) => [j.nen, j.trangThai, j.vongLai || 0]), [['muse', 'loi', 0], ['flow', 'loi', 2], ['suno', 'loi', 1]]);
-  assert.ok(nhatKy.some((x) => /↻ Hết lượt — tự chạy lại 2 việc lỗi/.test(x)), 'lượt 1: Flow + Suno chạy lại, Muse không');
+  assert.deepStrictEqual(demLan(daChay), { muse: 1, flow: 3, nhac: 2 }, JSON.stringify(daChay));
+  assert.deepStrictEqual(dp.viec.map((j) => [j.nen, j.trangThai, j.vongLai || 0]), [['muse', 'loi', 0], ['flow', 'loi', 2], ['fmusic', 'loi', 1]]);
+  assert.ok(nhatKy.some((x) => /↻ Hết lượt — tự chạy lại 2 việc lỗi/.test(x)), 'lượt 1: Flow + Flow Music chạy lại, Muse không');
   // Đảo lại: Muse 1 lượt, Flow 0 → Muse chạy 2 lần, Flow 1 lần.
   const daChay2 = [];
   const b = dungDieuPhoi({ taoLuong: luongBaNenHong(daChay2) });
@@ -1964,9 +1964,9 @@ testAsync('1.4.6 hết lượt → tự chạy lại việc lỗi theo số RIÊ
   b.dp.them({ nen: 'flow', loai: 'anh', tyLe: '16:9', prompts: ['f1'] });
   b.dp.chayTatCa();
   await chayHet(b.dp);
-  assert.deepStrictEqual(demLan(daChay2), { muse: 2, flow: 1, suno: 0 }, JSON.stringify(daChay2));
+  assert.deepStrictEqual(demLan(daChay2), { muse: 2, flow: 1, nhac: 0 }, JSON.stringify(daChay2));
 });
-test('1.4.6 trang Cài đặt: thẻ riêng Chung (Muse + Flow) / Muse / Google Flow / Suno / Cả app có nhãn nơi chạy; ô mới được nối đọc + lưu', () => {
+test('1.4.6 trang Cài đặt: thẻ riêng Chung (Muse + Flow) / Muse / Google Flow / Flow Music / Cả app có nhãn nơi chạy; ô mới được nối đọc + lưu', () => {
   const html = docNguon('src/ui/index.html', true), ui = docNguon('src/ui/app.js'), css = docNguon('src/ui/style.css');
   const cd = html.slice(html.indexOf('id="trang-caidat"'), html.indexOf('</main>', html.indexOf('id="trang-caidat"')));
   /** Đoạn HTML của thẻ có id (tới thẻ kế tiếp). */
@@ -1976,13 +1976,13 @@ test('1.4.6 trang Cài đặt: thẻ riêng Chung (Muse + Flow) / Muse / Google 
   coO('cdChungThe', 'cdDoiNen', 'cdVideoCanhAnh');
   assert.ok(/Muse — khi chạy<span class="ap ap-muse">/.test(coO('cdMuseThe', 'cdLuong', 'cdNghi', 'cdThuLai', 'cdChayLaiLoi', 'cdChoAnh', 'cdChoVideo', 'cdChoChu', 'cdPng', 'cdXoaChat', 'cdMauAnh', 'cdMauVideo', 'cdMauGoc')));
   assert.ok(/Google Flow — khi chạy<span class="ap ap-flow">/.test(coO('cdFlow', 'fTab', 'fThuLai', 'cdThuLaiFlow', 'cdChayLaiLoiFlow', 'cdXoaDuAnFlow', 'fNguong')));
-  assert.ok(/Suno — khi chạy<span class="ap ap-suno">/.test(coO('cdSunoThe', 'cdChoNhac', 'cdNghiSuno', 'cdThuLaiSuno', 'cdChayLaiLoiSuno')));
+  assert.ok(/Flow Music — khi chạy<span class="ap ap-nhac-noi">/.test(coO('cdNhacThe', 'cdLuongNhac', 'cdChoNhac', 'cdNghiNhac', 'cdThuLaiNhac', 'cdChayLaiLoiNhac')));
   assert.ok(/Cả app<span class="ap ap-app">/.test(coO('cdAppThe', 'cdXemLuong', 'cdTatMay', 'cdNheMay')));
-  for (const id of ['cdChungThe', 'cdMuseThe', 'cdFlow', 'cdSunoThe', 'cdAppThe']) assert.ok(/<small class="mo">(Chỉ áp|Áp|Chung cho)/.test(the(id)), `thẻ #${id} có dòng nói thẻ áp cho đâu`);
-  assert.ok(!/Muse \/ Suno/.test(cd) && !/ap-tat-ca/.test(cd), 'không còn ô dùng chung Muse / Suno');
+  for (const id of ['cdChungThe', 'cdMuseThe', 'cdFlow', 'cdNhacThe', 'cdAppThe']) assert.ok(/<small class="mo">(Chỉ áp|Áp|Chung cho)/.test(the(id)), `thẻ #${id} có dòng nói thẻ áp cho đâu`);
+  assert.ok(!/Muse \/ (Suno|Flow Music)<\/label>/.test(cd) && !/suno/i.test(cd) && !/ap-tat-ca/.test(cd), 'không còn ô dùng chung Muse / Flow Music, không còn Suno');
   assert.ok(cd.indexOf('id="cdAppThe"') < cd.indexOf('class="thanh-luu-cd"'), 'thanh Lưu vẫn ở cuối');
-  for (const n of ['muse', 'flow', 'suno']) assert.ok(new RegExp(`\\n\\.ap-${n} \\{`).test(css), `.ap-${n}`);
-  for (const [o, k] of [['cdThuLaiFlow', 'tuThuLaiFlow'], ['cdChayLaiLoiFlow', 'tuChayLaiLoiFlow'], ['cdThuLaiSuno', 'tuThuLaiSuno'], ['cdChayLaiLoiSuno', 'tuChayLaiLoiSuno'], ['cdNghiSuno', 'nghiSuno']]) {
+  for (const n of ['muse', 'flow', 'nhac-noi']) assert.ok(new RegExp(`\\n\\.ap-${n} \\{`).test(css), `.ap-${n}`);
+  for (const [o, k] of [['cdThuLaiFlow', 'tuThuLaiFlow'], ['cdChayLaiLoiFlow', 'tuChayLaiLoiFlow'], ['cdThuLaiNhac', 'tuThuLaiNhac'], ['cdChayLaiLoiNhac', 'tuChayLaiLoiNhac'], ['cdNghiNhac', 'nghiNhac']]) {
     assert.ok(ui.includes(`$('#${o}').value = c.${k};`), `vẽ #${o}`);
     assert.ok(ui.includes(`${k}: $('#${o}').value`), `lưu #${o}`);
   }
@@ -2067,10 +2067,10 @@ test('1.2.9: thư mục video "Ảnh xong → tự tạo video" RIÊNG từng d�
   assert.ok(/id="nutThuMucVideoDuAn"/.test(khu) && /id="ghiThuMucVideoDuAn"/.test(khu), 'nút chọn thư mục phải nằm trong mục "Ảnh xong → tự tạo video" của trang Tạo ảnh');
   assert.ok(/api\.call\('chonThuMucVideoDuAn', \{ id: d\.id \}\)/.test(a) && /api\.call\('boThuMucVideoDuAn', \{ id: d\.id \}\)/.test(a));
 });
-test('1.2.0 mục Tài khoản: thẻ riêng Muse / Google Flow / Suno, mỗi thẻ chỉ hiện tài khoản và nút Thêm của nơi đó', () => {
+test('1.2.0 mục Tài khoản: thẻ riêng Muse / Google Flow / Flow Music, mỗi thẻ chỉ hiện tài khoản và nút Thêm của nơi đó', () => {
   const h = docNguon('src/ui/index.html'), a = docNguon('src/ui/app.js');
-  for (const n of ['muse', 'flow', 'suno']) assert.ok(new RegExp(`id="nenTk"[\\s\\S]*data-v="${n}"`).test(h), `thiếu thẻ ${n}`);
-  assert.ok(/class="nut-gradient nho chi-flow" id="nutThemTKFlow"/.test(h) && /class="nut-gradient nho chi-suno" id="nutThemTKSuno"/.test(h));
+  for (const n of ['muse', 'flow', 'fmusic']) assert.ok(new RegExp(`id="nenTk"[\\s\\S]*data-v="${n}"`).test(h), `thiếu thẻ ${n}`);
+  assert.ok(/class="nut-gradient nho chi-flow" id="nutThemTKFlow"/.test(h) && !/chi-fmusic/.test(h), 'Flow Music không có nút Thêm riêng (đi kèm tài khoản Flow)');
   assert.ok(/S\.taiKhoan\.filter\(\(a\) => nenTk\(a\) === U\.nenTk\)/.test(a), 'danh sách chưa lọc theo thẻ đang chọn');
   assert.ok(/nenTk: U\.nenTk/.test(a), 'thẻ đang chọn chưa được nhớ');
 });
@@ -2086,9 +2086,9 @@ testAsync('Flow: lỗi mất kết nối / tạm nghỉ an toàn (daNghi) → vi
   dp._ketThuc(j, { ok: false, matKetNoi: true, loi: 'Không vào được trang dự án Flow' }, dp.o.taiKhoan.tim('flow-1'));
   assert.ok(j.trangThai === 'cho' && dp._nghi('flow-1'), 'mất kết nối thường → tài khoản tạm nghỉ');
 });
-test('tài khoản: mặc định có Muse 1 + Flow 1 + Suno 1, phiên tách theo nền tảng; dự án chọn tài khoản theo từng nền tảng', () => {
+test('tài khoản: mặc định có Muse 1 + Flow 1 (+ Flow Music đi kèm), phiên tách theo nền tảng; dự án chọn tài khoản theo từng nền tảng', () => {
   const { dp, tk } = dungDieuPhoi();
-  assert.deepStrictEqual(tk.ds.map((a) => [a.id, a.nen, a.partition]), [['tk-1', 'muse', 'persist:muse-tk-1'], ['flow-1', 'flow', 'persist:flow-flow-1'], ['suno-1', 'suno', 'persist:suno-suno-1']]);
+  assert.deepStrictEqual(tk.ds.map((a) => [a.id, a.nen, a.partition]), [['tk-1', 'muse', 'persist:muse-tk-1'], ['flow-1', 'flow', 'persist:flow-flow-1'], ['nhac-flow-1', 'fmusic', 'persist:flow-flow-1']]);
   const f2 = tk.them('Flow 2', 'flow');
   assert.strictEqual(f2.partition, `persist:flow-${f2.id}`);
   const d = dp.taoDuAn('P', [f2.id, 'tk-1']);
@@ -2119,69 +2119,102 @@ test('main.js: tab Flow có preload cầu nối, phiên Flow giữ nguyên user 
   assert.ok(/taiVeFlow\.attach\(/.test(m), 'tải về của phiên Flow phải đi qua DownloadManager');
 });
 
-console.log('\n── Suno (tạo nhạc) ────────────────────────────');
-const { chonBaiDaiHon } = require('../src/main/luong-suno');
-/** Luồng giả Suno: tài khoản trong `hetLuot` báo hết lượt, còn lại trả file mp3 đã tải về thư mục tạm. */
-const luongGiaSuno = (daChay, hetLuot = new Set(), dangChay = { n: 0, max: 0 }) => (a, stt) => (a.nen === 'suno' ? {
-  id: `${a.id}-${stt}`, nen: 'suno', ranh: true, viec: null, dung() {},
+console.log('\n── Flow Music (tạo nhạc, 1.5.0) ───────────────');
+const { chonBaiDaiHon } = require('../src/main/luong-nhac');
+/** Luồng giả Flow Music: tài khoản trong `hetLuot` báo hết credit, còn lại trả file mp3 đã tải về thư mục tạm. */
+const luongGiaNhac = (daChay, hetLuot = new Set(), dangChay = { n: 0, max: 0, theoTk: {} }) => (a, stt) => (a.nen === 'fmusic' ? {
+  id: `${a.id}-${stt}`, nen: 'fmusic', ranh: true, viec: null, dung() {},
   async chay(j) {
-    this.ranh = false; this.viec = j; daChay.push(['suno', a.id, j.so]);
+    this.ranh = false; this.viec = j; daChay.push(['fmusic', a.id, j.so]);
     dangChay.n++; dangChay.max = Math.max(dangChay.max, dangChay.n);
+    dangChay.theoTk[a.id] = (dangChay.theoTk[a.id] || 0) + 1; dangChay.maxTk = Math.max(dangChay.maxTk || 0, dangChay.theoTk[a.id]);
     await new Promise((r) => setTimeout(r, 15));
-    dangChay.n--; this.ranh = true; this.viec = null;
-    return hetLuot.has(a.id) ? { ok: false, hetLuot: true, loi: 'Suno hết lượt tải về: "Download limit reached"' }
-      : { ok: true, files: [{ duongDan: `/tam/suno-${j.so}.mp3` }], ghiChu: 'bài dài hơn: 2:41 (bài kia 2:05)' };
+    dangChay.n--; dangChay.theoTk[a.id]--; this.ranh = true; this.viec = null;
+    return hetLuot.has(a.id) ? { ok: false, hetLuot: true, loi: 'Flow Music hết lượt: "You are out of credits for today."' }
+      : { ok: true, files: [{ duongDan: `/tam/nhac-${j.so}.mp3` }], ghiChu: 'bài dài hơn: 2:59 (bài kia 2:29)' };
   }
 } : luongGiaHaiNen(daChay)(a, stt));
-test('Suno: trong 2 bài mới đầu tiên lấy bài DÀI HƠN (bằng nhau → bài trên; bài 3–4 bản nghe thử không xét)', () => {
+test('Flow Music: trong 2 bài đầu lấy bài DÀI HƠN (bằng nhau / không đọc được thời lượng → bài trên)', () => {
   const c = (id, giay) => ({ id, giay });
-  assert.strictEqual(chonBaiDaiHon([c('a', 125), c('b', 161), c('c', 240), c('d', 240)]).id, 'b');
-  assert.strictEqual(chonBaiDaiHon([c('a', 170), c('b', 161)]).id, 'a');
+  assert.strictEqual(chonBaiDaiHon([c('a', 149.4), c('b', 178.7)]).id, 'b');
+  assert.strictEqual(chonBaiDaiHon([c('a', 170), c('b', 161), c('c', 400)]).id, 'a', 'bài thứ 3 trở đi không xét');
   assert.strictEqual(chonBaiDaiHon([c('a', 150), c('b', 150)]).id, 'a');
+  assert.strictEqual(chonBaiDaiHon([c('a', 0), c('b', 0)]).id, 'a');
   assert.strictEqual(chonBaiDaiHon([c('a', 90)]).id, 'a');
   assert.strictEqual(chonBaiDaiHon([]), null);
 });
-testAsync('Suno: việc nhạc chỉ chạy ở tài khoản Suno (1 luồng), song song với ảnh Muse; tên {stt}.mp3 trong thư mục nhạc', async () => {
-  const daChay = [], chuyen = [], dem = { n: 0, max: 0 };
-  const { dp, nhatKy } = dungDieuPhoi({ taoLuong: luongGiaSuno(daChay, new Set(), dem), chuyenFile: (a, b) => chuyen.push([a, b]) });
-  dp.datCaiDat({ nghiGiuaLanGui: 0, luongMoiTK: 3, thuMucNhac: '/nhac', tenNhac: '{stt}' });
-  dp.them({ loai: 'nhac', nen: 'muse', prompts: ['lofi chill piano', 'epic orchestral', 'acoustic guitar'] });
+test('Flow Music: tài khoản Flow Music đi kèm mỗi tài khoản Google Flow (cùng phiên, cùng tên); bỏ Suno của bản cũ', () => {
+  const { tk } = dungDieuPhoi();
+  assert.deepStrictEqual(tk.ds.map((a) => [a.id, a.nen, a.partition]),
+    [['tk-1', 'muse', 'persist:muse-tk-1'], ['flow-1', 'flow', 'persist:flow-flow-1'], ['nhac-flow-1', 'fmusic', 'persist:flow-flow-1']]);
+  const f2 = tk.them('Flow 2', 'flow');
+  const m2 = tk.tim(`nhac-${f2.id}`);
+  assert.ok(m2 && m2.partition === f2.partition && m2.ten === 'Flow 2' && m2.flowTk === f2.id, JSON.stringify(m2));
+  assert.deepStrictEqual(tk.ds.map((a) => a.id).slice(-2), [f2.id, m2.id], 'đứng ngay sau tài khoản Flow của nó');
+  tk.sua(m2.id, { ten: 'Google B' });
+  assert.ok(tk.tim(f2.id).ten === 'Google B' && tk.tim(m2.id).ten === 'Google B', 'đổi tên một bên là đổi cả hai');
+  assert.ok(!tk.xoa(m2.id).ok && tk.tim(m2.id), 'không xoá riêng tài khoản Flow Music');
+  tk.sua(m2.id, { hetLuotDen: Date.now() + 1000, lyDoHetLuot: 'x' });
+  assert.ok(!tk.tim(f2.id).hetLuotDen, 'trạng thái chạy tách riêng (Flow Music hết credit không làm Flow nghỉ)');
+  assert.ok(tk.xoa(f2.id).ok && !tk.tim(m2.id), 'xoá tài khoản Flow là mất tài khoản Flow Music đi kèm');
+  assert.strictEqual(tk.them('X', 'fmusic').nen, 'flow', '"thêm Flow Music" = thêm tài khoản Flow');
+  // Dữ liệu bản cũ có tài khoản Suno → bỏ; tài khoản Flow có sẵn → tự có tài khoản Flow Music.
+  const store = khoGia({ taiKhoan: [{ id: 'tk-1', nen: 'muse', partition: 'persist:muse-tk-1', ten: 'M' },
+    { id: 'suno-1', nen: 'suno', partition: 'persist:suno-suno-1', ten: 'Suno 1', hetLuotDen: 9 },
+    { id: 'g', nen: 'flow', partition: 'persist:flow-g', ten: 'G' }] });
+  const ghi = [];
+  const q = new QuanLyTaiKhoan(store, (m, c) => ghi.push(c));
+  assert.deepStrictEqual(q.ds.map((a) => [a.id, a.nen]), [['tk-1', 'muse'], ['g', 'flow'], ['nhac-g', 'fmusic']]);
+  assert.ok(ghi.some((c) => /bỏ Suno: đã gỡ 1 tài khoản Suno/.test(c)), ghi.join('\n'));
+  assert.ok(store.get('taiKhoan').taiKhoan.every((a) => a.nen !== 'suno'), 'đã lưu danh sách mới');
+});
+testAsync('Flow Music: việc nhạc chỉ chạy ở tài khoản Flow Music (2 bài cùng lúc mỗi tài khoản), song song với ảnh Muse; tên {stt}.mp3 theo số prompt', async () => {
+  const daChay = [], chuyen = [], dem = { n: 0, max: 0, theoTk: {} };
+  const { dp, nhatKy } = dungDieuPhoi({ taoLuong: luongGiaNhac(daChay, new Set(), dem), chuyenFile: (a, b) => chuyen.push([a, b]) });
+  dp.datCaiDat({ nghiGiuaLanGui: 0, nghiNhac: 0, luongMoiTK: 3, thuMucNhac: '/nhac', tenNhac: '{stt}' });
+  assert.strictEqual(dp.caiDat.luongNhacMoiTK, 2, 'mặc định 2 bài cùng lúc mỗi tài khoản');
+  dp.them({ loai: 'nhac', nen: 'muse', prompts: ['lofi chill piano', 'epic orchestral', 'acoustic guitar', 'jazz'] });
   dp.them({ nen: 'muse', loai: 'anh', prompts: ['m1', 'm2'] });
   const nhac = dp.viec.filter((j) => j.loai === 'nhac');
-  assert.ok(nhac.length === 3 && nhac.every((j) => j.nen === 'suno'), 'loai nhac luôn chạy ở Suno, kể cả khi gửi nhầm nen');
+  assert.ok(nhac.length === 4 && nhac.every((j) => j.nen === 'fmusic'), 'loai nhac luôn chạy ở Flow Music, kể cả khi gửi nhầm nen');
   dp.chayTatCa();
   await chayHet(dp);
   assert.ok(dp.viec.every((j) => j.trangThai === 'xong'), dp.viec.map((j) => j.trangThai + j.loi).join());
-  assert.deepStrictEqual(daChay.filter((x) => x[0] === 'suno').map((x) => x[1]), ['suno-1', 'suno-1', 'suno-1']);
+  assert.deepStrictEqual([...new Set(daChay.filter((x) => x[0] === 'fmusic').map((x) => x[1]))], ['nhac-flow-1']);
+  assert.deepStrictEqual(daChay.filter((x) => x[0] === 'fmusic').map((x) => x[2]), [1, 2, 3, 4], 'gửi theo đúng thứ tự prompt');
   assert.ok(daChay.some((x) => x[0] === 'tk-1'), 'ảnh Muse vẫn chạy cùng lúc ở tài khoản Muse');
-  assert.strictEqual(dem.max, 1, 'mỗi tài khoản Suno chỉ một luồng');
-  assert.deepStrictEqual(nhac.map((j) => j.files[0].replace(/\\/g, '/')), ['/nhac/001.mp3', '/nhac/002.mp3', '/nhac/003.mp3']);
-  assert.ok(chuyen.some(([a, b]) => a === '/tam/suno-1.mp3' && b === nhac[0].files[0]), 'file Suno tải về được chuyển ra thư mục nhạc');
-  assert.ok(nhatKy.some((x) => /Việc #1 xong nhạc \(bài dài hơn: 2:41 \(bài kia 2:05\)\)/.test(x)), nhatKy.join('\n'));
+  assert.strictEqual(dem.maxTk, 2, 'mỗi tài khoản Flow Music 2 bài cùng lúc');
+  assert.deepStrictEqual(nhac.map((j) => j.files[0].replace(/\\/g, '/')), ['/nhac/001.mp3', '/nhac/002.mp3', '/nhac/003.mp3', '/nhac/004.mp3']);
+  assert.ok(chuyen.some(([a, b]) => a === '/tam/nhac-1.mp3' && b === nhac[0].files[0]), 'file tải về được chuyển ra thư mục nhạc');
+  assert.ok(nhatKy.some((x) => /Việc #1 xong nhạc \(bài dài hơn: 2:59 \(bài kia 2:29\)\)/.test(x)), nhatKy.join('\n'));
   assert.ok(nhac.every((j) => !j.tam), 'nhạc luôn tải về (không có công tắc tắt)');
+  // Số bài cùng lúc là cài đặt chung cả app (1–16).
+  dp.datCaiDat({ luongNhacMoiTK: 1 });
+  assert.strictEqual(dp.caiDat.luongNhacMoiTK, 1);
+  dp.datCaiDat({ luongNhacMoiTK: 99 });
+  assert.strictEqual(dp.caiDat.luongNhacMoiTK, 16);
 });
-testAsync('Suno hết lượt → việc TẠO LẠI ở tài khoản Suno dự phòng, tài khoản hết lượt nghỉ 6 giờ (nhớ qua lần mở app); hết cả thì tạm dừng', async () => {
+testAsync('Flow Music hết credit → việc TẠO LẠI ở tài khoản dự phòng, tài khoản hết lượt nghỉ 6 giờ (nhớ qua lần mở app), Flow vẫn chạy; hết cả thì tạm dừng', async () => {
   const daChay = [];
-  const { dp, tk, store, nhatKy } = dungDieuPhoi({ taoLuong: luongGiaSuno(daChay, new Set(['suno-1'])) });
-  const s2 = tk.them('Suno 2', 'suno');
-  dp.datCaiDat({ nghiGiuaLanGui: 0, tuThuLai: 0, tuChayLaiLoi: 0 });
+  const { dp, tk, store, nhatKy } = dungDieuPhoi({ taoLuong: luongGiaNhac(daChay, new Set(['nhac-flow-1'])) });
+  const f2 = tk.them('Flow 2', 'flow'), m2 = `nhac-${f2.id}`;
+  dp.datCaiDat({ nghiGiuaLanGui: 0, nghiNhac: 0, tuThuLai: 0, tuChayLaiLoi: 0, luongNhacMoiTK: 1 });
   dp.them({ loai: 'nhac', prompts: ['a', 'b'] });
   dp.chayTatCa();
   await chayHet(dp);
-  assert.ok(dp.viec.every((j) => j.trangThai === 'xong' && j.taiKhoan === s2.id), dp.viec.map((j) => j.trangThai + j.taiKhoan + j.loi).join());
-  assert.deepStrictEqual(daChay.filter((x) => x[1] === 'suno-1').map((x) => x[2]), [1], 'hết lượt một lần là nghỉ, việc sau chạy thẳng dự phòng');
+  assert.ok(dp.viec.every((j) => j.trangThai === 'xong' && j.taiKhoan === m2), dp.viec.map((j) => j.trangThai + j.taiKhoan + j.loi).join());
+  assert.deepStrictEqual(daChay.filter((x) => x[1] === 'nhac-flow-1').map((x) => x[2]), [1], 'hết lượt một lần là nghỉ, việc sau chạy thẳng dự phòng');
   assert.ok(dp.viec.every((j) => !j.tkLoi || !j.tkLoi.length) && dp.viec[0].thu === 0, 'hết lượt không tính là lần thử lỗi');
-  assert.ok(nhatKy.some((x) => /↪ #1 Suno hết lượt tải về.*\(ở "Suno 1"\) — tạo lại ở "Suno 2"/.test(x)), nhatKy.join('\n'));
-  const a1 = tk.tim('suno-1');
-  assert.ok(a1.hetLuotDen > Date.now() + 5.9 * 3600e3 && /Download limit/.test(a1.lyDoHetLuot));
-  const { QuanLyTaiKhoan: Q } = require('../src/main/tai-khoan');
-  assert.ok(new Q(store, () => {}).tim('suno-1').hetLuotDen === a1.hetLuotDen, 'mốc hết lượt lưu trên tài khoản');
-  assert.ok(dp._nghi('suno-1') && !dp._nghi(s2.id));
-  // Cả hai tài khoản Suno hết lượt → việc nhạc về Chờ, hàng chờ tạm dừng (không lặp vô ích).
+  assert.ok(nhatKy.some((x) => /↪ #1 Flow Music hết lượt.*\(ở "Flow 1"\) — tạo lại ở "Flow 2"/.test(x)), nhatKy.join('\n'));
+  const a1 = tk.tim('nhac-flow-1');
+  assert.ok(a1.hetLuotDen > Date.now() + 5.9 * 3600e3 && /out of credits/.test(a1.lyDoHetLuot));
+  assert.ok(new QuanLyTaiKhoan(store, () => {}).tim('nhac-flow-1').hetLuotDen === a1.hetLuotDen, 'mốc hết lượt lưu trên tài khoản');
+  assert.ok(dp._nghi('nhac-flow-1') && !dp._nghi(m2) && !dp._nghi('flow-1'), 'tài khoản Flow cùng tên vẫn tạo ảnh / video');
+  // Cả hai tài khoản hết credit → việc nhạc về Chờ, hàng chờ tạm dừng (không lặp vô ích).
   const daChay2 = [];
-  const b = dungDieuPhoi({ taoLuong: luongGiaSuno(daChay2, new Set(['suno-1', 'suno-2'])) });
-  b.tk.them('Suno 2', 'suno');
-  b.dp.datCaiDat({ nghiGiuaLanGui: 0, tuThuLai: 0, tuChayLaiLoi: 0 });
+  const b = dungDieuPhoi({ taoLuong: luongGiaNhac(daChay2, new Set(['nhac-flow-1', 'nhac-flow-2'])) });
+  b.tk.them('Flow 2', 'flow');
+  b.dp.datCaiDat({ nghiGiuaLanGui: 0, nghiNhac: 0, tuThuLai: 0, tuChayLaiLoi: 0, luongNhacMoiTK: 1 });
   b.dp.them({ loai: 'nhac', prompts: ['x'] });
   b.dp.chayTatCa();
   await chayHet(b.dp);
@@ -2189,8 +2222,9 @@ testAsync('Suno hết lượt → việc TẠO LẠI ở tài khoản Suno dự 
   assert.strictEqual(b.dp.viec[0].trangThai, 'cho');
   assert.strictEqual(daChay2.length, 2, 'mỗi tài khoản thử đúng một lần');
   assert.ok(b.nhatKy.some((x) => /không còn tài khoản dự phòng nào còn lượt/.test(x)));
+  assert.ok(b.nhatKy.some((x) => /Flow Music hết lượt: thêm tài khoản Google Flow/.test(x)), b.nhatKy.join('\n'));
 });
-test('Suno: cài đặt nhạc (thư mục, mẫu tên mặc định {stt}, chờ tối đa kẹp 120–3600 s); tên file .mp3', () => {
+test('Flow Music: cài đặt nhạc (thư mục, mẫu tên mặc định {stt}, chờ tối đa kẹp 120–3600 s); khoá Suno của bản cũ chuyển sang khoá mới', () => {
   const { dp } = dungDieuPhoi();
   assert.strictEqual(dp.caiDat.tenNhac, '{stt}');
   dp.datCaiDat({ choNhacGiay: 5, tenNhac: '' });
@@ -2203,163 +2237,140 @@ test('Suno: cài đặt nhạc (thư mục, mẫu tên mặc định {stt}, ch�
   assert.strictEqual(dp.thuMucRa('nhac'), '/nhac');
   assert.strictEqual(HD.tenFile({ ten: 'P' }, { so: 7, stt: 7, loai: 'nhac', prompt: 'x', taoLuc: 0 }, 'audio/mpeg', 0, '{stt}'), '007.mp3');
   assert.strictEqual(HD.mimeTuDuoi('/a/b.mp3'), 'audio/mpeg');
+  // Bản cũ đã chỉnh số của Suno → giữ cho Flow Music; việc Suno cũ → Flow Music (bỏ bài Suno đã nhớ).
+  const { dp: d2 } = dungDieuPhoi({ duLieu: { caiDat: { tuThuLaiSuno: 5, tuChayLaiLoiSuno: 0, nghiSuno: 9 },
+    duAn: [{ id: 'mac-dinh', ten: 'M', chaySong: { muse: 1, flow: 1, suno: 3 }, caiDat: { nghiSuno: 7 } }],
+    viec: [{ id: 'v1', duAn: 'mac-dinh', so: 1, stt: 1, loai: 'nhac', nen: 'suno', prompt: 'p', trangThai: 'cho', sunoBai: { tk: 'suno-1', ids: ['x'] }, nhanVat: [], files: [] }] } });
+  assert.deepStrictEqual([d2.caiDat.tuThuLaiNhac, d2.caiDat.tuChayLaiLoiNhac, d2.caiDat.nghiNhac], [5, 0, 9]);
+  assert.ok(!('tuThuLaiSuno' in d2.cd('mac-dinh')) && !('nghiSuno' in d2.cd('mac-dinh')), 'không còn khoá Suno');
+  assert.strictEqual(d2.cd('mac-dinh').nghiNhac, 7, 'cài đặt riêng dự án cũng chuyển');
+  assert.ok(d2.viec[0].nen === 'fmusic' && !('sunoBai' in d2.viec[0]));
+  assert.strictEqual(d2._soSong('mac-dinh', 'fmusic', true), 3, 'số tài khoản Chạy của Suno → của Flow Music');
 });
-test('Suno: trình trợ giúp — Styles + Lyrics trống, chỉ xét 2 bài mới, tải bằng menu Download của Suno (không lấy thẳng CDN), captcha để người dùng tự giải', () => {
-  const t = docNguon('src/inject/suno-trang.js'), l = docNguon('src/main/luong-suno.js'), m = docNguon('main.js');
-  assert.ok(/;\s*undefined;\s*$/.test(docNguon('src/inject/suno-trang.js', true).trim() + '\n'.trim()), 'kết thúc bằng undefined;');
-  assert.ok(/create-form-styles-wrapper/.test(t) && /Lyrics editor/.test(t) && /Create song/.test(t));
-  assert.ok(/moi\.slice\(0, 2\)/.test(l), 'chỉ chờ / xét 2 bài mới đầu tiên');
-  assert.ok(/window\.__suno\.taiMp3\(/.test(l) && !/fetch\(/.test(t), 'tải qua menu của Suno, trình trợ giúp không tự fetch file');
-  assert.ok(/hienCuaSo\(\)/.test(l) && !/recaptcha.*click|hcaptcha.*click/i.test(t), 'captcha: hiện cửa sổ, không bấm hộ');
-  assert.ok(/will-download/.test(m) && /choTaiSuno/.test(m), 'main.js bắt file tải về của phiên Suno');
-  assert.ok(/hetLuotDen: 0/.test(m), 'Kiểm tra tài khoản Suno xoá mốc hết lượt');
+test('Flow Music: trình trợ giúp dò đúng nhãn đã đo trên trang thật; tải bằng menu More options → Download → MP3 (không tự fetch file)', () => {
+  const t = docNguon('src/inject/nhac-trang.js'), l = docNguon('src/main/luong-nhac.js'), m = docNguon('main.js');
+  assert.ok(/;?\s*undefined;\s*$/.test(docNguon('src/inject/nhac-trang.js', true).trim()), 'kết thúc bằng undefined;');
+  for (const nhan of ['textarea[aria-label="Chat message"]', 'button[aria-label="Send message"]', '[role="button"][aria-label^="Open details for"]',
+    'button[aria-label^="More options for"]', 'button[aria-label="Settings menu"]']) assert.ok(t.includes(nhan), nhan);
+  assert.ok(!/fetch\(/.test(t) && !/__api\/download/.test(t), 'không tự gọi API tải của trang — chỉ bấm menu');
+  assert.ok(/kq\.the\.slice\(0, 2\)/.test(l) && /chonBaiDaiHon\(bai\)/.test(l), 'chỉ xét 2 bài đầu, lấy bài dài hơn');
+  assert.ok(/will-download/.test(m) && /choTaiNhac/.test(m) && /setAudioMuted\(true\)/.test(m), 'main.js bắt file tải về, cửa sổ ngầm tắt tiếng');
+  assert.ok(/boQuaWc: \(id\) => wcNhac\.has\(id\)/.test(m) && /this\.boQuaWc && this\.boQuaWc\(webContents\.id\)/.test(docNguon('src/flow/main/downloads.js')),
+    'phiên Flow dùng chung: tải của cửa sổ Flow Music không bị phần tải về của tab Flow giành mất');
+  assert.ok(/tk\.nen === 'flow' \|\| tk\.nen === 'fmusic'/.test(m), 'Flow Music cấu hình phiên như Flow (user agent thật)');
+  assert.ok(!/suno/i.test(m), 'main.js không còn Suno');
 });
-test('Suno: câu báo hết lượt — nhận hộp Out of Downloads / toast hết lượt, KHÔNG nhận chữ thường của hộp Download thật', () => {
+test('Flow Music: câu báo hết credit — nhận câu hết lượt, KHÔNG nhận chữ thường của Producer', () => {
   const vm = require('vm');
   const ctx = { window: {} };
-  vm.runInNewContext(docNguon('src/inject/suno-trang.js', true), ctx);
-  const s = ctx.window.__suno;
-  // Chữ thật trong hộp Download (ảnh người dùng gửi 15/10/2026) khi tải được.
-  const thuong = "Download 'Morning Light Breaks Throu…' · M4A · MP3 · WAV · MP4 video asset · Stems & MIDI · Manage · Download · You've unlocked this song. You can return and download at any time. Learn more.";
+  vm.runInNewContext(docNguon('src/inject/nhac-trang.js', true), ctx);
+  const s = ctx.window.__fmusic;
+  const thuong = "Laying down two takes of that 80 BPM lofi piano vibe with soft rain ambience for you right now. Let's see which variation hits the mood best for your session. Make a 15s Shorts video · add warm vinyl crackle";
   assert.strictEqual(s.cauHetLuot(thuong), '');
-  assert.strictEqual(s.cauHetLuot("Download 'X' · MP3 · Download · You've reached your download limit for this month. Upgrade to Pro for more downloads."),
-    "You've reached your download limit for this month. Upgrade to Pro for more downloads.");
-  assert.ok(s.cauHetLuot('Not enough credits. Upgrade to Pro to get more credits.'));
-  assert.ok(s.cauHetLuot("Out of Downloads · You don't have any downloads left. Subscribe for a monthly allowance, or buy downloads for the songs you want."));
-  const t = docNguon('src/inject/suno-trang.js');
-  assert.ok(/function hopTai\(\)/.test(t) && /dungChu\(e, \/\^mp3\$\/i\)/.test(t) && /NHAN\.nutTai/.test(t), 'tải: hộp chọn định dạng → ô MP3 → nút Download');
+  assert.strictEqual(s.cauHetLuot('Sound lofi. 530 credits'), '');
+  assert.ok(s.cauHetLuot("Sorry. You're out of credits for today. Upgrade to keep creating."));
+  assert.ok(s.cauHetLuot('You have reached your daily limit.'));
+  assert.ok(s.cauHetLuot('Not enough credits to generate this song'));
+  assert.ok(s.cauHetLuot('Bạn đã hết credit hôm nay'));
 });
-// ── 1.2.4: nhật ký 16/10/2026 — hộp Download có nút "Unlock & Download"; tải hỏng thì app GỬI LẠI prompt ──
-function sunoGia({ cu = [], taiHong = 0, dsTre = 0, hetGio = null } = {}) {
-  // Trang Suno giả ở mức lệnh window.__suno.*: danh sách bài, Create đẻ 4 bài (đang tạo → xong sau vài lần hỏi).
-  const tp = { ds: cu.map((id) => ({ id, trangThai: 'complete', giay: 180 })), tao: 0, taiMp3: [], dsGoi: 0, taiHong };
+/** Trang Flow Music giả ở mức lệnh window.__fmusic.*: gửi → phiên → đang tạo → 2 bài. */
+function nhacGia({ taiHong = 0, chiTraLoiChu = 0, hetCredit = false, giay = [149.4, 178.7] } = {}) {
+  const tp = { gui: [], taiMp3: [], hoi: 0, phien: '', the: [], dangTao: [], taiHong, chiTraLoiChu, moTrang: [] };
   const goi = async (bt) => {
-    if (/trangThai\(\)/.test(bt)) return { coForm: true };
-    if (/captcha\(\)/.test(bt)) return false;
-    if (/dsClip\(\)/.test(bt)) {
-      tp.dsGoi++;
-      if (tp.dsGoi <= dsTre) return [];                       // danh sách nạp muộn
-      for (const c of tp.ds) if (c.trangThai !== 'complete' && ++c.hoi > 2) Object.assign(c, { trangThai: 'complete' });
-      return tp.ds.map((c) => ({ ...c }));
-    }
-    if (/chuanBi\(/.test(bt)) return { ok: true };
-    if (/hetGioTao\(\)/.test(bt)) return hetGio;
-    if (/bamTao\(\)/.test(bt)) {
-      tp.tao++;
-      tp.ds = [130, 170, 240, 60].map((giay, i) => ({ id: `moi${tp.tao}-${i + 1}`, trangThai: 'streaming', giay, hoi: 0 })).concat(tp.ds);
+    if (/trangThai\(\)/.test(bt)) return { coO: true, daDangNhap: true, phien: tp.phien };
+    if (/\.gui\(/.test(bt)) {
+      tp.gui.push(JSON.parse(bt.match(/\.gui\((.*)\)$/)[1]));
+      tp.phien = 'ph1'; tp.hoi = 0;
       return { ok: true };
     }
+    if (/tinhTrang\(/.test(bt)) {
+      tp.hoi++;
+      if (hetCredit) return { phien: tp.phien, the: [], dangTao: [], ban: false, dangNghi: false, chuTrang: "You're out of credits for today.", thongBao: '' };
+      if (tp.chiTraLoiChu > 0) {
+        if (tp.hoi > 1) { if (tp.gui.length > tp.chiTraLoiChu) tp.chiTraLoiChu = 0; return { phien: tp.phien, the: [], dangTao: [], ban: false, dangNghi: false, chuTrang: 'Which genre do you want?', thongBao: '' }; }
+        return { phien: tp.phien, the: [], dangTao: [], ban: true, dangNghi: true, chuTrang: 'Thinking', thongBao: '' };
+      }
+      if (tp.hoi < 3) return { phien: tp.phien, the: [], dangTao: [{ ten: 'A', pt: 20 * tp.hoi }, { ten: 'B', pt: 10 }], ban: true, dangNghi: false, chuTrang: '', thongBao: '' };
+      tp.the = [{ id: 'bai-a', ten: 'Rainy Day Piano' }, { id: 'bai-b', ten: 'Soft Rain & Piano' }];
+      return { phien: tp.phien, the: tp.the, dangTao: [], ban: false, dangNghi: false, chuTrang: '', thongBao: '' };
+    }
+    if (/cauHetLuot\(/.test(bt)) { const vm = require('vm'); const c = { window: {} }; vm.runInNewContext(docNguon('src/inject/nhac-trang.js', true), c); return c.window.__fmusic.cauHetLuot(JSON.parse(bt.match(/cauHetLuot\((.*)\)$/)[1])); }
+    if (/thoiLuong\(/.test(bt)) return { 'bai-a': giay[0], 'bai-b': giay[1] };
     if (/taiMp3\(/.test(bt)) {
       const id = JSON.parse(bt.match(/taiMp3\((.*)\)$/)[1]);
       tp.taiMp3.push(id);
-      if (tp.taiHong > 0) { tp.taiHong--; return { ok: false, loi: 'hop-khong-co-nut-download', chu: 'Download · Unlock & Download' }; }
+      if (tp.taiHong > 0) { tp.taiHong--; return { ok: false, loi: 'menu-download-khong-co-mp3', menu: ['Download video', 'Get stems'] }; }
       tp.choTai && tp.choTai({ ok: true, duongDan: `/tam/${id}.mp3`, mime: 'audio/mpeg' });
-      return { ok: true, moKhoa: true, cach: 'mo-khoa' };
+      return { ok: true };
     }
-    if (/thongBao\(\)|hetLuotTai\(\)|cauHetLuot\(/.test(bt)) return '';
-    return { ok: false };
+    return true;
   };
   return { tp, goi };
 }
-function luongSunoGia(tp, goi, nhatKy) {
-  const { LuongSuno } = require('../src/main/luong-suno');
-  const l = new LuongSuno({ id: 'S1', taiKhoan: { id: 'suno-1' }, wc: {}, nguon: '', url: 'x', log: (m, c) => nhatKy.push(`[${m}] ${c}`),
+function luongNhacGia(tp, goi, nhatKy, tkId = 'nhac-flow-1') {
+  const { LuongNhac } = require('../src/main/luong-nhac');
+  const l = new LuongNhac({ id: 'N1', taiKhoan: { id: tkId }, wc: {}, nguon: '', url: 'https://www.flowmusic.app/', log: (m, c) => nhatKy.push(`[${m}] ${c}`),
     choTaiVe: () => { let res; const hua = new Promise((r) => { res = r; }); tp.choTai = res; return { hua, huy: () => {}, daBatDau: () => false }; } });
-  l.goi = goi; l.moTrang = async () => {}; l.ngu = async () => true;
+  l.goi = goi; l.moTrang = async (u) => { tp.moTrang.push(u); }; l.ngu = async () => true;
   return l;
 }
-const ctxSuno = (j) => ({ choToiDaGiay: 600, choGui: async () => {}, capNhat: (t) => Object.assign(j, t) });
+const ctxNhac = (j) => ({ choToiDaGiay: 600, choGui: async () => {}, capNhat: (t) => Object.assign(j, t) });
 
-testAsync('1.2.4 Suno tải hỏng → nạp lại trang, tải lại ĐÚNG bài đã tạo, không bấm Create lần nữa', async () => {
+testAsync('Flow Music: gửi prompt NGUYÊN VĂN → chờ 2 bài → tải MP3 bài dài hơn; nhớ phiên + bài đã chọn trên việc', async () => {
   const nhatKy = [];
-  const { tp, goi } = sunoGia({ cu: ['cu-1', 'cu-2'], taiHong: 1 });
-  const j = { so: 348, prompt: 'lofi' };
-  const r = await luongSunoGia(tp, goi, nhatKy)._chay(j, ctxSuno(j), 0);
+  const { tp, goi } = nhacGia();
+  const j = { so: 12, prompt: 'lofi chill piano, soft rain ambience, 80 bpm, instrumental' };
+  const r = await luongNhacGia(tp, goi, nhatKy)._chay(j, ctxNhac(j), 0);
   assert.ok(r.ok, JSON.stringify(r) + '\n' + nhatKy.join('\n'));
-  assert.strictEqual(tp.tao, 1, 'chỉ bấm Create MỘT lần');
-  assert.deepStrictEqual(tp.taiMp3, ['moi1-2', 'moi1-2'], 'tải lại đúng bài dài hơn trong 2 bài mới');
+  assert.deepStrictEqual(tp.gui, [j.prompt], 'gửi đúng một lần, nguyên văn');
+  assert.deepStrictEqual(tp.taiMp3, ['bai-b'], 'bài dài hơn (2:59 > 2:29)');
+  assert.strictEqual(r.files[0].duongDan, '/tam/bai-b.mp3');
+  assert.ok(/bài dài hơn: 2:59 \(bài kia 2:29\)/.test(r.ghiChu), r.ghiChu);
+  assert.deepStrictEqual(j.nhacPhien && [j.nhacPhien.tk, j.nhacPhien.url, j.nhacPhien.chon.id], ['nhac-flow-1', 'https://www.flowmusic.app/session/ph1', 'bai-b']);
+  assert.ok(nhatKy.some((x) => /#12 đã gửi → Flow Music đang tạo/.test(x)) && /Flow Music đang tạo/.test(j.buoc + nhatKy.join()), nhatKy.join('\n'));
+});
+testAsync('Flow Music tải hỏng → mở lại ĐÚNG phiên, tải lại đúng bài, không gửi lại prompt; lần chạy sau cùng tài khoản dùng lại phiên, tài khoản khác thì tạo mới', async () => {
+  const nhatKy = [];
+  const { tp, goi } = nhacGia({ taiHong: 3 });
+  const j = { so: 7, prompt: 'jazz' };
+  const l = luongNhacGia(tp, goi, nhatKy);
+  let r = await l._chay(j, ctxNhac(j), 0);
+  assert.ok(!r.ok && /menu-download-khong-co-mp3/.test(r.loi) && !r.hetLuot, JSON.stringify(r));
+  assert.strictEqual(tp.gui.length, 1);
+  assert.deepStrictEqual(tp.taiMp3, ['bai-b', 'bai-b', 'bai-b']);
   assert.ok(nhatKy.some((x) => /tải lại bài này \(lần 2\/3\), không gửi lại prompt/.test(x)), nhatKy.join('\n'));
-  assert.ok(nhatKy.some((x) => /Suno đang tạo 4 bài \(moi1-1, moi1-2, moi1-3, moi1-4\)/.test(x)), nhatKy.join('\n'));
-  assert.deepStrictEqual(j.sunoBai, { tk: 'suno-1', ids: ['moi1-1', 'moi1-2'] }, 'nhớ bài của việc trên tài khoản này');
+  assert.ok(tp.moTrang.filter((u) => u === 'https://www.flowmusic.app/session/ph1').length >= 2, tp.moTrang.join());
+  r = await l._chay(j, ctxNhac(j), 0);
+  assert.ok(r.ok && tp.gui.length === 1, `lần sau không gửi lại (đã gửi ${tp.gui.length} lần)`);
+  assert.ok(nhatKy.some((x) => /mở lại phiên Flow Music đã gửi .* — không gửi lại prompt/.test(x)), nhatKy.join('\n'));
+  const j2 = { so: 8, prompt: 'rock', nhacPhien: { tk: 'nhac-khac', url: 'https://www.flowmusic.app/session/zz' } };
+  r = await l._chay(j2, ctxNhac(j2), 0);
+  assert.ok(r.ok && tp.gui.length === 2, 'phiên của tài khoản khác → gửi mới ở tài khoản này');
 });
-
-testAsync('1.2.4 Suno tải hỏng cả 3 lần → việc lỗi; lần chạy sau ở CÙNG tài khoản tải lại bài cũ, KHÔNG gửi lại prompt; tài khoản khác thì tạo mới', async () => {
+testAsync('Flow Music: Producer chỉ trả lời bằng chữ → nhắn thêm MỘT lần "tạo bài luôn"; vẫn không ra bài thì lỗi kèm câu Producer trả lời', async () => {
   const nhatKy = [];
-  const { tp, goi } = sunoGia({ cu: ['cu-1'], taiHong: 3 });
-  const j = { so: 348, prompt: 'lofi' };
-  const l = luongSunoGia(tp, goi, nhatKy);
-  let r = await l._chay(j, ctxSuno(j), 0);
-  assert.ok(!r.ok && /hop-khong-co-nut-download/.test(r.loi) && !r.hetLuot, JSON.stringify(r));
-  assert.strictEqual(tp.tao, 1);
-  r = await l._chay(j, ctxSuno(j), 0);
-  assert.ok(r.ok && tp.tao === 1, `lần sau không bấm Create (đã bấm ${tp.tao} lần)`);
-  assert.ok(nhatKy.some((x) => /dùng lại 2 bài đã tạo lần trước \(moi1-1, moi1-2\) — không gửi lại prompt/.test(x)), nhatKy.join('\n'));
-  // Bài của tài khoản khác → không dùng được ở đây, tạo mới.
-  const j2 = { so: 349, prompt: 'jazz', sunoBai: { tk: 'suno-2', ids: ['moi1-1'] } };
-  r = await l._chay(j2, ctxSuno(j2), 0);
-  assert.ok(r.ok && tp.tao === 2, 'bài ở tài khoản khác → tạo mới ở tài khoản này');
+  let { tp, goi } = nhacGia({ chiTraLoiChu: 1 });
+  const j = { so: 3, prompt: 'make me something' };
+  let r = await luongNhacGia(tp, goi, nhatKy)._chay(j, ctxNhac(j), 0);
+  assert.ok(r.ok && tp.gui.length === 2 && /create the song now/i.test(tp.gui[1]), JSON.stringify(r) + tp.gui.join(' | '));
+  assert.ok(nhatKy.some((x) => /Producer chỉ trả lời bằng chữ/.test(x)));
+  ({ tp, goi } = nhacGia({ chiTraLoiChu: 99 }));
+  const j2 = { so: 4, prompt: 'hmm' };
+  r = await luongNhacGia(tp, goi, [])._chay(j2, ctxNhac(j2), 0);
+  assert.ok(!r.ok && !r.hetLuot && /không tạo bài nào — Producer trả lời: "Which genre do you want\?"/.test(r.loi) && tp.gui.length === 2, JSON.stringify(r));
 });
-
-testAsync('1.2.4 Suno: danh sách bài nạp muộn → KHÔNG tính bài cũ là bài mới (nhật ký: "Suno đang tạo 14 bài")', async () => {
-  const nhatKy = [];
-  const { tp, goi } = sunoGia({ cu: ['c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8', 'c9', 'c10'], dsTre: 4 });
-  const j = { so: 349, prompt: 'x' };
-  const r = await luongSunoGia(tp, goi, nhatKy)._chay(j, ctxSuno(j), 0);
-  assert.ok(r.ok, JSON.stringify(r));
-  assert.ok(nhatKy.some((x) => /Suno đang tạo 4 bài/.test(x)) && !nhatKy.some((x) => /đang tạo 14 bài/.test(x)), nhatKy.join('\n'));
-  assert.deepStrictEqual(tp.taiMp3, ['moi1-2']);
+testAsync('Flow Music: Producer báo hết credit → {hetLuot} (điều phối cho tài khoản nghỉ, bài sang dự phòng), không nhắn thêm', async () => {
+  const { tp, goi } = nhacGia({ hetCredit: true });
+  const j = { so: 5, prompt: 'x' };
+  const r = await luongNhacGia(tp, goi, [])._chay(j, ctxNhac(j), 0);
+  assert.ok(!r.ok && r.hetLuot && /Flow Music hết lượt: ".*out of credits/.test(r.loi), JSON.stringify(r));
+  assert.strictEqual(tp.gui.length, 1);
 });
-
-testAsync('1.2.5 Suno hết credit ("Create again in 9:44:35") → KHÔNG bấm Create, tài khoản nghỉ đúng tới giờ Suno ghi; bài đã tạo vẫn tải được', async () => {
-  const nhatKy = [];
-  const hetGio = { chu: 'Create again in 9:44:35', giay: 9 * 3600 + 44 * 60 + 35 };
-  const { tp, goi } = sunoGia({ cu: ['c1'], hetGio });
-  const j = { so: 354, prompt: 'x' };
-  const l = luongSunoGia(tp, goi, nhatKy);
-  let r = await l._chay(j, ctxSuno(j), 0);
-  assert.ok(!r.ok && r.hetLuot && /Suno hết credit tạo bài: "Create again in 9:44:35"/.test(r.loi), JSON.stringify(r));
-  assert.strictEqual(r.nghiMs, (hetGio.giay + 60) * 1000);
-  assert.strictEqual(tp.tao, 0, 'không bấm Create khi Suno ghi "Create again in"');
-  // Bài đã tạo trước đó (tải hỏng) vẫn tải lại được dù hết credit tạo bài.
-  const j2 = { so: 353, prompt: 'y', sunoBai: { tk: 'suno-1', ids: ['c1'] } };
-  r = await l._chay(j2, ctxSuno(j2), 0);
-  assert.ok(r.ok && tp.tao === 0 && tp.taiMp3.join() === 'c1', JSON.stringify(r));
-  // Điều phối: tài khoản nghỉ theo nghiMs của luồng (không phải 6 giờ cố định).
-  const NGHI = 3 * 3600e3;
-  // Luồng giả như luongGiaSuno (bận trong lúc chạy) — CI Windows từng đọc mốc trước khi việc kịp chạy (NaN giờ).
-  const { dp, tk } = dungDieuPhoi({ taoLuong: (a, stt) => (a.nen === 'suno' ? { id: `${a.id}-${stt}`, nen: 'suno', ranh: true, viec: null, dung() {},
-    async chay(j) {
-      this.ranh = false; this.viec = j;
-      await new Promise((x) => setTimeout(x, 15));
-      this.ranh = true; this.viec = null;
-      return { ok: false, hetLuot: true, nghiMs: NGHI, loi: 'Suno hết credit tạo bài: "Create again in 2:59:00"' };
-    } } : luongGiaHaiNen([])(a, stt)) });
-  dp.datCaiDat({ nghiGiuaLanGui: 0, tuThuLai: 0, tuChayLaiLoi: 0 });
-  dp.them({ loai: 'nhac', prompts: ['a'] });
-  dp.chayTatCa();
-  await chayHet(dp);
-  for (let i = 0; i < 200 && !(tk.tim('suno-1').hetLuotDen > 0); i++) { dp._vong(); await new Promise((x) => setTimeout(x, 15)); }
-  const a1 = tk.tim('suno-1');
-  assert.ok(Math.abs(a1.hetLuotDen - (Date.now() + NGHI)) < 60e3, `nghỉ ~3 giờ (còn ${((a1.hetLuotDen - Date.now()) / 3600e3).toFixed(2)} giờ)`);
-  assert.ok(/Create again in/.test(a1.lyDoHetLuot));
-});
-
-test('1.2.4 Suno: nhận nút "Unlock & Download" và nút "Download “<tên bài>”" sau khi mở khoá; Tạo lại bỏ bài đã nhớ', () => {
-  const vm = require('vm');
-  const ctx = { window: {} };
-  vm.runInNewContext(docNguon('src/inject/suno-trang.js', true), ctx);
-  assert.strictEqual(typeof ctx.window.__suno.bamTaiSauMoKhoa, 'function');
-  const t = docNguon('src/inject/suno-trang.js');
-  const NUT = eval(t.match(/nutTai: (\/.*\/i),/)[1]), SAU = eval(t.match(/nutTaiSauMoKhoa: (\/.*\/i),/)[1]);
-  for (const c of ['Download', 'Unlock & Download', 'Unlock and Download', 'Tải xuống']) assert.ok(NUT.test(c), c);
-  for (const c of ['Download all', 'Downloads', "Download 'First Light in the Room'", 'Unlock']) assert.ok(!NUT.test(c), c);
-  assert.ok(SAU.test('Download “First Light in the Room”') && !SAU.test('Download') && !SAU.test('Downloads'));
-  // 1.2.5 (video 16/10/2026): nút "Preparing..." sau Unlock; nút Create "Create again in 9:44:35" khi hết credit.
-  const CB = eval(t.match(/dangChuanBi: (\/.*\/i),/)[1]), TL = eval(t.match(/choTaoLai: (\/.*\/i),/)[1]);
-  assert.ok(CB.test('Preparing...') && CB.test('Preparing…') && !CB.test('Unlock & Download'));
-  assert.ok(TL.test('Create again in 9:44:35') && TL.exec('Create again in 9:44:35')[2] === '9:44:35' && TL.test('Create again in 05:12') && !TL.test('Create'));
+test('Flow Music: Tạo lại / Đổi tài khoản bỏ phiên đã nhớ (nhacPhien)', () => {
   const dp = docNguon('src/main/dieu-phoi.js');
-  assert.ok(/sunoBai: null/.test(dp.slice(dp.indexOf('taoLai(ids, chay) {'), dp.indexOf('taoLai(ids, chay) {') + 600)), 'Tạo lại phải bỏ sunoBai');
+  assert.ok(/nhacPhien: null/.test(dp.slice(dp.indexOf('taoLai(ids, chay) {'), dp.indexOf('taoLai(ids, chay) {') + 600)), 'Tạo lại phải bỏ nhacPhien');
+  assert.ok(/j\.nhacPhien = null;/.test(dp.slice(dp.indexOf('doiTaiKhoan(ids) {'), dp.indexOf('doiTaiKhoan(ids) {') + 1200)));
+  assert.ok(!/suno/i.test(dp.replace(/[^\n]*(KHOA_SUNO_CU|bản cũ|suno'|c\.suno|sunoBai)[^\n]*/g, '')), 'điều phối không còn Suno (trừ phần chuyển dữ liệu bản cũ)');
 });
 
 test('1.2.5 Hộp thoại dài (chọn tài khoản nhiều nơi chạy) tự cuộn, nút Lưu / Huỷ luôn thấy; chọn tài khoản gọn hai cột', () => {
@@ -2371,7 +2382,7 @@ test('1.2.5 Hộp thoại dài (chọn tài khoản nhiều nơi chạy) tự cu
   assert.ok(/class="chon-tk-vai"/.test(a) && /\.chon-tk-vai \{ display: grid; grid-template-columns: repeat\(auto-fill, minmax\(300px, 1fr\)\)/.test(c));
 });
 
-test('Suno: giao diện có mục Tạo nhạc, nút Thêm Suno, ô chờ tối đa; trang nhạc ẩn phần chỉ dành cho ảnh / video', () => {
+test('Flow Music: giao diện có mục Tạo nhạc, thẻ tài khoản Flow Music (không nút Thêm / Xoá riêng), ô chờ tối đa + số bài cùng lúc; trang nhạc ẩn phần chỉ dành cho ảnh / video', () => {
   const h = docNguon('src/ui/index.html'), a = docNguon('src/ui/app.js'), c = docNguon('src/ui/style.css');
   assert.ok(/data-trang="nhac"[\s\S]{0,80}data-icon="music"/.test(h));
   for (const id of ['nenTao', 'cheDo', 'thaAnh', 'tyLe', 'khuChuoi', 'khuVideoThuMuc', 'locNen', 'chonXoaChat']) {
@@ -2379,9 +2390,12 @@ test('Suno: giao diện có mục Tạo nhạc, nút Thêm Suno, ô chờ tối 
   }
   assert.ok(/body\.trang-nhac \.khong-nhac \{ display: none !important; \}/.test(c));
   assert.ok(/classList\.toggle\('trang-nhac', trang === 'nhac'\)/.test(a));
-  assert.ok(/themTk\('suno'\)/.test(a) && /id="nutThemTKSuno"/.test(h));
+  assert.ok(/<button data-v="fmusic">Flow Music/.test(h) && !/nutThemTKSuno|themTk\('suno'\)/.test(h + a));
+  assert.ok(/\$\{nhac \? '' : `<button class="nut-vien nho do" data-tk="xoa"/.test(a), 'thẻ Flow Music không có nút Xoá');
   assert.ok(/choNhacGiay: \$\('#cdChoNhac'\)\.value/.test(a) && /\$\('#cdChoNhac'\)\.value = c\.choNhacGiay/.test(a));
+  assert.ok(/luongNhacMoiTK: \$\('#cdLuongNhac'\)\.value/.test(a) && /id="cdLuongNhac"/.test(h));
   assert.ok(/nhac: \{ tai: '', ten: 'tenNhac' \}/.test(a), 'mẫu tên nhạc lưu vào tenNhac');
+  assert.ok(!/suno/i.test(h) && !/suno/i.test(a) && !/suno/i.test(c), 'giao diện không còn chữ Suno');
 });
 
 // ── 1.3.0: dự án chạy song song, cài đặt riêng, số thứ tự riêng, dừng / chạy từng việc ─────────
@@ -2592,7 +2606,7 @@ testAsync('1.3.0 Flow: mỗi dự án tab riêng + dự án Flow riêng; tên vi
   assert.strictEqual(dp.datFlowUrl(b.id, 'flow-1', 'https://example.com/'), false, 'chỉ nhận địa chỉ dự án Flow');
   assert.deepStrictEqual([dp.flowUrlCua(b.id, 'flow-1'), dp.flowUrlCua('mac-dinh', 'flow-1')], ['https://flow.google.com/project/xyz', ''], 'dự án khác không dùng chung dự án Flow');
 });
-testAsync('1.3.0 Suno: một luồng mỗi tài khoản DÙNG CHUNG mọi dự án, chia lượt đều (dự án sau không phải chờ hết dự án trước)', async () => {
+testAsync('1.3.0 / 1.5.0 Flow Music: luồng DÙNG CHUNG mọi dự án, chia lượt đều (dự án sau không phải chờ hết dự án trước)', async () => {
   const thuTu = [];
   const taoLuong = (a, stt, duAnId) => ({ id: `${a.id}-${stt}`, nen: a.nen, duAn: duAnId, ranh: true, viec: null, dung() {},
     async chay(j) { this.ranh = false; this.viec = j; thuTu.push([j.duAn, duAnId]); await new Promise((r) => setTimeout(r, 5)); this.ranh = true; this.viec = null; return { ok: true, files: [{ mime: 'audio/mpeg', b64: 'AA==' }] }; } });
@@ -2603,7 +2617,7 @@ testAsync('1.3.0 Suno: một luồng mỗi tài khoản DÙNG CHUNG mọi dự �
   dp.them({ duAn: b.id, loai: 'nhac', prompts: ['b1', 'b2'] });
   dp.chayTatCa();
   await chayHet(dp);
-  assert.ok(thuTu.every((x) => x[1] === null), 'luồng Suno không gắn dự án');
+  assert.ok(thuTu.every((x) => x[1] === null), 'luồng Flow Music không gắn dự án');
   assert.ok(thuTu.slice(0, 4).some((x) => x[0] === b.id), `B được chia lượt sớm: ${thuTu.map((x) => x[0]).join(',')}`);
 });
 test('1.3.0 giao diện: nút Chạy / Dừng theo dự án, nút Dừng / Chạy ở từng việc + thanh chọn, ô "Chạy prompt số", chọn ĐÍCH DANH tài khoản chạy', () => {
@@ -2621,12 +2635,12 @@ test('1.3.0 giao diện: nút Chạy / Dừng theo dự án, nút Dừng / Chạ
 test('1.3.0 vai tài khoản trong hộp thoại → thứ tự [chạy…, dự phòng…] + số chạy cùng lúc', () => {
   const a = docNguon('src/ui/app.js');
   const vaiSrc = a.slice(a.indexOf('const vaiTk = '), a.indexOf('const viecTheoId'));
-  const DS_NEN = ['muse', 'flow', 'suno'];
+  const DS_NEN = ['muse', 'flow', 'fmusic'];
   // eslint-disable-next-line no-new-func
   const f = new Function('DS_NEN', vaiSrc + '; return { vaiTk, laySong, layTk };')(DS_NEN);
-  const v = { thuTu_muse: 'm1,m2,m3,m4', vai_m1: 'du', vai_m2: 'chay', vai_m3: 'khong', vai_m4: 'chay', thuTu_flow: 'f1,f2', vai_f1: 'du', vai_f2: 'du', thuTu_suno: '' };
+  const v = { thuTu_muse: 'm1,m2,m3,m4', vai_m1: 'du', vai_m2: 'chay', vai_m3: 'khong', vai_m4: 'chay', thuTu_flow: 'f1,f2', vai_f1: 'du', vai_f2: 'du', thuTu_fmusic: '' };
   assert.deepStrictEqual(f.layTk(v), ['m2', 'm4', 'm1', 'f1', 'f2']);
-  assert.deepStrictEqual(f.laySong(v), { muse: 2, flow: 1, suno: 1 }, 'không chọn "Chạy" mà có dự phòng → dự phòng đầu thành Chạy');
+  assert.deepStrictEqual(f.laySong(v), { muse: 2, flow: 1, fmusic: 1 }, 'không chọn "Chạy" mà có dự phòng → dự phòng đầu thành Chạy');
 });
 
 console.log('\n── 1.3.4 RAM / giật ──────────────────────────');
@@ -3350,7 +3364,7 @@ console.log('\n── 1.4.0 ─────────────────�
     for (const id of ['cdDriveCach', 'cdDriveTk', 'cdDriveTkMoi', 'nutThemTKDrive']) assert.ok(new RegExp(`id="${id}"`).test(html), id);
     assert.ok(/<button data-v="drive"/.test(html) && /chi-drive/.test(html));
     assert.ok(/a\.nen === 'drive'\) \? a\.nen : 'muse'/.test(ui), 'tài khoản Drive không bị coi là Muse ở hộp tài khoản dự án');
-    assert.ok(/const DS_NEN = \['muse', 'flow', 'suno'\];/.test(ui), 'hộp tài khoản dự án chỉ Muse / Flow / Suno');
+    assert.ok(/const DS_NEN = \['muse', 'flow', 'fmusic'\];/.test(ui), 'hộp tài khoản dự án chỉ Muse / Flow / Flow Music');
     assert.ok(/driveCach: \$\('#cdDriveCach'\)\.value, driveTk: \$\('#cdDriveTk'\)\.value/.test(ui));
     assert.ok(/lenDriveWeb: \(x\) => lenDriveWeb\(x\)/.test(m) && /tk\.nen === 'drive'/.test(m));
   });

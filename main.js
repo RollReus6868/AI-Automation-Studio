@@ -15,10 +15,10 @@ const { spawn, execFile } = require('child_process');
 
 const pkg = require('./package.json');
 const { Store } = require('./src/main/store');
-const { QuanLyTaiKhoan } = require('./src/main/tai-khoan');
+const { QuanLyTaiKhoan, idNhac } = require('./src/main/tai-khoan');
 const { DieuPhoi } = require('./src/main/dieu-phoi');
 const { Luong } = require('./src/main/luong');
-const { LuongSuno } = require('./src/main/luong-suno');
+const { LuongNhac } = require('./src/main/luong-nhac');
 const { BoCapNhat, layRepo } = require('./src/main/cap-nhat');
 const hd = require('./src/main/hang-doi');
 const { QuanLyTabFlow, FLOW_URL } = require('./src/flow/tab-flow');
@@ -39,11 +39,11 @@ app.setPath('userData', process.env.MUSE_DATA_DIR ||
 
 const GOC_MUSE = (process.env.MUSE_URL || 'https://muse.ai').replace(/\/$/, '');
 const NGUON_TRANG = fs.readFileSync(path.join(__dirname, 'src/inject/muse-trang.js'), 'utf8');
-// Suno (mục Tạo nhạc, 1.1.0): luồng mở thẳng trang Create.
-const SUNO_URL = process.env.SUNO_URL || 'https://suno.com/create';
+// 1.5.0: mục Tạo nhạc chạy trên Google Flow Music — luồng mở trang chủ (= phiên chat mới).
+const NHAC_URL = process.env.NHAC_URL || 'https://www.flowmusic.app/';
 // 1.4.0: Google Drive (tài khoản nền 'drive' — chỉ để tải kết quả lên Drive). Bài kiểm: trang Drive giả.
 const DRIVE_GOC = (process.env.DRIVE_URL || 'https://drive.google.com').replace(/\/$/, '');
-const NGUON_SUNO = fs.readFileSync(path.join(__dirname, 'src/inject/suno-trang.js'), 'utf8');
+const NGUON_NHAC = fs.readFileSync(path.join(__dirname, 'src/inject/nhac-trang.js'), 'utf8');
 const DUOI_ANH = /\.(png|jpe?g|webp|gif|bmp)$/i;
 const MIME = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif', bmp: 'image/bmp' };
 
@@ -119,7 +119,7 @@ function baoNgay() {
 
 /**
  * 1.3.4 — Ghi RAM của app vào nhật ký (mỗi 10 phút khi đang chạy) theo TỪNG phần: giao diện, lõi app, GPU, từng
- * luồng Muse / Suno, từng tab Flow. Người dùng gửi nhật ký là biết phần nào ngốn RAM, không phải đoán từ Task Manager.
+ * luồng Muse / Flow Music, từng tab Flow. Người dùng gửi nhật ký là biết phần nào ngốn RAM, không phải đoán từ Task Manager.
  */
 function docRam() {
   const nhan = new Map();
@@ -185,17 +185,14 @@ function phien(tk) {
     daCauHinh.add(tk.partition);
     if (tk.nen === 'drive') {
       // 1.4.0 Google Drive: đăng nhập Google như phiên Flow — giữ nguyên user agent thật của app (bỏ chữ "Electron"
-      // thì Google báo "trình duyệt không an toàn", xem Suno 15/10/2026). Không tải gì về qua phiên này.
-    } else if (tk.nen === 'flow') {
+      // thì Google báo "trình duyệt không an toàn", lỗi đã gặp 15/10/2026). Không tải gì về qua phiên này.
+    } else if (tk.nen === 'flow' || tk.nen === 'fmusic') {
       // Google Flow: giữ nguyên phiên như Flow Automation Studio (đã chạy thật). Tải về theo TỪNG
       // tab: Electron đưa webContents vào will-download nên biết chắc file nào của tab nào.
+      // 1.5.0: Flow Music dùng CHUNG phiên này (cùng tài khoản Google, user agent thật — bỏ chữ "Electron"
+      // thì Google không cho đăng nhập). File nhạc do cửa sổ Flow Music tải thì ganTaiNhac nhận, phần Flow bỏ qua.
       taiVeFlow.attach(ses);
-    } else if (tk.nen === 'suno') {
-      // Suno đăng nhập bằng Google: giữ user agent THẬT của app như phiên Flow (Google cho đăng nhập ở
-      // phiên Flow). Lỗi 15/10/2026: bỏ chữ "Electron/…" (như Muse) → Google báo "Couldn't sign you in —
-      // This browser or app may not be secure". Chỉ xin trang tiếng Anh (nhãn suno-trang.js đã đo).
-      ganTaiSuno(ses);
-      ses.setUserAgent(ses.getUserAgent(), 'en-US,en');
+      ganTaiNhac(ses);
     } else {
       // Muse (đăng nhập Meta): bỏ chữ "Electron/…" khỏi user agent — đã chạy thật từ Muse Automation Studio.
       // Xin Muse giao diện tiếng Anh (nhãn đã đo); Muse vẫn hiện tiếng Việt thì muse-trang.js cũng hiểu.
@@ -206,40 +203,41 @@ function phien(tk) {
 }
 
 /**
- * Tải về của luồng Suno: luồng đăng ký chờ trước khi bấm Download (theo webContents của cửa sổ luồng),
- * will-download của phiên đó lưu file vào thư mục tạm rồi báo đường dẫn. Tải không ai chờ (người dùng
- * tự bấm trong khung đăng nhập) thì để Electron làm như thường (hỏi chỗ lưu).
+ * Tải về của luồng Flow Music: luồng đăng ký chờ trước khi bấm MP3 (theo webContents của cửa sổ luồng),
+ * will-download của phiên đó lưu file vào thư mục tạm rồi báo đường dẫn. Phiên này dùng chung với tab Flow:
+ * tải của tab Flow không ai chờ ở đây thì để phần tải về của Flow lo (taiVeFlow bỏ qua wc có trong bangNhac).
  */
-const choTaiSuno = new Map();   // webContents.id → { thuMuc, xong(kq) }
-function ganTaiSuno(ses) {
+const choTaiNhac = new Map();   // webContents.id → { thuMuc, xong(kq) }
+const wcNhac = new Set();       // webContents.id của mọi cửa sổ Flow Music (tải của chúng không phải của tab Flow)
+function ganTaiNhac(ses) {
   ses.on('will-download', (_e, item, wc) => {
-    const c = wc && choTaiSuno.get(wc.id);
+    const c = wc && choTaiNhac.get(wc.id);
     if (!c) return;
-    choTaiSuno.delete(wc.id);
+    choTaiNhac.delete(wc.id);
     c.batDau();
     fs.mkdirSync(c.thuMuc, { recursive: true });
-    const ten = slugThuMuc(item.getFilename().replace(/\.[^.]+$/, '')) || 'suno';
+    const ten = slugThuMuc(item.getFilename().replace(/\.[^.]+$/, '')) || 'nhac';
     const duoi = (item.getFilename().match(/\.[a-z0-9]{2,4}$/i) || ['.mp3'])[0];
     const p = path.join(c.thuMuc, `${Date.now()}-${ten}${duoi}`);
     item.setSavePath(p);
     item.once('done', (_ev, st) => {
       const mime = hd.mimeTuDuoi(p);
       c.xong(st === 'completed' ? { ok: true, duongDan: p, mime: /octet/.test(mime) ? item.getMimeType() || 'audio/mpeg' : mime }
-        : { ok: false, loi: `Tải file từ Suno không xong (${st})` });
+        : { ok: false, loi: `Tải file từ Flow Music không xong (${st})` });
     });
   });
 }
-function choTaiVeSuno(wc, ms) {
+function choTaiVeNhac(wc, ms) {
   let hen = null, daBatDau = false;
   const hua = new Promise((res) => {
-    hen = setTimeout(() => { choTaiSuno.delete(wc.id); res({ ok: false, hetGio: true }); }, ms);
-    choTaiSuno.set(wc.id, {
-      thuMuc: path.join(app.getPath('userData'), 'suno-tai-tam'),
+    hen = setTimeout(() => { choTaiNhac.delete(wc.id); res({ ok: false, hetGio: true }); }, ms);
+    choTaiNhac.set(wc.id, {
+      thuMuc: path.join(app.getPath('userData'), 'nhac-tai-tam'),
       batDau: () => { daBatDau = true; clearTimeout(hen); },   // đã bắt đầu tải → chờ tới khi xong, không cắt giữa chừng
       xong: res
     });
   });
-  return { hua, huy: () => { clearTimeout(hen); choTaiSuno.delete(wc.id); }, daBatDau: () => daBatDau };
+  return { hua, huy: () => { clearTimeout(hen); choTaiNhac.delete(wc.id); }, daBatDau: () => daBatDau };
 }
 
 const WEB_PREFS = (tk) => (tk.nen === 'flow'
@@ -329,7 +327,7 @@ function donKhoFlow() {
 }
 
 // ── 1.4.0: máy mượt — hạ ưu tiên CPU các trang chạy ngầm ─────────────────────
-// Mỗi luồng Muse / Suno / tab Flow là một trang web thật (tiến trình riêng). Chạy nhiều luồng thì các trang này giành
+// Mỗi luồng Muse / Flow Music / tab Flow là một trang web thật (tiến trình riêng). Chạy nhiều luồng thì các trang này giành
 // CPU với giao diện app và các phần mềm khác → máy giật. Hạ chúng xuống "dưới bình thường": máy rảnh thì vẫn chạy đủ
 // nhanh, máy bận thì giao diện / phần mềm người dùng đang dùng được ưu tiên trước. Tắt ở Cài đặt → Chạy.
 const daHaUuTien = new Set();
@@ -379,7 +377,7 @@ const viewCuaLuong = new Map();
 let xemLuong = !!process.env.MUSE_SHOW_LANES;
 
 /**
- * @param duAnId  1.3.0: luồng Muse / tab Flow RIÊNG của một dự án (null = luồng dùng chung, Suno). Tab Flow chạy
+ * @param duAnId  1.3.0: luồng Muse / tab Flow RIÊNG của một dự án (null = luồng dùng chung, Flow Music). Tab Flow chạy
  *                trên dự án Flow riêng của dự án đó (chưa có thì mở dự án Flow MỚI, không dùng dự án Flow cũ).
  */
 function taoLuong(tk, stt, duAnId) {
@@ -408,16 +406,17 @@ function taoLuong(tk, stt, duAnId) {
         baoTrangThai();
       } });
   }
-  if (tk.nen === 'suno') {
-    const w = taoCuaSoAn(tk, `Suno · ${id}`);
-    // Suno mở file tải về trong cửa sổ mới → tải file đó (đừng mở trang mp3 thay cho trang Create).
-    w.webContents.setWindowOpenHandler(({ url }) => {
-      if (/\.(mp3|wav|m4a)(\?|$)/i.test(url) || /cdn\d*\.suno\.ai\//i.test(url)) w.webContents.downloadURL(url);
-      return { action: 'deny' };
-    });
+  if (tk.nen === 'fmusic') {
+    const w = taoCuaSoAn(tk, `Flow Music · ${id}`);
+    // Trang tự phát bài vừa tạo xong → cửa sổ ngầm tắt tiếng (không phát ra loa của máy).
+    w.webContents.setAudioMuted(true);
+    w.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+    const wcId = w.webContents.id;
+    wcNhac.add(wcId);
+    w.webContents.once('destroyed', () => wcNhac.delete(wcId));
     if (xemLuong) w.showInactive();
-    const l = new LuongSuno({ id, taiKhoan: tk, wc: w.webContents, nguon: NGUON_SUNO, url: SUNO_URL, log,
-      choTaiVe: (ms) => choTaiVeSuno(w.webContents, ms), hienCuaSo: () => { if (!w.isDestroyed()) w.show(); } });
+    const l = new LuongNhac({ id, taiKhoan: tk, wc: w.webContents, nguon: NGUON_NHAC, url: NHAC_URL, log,
+      choTaiVe: (ms) => choTaiVeNhac(w.webContents, ms) });
     viewCuaLuong.set(l, w);
     return l;
   }
@@ -429,7 +428,7 @@ function taoLuong(tk, stt, duAnId) {
   return l;
 }
 
-/** 1.4.13: RAM (MB) trang của một luồng Muse / Suno — để làm mới luồng khi trang phình quá ngưỡng. */
+/** 1.4.13: RAM (MB) trang của một luồng Muse / Flow Music — để làm mới luồng khi trang phình quá ngưỡng. */
 function ramLuong(l) {
   const w = viewCuaLuong.get(l);
   if (!w || w.isDestroyed()) return 0;
@@ -437,7 +436,7 @@ function ramLuong(l) {
   const m = app.getAppMetrics().find((x) => x.pid === pid);
   return m && m.memory ? m.memory.workingSetSize / 1024 : 0;
 }
-/** 1.4.13: RAM cả app (byte) — mọi tiến trình: giao diện, lõi, GPU, trang Muse / Flow / Suno. */
+/** 1.4.13: RAM cả app (byte) — mọi tiến trình: giao diện, lõi, GPU, trang Muse / Flow / Flow Music. */
 function ramApp() {
   return app.getAppMetrics().reduce((t, m) => t + ((m.memory && m.memory.workingSetSize) || 0), 0) * 1024;
 }
@@ -460,7 +459,7 @@ function moDangNhap(id, khung) {
   win.contentView.addChildView(v);
   dangNhap = { id, view: v };
   datKhungDangNhap(khung);
-  v.webContents.loadURL(tk.nen === 'flow' ? (tk.flowUrl || FLOW_URL) : tk.nen === 'suno' ? SUNO_URL : tk.nen === 'drive' ? `${DRIVE_GOC}/drive/my-drive` : GOC_MUSE).catch(() => {});
+  v.webContents.loadURL(tk.nen === 'flow' ? (tk.flowUrl || FLOW_URL) : tk.nen === 'fmusic' ? NHAC_URL : tk.nen === 'drive' ? `${DRIVE_GOC}/drive/my-drive` : GOC_MUSE).catch(() => {});
   baoTrangThai();
   return { ok: true };
 }
@@ -473,7 +472,7 @@ function datKhungDangNhap(k) {
 
 /**
  * Đóng khung đăng nhập: gỡ khỏi cửa sổ NGAY rồi mới kiểm tài khoản (chạy nền, cửa sổ ẩn riêng).
- * Lỗi 15/10/2026: gỡ khung SAU khi kiểm xong (Suno tới 25 s) → khung đăng nhập là lớp native nằm đè lên
+ * Lỗi 15/10/2026: gỡ khung SAU khi kiểm xong (trang tới 25 s) → khung đăng nhập là lớp native nằm đè lên
  * mọi mục khác, hộp thoại (vd "Xoá tài khoản?") cũng phải chờ — trông như app treo.
  */
 async function dongDangNhap(kiem = true) {
@@ -493,6 +492,9 @@ async function dongDangNhap(kiem = true) {
     else log('warning', `⚠ Không nhận được địa chỉ dự án Flow "${url}" — báo cho người phát triển.`);
   }
   kiemTaiKhoan(id).catch((e) => log('warning', `👤 Không kiểm được "${tk.ten}": ${e.message}`));
+  // 1.5.0: tài khoản Flow Music đi kèm dùng chung phiên → kiểm luôn (đăng nhập Google xong là biết Flow Music chạy được chưa).
+  const nhac = tk.nen === 'flow' && taiKhoan.tim(idNhac(tk.id));
+  if (nhac) kiemTaiKhoan(nhac.id).catch(() => {});
 }
 
 async function docTrangThai(wc, ms) {
@@ -545,25 +547,26 @@ async function kiemTaiKhoan(id, nguoiBam = false) {
     baoTrangThai();
     return co ? 'da-dang-nhap' : 'can-dang-nhap';
   }
-  if (tk.nen === 'suno') {
-    const w = taoCuaSoAn(tk, 'Suno · kiểm tài khoản');
-    w.webContents.loadURL(SUNO_URL).catch(() => {});
+  if (tk.nen === 'fmusic') {
+    const w = taoCuaSoAn(tk, 'Flow Music · kiểm tài khoản');
+    w.webContents.setAudioMuted(true);
+    w.webContents.loadURL(NHAC_URL).catch(() => {});
     let tt = null;
     for (const het = Date.now() + 25000; Date.now() < het;) {
       try {
-        await w.webContents.executeJavaScript(NGUON_SUNO, true);
-        tt = await w.webContents.executeJavaScript('window.__suno.trangThai()', true);
+        await w.webContents.executeJavaScript(NGUON_NHAC, true);
+        tt = await w.webContents.executeJavaScript('window.__fmusic.trangThai()', true);
         if (tt.daDangNhap || tt.canDangNhap) break;
       } catch (_) {}
       await new Promise((r) => setTimeout(r, 500));
     }
     dongCuaSoAn(w);
     const kq = tt && tt.daDangNhap ? 'da-dang-nhap' : tt && tt.canDangNhap ? 'can-dang-nhap' : 'chua-kiem';
-    // Bấm Kiểm tra = người dùng muốn thử lại tài khoản: bỏ mốc "hết lượt" Suno đã nhớ.
+    // Bấm Kiểm tra = người dùng muốn thử lại tài khoản: bỏ mốc "hết lượt" Flow Music đã nhớ.
     const coHetLuot = (tk.hetLuotDen || 0) > Date.now();
-    taiKhoan.sua(id, { trangThai: kq, hetLuotDen: 0 });
-    log(kq === 'da-dang-nhap' ? 'success' : 'warning', `👤 "${tk.ten}": ${kq === 'da-dang-nhap' ? 'đã đăng nhập Suno' : kq === 'can-dang-nhap' ? 'CHƯA đăng nhập Suno' : 'không kiểm được (mạng?)'}` +
-      (coHetLuot ? ' · đã bỏ đánh dấu "hết lượt", lần chạy sau dùng lại tài khoản này' : ''));
+    taiKhoan.sua(id, { trangThai: kq, ...(nguoiBam ? { hetLuotDen: 0 } : {}) });
+    log(kq === 'da-dang-nhap' ? 'success' : 'warning', `👤 "${tk.ten}": ${kq === 'da-dang-nhap' ? 'đã đăng nhập Flow Music' : kq === 'can-dang-nhap' ? 'CHƯA đăng nhập Flow Music (đăng nhập Google ở tài khoản Flow cùng tên)' : 'không kiểm được (mạng?)'}` +
+      (coHetLuot && nguoiBam ? ' · đã bỏ đánh dấu "hết lượt", lần chạy sau dùng lại tài khoản này' : ''));
     baoTrangThai();
     return kq;
   }
@@ -949,8 +952,10 @@ const LENH = {
     const tk = taiKhoan.tim(id);
     if (!tk) return;
     await session.fromPartition(tk.partition).clearStorageData();
-    taiKhoan.sua(id, { trangThai: 'can-dang-nhap' });
-    log('warning', `🚪 Đã đăng xuất "${tk.ten}"`);
+    // 1.5.0: tài khoản Flow và Flow Music đi kèm dùng chung phiên → đăng xuất một bên là đăng xuất cả hai.
+    const cung = taiKhoan.list().filter((a) => a.partition === tk.partition);
+    for (const a of cung) taiKhoan.sua(a.id, { trangThai: 'can-dang-nhap' });
+    log('warning', `🚪 Đã đăng xuất "${tk.ten}"${cung.length > 1 ? ' (cả Google Flow và Flow Music — dùng chung đăng nhập)' : ''}`);
     baoTrangThai();
   },
   kiemTaiKhoan: ({ id }) => kiemTaiKhoan(id, true),
@@ -1225,6 +1230,7 @@ app.whenReady().then(() => {
   taiVeFlow = new DownloadManager({
     getSettings: () => ({}),
     findTabByWcId: (id) => tabsFlow.findByWcId(id),
+    boQuaWc: (id) => wcNhac.has(id),   // 1.5.0: cửa sổ Flow Music dùng chung phiên — tải của nó không phải của tab Flow
     dirForTab: (tab) => (tab && tab.thuMucTai) || path.join(app.getPath('userData'), 'flow-tai-tam', 'khac'),
     log: (muc, chu) => { if (muc !== 'success') log(muc, chu); },
     notifyTab: (tabId, payload) => {

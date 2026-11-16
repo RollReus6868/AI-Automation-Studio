@@ -174,15 +174,15 @@
     });
   }
   const loaiTrang = () => (U.trang === 'video' || U.trang === 'nhac' ? U.trang : 'anh');
-  /** Nơi chạy đang chọn ở cột Tạo của trang hiện tại: 'muse' | 'flow' — trang nhạc luôn là 'suno'. */
-  const nenTrang = () => (loaiTrang() === 'nhac' ? 'suno' : U.nen[loaiTrang()] === 'flow' ? 'flow' : 'muse');
-  const TEN_NEN = { muse: 'Muse', flow: 'Google Flow', suno: 'Suno', drive: 'Google Drive' };
-  const DS_NEN = ['muse', 'flow', 'suno'];
+  /** Nơi chạy đang chọn ở cột Tạo của trang hiện tại: 'muse' | 'flow' — trang nhạc luôn là 'fmusic' (Flow Music). */
+  const nenTrang = () => (loaiTrang() === 'nhac' ? 'fmusic' : U.nen[loaiTrang()] === 'flow' ? 'flow' : 'muse');
+  const TEN_NEN = { muse: 'Muse', flow: 'Google Flow', fmusic: 'Flow Music', drive: 'Google Drive' };
+  const DS_NEN = ['muse', 'flow', 'fmusic'];
   const DS_NEN_TK = [...DS_NEN, 'drive'];   // 1.4.0: thẻ Drive ở mục Tài khoản (không nhận việc tạo)
   const TEN_LOAI = { anh: 'ảnh', video: 'video', nhac: 'nhạc' };
   const ICON_LOAI = { anh: 'image', video: 'film', nhac: 'music' };
   const TY_LE_FLOW = ['16:9', '9:16'];
-  const nenTk = (a) => (a && (a.nen === 'flow' || a.nen === 'suno' || a.nen === 'drive') ? a.nen : 'muse');
+  const nenTk = (a) => (a && (a.nen === 'flow' || a.nen === 'fmusic' || a.nen === 'drive') ? a.nen : 'muse');
   const so3 = (n) => String(n).padStart(3, '0');
   function gio(t) {
     if (!t) return '';
@@ -290,7 +290,7 @@
         <div class="chon-tk-vai">${thuTu.map((id, i) => {
           const a = tk.find((x) => x.id === id);
           const vai = i < song ? 'chay' : ds.includes(id) ? 'du' : 'khong';
-          const loai = nen === 'suno' ? '' : `<span class="loai-tk">${LOAI_TK.map(([l, t]) =>
+          const loai = nen === 'fmusic' ? '' : `<span class="loai-tk">${LOAI_TK.map(([l, t]) =>
             `<label title="Dùng tài khoản này để tạo ${t.toLowerCase()}"><input type="checkbox" name="loai_${l}_${esc(id)}" ${boLoaiCua(d, l, id) ? '' : 'checked'}>${t}</label>`).join('')}</span>`;
           const sk = skTk(id);
           return `<div class="hang-vai" data-vai="${vai}"><span title="${esc(`${a.ten} — ${sk.chu}`)}"><i class="cham-sk sk-${sk.muc}"></i>${esc(a.ten)}${a.trangThai === 'can-dang-nhap' ? ' <small>(chưa đăng nhập)</small>' : ''}</span>` +
@@ -497,8 +497,8 @@
         (r.loi.length ? ` · bỏ qua "${r.loi.join(', ')}"` : '') + (r.ngoai.length ? ` · không có prompt số ${HD.gonSo(r.ngoai)}` : '') : '';
     const nen = nenTrang();
     for (const b of $$('#nenTao button')) b.classList.toggle('on', b.dataset.v === nen);
-    $('#ghiNen').textContent = nen === 'suno'
-      ? `Suno: prompt vào ô Styles (chế độ Advanced, không lời). Mỗi lần Create ra 4 bài — app tải MP3 của bài dài hơn trong 2 bài đầu; tài khoản hết lượt thì tạo lại ở tài khoản Suno dự phòng. ${S.taiKhoan.some((a) => nenTk(a) === 'suno') ? '' : 'Chưa có tài khoản Suno — thêm ở mục Tài khoản.'}`
+    $('#ghiNen').textContent = nen === 'fmusic'
+      ? `Flow Music (flowmusic.app): mỗi prompt một phiên chat mới, prompt gửi nguyên văn (muốn nhạc không lời thì ghi "instrumental" trong prompt). Mỗi lần ra 2 bài — app tải MP3 của bài dài hơn, đặt tên theo số prompt. ${S.caiDatChung ? (S.caiDatChung.luongNhacMoiTK || 2) : 2} bài cùng lúc mỗi tài khoản; hết credit thì tạo lại ở tài khoản dự phòng. ${S.taiKhoan.some((a) => nenTk(a) === 'fmusic') ? 'Dùng chung đăng nhập với tài khoản Google Flow.' : 'Chưa có tài khoản — thêm tài khoản Google Flow ở mục Tài khoản (Flow Music dùng chung đăng nhập đó).'}`
       : nen === 'flow'
       ? `Google Flow nhận việc theo mẻ (tối đa ${S.caiDat.flow.meToiDa} prompt), chỉ có tỷ lệ 16:9 và 9:16. ${S.taiKhoan.some((a) => nenTk(a) === 'flow') ? '' : 'Chưa có tài khoản Flow — thêm ở mục Tài khoản.'}`
       : `Muse: mỗi prompt một chat mới, ${S.caiDat.luongMoiTK} luồng mỗi tài khoản. ${S.taiKhoan.some((a) => nenTk(a) === 'muse') ? '' : 'Chưa có tài khoản Muse — thêm ở mục Tài khoản.'}`;
@@ -604,7 +604,7 @@
       const b = j.buoc === 'tao' ? `Muse đang tạo ${j.loai === 'video' ? 'video' : 'ảnh'}` : (NHAN_BUOC[j.buoc] || j.buoc || 'Đang chuẩn bị');
       return ['chay', 'Đang chạy', b];
     }
-    return ['cho', 'Đang chờ', j.thread ? 'Sẽ lấy tiếp kết quả' : j.sunoBai && j.loi ? `Tải lại bài đã tạo: ${j.loi}` : (j.loi ? `Thử lại: ${j.loi}` :
+    return ['cho', 'Đang chờ', j.thread ? 'Sẽ lấy tiếp kết quả' : j.nhacPhien && j.loi ? `Tải lại bài đã tạo: ${j.loi}` : (j.loi ? `Thử lại: ${j.loi}` :
       j.uuTienLuc || j.chayRieng ? 'Chạy ngay (lên đầu hàng)' : duAnDangChay(j.duAn) ? 'Trong hàng chờ' : theoHen(j) ? 'Trong hàng chờ — chạy theo hẹn giờ' : 'Trong hàng chờ — dự án chưa chạy')];
   }
 
@@ -880,7 +880,7 @@
   async function doiNen(ids, nen) {
     const ds = ids.map(viecTheoId).filter((j) => j && j.loai !== 'nhac');
     const doi = ds.filter((j) => nenTk(j) !== nen);
-    if (!doi.length) { toast(ds.length ? `Các việc đã chọn đều đang chạy ở ${TEN_NEN[nen]}` : 'Việc nhạc chỉ chạy ở Suno', true); return; }
+    if (!doi.length) { toast(ds.length ? `Các việc đã chọn đều đang chạy ở ${TEN_NEN[nen]}` : 'Việc nhạc chỉ chạy ở Flow Music', true); return; }
     const xong = doi.filter((j) => j.trangThai === 'xong').length, chay = doi.filter((j) => j.trangThai === 'chay').length;
     const tyLeKhac = nen === 'flow' && doi.some((j) => !TY_LE_FLOW.includes(j.tyLe));
     if ((xong || chay || tyLeKhac || doi.length > 1) && !(await xacNhan(`Đổi ${doi.length} việc sang ${TEN_NEN[nen]}?`,
@@ -1016,7 +1016,7 @@
     }
     const nen = nenTrang();
     if (!S.taiKhoan.some((a) => nenTk(a) === nen)) { toast(`Chưa có tài khoản ${TEN_NEN[nen]} — vào mục Tài khoản để thêm và đăng nhập`, true); return null; }
-    // Nhạc Suno: chỉ prompt (ô Styles) — không ảnh, nhân vật, tỷ lệ hay chuỗi video.
+    // Nhạc Flow Music: chỉ prompt — không ảnh, nhân vật, tỷ lệ hay chuỗi video.
     if (loai === 'nhac') return { nen, loai, soBan: $('#soBan').value, hauTo: $('#hauTo').value, chonSo: $('#chonSo').value, boQuaDaCo: $('#boQuaDaCo').checked };
     return {
       nen, loai, tyLe: U.tyLe[loai], thamChieu: TC().ds, thamChieuTheoDong: theoDong,
@@ -1246,7 +1246,7 @@
   function veTaiKhoan() {
     $('#soLuongTK').textContent = S.caiDat.luongMoiTK;
     $('#soTabFlow').textContent = S.caiDat.flow.tabMoiTK;
-    // Mỗi nơi chạy một thẻ riêng (Muse / Google Flow / Suno) cho khỏi lẫn tài khoản với nhau.
+    // Mỗi nơi chạy một thẻ riêng (Muse / Google Flow / Flow Music / Drive) cho khỏi lẫn tài khoản với nhau.
     if (!DS_NEN_TK.includes(U.nenTk)) U.nenTk = 'muse';
     for (const b of $$('#nenTk button')) b.classList.toggle('on', b.dataset.v === U.nenTk);
     for (const n of DS_NEN_TK) {
@@ -1259,27 +1259,28 @@
     datHtml($('#dsTaiKhoan'), ds.length ? ds.map((a) => {
       const [cls, nhan] = NHAN_TK[a.trangThai] || NHAN_TK['chua-kiem'];
       const dang = S.dangNhap && S.dangNhap.id === a.id;
-      const nen = nenTk(a), flow = nen === 'flow', drive = nen === 'drive';
+      const nen = nenTk(a), flow = nen === 'flow', drive = nen === 'drive', nhac = nen === 'fmusic';
       const sk = skTk(a.id);
       return `<div class="the-tk tk-${nen} sk-${sk.muc}${sk.danhDau && !drive ? ' co-dd' : ''}" title="${esc(sk.chu)}">
         <div class="av">${esc((a.ten || '?').trim().charAt(0).toUpperCase())}</div>
         <div class="tt"><b>${esc(a.ten)}</b><span class="tag nen-${nen}">${TEN_NEN[nen].toUpperCase()}</span><span class="pill ${cls}">${nhan}</span>${drive ? '' : veSucKhoe(sk) + veDanhDau(sk, a.id)}${drive
           ? '<div class="han-muc mo">Chỉ dùng để tải ảnh / video lên Google Drive — chọn tài khoản này ở Cài đặt → Google Drive → "Tải thẳng lên drive.google.com".</div>'
-          : nen === 'suno' ? veHetLuot(a)
+          : nhac ? veHetLuot(a)
           : flow ? `<div class="han-muc mo du-an-flow" title="${esc(a.flowUrl || '')}">Dự án Flow: ${a.flowUrl ? esc(a.flowUrl.replace(/^https:\/\/labs\.google\/fx\/(\w+\/)?tools\/flow\//, '…/')) : 'chưa chọn — app tự mở dự án mới (hoặc Đăng nhập → mở một dự án → Xong)'}</div>`
           : veHanMuc(a.hanMuc) + veChanVideo(a)}
           <div class="hang-nut">
             <button class="nut-vien nho" data-tk="dangNhap" data-id="${esc(a.id)}" ${dang ? 'disabled' : ''}>${ic('log-in')}Đăng nhập</button>
             <button class="nut-vien nho" data-tk="kiem" data-id="${esc(a.id)}">${ic('refresh-cw')}Kiểm tra</button>
             ${!drive && sk.muc === 'loi' && a.trangThai !== 'can-dang-nhap' ? `<button class="nut-vien nho nut-chay-lai" data-tk="chayLai" data-id="${esc(a.id)}" title="Lỗi đã sửa xong (đăng nhập lại, đổi mạng…) — cho tài khoản nhận việc lại ngay, khỏi chờ hết giờ nghỉ">${ic('zap')}Chạy lại ngay</button>` : ''}
-            ${nen === 'suno' || drive ? '' : flow ? `<button class="nut-vien nho" data-tk="duAnFlow" data-id="${esc(a.id)}" title="Đổi trang dự án Flow mà tài khoản này chạy">${ic('folder')}Dự án</button>`
+            ${nhac || drive ? '' : flow ? `<button class="nut-vien nho" data-tk="duAnFlow" data-id="${esc(a.id)}" title="Đổi trang dự án Flow mà tài khoản này chạy">${ic('folder')}Dự án</button>`
               : `<button class="nut-vien nho" data-tk="xoaChat" data-id="${esc(a.id)}" title="Xoá toàn bộ đoạn chat của tài khoản này trên Muse">${ic('message-square-x')}Xoá chat</button>`}
             <button class="nut-vien nho" data-tk="doiTen" data-id="${esc(a.id)}">${ic('pencil')}</button>
             <button class="nut-vien nho" data-tk="dangXuat" data-id="${esc(a.id)}" title="Đăng xuất">${ic('log-out')}</button>
-            <button class="nut-vien nho do" data-tk="xoa" data-id="${esc(a.id)}" title="Xoá">${ic('trash-2')}</button>
+            ${nhac ? '' : `<button class="nut-vien nho do" data-tk="xoa" data-id="${esc(a.id)}" title="Xoá">${ic('trash-2')}</button>`}
           </div></div>
       </div>`;
-    }).join('') : `<div class="trong">Chưa có tài khoản ${TEN_NEN[U.nenTk]} — bấm <b>Thêm ${{ flow: 'Flow', drive: 'Drive' }[U.nenTk] || TEN_NEN[U.nenTk]}</b> ở trên.</div>`);
+    }).join('') : U.nenTk === 'fmusic' ? '<div class="trong">Chưa có tài khoản Google Flow — mỗi tài khoản Google Flow có sẵn một tài khoản Flow Music dùng chung đăng nhập. Bấm <b>Thêm Flow</b> ở thẻ Google Flow.</div>'
+      : `<div class="trong">Chưa có tài khoản ${TEN_NEN[U.nenTk]} — bấm <b>Thêm ${{ flow: 'Flow', drive: 'Drive' }[U.nenTk] || TEN_NEN[U.nenTk]}</b> ở trên.</div>`);
     const tk = S.dangNhap && S.taiKhoan.find((a) => a.id === S.dangNhap.id);
     $('#tieuDeDangNhap').textContent = tk ? `Đăng nhập ${TEN_NEN[nenTk(tk)]}: ${tk.ten}${nenTk(tk) === 'flow' ? ' — mở một dự án rồi bấm Xong' : ''}` : 'Đăng nhập';
     $('#nutXongDangNhap').hidden = !tk;
@@ -1301,11 +1302,13 @@
     return `<div class="canh-bao-dd"><span class="cb-dd-chu">⚠ ${esc(sk.danhDau.lyDo || 'Tài khoản nghi bị Google đánh dấu hoạt động bất thường — không nên dùng')}</span>` +
       `<button type="button" class="nut-vien nho nut-bo-dd" data-tk="boDanhDau" data-id="${esc(id)}" title="Xoá các lần bị báo đã nhớ — tài khoản hết bị cảnh báo">Bỏ cảnh báo</button></div>`;
   }
-  /** Tài khoản Suno: còn đang nghỉ vì hết lượt tạo / tải không (nhớ qua cả lần tắt app). */
+  /** Tài khoản Flow Music: dùng chung đăng nhập với tài khoản Flow nào, còn đang nghỉ vì hết credit không (nhớ qua cả lần tắt app). */
   function veHetLuot(a) {
-    if (!a.hetLuotDen || a.hetLuotDen <= Date.now()) return '<div class="han-muc mo">Suno: chạy được. Hết lượt tạo / tải thì bài tự tạo lại ở tài khoản Suno dự phòng.</div>';
+    const f = S.taiKhoan.find((x) => x.id === a.flowTk);
+    const chung = `<div class="han-muc mo">Dùng chung đăng nhập Google với tài khoản Google Flow "${esc(f ? f.ten : a.ten)}" — đăng nhập / đăng xuất một bên là cả hai.</div>`;
+    if (!a.hetLuotDen || a.hetLuotDen <= Date.now()) return chung + '<div class="han-muc mo">Hết credit thì bài tự tạo lại ở tài khoản dự phòng.</div>';
     const t = new Date(a.hetLuotDen), hai = (n) => String(n).padStart(2, '0');
-    return `<div class="han-muc het-luot" title="${esc(a.lyDoHetLuot || '')}">Hết lượt — nghỉ đến ${hai(t.getHours())}:${hai(t.getMinutes())} ngày ${hai(t.getDate())}/${hai(t.getMonth() + 1)}${a.lyDoHetLuot ? ` (${esc(a.lyDoHetLuot)})` : ''}. Bấm Kiểm tra để cho chạy lại sớm.</div>`;
+    return chung + `<div class="han-muc het-luot" title="${esc(a.lyDoHetLuot || '')}">Hết lượt — nghỉ đến ${hai(t.getHours())}:${hai(t.getMinutes())} ngày ${hai(t.getDate())}/${hai(t.getMonth() + 1)}${a.lyDoHetLuot ? ` (${esc(a.lyDoHetLuot)})` : ''}. Bấm Kiểm tra để cho chạy lại sớm.</div>`;
   }
   /** 1.2.9: Muse chặn tạo video theo khu vực ở tài khoản này — app tạm không giao video cho nó (vẫn tạo ảnh). */
   function veChanVideo(a) {
@@ -1354,7 +1357,7 @@
       const v = await hoi({ tieuDe: 'Đổi tên tài khoản', html: `<label>Tên<input name="ten" value="${esc(a.ten)}"></label>`, ok: 'Lưu' });
       if (v && v.ten.trim()) api.call('suaTaiKhoan', { id, thay: { ten: v.ten } });
     } else if (lenh === 'dangXuat') {
-      if (await xacNhan('Đăng xuất?', `Xoá phiên đăng nhập ${{ flow: 'Google', drive: 'Google', suno: 'Suno', muse: 'Muse' }[nenTk(a)]} của "${esc(a.ten)}" trong app.`, 'Đăng xuất', true)) api.call('dangXuat', { id });
+      if (await xacNhan('Đăng xuất?', `Xoá phiên đăng nhập ${{ flow: 'Google', drive: 'Google', fmusic: 'Google', muse: 'Muse' }[nenTk(a)]} của "${esc(a.ten)}" trong app.${['flow', 'fmusic'].includes(nenTk(a)) ? ' Tài khoản Google Flow và Flow Music cùng tên dùng chung đăng nhập — cả hai cùng bị đăng xuất.' : ''}`, 'Đăng xuất', true)) api.call('dangXuat', { id });
     } else if (lenh === 'xoa') {
       if (await xacNhan('Xoá tài khoản?', `Xoá "${esc(a.ten)}" và phiên đăng nhập của nó khỏi app.`, 'Xoá', true)) {
         const r = await api.call('xoaTaiKhoan', { id });
@@ -1423,7 +1426,7 @@
         const da = duAnDsHen(el);
         const cho = S.viec.filter((j) => j.loai === l && j.trangThai === 'cho' && (!da.length || da.includes(j.duAn))).length;
         o('ghi').textContent = `Hiện có ${cho} việc ${TEN_LOAI[l]} đang chờ ${da.length ? (da.length === 1 ? 'trong dự án đã chọn' : `trong ${da.length} dự án đã chọn`) : 'ở mọi dự án'}. ` +
-          (l === 'nhac' ? 'Chạy trên các tài khoản Suno.' : 'Chạy trên Muse / Google Flow theo nơi đã chọn của từng việc.');
+          (l === 'nhac' ? 'Chạy trên Flow Music (tài khoản Google Flow).' : 'Chạy trên Muse / Google Flow theo nơi đã chọn của từng việc.');
       }
     }
   }
@@ -1443,9 +1446,10 @@
     { const g = (S.caiDatChung || c).ramAppToiDa || 0, may = S.ramMayGB || 0;
       $('#cdRamApp').value = g;
       $('#cdRamAppGhi').textContent = may ? `Máy có ${String(may).replace('.', ',')} GB RAM — để 0 là tự động ${String(Math.max(1, Math.round(may * 0.75 * 10) / 10)).replace('.', ',')} GB (75%).` : 'Để 0 là tự động 75% RAM máy.'; }
-    // 1.4.6: thử lại / chạy lại lỗi / nghỉ gửi riêng của Flow và Suno (các ô cdThuLai, cdChayLaiLoi, cdNghi giờ chỉ của Muse)
+    // 1.4.6: thử lại / chạy lại lỗi / nghỉ gửi riêng của Flow và Flow Music (các ô cdThuLai, cdChayLaiLoi, cdNghi giờ chỉ của Muse)
     $('#cdThuLaiFlow').value = c.tuThuLaiFlow; $('#cdChayLaiLoiFlow').value = c.tuChayLaiLoiFlow;
-    $('#cdThuLaiSuno').value = c.tuThuLaiSuno; $('#cdChayLaiLoiSuno').value = c.tuChayLaiLoiSuno; $('#cdNghiSuno').value = c.nghiSuno;
+    $('#cdThuLaiNhac').value = c.tuThuLaiNhac; $('#cdChayLaiLoiNhac').value = c.tuChayLaiLoiNhac; $('#cdNghiNhac').value = c.nghiNhac;
+    $('#cdLuongNhac').value = (S.caiDatChung || c).luongNhacMoiTK || 2;
     $('#cdPng').checked = !!c.png;
     $('#cdDoiNen').checked = c.doiNenKhiLoi !== false;
     $('#cdTatMay').checked = !!(S.caiDatChung || c).tatMayKhiXong;   // chung cho mọi dự án
@@ -1954,12 +1958,11 @@
       if (a && a.id) { U.nenTk = nen; luuUi(); veTaiKhoan(); }
       if (a && a.id && await xacNhan('Đăng nhập luôn?', nen === 'flow'
         ? `Mở Google Flow để đăng nhập "${esc(a.ten)}"? Đăng nhập xong, mở (hoặc tạo) một dự án Flow rồi bấm <b>Xong</b>.`
-        : `Mở ${{ suno: 'suno.com', drive: 'Google Drive' }[nen] || 'muse.ai'} để đăng nhập "${esc(a.ten)}"?`, 'Đăng nhập')) lenhTaiKhoan('dangNhap', a.id);
+        : `Mở ${{ drive: 'Google Drive' }[nen] || 'muse.ai'} để đăng nhập "${esc(a.ten)}"?`, 'Đăng nhập')) lenhTaiKhoan('dangNhap', a.id);
     };
     $('#nenTk').onclick = (e) => { const b = e.target.closest('[data-v]'); if (b) { U.nenTk = b.dataset.v; luuUi(); veTaiKhoan(); } };
     $('#nutThemTK').onclick = () => themTk('muse');
     $('#nutThemTKFlow').onclick = () => themTk('flow');
-    $('#nutThemTKSuno').onclick = () => themTk('suno');
     $('#nutThemTKDrive').onclick = () => themTk('drive');
     $('#dsTaiKhoan').addEventListener('click', (e) => { const b = e.target.closest('[data-tk]'); if (b) lenhTaiKhoan(b.dataset.tk, b.dataset.id); });
     $('#nutXongDangNhap').onclick = () => dongDangNhap();
@@ -2056,9 +2059,10 @@
       return {
         luongMoiTK: $('#cdLuong').value, nghiGiuaLanGui: $('#cdNghi').value, tuThuLai: $('#cdThuLai').value, tuChayLaiLoi: $('#cdChayLaiLoi').value,
         choAnhGiay: $('#cdChoAnh').value, choVideoGiay: $('#cdChoVideo').value, choChuGiay: $('#cdChoChu').value, choNhacGiay: $('#cdChoNhac').value,
-        // 1.4.6: thẻ "Google Flow — khi chạy" / "Suno — khi chạy"
+        // 1.4.6: thẻ "Google Flow — khi chạy" / "Flow Music — khi chạy"
         tuThuLaiFlow: $('#cdThuLaiFlow').value, tuChayLaiLoiFlow: $('#cdChayLaiLoiFlow').value,
-        tuThuLaiSuno: $('#cdThuLaiSuno').value, tuChayLaiLoiSuno: $('#cdChayLaiLoiSuno').value, nghiSuno: $('#cdNghiSuno').value,
+        tuThuLaiNhac: $('#cdThuLaiNhac').value, tuChayLaiLoiNhac: $('#cdChayLaiLoiNhac').value, nghiNhac: $('#cdNghiNhac').value,
+        luongNhacMoiTK: $('#cdLuongNhac').value,   // 1.5.0: chung cả app
         png: $('#cdPng').checked, doiNenKhiLoi: $('#cdDoiNen').checked, tatMayKhiXong: $('#cdTatMay').checked,
         videoCanhAnh: $('#cdVideoCanhAnh').checked, xoaChatKhiXong: $('#cdXoaChat').checked, xoaDuAnFlowKhiXong: $('#cdXoaDuAnFlow').checked,
         driveBat: $('#cdDrive').checked, driveCach: $('#cdDriveCach').value, driveTk: $('#cdDriveTk').value, nheMay: $('#cdNheMay').checked,

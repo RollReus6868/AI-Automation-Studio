@@ -32,7 +32,7 @@ for (let n = 1; n <= 300; n++) {
   viec.push(j);
 }
 fs.writeFileSync(path.join(tam, 'data', 'du-lieu.json'), JSON.stringify({
-  duAn: [{ id: 'da-ram', ten: 'Dự án RAM', so: 300, taoLuc: 1792217727436, taiKhoan: ['tk-1'], chaySong: { muse: 1, flow: 1, suno: 1 }, soLoai: { anh: 0, video: 300, nhac: 0 } }],
+  duAn: [{ id: 'da-ram', ten: 'Dự án RAM', so: 300, taoLuc: 1792217727436, taiKhoan: ['tk-1'], chaySong: { muse: 1, flow: 1, fmusic: 1 }, soLoai: { anh: 0, video: 300, nhac: 0 } }],
   viec, nhanVat: [], mauPrompt: []
 }));
 

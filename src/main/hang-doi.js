@@ -272,7 +272,7 @@ function viecKeTiep(jobs, uuTien, boQua) {
 function thoiGianDuKien(jobs, loai) {
   const xong = jobs.filter((j) => j.loai === loai && j.trangThai === 'xong' && j.batDauLuc && j.xongLuc)
     .sort((a, b) => b.xongLuc - a.xongLuc).slice(0, 10);
-  if (!xong.length) return loai === 'nhac' ? 150 : loai === 'video' ? 80 : 35;   // Suno free ~2–3 phút một lần Create
+  if (!xong.length) return loai === 'nhac' ? 150 : loai === 'video' ? 80 : 35;   // Flow Music ~40–150 giây một lần gửi + tải về
   const tb = xong.reduce((s, j) => s + (j.xongLuc - j.batDauLuc), 0) / xong.length / 1000;
   return Math.max(10, Math.round(tb));
 }
