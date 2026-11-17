@@ -103,7 +103,11 @@ class QuanLyTaiKhoan {
     // Flow Music hết credit / chạm giới hạn: nghỉ tới lúc này (0 = bỏ).
     if (typeof thay.hetLuotDen === 'number') { a.hetLuotDen = thay.hetLuotDen; a.lyDoHetLuot = thay.hetLuotDen ? String(thay.lyDoHetLuot || '') : ''; }
     // Muse chặn tạo VIDEO theo khu vực (1.2.9): nhớ qua các lần chạy / mở app — tài khoản vẫn tạo ảnh (0 = bỏ).
-    if (typeof thay.chanVideoDen === 'number') { a.chanVideoDen = thay.chanVideoDen; a.lyDoChanVideo = thay.chanVideoDen ? String(thay.lyDoChanVideo || '') : ''; }
+    if (typeof thay.chanVideoDen === 'number') {
+      a.chanVideoDen = thay.chanVideoDen;
+      a.lyDoChanVideo = thay.chanVideoDen ? String(thay.lyDoChanVideo || '') : '';
+      a.chanVideoHetLuot = !!(thay.chanVideoDen && thay.chanVideoHetLuot);   // 1.5.1: hết lượt video, không phải chặn khu vực
+    }
     // 1.4.7: các lần Flow báo "hoạt động bất thường" [{luc, anh}] — để nhận ra tài khoản bị Google đánh dấu ([] = bỏ).
     if (Array.isArray(thay.batThuong)) {
       a.batThuong = thay.batThuong.filter((x) => x && Number.isFinite(Number(x.luc)))

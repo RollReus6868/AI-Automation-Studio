@@ -1314,6 +1314,10 @@
   function veChanVideo(a) {
     if (!a.chanVideoDen || a.chanVideoDen <= Date.now()) return '';
     const t = new Date(a.chanVideoDen), hai = (n) => String(n).padStart(2, '0');
+    // 1.5.1: Muse báo HẾT LƯỢT video (giới hạn 24 giờ) — khác chặn khu vực; trước ghi chung "chặn khu vực" nên tưởng tài khoản lỗi.
+    if (a.chanVideoHetLuot || /hết lượt|limit|quota|giới hạn/i.test(a.lyDoChanVideo || '')) {
+      return `<div class="han-muc het-luot" title="${esc(a.lyDoChanVideo || '')}">Hết lượt tạo video (Muse báo đạt giới hạn) — tài khoản không hỏng, app chỉ dùng nó tạo ảnh tới ${hai(t.getHours())}:${hai(t.getMinutes())} ngày ${hai(t.getDate())}/${hai(t.getMonth() + 1)}; video chạy ở tài khoản khác hoặc Flow. Có lượt lại sớm thì bấm Kiểm tra.</div>`;
+    }
     return `<div class="han-muc het-luot" title="${esc(a.lyDoChanVideo || '')}">Muse chặn tạo video ở khu vực của tài khoản này — app chỉ dùng nó tạo ảnh tới ${hai(t.getHours())}:${hai(t.getMinutes())} ngày ${hai(t.getDate())}/${hai(t.getMonth() + 1)}; video chạy ở tài khoản khác hoặc Flow. Bấm Kiểm tra để thử lại sớm.</div>`;
   }
   /** Mức dùng token Muse (Cài đặt → Chung → Usage), chữ giữ nguyên như Muse hiện. */

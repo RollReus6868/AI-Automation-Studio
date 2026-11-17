@@ -1,4 +1,11 @@
-# AI Automation Studio 1.5.0
+# AI Automation Studio 1.5.1
+
+- **Muse tạo video lâu hơn thời gian chờ không còn bị bỏ ngang.** Trước đây chờ đủ 300 giây mà video chưa xong là app bỏ chat, gửi lại prompt ở tài khoản khác (tốn thêm lượt) và tính tài khoản bị lỗi — lỗi 2 lần là tài khoản phải nghỉ 15 phút, dù Muse vẫn tạo xong video ngay sau đó. Giờ nếu hết giờ chờ mà Muse **vẫn đang tạo**: app giữ nguyên chat đó, cứ 2 phút mở lại kiểm một lần (tối đa 6 lần), xong thì tải về. Không gửi lại, không tính lỗi, tài khoản không bị nghỉ. Nhật ký ghi `⏳ #N Muse vẫn đang tạo sau 300 giây … giữ chat, kiểm lại sau 2 phút`.
+- **Không mất dấu chat:** khi chạy nhiều luồng, Muse có lúc chậm đổi địa chỉ chat nên nhật ký ghi `#85 đã gửi → ` (trống). App giờ nhớ địa chỉ chat ngay khi Muse đổi xong, nên vẫn mở lại và kiểm lại được.
+- **Ghi đúng lý do khi Muse báo hết lượt video:** tài khoản Muse báo đạt giới hạn tạo video 24 giờ giờ hiện *"Hết lượt tạo video (Muse báo đạt giới hạn) — tài khoản không hỏng, app chỉ dùng nó tạo ảnh tới …"*, thay vì *"Muse chặn tạo video ở khu vực…"* như trước (dễ tưởng tài khoản bị lỗi).
+- Mọi thứ khác giữ nguyên như 1.5.0.
+
+## Bản 1.5.0
 
 - **Tạo nhạc chuyển từ Suno sang Google Flow Music (flowmusic.app).** Mọi thứ của Suno đã bỏ khỏi app (tài khoản Suno, thẻ cài đặt Suno, nút Thêm Suno).
   - **Không cần thêm tài khoản mới:** mỗi tài khoản **Google Flow** có sẵn một tài khoản **Flow Music** dùng chung đăng nhập Google (thẻ *Flow Music* ở mục Tài khoản). Lần đầu, nếu thẻ Flow Music báo *Chưa đăng nhập*: bấm **Đăng nhập** trên thẻ đó, ở trang flowmusic.app bấm đăng nhập và chọn tài khoản Google (đã đăng nhập sẵn trong app, không nhập lại mật khẩu), rồi bấm **Xong**. Đăng xuất một bên là đăng xuất cả hai.

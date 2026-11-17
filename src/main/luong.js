@@ -163,6 +163,12 @@ class Luong {
         continue;
       }
       if (kq.canDangNhap) return { ok: false, canDangNhap: true, loi: 'Muse đòi đăng nhập lại', giuThread: true };
+      // 1.5.1: gửi xong mà Muse chưa đổi địa chỉ khỏi /thread/new (Muse chậm khi nhiều luồng) → nhớ chat ngay khi có địa chỉ,
+      // để hết giờ chờ còn mở lại / kiểm được chat này (nhật ký 17/11/2026: "#85 đã gửi → " rồi mất dấu chat).
+      if (!job.thread && kq.thread) {
+        ctx.capNhat({ thread: kq.thread });
+        this.log('info', `[${this.id}] #${job.so} chat của việc: ${kq.thread}`);
+      }
       matTu = kq.matKetNoi ? matTu || Date.now() : 0;
       if (matTu && Date.now() - matTu > this.choKetNoiMs) {
         return { ok: false, matKetNoi: true, loi: `Muse mất kết nối ("${kq.trangThaiMuse}") — chưa tải được kết quả`, giuThread: true };
@@ -212,7 +218,11 @@ class Luong {
       const dangTao = !!(kqCuoi && (kqCuoi.dangGo || kqCuoi.soKhungAnh || kqCuoi.soKhungVideo || !kqCuoi.chu));
       return { ok: false, chuaXong: true, dangTao, loi: `Chưa thấy kết quả sau ${ctx.choToiDaGiay} giây`, giuThread: true };
     }
-    return { ok: false, loi: `Quá ${ctx.choToiDaGiay} giây chưa thấy kết quả`, giuThread: true };
+    // 1.5.1: hết giờ chờ mà Muse VẪN ĐANG TẠO (đang gõ / có khung chưa xong / chưa trả lời chữ) → báo kèm dangTao: điều phối
+    // giữ chat, kiểm lại sau thay vì gửi lại ở tài khoản khác (nhật ký 17/11/2026: video Muse xong ở giây 301–305 thì app
+    // đã bỏ chat, gửi lại tài khoản khác — tốn lượt, tài khoản bị tính lỗi oan rồi nghỉ 15 phút).
+    const dangTao = !!(kqCuoi && (kqCuoi.dangGo || kqCuoi.soKhungAnh || kqCuoi.soKhungVideo || !kqCuoi.chu));
+    return { ok: false, loi: `Quá ${ctx.choToiDaGiay} giây chưa thấy kết quả`, giuThread: true, dangTao, quaGio: true };
   }
 }
 
