@@ -115,6 +115,9 @@ module.exports = async ({ win, app, dieuPhoi, docRam, baoRam, nhatKy, taiKhoan }
     await js(`document.querySelector('${theAnh} [data-hen="them"]').click(); 1`);
     await datHen('23:00', [dB.id, dC.id]);
     await choDen(async () => dieuPhoi.henGio.some((h) => h.loai === 'anh' && h.batDau === '23:00'), 5000);
+    // 1.5.1: chờ giao diện vẽ lại danh sách sau khi lưu (hẹn 23:00 đã có id, không còn hàng mới chưa lưu) rồi mới bấm Thêm —
+    // bấm sớm thì lần vẽ lại xoá mất hàng mới, datHen sửa nhầm hẹn 23:00 (đỏ thỉnh thoảng ở 1100 px).
+    await choDen(() => js(`(() => { const ds = [...document.querySelectorAll('${theAnh} .hen')]; return ds.length === 1 && !!ds[0].dataset.id; })()`), 5000);
     await js(`document.querySelector('${theAnh} [data-hen="them"]').click(); 1`);
     await datHen('02:00', ['da-ram']);
     await choDen(async () => dieuPhoi.henGio.filter((h) => h.loai === 'anh').length === 2, 5000);

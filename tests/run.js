@@ -744,6 +744,102 @@ testAsync('1.4.12 kiểm việc dở: Muse còn đang tạo → giữ chat, hẹ
     [['kiem', true, 'https://muse/thread/cu'], ['kiem', true, 'https://muse/thread/cu'], [1, false, 'https://muse/thread/cu']], JSON.stringify(nhat));
   assert.strictEqual(j.trangThai, 'xong');
 });
+// 1.5.1 (nhật ký 17/11/2026): Muse tạo video xong ở giây 301–305 → app báo "Quá 300 giây chưa thấy kết quả", bỏ chat,
+// gửi lại ở tài khoản khác, tài khoản bị tính lỗi rồi nghỉ 15 phút. Giờ: Muse còn đang tạo → giữ chat, kiểm lại sau.
+testAsync('1.5.1 hết giờ chờ mà Muse VẪN ĐANG TẠO → giữ chat, kiểm lại sau (không gửi lại tài khoản khác, không tính lỗi, không nghỉ)', async () => {
+  const nhat = [];
+  const QUA_GIO = { ok: false, loi: 'Quá 300 giây chưa thấy kết quả', giuThread: true, quaGio: true, dangTao: true };
+  const { dp, tk, nhatKy } = dungDieuPhoi({ taoLuong: luongKiem(nhat, (j, ctx) => (ctx.chiKiem ? XONG : QUA_GIO)) });
+  tk.them('Hai');
+  dp.datCaiDat({ luongMoiTK: 1, nghiGiuaLanGui: 0, tuThuLai: 1, tuChayLaiLoi: 0, anhTruocVideo: false });
+  dp.them({ loai: 'video', prompts: ['a', 'b'] });
+  dp.chayTatCa();
+  await chayHet(dp);
+  const [j1, j2] = dp.viec;
+  for (const j of [j1, j2]) {
+    assert.ok(j.trangThai === 'cho' && j.taiKhoan === 'tk-1' && j.thread === `https://muse/thread/tk-1-${j.so}` && j.kiemLai > Date.now() && j.kiemSo === 1, JSON.stringify(j));
+  }
+  assert.ok(nhat.every((x) => x.tk === 'tk-1'), `không gửi lại ở tài khoản khác: ${JSON.stringify(nhat)}`);
+  assert.ok(!dp._nghi('tk-1') && !(dp.loiLienTiep['tk-1'] > 0), 'tài khoản không bị tính lỗi / nghỉ');
+  assert.ok(nhatKy.some((x) => /⏳ #1 Muse vẫn đang tạo sau 300 giây ở "Muse 1" — giữ chat, kiểm lại sau 2 phút \(không gửi lại/.test(x)), nhatKy.join('\n'));
+  assert.ok(!nhatKy.some((x) => /↪ #\d .*chuyển sang/.test(x)), nhatKy.join('\n'));
+  // Tới giờ kiểm lại: mở lại CHÍNH chat đó (chiKiem, không gửi) → Muse đã xong → tải về.
+  j1.kiemLai = j2.kiemLai = Date.now() - 1;
+  dp._vong();
+  await chayHet(dp);
+  assert.deepStrictEqual([j1.trangThai, j2.trangThai], ['xong', 'xong']);
+  assert.deepStrictEqual(nhat.slice(2).map((x) => [x.stt, x.chiKiem, x.thread]),
+    [['kiem', true, 'https://muse/thread/tk-1-1'], ['kiem', true, 'https://muse/thread/tk-1-2']], JSON.stringify(nhat));
+  // Không còn đang tạo (Muse im lặng có chữ / không có chat) → lỗi như cũ: chuyển tài khoản.
+  const nhat2 = [];
+  const b = dungDieuPhoi({ taoLuong: luongKiem(nhat2, (j, ctx, a) => (a.id === 'tk-1' ? { ...QUA_GIO, dangTao: false } : XONG)) });
+  b.tk.them('Hai');
+  b.dp.datCaiDat({ luongMoiTK: 1, nghiGiuaLanGui: 0, tuThuLai: 1, tuChayLaiLoi: 0, anhTruocVideo: false });
+  b.dp.them({ loai: 'video', prompts: ['c'] });
+  b.dp.chayTatCa();
+  await chayHet(b.dp);
+  assert.deepStrictEqual(nhat2.map((x) => x.tk), ['tk-1', 'hai'], JSON.stringify(nhat2));
+  // Hết số lần giữ (KIEM_TOI_DA) → chạy như thường.
+  const c = dungDieuPhoi({ taoLuong: luongKiem([], (j, ctx, a) => (a.id === 'tk-1' ? QUA_GIO : XONG)) });
+  c.tk.them('Hai');
+  c.dp.datCaiDat({ luongMoiTK: 1, nghiGiuaLanGui: 0, tuThuLai: 1, tuChayLaiLoi: 0, anhTruocVideo: false });
+  c.dp.them({ loai: 'video', prompts: ['d'] });
+  Object.assign(c.dp.viec[0], { taiKhoan: 'tk-1', thread: 'https://muse/thread/cu', kiemSo: 6 });   // đã giữ đủ 6 lần
+  c.dp.chayTatCa();
+  await chayHet(c.dp);
+  assert.deepStrictEqual([c.dp.viec[0].trangThai, c.dp.viec[0].taiKhoan], ['xong', 'hai']);
+});
+test('1.5.1 luồng Muse: hết giờ chờ báo kèm Muse còn đang tạo không; gửi xong chưa có địa chỉ chat thì nhớ ngay khi có', () => {
+  const l = docNguon('src/main/luong.js'), t = docNguon('src/inject/muse-trang.js');
+  assert.ok(/giuThread: true, dangTao, quaGio: true/.test(l));
+  assert.ok(/if \(!job\.thread && kq\.thread\) \{\s*ctx\.capNhat\(\{ thread: kq\.thread \}\)/.test(l));
+  assert.ok(/thread: \/\\\/thread\\\/\(\?!new\\b\)\[\^\/\?#\]\+\/\.test\(location\.pathname\) \? location\.href : ''/.test(t), 'ketQua() trả địa chỉ chat (không phải /thread/new)');
+});
+test('1.5.1 luồng Muse (chạy thật, trang giả): gửi xong chưa có địa chỉ chat → nhớ chat khi Muse đổi địa chỉ; hết giờ mà Muse đang tạo → quaGio + dangTao', () => {
+  const { execFileSync } = require('child_process');
+  const chay = (ketQua) => {
+    const ma = `
+      const { Luong } = require(${JSON.stringify(path.join(__dirname, '../src/main/luong'))});
+      let lan = 0;
+      const wc = { isDestroyed: () => false, loadURL: () => Promise.resolve(),
+        executeJavaScript: (c) => {
+          if (/phienBan/.test(c)) return Promise.resolve(true);
+          if (/trangThai\\(\\)/.test(c)) return Promise.resolve({ coONhap: true });
+          if (/gui\\(/.test(c)) return Promise.resolve({ ok: true, thread: '' });
+          if (/ketQua\\(\\)/.test(c)) { lan++; return Promise.resolve(${ketQua}); }
+          return Promise.resolve(0);
+        } };
+      const thay = [];
+      const l = new Luong({ id: 'L', wc, nguon: '', goc: 'https://muse', log: () => {} });
+      l.chay({ so: 85, loai: 'video' }, { tinNhan: 'x', choToiDaGiay: 4, choChuGiay: 120, choGui: async () => {}, capNhat: (t) => thay.push(t) })
+        .then((r) => { console.log(JSON.stringify({ r, thread: thay.filter((t) => 'thread' in t).map((t) => t.thread) })); process.exit(0); });`;
+    return JSON.parse(execFileSync(process.execPath, ['-e', ma], { encoding: 'utf8' }).trim());
+  };
+  let o = chay(`{ soAnh: 0, soVideo: 0, soKhungAnh: 0, soKhungVideo: 1, dangGo: true, chu: '', thread: lan > 1 ? 'https://muse/thread/abc' : '' }`);
+  assert.ok(o.r.quaGio && o.r.dangTao && o.r.giuThread && /Quá 4 giây chưa thấy kết quả/.test(o.r.loi), JSON.stringify(o));
+  assert.deepStrictEqual(o.thread, ['', 'https://muse/thread/abc'], 'nhớ địa chỉ chat ngay khi Muse đổi khỏi /thread/new');
+  o = chay(`{ soAnh: 0, soVideo: 0, soKhungAnh: 0, soKhungVideo: 0, dangGo: false, chu: 'Mình đã nhận ảnh.', thread: 'https://muse/thread/abc' }`);
+  assert.ok(o.r.quaGio && !o.r.dangTao, 'Muse đã trả lời chữ, không còn khung đang tạo → không phải "đang tạo"');
+});
+test('1.5.1 hết lượt video ≠ bị chặn khu vực: thẻ tài khoản và tình trạng ghi đúng lý do', () => {
+  const { dp, tk } = dungDieuPhoi();
+  tk.sua('tk-1', { chanVideoDen: Date.now() + 3600e3, lyDoChanVideo: 'Muse báo hết lượt tạo video: "Bạn đã đạt giới hạn tạo video trong 24 giờ."', chanVideoHetLuot: true });
+  let s = dp.sucKhoeTk()['tk-1'];
+  assert.ok(/^Hết lượt tạo video \(Muse báo giới hạn\) — vẫn tạo ảnh/.test(s.chu) && !/khu vực/.test(s.chu), s.chu);
+  assert.strictEqual(tk.tim('tk-1').chanVideoHetLuot, true);
+  tk.sua('tk-1', { chanVideoDen: Date.now() + 3600e3, lyDoChanVideo: 'Muse báo tài khoản bị chặn tạo video: "403 — không khả dụng tại khu vực của bạn"' });
+  s = dp.sucKhoeTk()['tk-1'];
+  assert.ok(/chặn tạo video ở khu vực/.test(s.chu) && tk.tim('tk-1').chanVideoHetLuot === false, s.chu);
+  tk.sua('tk-1', { chanVideoDen: 0 });
+  assert.strictEqual(tk.tim('tk-1').chanVideoHetLuot, false);
+  // Dữ liệu bản cũ (chưa có cờ): đoán theo lý do đã lưu.
+  tk.tim('tk-1').chanVideoDen = Date.now() + 3600e3;
+  tk.tim('tk-1').lyDoChanVideo = 'Muse báo hết lượt tạo video: "…"';
+  assert.ok(/^Hết lượt tạo video/.test(dp.sucKhoeTk()['tk-1'].chu));
+  const a = docNguon('src/ui/app.js');
+  assert.ok(/Hết lượt tạo video \(Muse báo đạt giới hạn\) — tài khoản không hỏng/.test(a));
+  assert.ok(/chanVideoHetLuot: !!r\.hetLuotLoai/.test(docNguon('src/main/dieu-phoi.js')), 'hết lượt video lưu cờ trên tài khoản');
+});
 testAsync('1.4.12 chat dở ở tài khoản giờ không nhận việc này (hết lượt / nghỉ): kiểm chat cũ TRƯỚC khi gửi lại ở tài khoản khác (bản cũ gửi lại ngay → trùng)', async () => {
   for (const [ten, kq, mong] of [['chat cũ đã xong', XONG, [['kiem', 'tk-1']]], ['chat cũ trống', { ok: false, chuaXong: true, dangTao: false }, [['kiem', 'tk-1'], [1, 'hai']]]]) {
     const nhat = [];

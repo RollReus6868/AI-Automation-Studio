@@ -236,6 +236,7 @@
     const khungVideo = $$('[data-testid="hatch-chat-attachment-presentation-video"]');
     return {
       url: location.href,
+      thread: /\/thread\/(?!new\b)[^/?#]+/.test(location.pathname) ? location.href : '',   // 1.5.1
       soTinMuse: ms.length,
       soKhungAnh: khungAnh.length,
       soKhungVideo: khungVideo.length,

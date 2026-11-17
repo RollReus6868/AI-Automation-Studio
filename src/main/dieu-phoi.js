@@ -47,6 +47,8 @@ const TEN_NEN = { muse: 'Muse', flow: 'Flow', fmusic: 'Flow Music' };
 // Flow Music báo hết credit / chạm giới hạn → tài khoản nghỉ lâu, việc tạo lại ở tài khoản dự phòng.
 const NGHI_HET_LUOT_MS = 6 * 60 * 60 * 1000;
 // 1.5.0: việc nhạc của bản cũ (Suno) chuyển sang Flow Music.
+/** 1.5.1: tài khoản thôi nhận video vì Muse báo HẾT LƯỢT (không phải chặn khu vực). Dữ liệu bản cũ: đoán theo lý do đã lưu. */
+const laHetLuotVideo = (a) => !!(a && (a.chanVideoHetLuot || /hết lượt|limit|quota|giới hạn/i.test(a.lyDoChanVideo || '')));
 const chuanNen = (n) => (n === 'flow' || n === 'fmusic' ? n : n === 'suno' ? 'fmusic' : 'muse');
 const TEN_LOAI = { anh: 'ảnh', video: 'video', nhac: 'nhạc' };
 const KHOA_THU_MUC = { anh: 'thuMucAnh', video: 'thuMucVideo', nhac: 'thuMucNhac' };
@@ -553,7 +555,12 @@ class DieuPhoi {
       else if ((a.hetLuotDen || 0) > bay) x = { muc: 'loi', chu: `Hết lượt${a.lyDoHetLuot ? ` (${a.lyDoHetLuot})` : ''}`, den: a.hetLuotDen };
       else if ((this.nghiDen[id] || 0) > bay) x = { muc: 'loi', chu: `Đang nghỉ: ${this.lyDoNghi[id] || 'lỗi'}`, den: this.nghiDen[id] };
       else if (f && f.den > bay) x = { muc: 'loi', chu: `Đang nghỉ: ${f.lyDo || 'Flow báo lỗi'}`, den: f.den };
-      else if ((a.chanVideoDen || 0) > bay) x = { muc: 'loi', chu: 'Muse chặn tạo video — tài khoản chỉ tạo ảnh', den: a.chanVideoDen };
+      else if ((a.chanVideoDen || 0) > bay) {
+        // 1.5.1: hết lượt video 24 giờ ≠ bị chặn khu vực (trước ghi chung "Muse chặn tạo video" → người dùng tưởng tài khoản lỗi).
+        x = laHetLuotVideo(a)
+          ? { muc: 'loi', chu: `Hết lượt tạo video (Muse báo giới hạn) — vẫn tạo ảnh${a.lyDoChanVideo ? `: ${rutLoi(a.lyDoChanVideo)}` : ''}`, den: a.chanVideoDen }
+          : { muc: 'loi', chu: 'Muse chặn tạo video ở khu vực này — tài khoản chỉ tạo ảnh', den: a.chanVideoDen };
+      }
       else if (chanLoai.length) {
         const den = Math.max(...chanLoai.map((k) => this.nghiLoai[k]));
         x = { muc: 'loi', chu: `Bị chặn tạo ${chanLoai.map((k) => TEN_LOAI[k.split(':')[1]] || k.split(':')[1]).join(', ')}${this.lyDoNghi[id] ? `: ${this.lyDoNghi[id]}` : ''}`, den };
@@ -2140,6 +2147,17 @@ class DieuPhoi {
   }
 
   /** 1.4.12: việc Muse đã gửi prompt (có chat thật) mà chưa có kết quả — kiểm được bằng cách mở lại chat. */
+  /** 1.5.1: việc Muse đã có chat riêng (đã gửi, Muse đổi địa chỉ khỏi /thread/new) — mở lại / kiểm được. */
+  _laMuseCoChat(j) {
+    return (j.nen || 'muse') === 'muse' && !!j.thread && !!j.taiKhoan && !/\/thread\/new\b/.test(j.thread);
+  }
+
+  /** Số giây chờ tối đa của việc (theo loại, cài đặt của dự án). */
+  _choGiay(j) {
+    const c = this.cd(j.duAn);
+    return j.loai === 'nhac' ? c.choNhacGiay : j.loai === 'video' ? c.choVideoGiay : c.choAnhGiay;
+  }
+
   _laViecDo(j) {
     return (j.nen || 'muse') === 'muse' && !!j.thread && !!j.taiKhoan && !/\/thread\/new\b/.test(j.thread) &&
       ['cho', 'dung', 'loi'].includes(j.trangThai) && !j.dangKiem;
@@ -2512,8 +2530,8 @@ class DieuPhoi {
         if (j.loai === 'video' && this.o.taiKhoan.tim(tkId)) {
           // Chặn khu vực không tự hết sau 1 giờ: nhớ trên tài khoản (24 giờ, qua cả lần mở app sau) để không gửi
           // lại video vào tài khoản này mỗi lần bấm Chạy. Tài khoản vẫn tạo ảnh. Bấm Kiểm tra để thử lại sớm.
-          this.o.taiKhoan.sua(tkId, { chanVideoDen: Date.now() + CHAN_VIDEO_MS, lyDoChanVideo: r.loi });
-          this.log('warning', `⚠ "${this._tenTk(tkId)}": ${r.loi} — tài khoản này thôi nhận VIDEO 24 giờ (vẫn tạo ảnh); video chuyển sang tài khoản Muse khác, hết tài khoản Muse thì sang Flow. Bấm Kiểm tra ở tài khoản để thử lại sớm.`);
+          this.o.taiKhoan.sua(tkId, { chanVideoDen: Date.now() + CHAN_VIDEO_MS, lyDoChanVideo: r.loi, chanVideoHetLuot: !!r.hetLuotLoai });
+          this.log('warning', `⚠ "${this._tenTk(tkId)}": ${r.loi} — ${r.hetLuotLoai ? 'hết lượt tạo video: ' : ''}tài khoản này thôi nhận VIDEO 24 giờ (vẫn tạo ảnh); video chuyển sang tài khoản Muse khác, hết tài khoản Muse thì sang Flow. Bấm Kiểm tra ở tài khoản để thử lại sớm.`);
         } else {
           // 1.4.12: hết lượt tạo ảnh → nghỉ loại ảnh lâu như hết lượt Flow Music (6 giờ); chặn khác → 60 phút như trước.
           const ms = r.hetLuotLoai ? NGHI_HET_LUOT_MS : NGHI_CHAN_LOAI_MS;
@@ -2545,6 +2563,14 @@ class DieuPhoi {
       this.lyDoNghi[tkId] = r.loi;
       const sang = hd.taiKhoanChoViec({ tkLoi: [] }, this._dsTk(j.duAn, j.nen, j.loai), (id) => this._nghi(id));
       this.log('warning', `↪ #${j.so} ${r.loi} (ở "${this._tenTk(tkId)}")${sang ? ` — tạo lại ở "${this._tenTk(sang)}"` : ' — không còn tài khoản dự phòng nào còn lượt'}`);
+    } else if (r.quaGio && r.dangTao && this._laMuseCoChat(j) && (j.kiemSo || 0) < KIEM_TOI_DA) {
+      // 1.5.1: hết giờ chờ mà Muse VẪN ĐANG TẠO trong chat → không phải lỗi của tài khoản: giữ chat, việc về Chờ và
+      // KIỂM LẠI chat đó sau KIEM_LAI_MS (cùng cơ chế kiểm việc dở) — không gửi lại ở tài khoản khác, không tính lỗi,
+      // tài khoản không bị nghỉ. Muse xong thì tải về; quá KIEM_TOI_DA lần kiểm vẫn chưa xong thì chạy như thường.
+      j.kiemSo = (j.kiemSo || 0) + 1;
+      Object.assign(j, { trangThai: 'cho', buoc: '', loi: '', kiemLai: Date.now() + KIEM_LAI_MS });
+      if (j.taiKhoan) this.ketQuaTk[j.taiKhoan] = { ok: true, luc: Date.now() };
+      this.log('info', `⏳ #${j.so} Muse vẫn đang tạo sau ${this._choGiay(j)} giây ở "${this._tenTk(j.taiKhoan)}" — giữ chat, kiểm lại sau ${Math.round(KIEM_LAI_MS / 60000)} phút (không gửi lại, không tính lỗi; lần ${j.kiemSo}/${KIEM_TOI_DA}).`);
     } else if (r.canDangNhap) {
       Object.assign(j, { trangThai: 'cho', buoc: '' });
       if (!r.giuThread) j.thread = '';
