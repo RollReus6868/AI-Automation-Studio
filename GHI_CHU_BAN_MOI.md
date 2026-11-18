@@ -1,4 +1,13 @@
-# AI Automation Studio 1.5.1
+# AI Automation Studio 1.5.2
+
+- **Nhạc lên Google Drive:** bật *tự đưa lên Google Drive* (Cài đặt → Google Drive) thì nhạc Flow Music cũng lên Drive, vào thư mục **`<Tên dự án>/BGM`** — cùng thư mục dự án với `images` và `Videos`. Nhạc vẫn tải về máy như cũ. Nút *Lên Drive* (từng việc / hàng loạt) cũng dùng được ở trang Tạo nhạc.
+- **Xem lại tab của video đang chạy / đã lỗi:** bấm vào việc → cột *Chi tiết kết quả* có mục mới **Tab của việc này**:
+  - **Hiện tab đang chạy** — mở cửa sổ đang làm việc đó để xem trực tiếp (bấm X chỉ ẩn đi, việc vẫn chạy).
+  - Mỗi **chat Muse** việc đã chạy — kể cả chat cũ ở tài khoản trước khi bị chuyển vì quá giờ — có **Mở tab** (xem Muse đã tạo được chưa) và **Tải về** (lấy video trong chat đó về, không gửi lại prompt; việc thành Xong, đặt tên và đưa lên Drive như thường). Chat còn đang tạo thì app báo "Muse vẫn đang tạo", bấm lại sau.
+- Flow Music chạy 2 bài cùng lúc: trước đây trang của bài sau mở nhanh hơn thì có lúc gửi trước bài trước; giờ luôn **gửi đúng thứ tự prompt** (tên file vốn đã đúng số).
+- Mọi thứ khác giữ nguyên như 1.5.1.
+
+## Bản 1.5.1
 
 - **Muse tạo video lâu hơn thời gian chờ không còn bị bỏ ngang.** Trước đây chờ đủ 300 giây mà video chưa xong là app bỏ chat, gửi lại prompt ở tài khoản khác (tốn thêm lượt) và tính tài khoản bị lỗi — lỗi 2 lần là tài khoản phải nghỉ 15 phút, dù Muse vẫn tạo xong video ngay sau đó. Giờ nếu hết giờ chờ mà Muse **vẫn đang tạo**: app giữ nguyên chat đó, cứ 2 phút mở lại kiểm một lần (tối đa 6 lần), xong thì tải về. Không gửi lại, không tính lỗi, tài khoản không bị nghỉ. Nhật ký ghi `⏳ #N Muse vẫn đang tạo sau 300 giây … giữ chat, kiểm lại sau 2 phút`.
 - **Không mất dấu chat:** khi chạy nhiều luồng, Muse có lúc chậm đổi địa chỉ chat nên nhật ký ghi `#85 đã gửi → ` (trống). App giờ nhớ địa chỉ chat ngay khi Muse đổi xong, nên vẫn mở lại và kiểm lại được.

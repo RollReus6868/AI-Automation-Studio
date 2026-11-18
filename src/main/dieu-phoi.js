@@ -99,7 +99,7 @@ const CAI_DAT_MAC_DINH = {
   // tài khoản, hay Muse từ chối tạo video từ một ảnh. Mỗi việc chỉ đổi bên một lần (không đá qua đá lại).
   doiNenKhiLoi: true,
   tachPrompt: 'dong',     // 'dong' | 'doan'
-  // 1.4.0: ảnh / video xong → đưa lên Google Drive (<Drive>/<Tên dự án>/images | Videos), hai cách:
+  // 1.4.0: ảnh / video xong → đưa lên Google Drive (<Drive>/<Tên dự án>/images | Videos; 1.5.2: nhạc → BGM), hai cách:
   //   'may' = chép vào thư mục Google Drive trên máy (Drive cho máy tính tự tải lên) — thuMucDrive;
   //   'web' = tải thẳng lên drive.google.com bằng trình duyệt trong app, tài khoản Drive driveTk.
   boQuaDaCo: false,       // 1.4.2: thêm prompt → bỏ qua số đã có file trong thư mục lưu (quét thư mục)
@@ -1146,6 +1146,70 @@ class DieuPhoi {
   }
 
   /** Luồng đang chạy việc j (Flow: mẻ có j). */
+  /**
+   * 1.5.2 — nhớ các chat Muse việc đã chạy (j.chatCu, mới nhất cuối, tối đa 10). Việc chuyển tài khoản / Tạo lại thì
+   * j.thread bị xoá nhưng chat cũ vẫn có thể ra video muộn → người dùng mở lại xem, tải video từ chat đó (taiTuChat).
+   */
+  _nhoChat(j, thread, tk) {
+    if (!thread || !tk || /\/thread\/new\b/.test(thread)) return;
+    const ds = (j.chatCu || []).filter((c) => c.thread !== thread);
+    ds.push({ tk, thread, luc: Date.now() });
+    j.chatCu = ds.slice(-10);
+  }
+
+  /** Chat của việc (cũ → mới) — gồm chat đang dùng. */
+  dsChat(j) {
+    const ds = [...(j.chatCu || [])];
+    if (j.thread && j.taiKhoan && !ds.some((c) => c.thread === j.thread) && !/\/thread\/new\b/.test(j.thread)) ds.push({ tk: j.taiKhoan, thread: j.thread, luc: j.guiLuc || j.batDauLuc || 0 });
+    return ds;
+  }
+
+  /**
+   * 1.5.2 — người dùng bấm "Tải video về" ở một chat của việc (thường là chat cũ: quá giờ chờ rồi chuyển tài khoản, sau đó
+   * Muse vẫn tạo xong). Mở chat đó bằng luồng tạm của đúng tài khoản (chỉ kiểm, KHÔNG gửi), có kết quả thì lưu như việc
+   * xong bình thường (tên theo mẫu, Drive, nối video). Việc đang chạy ở chỗ khác thì bỏ lần chạy đó (không tải trùng).
+   */
+  async taiTuChat(id, thread) {
+    const j = this.viec.find((v) => v.id === id);
+    if (!j) return { ok: false, loi: 'Không thấy việc' };
+    if ((j.nen || 'muse') !== 'muse') return { ok: false, loi: 'Chỉ việc chạy trên Muse mới tải từ chat được' };
+    const chat = this.dsChat(j).find((c) => c.thread === thread);
+    if (!chat) return { ok: false, loi: 'Việc này không có chat đó' };
+    const tk = this.o.taiKhoan.tim(chat.tk);
+    if (!tk) return { ok: false, loi: 'Tài khoản của chat này đã bị xoá' };
+    if (!this._taiChat) this._taiChat = new Set();
+    if (this._taiChat.has(j.id)) return { ok: false, loi: 'Đang tải từ chat của việc này — chờ chút' };
+    this._taiChat.add(j.id);
+    const l = this.o.taoLuong(tk, 'kiem', null);
+    const cd = this.cd(j.duAn);
+    this.log('info', `📥 #${j.so}: mở chat ở "${tk.ten}" để tải video (không gửi lại prompt) — ${thread}`);
+    let r;
+    try {
+      r = await l.chay({ ...j, thread, taiKhoan: tk.id, files: [] }, {
+        tinNhan: '', files: [], png: cd.png, chiKiem: true, choToiDaGiay: KIEM_GIAY, choChuGiay: 24 * 3600,
+        choGui: async () => {}, capNhat: () => {}
+      });
+    } catch (err) { r = { ok: false, loi: err.message }; } finally {
+      this._taiChat.delete(j.id);
+      try { this.o.huyLuong(l); } catch (_) { /* cửa sổ đã đóng */ }
+    }
+    if (!this.viec.includes(j)) return { ok: false, loi: 'Việc đã bị xoá' };
+    if (!r.ok) {
+      const loi = r.chuaXong ? (r.dangTao ? 'Muse vẫn đang tạo trong chat này — đợi thêm rồi bấm lại' : 'Chat này chưa có video / ảnh nào') : r.loi || 'Không lấy được kết quả';
+      this.log('warning', `📥 #${j.so}: chưa tải được từ chat ở "${tk.ten}" — ${loi}`);
+      this.o.bao();
+      return { ok: false, loi };
+    }
+    if (j.trangThai === 'chay') this._thaoViec(j);   // đang chạy ở chỗ khác → bỏ lần chạy đó, dùng kết quả chat này
+    Object.assign(j, { trangThai: 'chay', thread, taiKhoan: tk.id });
+    delete j.kiemLai; delete j.kiemSo;
+    this._ketThuc(j, r, tk);
+    this.log('success', `📥 #${j.so}: đã tải từ chat ở "${tk.ten}" — không tạo lại.`);
+    this.luu();
+    this._vong();
+    return { ok: true, files: j.files };
+  }
+
   _luongCuaViec(j) {
     return this.luong.find((y) => y.luong.nen === 'flow' ? (y.luong.dsViec || []).includes(j) : y.luong.viec === j);
   }
@@ -1376,7 +1440,7 @@ class DieuPhoi {
 
   /** Đưa (lại) kết quả của các việc đã xong lên Google Drive — dùng thư mục Drive của dự án, kể cả khi tắt "tự đưa". */
   lenDriveViec(ids) {
-    const ds = this.viec.filter((j) => ids.includes(j.id) && j.trangThai === 'xong' && (j.loai === 'anh' || j.loai === 'video') && (j.files || []).length);
+    const ds = this.viec.filter((j) => ids.includes(j.id) && j.trangThai === 'xong' && ['anh', 'video', 'nhac'].includes(j.loai) && (j.files || []).length);
     const chep = ds.filter((j) => !this._driveThieu(this.cd(j.duAn)));
     if (ds.length && !chep.length) return { ok: false, loi: `${this._driveThieu(this.cd(ds[0].duAn))} — vào Cài đặt → Google Drive` };
     for (const j of chep) this._lenDrive(j, true);
@@ -1387,7 +1451,7 @@ class DieuPhoi {
   _lenDrive(j, tay = false) {
     if (!this.o.lenDrive && !this.o.lenDriveWeb) return;
     const c = this.cd(j.duAn);
-    if (!(tay || c.driveBat) || (j.loai !== 'anh' && j.loai !== 'video')) return;
+    if (!(tay || c.driveBat) || !['anh', 'video', 'nhac'].includes(j.loai)) return;   // 1.5.2: nhạc → <dự án>/BGM
     const thieu = this._driveThieu(c);
     if (thieu) {
       if (!tay) this._baoLoiDrive(j, thieu);
@@ -1747,6 +1811,21 @@ class DieuPhoi {
   coViecDangChay() { return this.luong.some((x) => !x.luong.ranh); }
 
   /** Giãn nhịp gửi theo từng tài khoản (đặt chỗ đồng bộ nên không hai luồng cùng lọt). */
+  /**
+   * 1.5.2: Flow Music chạy nhiều bài cùng lúc mỗi tài khoản (mỗi bài một trang) — trang nào mở xong trước thì gửi trước, nên
+   * prompt 2 có lúc lên trước prompt 1. Chờ tới khi các việc nhạc giao TRƯỚC ở cùng tài khoản đã gửi (có phiên) hoặc
+   * không còn chạy, rồi mới gửi → gửi đúng thứ tự prompt. Tối đa 90 giây (trang kia đứng thì thôi chờ).
+   */
+  async _choLuotGuiNhac(j, tkId, lan) {
+    const so = this._soGiao && this._soGiao.get(j);
+    if (!so) return;
+    const truoc = () => this.viec.some((v) => v !== j && v.nen === 'fmusic' && v.trangThai === 'chay' && v.taiKhoan === tkId
+      && !v.nhacPhien && (this._soGiao.get(v) || Infinity) < so);
+    for (const het = Date.now() + 90000; Date.now() < het && truoc() && j.lanGiao === lan;) {
+      await new Promise((r) => setTimeout(r, 200));
+    }
+  }
+
   async choGui(tkId, nghiGiay = this.caiDat.nghiGiuaLanGui) {
     for (;;) {
       const con = (this.lanGui[tkId] || 0) + nghiGiay * 1000 - Date.now();
@@ -2065,6 +2144,8 @@ class DieuPhoi {
     const tk = this.o.taiKhoan.tim(x.taiKhoanId);
     const lan = j.lanGiao = (j.lanGiao || 0) + 1;   // 1.4.0: lần giao này — kết quả của lần giao cũ (việc đã đổi bên) bị bỏ
     x.giaoLuc = Date.now(); x.viecGiao = j;          // 1.4.9: canh treo (_canhTreo)
+    if (!this._soGiao) { this._soGiao = new WeakMap(); this._demGiao = 0; }
+    this._soGiao.set(j, ++this._demGiao);            // 1.5.2: thứ tự giao (Flow Music gửi đúng thứ tự)
     delete j.tkMuon;
     Object.assign(j, { trangThai: 'chay', taiKhoan: x.taiKhoanId, batDauLuc: j.thread ? (j.batDauLuc || Date.now()) : Date.now(), loi: '' });
     this.luu();
@@ -2086,10 +2167,14 @@ class DieuPhoi {
       png: cd.png,
       choToiDaGiay: j.loai === 'nhac' ? cd.choNhacGiay : j.loai === 'video' ? cd.choVideoGiay : cd.choAnhGiay,
       choChuGiay: j.loai === 'video' ? cd.choChuGiay * 2 : cd.choChuGiay,
-      choGui: () => this.choGui(x.taiKhoanId, theoNen(cd, j.nen, 'nghiGiuaLanGui')),
+      choGui: async () => {
+        if (j.nen === 'fmusic') await this._choLuotGuiNhac(j, x.taiKhoanId, lan);
+        return this.choGui(x.taiKhoanId, theoNen(cd, j.nen, 'nghiGiuaLanGui'));
+      },
       capNhat: (thay) => {
         if (j.lanGiao !== lan) return;
         Object.assign(j, thay);
+        if (thay.thread) this._nhoChat(j, thay.thread, x.taiKhoanId);   // 1.5.2: nhớ mọi chat của việc (mở lại / tải về tay)
         if (thay.thread || thay.guiLuc) { delete j.kiemSo; delete j.ghiChuMo; this.luuNgay(); } else this._luuBuoc(thay);
       }
     });

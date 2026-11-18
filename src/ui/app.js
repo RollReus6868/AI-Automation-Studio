@@ -750,6 +750,32 @@
     }
   }
 
+  const nutDrive = (j) => `<button class="nut-vien" data-ct="lenDrive" title="${esc(j.drive && j.drive[0] ? `Đã có trên Drive: ${j.drive[0]}` : j.driveLoi || 'Chép file lên thư mục Google Drive (Cài đặt → Google Drive)')}">${ic('cloud-upload')}${j.drive && j.drive.length ? 'Đưa lại lên Drive' : 'Lên Drive'}</button>`;
+
+  /**
+   * 1.5.2: mục "Tab của việc này" ở cột chi tiết — hiện tab (cửa sổ) đang chạy việc, và các chat Muse việc đã chạy (chat cũ:
+   * quá giờ chờ rồi chuyển tài khoản…) để mở ra xem và tải video từ đúng chat đó, không gửi lại prompt.
+   */
+  function veTabViec(j) {
+    const chay = j.trangThai === 'chay' && !j.dangKiem;
+    const muse = nenTk(j) === 'muse';
+    const ds = muse ? [...(j.chatCu || [])] : [];
+    if (muse && j.thread && j.taiKhoan && !/\/thread\/new\b/.test(j.thread) && !ds.some((c) => c.thread === j.thread)) ds.push({ tk: j.taiKhoan, thread: j.thread, luc: j.guiLuc || j.batDauLuc || 0 });
+    if (!chay && !ds.length) return '';
+    const dong = ds.slice().reverse().map((c) => {
+      const dang = chay && c.thread === j.thread;
+      return `<div class="ct-chat">
+        <div class="ct-chat-ten">${ic('monitor')}<span>${esc(tenTk(c.tk))}${c.luc ? ` · ${esc(gio(c.luc))}` : ''}${dang ? ' · <b>đang chạy</b>' : c.thread === j.thread ? ' · chat hiện tại' : ' · chat cũ'}</span></div>
+        <div class="ct-chat-nut">
+          <button class="nut-vien nho" data-chat="mo" data-thread="${esc(c.thread)}" title="Mở chat này trong cửa sổ riêng để xem Muse đã tạo được chưa">${ic('external-link')}Mở tab</button>
+          <button class="nut-vien nho" data-chat="tai" data-thread="${esc(c.thread)}" title="Lấy video / ảnh đã có trong chat này về (không gửi lại prompt); việc thành Xong">${ic('download')}Tải về</button>
+        </div></div>`;
+    }).join('');
+    return `<div class="ct-dau"><span>Tab của việc này</span></div>
+      ${chay ? `<div class="ct-nut" style="grid-template-columns:1fr"><button class="nut-vien" data-ct="xemTab" title="Hiện cửa sổ đang chạy việc này (đóng cửa sổ chỉ ẩn đi, việc vẫn chạy)">${ic('monitor')}Hiện tab đang chạy</button></div>` : ''}
+      ${dong}`;
+  }
+
   function veChiTiet() {
     const j = viecTheoId(U.chiTiet);
     const hop = $('#chiTiet');
@@ -789,7 +815,9 @@
       </div>
       ${f && j.loai === 'anh' ? `<div class="ct-nut" style="grid-template-columns:1fr"><button class="nut-vien" data-ct="video">${ic('film')}Tạo video từ ảnh này</button></div>` : ''}
       ${j.loai !== 'nhac' ? `<div class="ct-nut" style="grid-template-columns:${f && j.trangThai === 'xong' ? '1fr 1fr' : '1fr'}"><button class="nut-vien" data-ct="doiNen">${ic('arrow-left-right')}Đổi sang ${nenTk(j) === 'flow' ? 'Muse' : 'Flow'} &amp; chạy ngay</button>${
-        f && j.trangThai === 'xong' ? `<button class="nut-vien" data-ct="lenDrive" title="${esc(j.drive && j.drive[0] ? `Đã có trên Drive: ${j.drive[0]}` : j.driveLoi || 'Chép file lên thư mục Google Drive (Cài đặt → Google Drive)')}">${ic('cloud-upload')}${j.drive && j.drive.length ? 'Đưa lại lên Drive' : 'Lên Drive'}</button>` : ''}</div>` : ''}`);
+        f && j.trangThai === 'xong' ? nutDrive(j) : ''}</div>` : ''}
+      ${j.loai === 'nhac' && f && j.trangThai === 'xong' ? `<div class="ct-nut" style="grid-template-columns:1fr">${nutDrive(j)}</div>` : ''}
+      ${veTabViec(j)}`);
   }
 
   // ── Hành động trên việc ──────────────────────────────────────────────────
@@ -809,6 +837,9 @@
       kiemViecDo([j.id]);
     } else if (lenh === 'doiNen') {
       doiNen([j.id], nenTk(j) === 'flow' ? 'muse' : 'flow');
+    } else if (lenh === 'xemTab') {
+      const r = await api.call('xemTabViec', { id: j.id });
+      if (r && !r.ok) toast(r.loi, true);
     } else if (lenh === 'lenDrive') {
       lenDrive([j.id]);
     } else if (lenh === 'xoa') {
@@ -893,6 +924,21 @@
     if (r && r.khongTk && r.khongTk.length && !r.doi) { toast(`Dự án chưa có tài khoản ${TEN_NEN[nen]} dùng được — bấm nút tài khoản cạnh tên dự án`, true); return; }
     toast(r && r.doi ? `Đã đổi ${r.doi} việc sang ${TEN_NEN[nen]} và chạy ngay${r.khongTk && r.khongTk.length ? ` · dự án ${r.khongTk.join(', ')} chưa có tài khoản ${TEN_NEN[nen]}` : ''}` : 'Không đổi được việc nào', !(r && r.doi));
   }
+  async function lenhChat(b, j) {
+    const thread = b.dataset.thread;
+    if (b.dataset.chat === 'mo') {
+      const r = await api.call('xemTabViec', { id: j.id, thread });
+      if (r && !r.ok) toast(r.loi, true);
+      return;
+    }
+    b.disabled = true;
+    toast(`#${j.so}: đang mở chat để lấy video về…`);
+    try {
+      const r = await api.call('taiTuChat', { id: j.id, thread });
+      toast(r && r.ok ? `#${j.so}: đã tải về từ chat — việc xong` : (r && r.loi) || 'Không tải được', !(r && r.ok));
+    } finally { b.disabled = false; }
+  }
+
   async function lenDrive(ids) {
     const r = await api.call('lenDriveViec', { ids });
     if (!r || !r.ok) { toast((r && r.loi) || 'Không đưa lên Drive được', true); return; }
@@ -933,7 +979,7 @@
       f && j.loai === 'anh' ? `<button data-l="video">${ic('film')}Tạo video từ ảnh này</button>` : '',
       // 1.4.0: đổi ngay sang bên kia rồi chạy luôn; đưa kết quả lên Google Drive.
       j.loai !== 'nhac' ? `<button data-l="doiNen">${ic('arrow-left-right')}Đổi sang ${nenTk(j) === 'flow' ? 'Muse' : 'Flow'} &amp; chạy ngay</button>` : '',
-      f && j.trangThai === 'xong' && j.loai !== 'nhac' ? `<button data-l="lenDrive">${ic('cloud-upload')}Đưa lên Google Drive</button>` : '',
+      f && j.trangThai === 'xong' ? `<button data-l="lenDrive">${ic('cloud-upload')}Đưa lên Google Drive</button>` : '',
       `<button data-l="chep">${ic('copy')}Sao chép prompt</button><div class="tach"></div><button data-l="xoa" class="do">${ic('trash-2')}Xoá</button>`
     ].join('');
     document.body.appendChild(m);
@@ -1924,6 +1970,9 @@
       const b = e.target.closest('[data-ct]');
       const j = viecTheoId(U.chiTiet);
       if (b && j && !b.disabled) hanhDong(b.dataset.ct, j);
+      // 1.5.2: chat của việc — mở tab xem / tải video từ chat đó.
+      const c = e.target.closest('[data-chat]');
+      if (c && j && !c.disabled) lenhChat(c, j);
     });
     $('#nutPhongTo').onclick = () => { const j = viecTheoId(U.chiTiet); if (j && j.files && j.files[0]) moXemLon(j.files[0], j.loai); };
     $('#dongXemLon').onclick = () => { $('#xemLon').hidden = true; $('#xemLonNoiDung').innerHTML = ''; };

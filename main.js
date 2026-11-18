@@ -283,6 +283,49 @@ function taoCuaSoAn(tk, tieuDe) {
   w.on('close', (e) => { if (!appDangThoat && !w.__huy) { e.preventDefault(); w.hide(); } });
   return w;
 }
+/**
+ * 1.5.2 — "Hiện tab đang chạy" / "Mở tab" ở cột chi tiết của việc.
+ *  - Việc đang chạy, không chỉ chat (hoặc chỉ đúng chat đang chạy) → hiện cửa sổ của luồng / tab Flow đang chạy nó (bấm X chỉ
+ *    ẩn lại, việc vẫn chạy).
+ *  - Chat cũ của việc (Muse) → mở cửa sổ XEM riêng bằng phiên của đúng tài khoản (không đụng luồng đang chạy); mỗi chat một
+ *    cửa sổ, bấm lại thì đưa cửa sổ đó lên trước. Đóng cửa sổ xem là đóng hẳn.
+ */
+const cuaSoXemChat = new Map();   // thread → BrowserWindow
+function xemTabViec(id, thread) {
+  const j = dieuPhoi.viec.find((v) => v.id === id);
+  if (!j) return { ok: false, loi: 'Không thấy việc' };
+  const x = j.trangThai === 'chay' ? dieuPhoi._luongCuaViec(j) : null;
+  if (x && (!thread || thread === j.thread)) {
+    const w = x.luong.nen === 'flow' ? x.luong.tab && x.luong.tab.view : viewCuaLuong.get(x.luong);
+    if (w && !w.isDestroyed()) {
+      w.setSkipTaskbar(false);
+      w.show();
+      w.focus();
+      log('info', `👁 Hiện tab đang chạy #${j.so} (${w.getTitle()}) — bấm X trên cửa sổ đó chỉ ẩn đi, việc vẫn chạy.`);
+      return { ok: true, dangChay: true };
+    }
+  }
+  if (!thread) return { ok: false, loi: 'Việc không còn chạy ở tab nào — mở chat của việc ở danh sách bên dưới' };
+  const chat = dieuPhoi.dsChat(j).find((c) => c.thread === thread);
+  if (!chat) return { ok: false, loi: 'Việc này không có chat đó' };
+  const tk = taiKhoan.tim(chat.tk);
+  if (!tk) return { ok: false, loi: 'Tài khoản của chat này đã bị xoá' };
+  let w = cuaSoXemChat.get(thread);
+  if (w && !w.isDestroyed()) { w.show(); w.focus(); return { ok: true }; }
+  w = new BrowserWindow({
+    show: true, width: 1280, height: 860, title: `Chat #${j.so} · ${tk.ten}`, autoHideMenuBar: true,
+    icon: path.join(__dirname, 'icons', process.platform === 'win32' ? 'icon.ico' : 'icon256.png'),
+    webPreferences: { session: phien(tk), contextIsolation: true, sandbox: true, spellcheck: false }
+  });
+  w.webContents.setWindowOpenHandler(({ url }) => { if (/^https?:/.test(url)) shell.openExternal(url); return { action: 'deny' }; });
+  w.on('page-title-updated', (e) => e.preventDefault());
+  w.on('closed', () => { if (cuaSoXemChat.get(thread) === w) cuaSoXemChat.delete(thread); });
+  cuaSoXemChat.set(thread, w);
+  w.loadURL(thread).catch(() => {});
+  log('info', `👁 Mở chat của #${j.so} ở "${tk.ten}": ${thread}`);
+  return { ok: true };
+}
+
 function dongCuaSoAn(w) {
   if (!w || w.isDestroyed()) return;
   w.__huy = true;
@@ -891,7 +934,10 @@ const LENH = {
   dungViec: ({ ids }) => dieuPhoi.dungViec(ids),
   chayViec: ({ ids }) => dieuPhoi.chayViec(ids),
   doiTaiKhoan: ({ ids }) => dieuPhoi.doiTaiKhoan(ids || []),   // 1.4.9: nút "Đổi tài khoản" ở việc đang chạy / treo
-  kiemViecDo: ({ ids } = {}) => dieuPhoi.kiemViecDo(Array.isArray(ids) ? ids : null),   // 1.4.12: nút "Kiểm tra việc dở" (Muse); không có ids = mọi việc dở
+  kiemViecDo: ({ ids } = {}) => dieuPhoi.kiemViecDo(Array.isArray(ids) ? ids : null),
+  // 1.5.2: cột chi tiết — hiện tab (cửa sổ) đang chạy việc, hoặc mở một chat Muse việc đã chạy; tải video từ chat đó.
+  xemTabViec: ({ id, thread } = {}) => xemTabViec(id, thread),
+  taiTuChat: ({ id, thread } = {}) => dieuPhoi.taiTuChat(id, thread),   // 1.4.12: nút "Kiểm tra việc dở" (Muse); không có ids = mọi việc dở
   xoaViec: ({ ids }) => dieuPhoi.xoaViec(ids),
   suaViec: ({ id, thay }) => dieuPhoi.suaViec(id, thay),
   // 1.4.0: đổi prompt nhiều việc, đổi ngay sang Muse / Flow, đưa lên Google Drive, chạy lại tài khoản đang nghỉ.
