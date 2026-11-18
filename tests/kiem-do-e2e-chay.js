@@ -80,6 +80,55 @@ module.exports = function e2eKiemDo({ win, LENH, dieuPhoi, taiKhoan }) {
       kiem(moi.length === 1 && /chim bay kiểm hết lượt/.test(moi[0].prompt), 'chỉ đúng 1 lần gửi mới (C ở Muse 2), B không bị gửi lại');
       kiem(b.thread.endsWith('/thread/kiem-dang'), 'B vẫn giữ chat cũ');
       LENH.dung({ duAn: d.id });
+
+      // 1.5.2: cột chi tiết — "Tab của việc này": mở chat cũ xem, tải video từ chat cũ (không gửi lại).
+      ghi('-- 3. Chat cũ của B: Mở tab + Tải về (1.5.2)');
+      await guiGia({ prompt: tin(b), soFile: 0, thread: 'kiem-cu-xong', t0: Date.now() - 60000 });
+      b.chatCu = [{ tk: 'tk-1', thread: `${URL_}/thread/kiem-cu-xong`, luc: Date.now() - 600000 }];
+      dieuPhoi.luu();
+      await js(`window.__diToi('video'); undefined`);
+      await cho(() => js(`!!document.querySelector('#dsHang .dong-viec[data-id="${b.id}"]')`), 10000, 'dòng B hiện');
+      await js(`document.querySelector('#dsHang .dong-viec[data-id="${b.id}"] .dong-prompt, #dsHang .dong-viec[data-id="${b.id}"]').click(); 1`);
+      const coMuc = await cho(async () => Number(await js(`document.querySelectorAll('#chiTiet .ct-chat').length`)) === 2, 10000, 'mục Tab của việc này có 2 chat');
+      kiem(coMuc, 'cột chi tiết có mục "Tab của việc này" với 2 chat (chat hiện tại + chat cũ)');
+      const truocCuaSo = require('electron').BrowserWindow.getAllWindows().length;
+      await js(`document.querySelector('#chiTiet [data-chat="mo"][data-thread$="/thread/kiem-cu-xong"]').click(); 1`);
+      const coCuaSo = await cho(() => require('electron').BrowserWindow.getAllWindows().some((w) => w.isVisible() && /\/thread\/kiem-cu-xong/.test(w.webContents.getURL())), 10000, 'cửa sổ chat cũ');
+      kiem(coCuaSo && require('electron').BrowserWindow.getAllWindows().length === truocCuaSo + 1, '"Mở tab" mở cửa sổ xem đúng chat cũ (phiên của Muse 1)');
+      const gui3 = (await daGui()).length;
+      await js(`document.querySelector('#chiTiet [data-chat="tai"][data-thread$="/thread/kiem-dang"]').click(); 1`);
+      await ngu(1500);
+      await cho(() => !(dieuPhoi._taiChat && dieuPhoi._taiChat.size), 90000, 'tải từ chat đang tạo xong lượt');
+      kiem(b.trangThai === 'loi' && LENH.trangThai().nhatKy.some((x) => /📥 #2: chưa tải được từ chat ở "Muse 1" — Muse vẫn đang tạo/.test(x.chu)),
+        '"Tải về" ở chat Muse còn đang tạo → báo "Muse vẫn đang tạo", việc giữ nguyên');
+      await js(`document.querySelector('#chiTiet [data-chat="tai"][data-thread$="/thread/kiem-cu-xong"]').click(); 1`);
+      await cho(() => b.trangThai === 'xong', 90000, 'B xong từ chat cũ');
+      ghi(`   B ${b.trangThai} ${b.files[0] || ''} tk=${b.taiKhoan}`);
+      kiem(b.trangThai === 'xong' && b.taiKhoan === 'tk-1' && fs.existsSync(path.join(thuMuc, '002.mp4')), '"Tải về" ở chat cũ đã có video → tải về 002.mp4, việc Xong');
+      kiem((await daGui()).length === gui3, 'tải từ chat cũ không gửi prompt nào');
+      kiem(LENH.trangThai().nhatKy.some((x) => /📥 #2: đã tải từ chat ở "Muse 1" — không tạo lại/.test(x.chu)), 'nhật ký ghi tải từ chat');
+      for (const w of require('electron').BrowserWindow.getAllWindows()) if (/\/thread\/kiem-cu-xong/.test(w.webContents.getURL())) w.close();
+
+      // "Hiện tab đang chạy": việc E đang chờ Muse trong chat (tạo lâu) → hiện đúng cửa sổ luồng đang chạy nó.
+      ghi('-- 4. Hiện tab đang chạy (1.5.2)');
+      LENH.them({ duAn: d.id, loai: 'video', tyLe: '9:16', prompts: ['rùa bò hiện tab'] });
+      const e = dieuPhoi.viec.filter((j) => j.duAn === d.id).sort((x, y) => y.so - x.so)[0];
+      await guiGia({ prompt: tin(e), soFile: 0, thread: 'kiem-lau', t0: Date.now() + 3600e3 });
+      // Muse 1 đã thôi nhận video (mục C) → chat của E ở Muse 2.
+      Object.assign(e, { trangThai: 'cho', taiKhoan: tk2.id, thread: `${URL_}/thread/kiem-lau`, kiemSo: 6 });
+      LENH.chay({ duAn: d.id });
+      await cho(() => e.trangThai === 'chay' && dieuPhoi._luongCuaViec(e), 30000, 'E đang chạy ở luồng');
+      await js(`document.querySelector('#dsHang .dong-viec[data-id="${e.id}"]').click(); 1`);
+      await cho(() => js(`!!document.querySelector('#chiTiet [data-ct="xemTab"]')`), 10000, 'nút Hiện tab đang chạy');
+      await js(`document.querySelector('#chiTiet [data-ct="xemTab"]').click(); 1`);
+      const hien = await cho(() => require('electron').BrowserWindow.getAllWindows().some((w) => w.isVisible() && /\/thread\/kiem-lau/.test(w.webContents.getURL())), 10000, 'cửa sổ luồng hiện');
+      ghi(`   E ${e.trangThai} buoc=${e.buoc} thread=${e.thread} · cửa sổ: ${require('electron').BrowserWindow.getAllWindows().map((w) => `${w.isVisible() ? 'hiện' : 'ẩn'}:${w.getTitle()}:${w.webContents.getURL()}`).join(' | ')}`);
+      kiem(hien, '"Hiện tab đang chạy" hiện đúng cửa sổ luồng đang chờ chat của việc');
+      const wl = require('electron').BrowserWindow.getAllWindows().find((w) => /\/thread\/kiem-lau/.test(w.webContents.getURL()));
+      if (wl) wl.close();
+      await ngu(800);
+      kiem(wl && !wl.isDestroyed() && !wl.isVisible() && e.trangThai === 'chay', 'bấm X trên cửa sổ luồng chỉ ẩn đi, việc vẫn chạy');
+      LENH.dung({ duAn: d.id });
     } catch (err) {
       ghi(`  ✘ lỗi kịch bản: ${err.stack}`);
       loi.push(err.message);

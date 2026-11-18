@@ -8,6 +8,7 @@
 //
 //  Cấu trúc: <thư mục Drive>/<Tên dự án>/images/<tên file>   (ảnh)
 //            <thư mục Drive>/<Tên dự án>/Videos/<tên file>   (video)
+//            <thư mục Drive>/<Tên dự án>/BGM/<tên file>      (1.5.2: nhạc Flow Music)
 //  Không ghi đè file khác cùng tên (thêm " (2)"); file Drive cũ của CHÍNH việc đó (Tạo lại) thì ghi đè.
 //  1.4.1: tên trên Drive theo mẫu tên của việc (o.ten), không theo tên file trên máy (có thể đã thành "001 (2).jpg").
 // ============================================================================
@@ -15,7 +16,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const THU_MUC_LOAI = { anh: 'images', video: 'Videos' };
+const THU_MUC_LOAI = { anh: 'images', video: 'Videos', nhac: 'BGM' };
 
 /** Tên thư mục dự án trên Drive: giữ nguyên tên (cả tiếng Việt), chỉ bỏ ký tự Windows / macOS cấm. */
 function tenThuMucDuAn(ten) {
@@ -42,7 +43,7 @@ async function tonTai(p, fsp) {
  */
 async function chepLenDrive({ goc, tenDuAn, loai, files, ten: tenDs = [], cu = [], fsp = fs.promises }) {
   const thuMuc = thuMucDich(goc || '', tenDuAn, loai);
-  if (!thuMuc) return { ok: false, loi: 'Chỉ ảnh và video được đưa lên Drive' };
+  if (!thuMuc) return { ok: false, loi: 'Chỉ ảnh, video và nhạc được đưa lên Drive' };
   if (!goc) return { ok: false, loi: 'Chưa chọn thư mục Google Drive (Cài đặt → Google Drive)' };
   if (!(await tonTai(goc, fsp))) {
     return { ok: false, loi: `Không thấy thư mục Google Drive "${goc}" — mở Google Drive cho máy tính và đăng nhập, hoặc chọn lại thư mục ở Cài đặt → Google Drive` };

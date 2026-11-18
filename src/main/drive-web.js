@@ -9,7 +9,7 @@
 //  trùng tên thì chọn "Thay thế" (file Drive cũ của chính việc đó) hoặc "Giữ cả hai", rồi chờ khung tiến độ
 //  báo tải xong. Không gọi API ẩn của Google, không giả trình duyệt.
 //
-//  Cấu trúc: Drive của tôi/<Tên dự án>/images (ảnh) · /Videos (video). Mã thư mục nhớ trong store
+//  Cấu trúc: Drive của tôi/<Tên dự án>/images (ảnh) · /Videos (video) · /BGM (nhạc, 1.5.2). Mã thư mục nhớ trong store
 //  (driveWeb) để lần sau mở thẳng; thư mục bị xoá thì tìm / tạo lại.
 //  Selector ở src/inject/drive-trang.js — CHƯA đo trên Drive thật; hỏng thì lưu HTML trang để sửa.
 // ============================================================================
@@ -54,7 +54,7 @@ class DriveWeb {
     const tk = this.o.timTk(tkId);
     if (!tk) return { ok: false, loi: 'Chưa chọn tài khoản Google Drive (Cài đặt → Google Drive)' };
     const sub = THU_MUC_LOAI[loai];
-    if (!sub) return { ok: false, loi: 'Chỉ ảnh và video được đưa lên Drive' };
+    if (!sub) return { ok: false, loi: 'Chỉ ảnh, video và nhạc được đưa lên Drive' };
     const ds = (files || []).map((f, i) => ({ f, ten: tenDs[i] || (f && path.basename(f)) })).filter((x) => x.f && fs.existsSync(x.f));
     if (!ds.length) return { ok: false, loi: 'File kết quả không còn trên máy' };
     const tenDa = tenThuMucDuAn(tenDuAn);

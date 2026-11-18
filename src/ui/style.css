@@ -605,3 +605,11 @@ label > .ap { margin-left: 6px; }
 .muc-don small { display: block; color: var(--chu-phu); font-size: 12px; margin-top: 2px; }
 .muc-don .co { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
 .ghi-don { color: var(--chu-phu); font-size: 12px; margin: 8px 0 0; overflow-wrap: anywhere; }
+
+/* 1.5.2: "Tab của việc này" — chat Muse của việc (mở xem / tải về từ chat đó) */
+.ct-chat { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; padding: 8px 10px; margin-bottom: 6px;
+  border: 1px solid var(--vien, rgba(255,255,255,.08)); border-radius: 10px; background: rgba(255,255,255,.02); }
+.ct-chat-ten { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1 1 140px; font-size: 12px; opacity: .9; }
+.ct-chat-ten span { overflow-wrap: anywhere; line-height: 1.35; }
+.ct-chat-ten svg { width: 14px; height: 14px; flex: none; }
+.ct-chat-nut { display: flex; gap: 6px; flex: none; }
