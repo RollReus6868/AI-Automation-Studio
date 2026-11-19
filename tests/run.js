@@ -1452,14 +1452,20 @@ test('trình viewer: mở thì luôn đóng (finally), kể cả khi không lấ
 test('1.5.3/1.5.4: ảnh Muse cỡ đầy đủ — trình xem mở bằng CHUỘT THẬT khi Muse bỏ qua cú bấm JavaScript', () => {
   const s = docNguon('src/inject/muse-trang.js');
   const than = s.slice(s.indexOf('async function layFile('), s.indexOf('window.__muse ='));
-  assert.ok(/bamGiua\(nut\)/.test(than) && /choAnhXem\(nho \? 3000 : 15000\)/.test(than), 'thử bấm JavaScript trước, chỉ chờ 3 giây');
+  assert.ok(/bamGiua\(nut\)/.test(than) && /choAnhXem\(nho \? 10000 : 15000\)/.test(than), 'bấm JavaScript mở trình xem (Muse thật nhận), chờ ảnh thật tới 10 giây');
+  assert.ok(/\$\('\[data-pel-click="chat_media_click"\]', x\.khung\)/.test(than), 'nút mở ảnh của Muse thật (data-pel-click=chat_media_click)');
   assert.ok(/canChuotThat: !duCo && Math\.max\(img\.naturalWidth, img\.naturalHeight\) < 1000/.test(than), 'ảnh vẫn nhỏ → nhờ luồng bấm chuột thật');
   assert.ok(/a\[href\]/.test(than) && /cachLay: 'lien-ket'/.test(than), 'ảnh trong liên kết: không bấm (rời trang), tải thẳng liên kết');
   const tx = s.slice(s.indexOf('function anhTrinhXem('), s.indexOf('function lopTrinhXem('));
-  assert.ok(/xemTruoc\.has\(i\)/.test(tx) && /i\.closest\(KHUNG_ANH\)/.test(tx) && !/role="dialog"/.test(tx), 'ảnh trình xem = ảnh MỚI ngoài khung chat, không cần role=dialog');
+  assert.ok(/xemTruoc\.has\(i\)/.test(tx) && /i\.closest\(KHUNG_ANH\)/.test(tx), 'ảnh trình xem = ảnh ngoài khung chat (mới, hoặc trong hộp thoại)');
+  // 1.5.5: Muse thật có ảnh NỀN mờ (bản xem trước) hiện to hơn ảnh thật → chọn theo SỐ ĐIỂM ẢNH, không theo cỡ hiện.
+  assert.ok(/dienTich\(i\) > dienTich\(tot\) \|\| \(dienTich\(i\) === dienTich\(tot\) && hienTich\(i\) > hienTich\(tot\)\)/.test(tx), 'chọn ảnh nhiều điểm ảnh nhất');
+  const cx = s.slice(s.indexOf('async function choAnhXem('), s.indexOf('const dangXem ='));
+  assert.ok(/if \(lon && du\) return i;/.test(cx) && /onDinh >= 3 && \(lon \|\| du\)/.test(cx), 'chỉ xong sớm khi đã có ảnh thật ≥ 1000 px');
   assert.ok(/window\.__muse = \{[^}]*diemAnh, layAnhXem, diemNutXem, docAnhTai, chanDoanAnh/.test(s));
   const nut = s.slice(s.indexOf('function nutTrinhXem('), s.indexOf('const giua ='));
   assert.ok(/tren\[tren\.length - 1\] : tren\[0\]/.test(nut), 'nút không nhãn: ✕ góc trái, ↓ góc phải');
+  assert.ok(/'media_download' : 'media_close'/.test(nut), 'nút trình xem của Muse thật: data-pel-click media_close / media_download');
   const nutMo = s.slice(s.indexOf('function nutMoAnh('), s.indexOf('function anhSanSang('));
   assert.ok(/n\.contains\(khung\) \|\| khung\.contains\(n\)/.test(nutMo) && /khungs\.indexOf\(khung\)/.test(nutMo), 'tin nhiều ảnh → nút đúng khung');
   const l = docNguon('src/main/luong.js');

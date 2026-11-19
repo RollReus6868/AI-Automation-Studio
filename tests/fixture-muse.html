@@ -282,8 +282,9 @@ async function veThread(id) {
     anh.push({ full, nho });
     const luoi = /LUOI/.test(t.prompt);
     const img = luoi ? '' : SRCSET ? `<img src="${nho}" srcset="${nho} 1x, ${full} 4x">` : `<img src="${nho}">`;
-    khungHtml += `<div data-testid="hatch-chat-attachment-presentation-image">${img}</div>` +
-      (SRCSET || THAT ? '' : `<button aria-label="${L.mo} ${luoi ? 'ảnh lười' : 'ảnh'} ${k + 1}" type="button" class="moXem" data-k="${k}"></button>`);
+    // 1.5.5: như Muse thật (đo 19/11/2026) — ảnh nằm TRONG nút "Open generated image…" (data-pel-click=chat_media_click).
+    khungHtml += `<div data-testid="hatch-chat-attachment-presentation-image">` + (SRCSET || THAT ? img
+      : `<button aria-label="${L.mo} ${luoi ? 'ảnh lười' : 'ảnh'} ${k + 1}" ${pel('chat_media_click')} type="button" class="moXem" data-k="${k}">${img}</button>`) + `</div>`;
   }
   veKhung(user + chu + `<div data-message-item="true" data-message-role="assistant"><div aria-busy="false">${khungHtml}</div></div>`);
   if (THAT) {
@@ -300,7 +301,8 @@ async function veThread(id) {
         d.innerHTML = `<button class="dong" style="position:absolute;left:16px;top:16px;width:32px;height:32px">✕</button>` +
           `<button style="position:absolute;right:60px;top:16px;width:32px;height:32px">⇪</button>` +
           `<button class="tai" style="position:absolute;right:16px;top:16px;width:32px;height:32px">↓</button>` +
-          `<img src="${nho}" style="position:absolute;left:10%;top:10%;width:80%;height:80%;object-fit:contain">`;
+          `<img src="${nho}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:blur(20px)">` +
+          `<img class="chinh" src="${nho}" style="position:absolute;left:10%;top:10%;width:80%;height:80%;object-fit:contain">`;
         const that = (f) => (ev) => { if (ev.isTrusted) f(); };
         d.querySelector('.dong').onclick = that(() => d.remove());
         d.querySelector('.tai').onclick = that(() => {
@@ -311,7 +313,7 @@ async function veThread(id) {
         });
         document.addEventListener('keydown', function esc(ev) { if (ev.isTrusted && ev.key === 'Escape') { d.remove(); document.removeEventListener('keydown', esc); } });
         document.body.appendChild(d);
-        if (!CHITAI && nho !== full) setTimeout(() => { const c = d.querySelector('img'); if (c) c.src = full; }, 700);
+        if (!CHITAI && nho !== full) setTimeout(() => { const c = d.querySelector('img.chinh'); if (c) c.src = full; }, 700);
       });
     });
   }
@@ -319,8 +321,11 @@ async function veThread(id) {
     const { full, nho } = anh[+b.dataset.k];
     const d = document.createElement('div');
     d.setAttribute('role', 'dialog');
-    // Dải ảnh nhỏ (mọi ảnh của tin, hiện bé) + ảnh chính hiện to.
-    d.innerHTML = `<button aria-label="${L.dong}">x</button><img class="chinh" src="${nho}" style="width:400px;max-width:none">` +
+    // 1.5.5: như Muse thật (đo 19/11/2026): ảnh NỀN mờ = bản xem trước nhưng hiện TO NHẤT (phủ kín màn hình), ảnh chính
+    // nhỏ hơn trên màn hình mà nhiều điểm ảnh hơn; nút media_close / media_download. Thêm dải ảnh nhỏ (mọi ảnh của tin).
+    d.innerHTML = `<img class="nen" src="${nho}" style="position:fixed;inset:0;width:100vw;height:100vh;object-fit:cover;filter:blur(20px);z-index:-1">` +
+      `<button aria-label="${L.dong}" ${pel('media_close')}>x</button><button aria-label="Download" ${pel('media_download')}>↓</button>` +
+      `<img class="chinh" src="${nho}" style="width:400px;max-width:none">` +
       anh.map((a) => `<img src="${a.full}" style="width:40px">`).join('');
     d.querySelector('button').onclick = () => d.remove();
     document.body.appendChild(d);
