@@ -1443,21 +1443,34 @@ test('trình trợ giúp kết thúc bằng undefined; (executeJavaScript không
 test('trình viewer: mở thì luôn đóng (finally), kể cả khi không lấy được ảnh', () => {
   const s = docNguon('src/inject/muse-trang.js');
   const than = s.slice(s.indexOf('async function layFile('), s.indexOf('window.__muse ='));
-  assert.ok(/moXem = x\.daMo/.test(than), 'đánh dấu đã mở theo daMo, không theo việc có ảnh');
-  assert.ok(/finally \{\s*if \(moXem\) \{ dongTrinhXem\(\)/.test(than));
+  assert.ok(/moXem = !!v \|\| dangXem\(\)/.test(than), 'đánh dấu đã mở theo trình xem thật sự mở');
+  assert.ok(/finally \{\s*if \(moXem\) await dongTrinhXem\(\)/.test(than));
+  const l = docNguon('src/main/luong.js');
+  const dd = l.slice(l.indexOf('async anhDayDu('), l.indexOf('Chạy một việc.'));
+  assert.ok(/\} finally \{[\s\S]*diemNutXem\('dong'\)[\s\S]*phimThat\('Escape'/.test(dd), 'luồng: luôn đóng trình xem (✕ chuột thật, không thì Escape thật)');
 });
-test('1.5.3: ảnh Muse lấy cỡ đầy đủ — luôn mở trình xem, không lấy bản xem trước trong chat', () => {
+test('1.5.3/1.5.4: ảnh Muse cỡ đầy đủ — trình xem mở bằng CHUỘT THẬT khi Muse bỏ qua cú bấm JavaScript', () => {
   const s = docNguon('src/inject/muse-trang.js');
   const than = s.slice(s.indexOf('async function layFile('), s.indexOf('window.__muse ='));
-  assert.ok(/const x = await moTrinhXem\(khung, dienTich\(nho\)\)/.test(than), 'luôn mở trình xem, kể cả khi ảnh chat đã nạp');
-  assert.ok(!/if \(!img\) \{ const x = await moTrinhXem/.test(than), 'không còn chỉ mở trình xem khi ảnh lười');
-  assert.ok(/dienTich\(x\.img\) >= dienTich\(img\)/.test(than), 'chọn ảnh lớn hơn trong hai ảnh');
-  assert.ok(/urlLonNhat\(img\)/.test(than) && /anhSangPng\(img, b\)/.test(than) && /coAnh\(b, img\)/.test(than),
-    'srcset lớn nhất; đổi PNG từ chính file đã tải; cỡ = cỡ file thật');
-  const mo = s.slice(s.indexOf('async function moTrinhXem('), s.indexOf('function dongTrinhXem('));
-  assert.ok(/dienTich\(i\) > \(dienTichNho \|\| 0\)/.test(mo) && /onDinh >= 3/.test(mo), 'chờ ảnh lớn hơn bản xem trước, hoặc trình xem đứng yên');
-  const nut = s.slice(s.indexOf('function nutMoAnh('), s.indexOf('function anhSanSang('));
-  assert.ok(/n\.contains\(khung\) \|\| khung\.contains\(n\)/.test(nut) && /khungs\.indexOf\(khung\)/.test(nut), 'tin nhiều ảnh → nút đúng khung');
+  assert.ok(/bamGiua\(nut\)/.test(than) && /choAnhXem\(nho \? 3000 : 15000\)/.test(than), 'thử bấm JavaScript trước, chỉ chờ 3 giây');
+  assert.ok(/canChuotThat: !duCo && Math\.max\(img\.naturalWidth, img\.naturalHeight\) < 1000/.test(than), 'ảnh vẫn nhỏ → nhờ luồng bấm chuột thật');
+  assert.ok(/a\[href\]/.test(than) && /cachLay: 'lien-ket'/.test(than), 'ảnh trong liên kết: không bấm (rời trang), tải thẳng liên kết');
+  const tx = s.slice(s.indexOf('function anhTrinhXem('), s.indexOf('function lopTrinhXem('));
+  assert.ok(/xemTruoc\.has\(i\)/.test(tx) && /i\.closest\(KHUNG_ANH\)/.test(tx) && !/role="dialog"/.test(tx), 'ảnh trình xem = ảnh MỚI ngoài khung chat, không cần role=dialog');
+  assert.ok(/window\.__muse = \{[^}]*diemAnh, layAnhXem, diemNutXem, docAnhTai, chanDoanAnh/.test(s));
+  const nut = s.slice(s.indexOf('function nutTrinhXem('), s.indexOf('const giua ='));
+  assert.ok(/tren\[tren\.length - 1\] : tren\[0\]/.test(nut), 'nút không nhãn: ✕ góc trái, ↓ góc phải');
+  const nutMo = s.slice(s.indexOf('function nutMoAnh('), s.indexOf('function anhSanSang('));
+  assert.ok(/n\.contains\(khung\) \|\| khung\.contains\(n\)/.test(nutMo) && /khungs\.indexOf\(khung\)/.test(nutMo), 'tin nhiều ảnh → nút đúng khung');
+  const l = docNguon('src/main/luong.js');
+  assert.ok(/if \(!dung\[i\]\.canChuotThat\) continue;/.test(l) && /this\.anhDayDu\(job, dung\[i\], ctx\)/.test(l));
+  const dd = l.slice(l.indexOf('async anhDayDu('), l.indexOf('Chạy một việc.'));
+  assert.ok(/diemAnh\(\$\{k\}\)/.test(dd) && /bamChuotThat\(this\.wc, d\.x, d\.y\)/.test(dd) && /layAnhXem/.test(dd), 'bấm chuột thật vào ảnh rồi lấy ảnh trình xem');
+  assert.ok(/diemNutXem\('tai'\)/.test(dd) && /this\.choTai\(this\.wc, 45000\)/.test(dd) && /docAnhTai/.test(dd), 'vẫn nhỏ → nút tải ↓, bắt file ở will-download');
+  assert.ok(/luuChanDoan\(`anh-nho-\$\{job\.so\}`/.test(dd), 'không được → lưu tệp chẩn đoán');
+  const m = docNguon('main.js');
+  assert.ok(/ganTaiMuse\(ses\);/.test(m) && /choTaiMuseDs\.get\(wc\.id\)/.test(m) && /if \(!c\) return;/.test(m.slice(m.indexOf('function ganTaiMuse('))), 'chỉ bắt tải của cửa sổ đang chờ');
+  assert.strictEqual((m.match(/\.\.\.tuyChonLuongMuse\(\)/g) || []).length, 2, 'luồng chạy + "Tải về hàng loạt" đều có chuột thật / nút tải');
   const HD = require('../src/main/hang-doi');
   assert.strictEqual(HD.chuCoAnh({ w: 1920, h: 1080 }), ' (1920×1080)');
   assert.strictEqual(HD.chuCoAnh({ duongDan: 'x.png' }), '');

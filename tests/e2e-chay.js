@@ -365,6 +365,28 @@ module.exports = function e2e({ win, app, LENH, dieuPhoi }) {
       kiem(dayDu && dayDu.xongLuc - dayDu.batDauLuc < 12000, `ảnh chat đã đủ cỡ → không chờ trình xem lâu (${dayDu && dayDu.xongLuc - dayDu.batDauLuc} ms)`);
       kiem(LENH.trangThai().nhatKy.slice(nk11b).some((d) => /xong ảnh.*\(1024×576\)/.test(d.chu)), 'nhật ký ghi cỡ ảnh đã tải (1024×576)');
 
+      // 11c) 1.5.4: Muse THẬT (người dùng 19/11/2026, 1.5.3 vẫn 498×280): trình xem chỉ mở khi bấm THẬT vào ảnh,
+      //      lớp phủ không role=dialog, nút không nhãn; CHITAI = trình xem cũng chỉ ảnh nhỏ → phải bấm nút tải ↓.
+      ghi('-- 11c. Ảnh đủ cỡ khi Muse chỉ nhận cú bấm thật');
+      await tk1.cookies.set({ url: process.env.MUSE_URL, name: 'muse_that', value: '1' });
+      const truoc11c = viec().length, nk11c = LENH.trangThai().nhatKy.length;
+      LENH.them({ duAn: 'mac-dinh', loai: 'anh', tyLe: '16:9', prompts: ['THAT ảnh bấm thật', 'CHITAI ảnh chỉ tải bằng nút', 'NHIEU THAT hai ảnh bấm thật'], chay: true });
+      await cho(() => !dieuPhoi.dangChay && !dieuPhoi.coViecDangChay(), 120000, 'chạy xong việc ảnh bấm thật');
+      const v11c = viec().slice(truoc11c);
+      for (const j of v11c) ghi(`   #${j.so} ${j.trangThai} ${(j.files || []).map((f) => ihdr(f).join('x')).join(',')} ${j.loi || ''}`);
+      const nk11 = LENH.trangThai().nhatKy.slice(nk11c).map((d) => d.chu);
+      for (const d of nk11.filter((x) => /đủ cỡ|chuột thật|chẩn đoán/.test(x))) ghi(`   ${d}`);
+      kiem(v11c.length === 3 && v11c.every((j) => j.trangThai === 'xong' && j.files.length && j.files.every((f) => ihdr(f).join('x') === '1024x576')),
+        'Muse chỉ nhận cú bấm thật → vẫn tải ảnh đủ cỡ 1024x576 (cả khi phải bấm nút tải ↓)');
+      const n11c = v11c.find((j) => /NHIEU/.test(j.prompt));
+      kiem(n11c && n11c.files.length === 2 && !fs.readFileSync(n11c.files[0]).equals(fs.readFileSync(n11c.files[1])), 'một tin 2 ảnh → bấm thật đúng từng ảnh, 2 file khác nhau');
+      kiem(nk11.some((x) => /ảnh đủ cỡ 1024×576 \(trong chat chỉ 256×144\) — lấy ở trình xem ảnh/.test(x)) &&
+        nk11.some((x) => /ảnh đủ cỡ 1024×576 \(trong chat chỉ 256×144\) — lấy bằng nút tải ↓/.test(x)), 'nhật ký ghi lấy ở trình xem / bằng nút tải ↓');
+      kiem(!nk11.some((x) => /ảnh chỉ \d+×\d+ — có thể Muse/.test(x)), 'không còn cảnh báo ảnh nhỏ');
+      const tamMuse = path.join(require('electron').app.getPath('userData'), 'muse-tai-tam');
+      kiem(!fs.existsSync(tamMuse) || !fs.readdirSync(tamMuse).length, 'file tải tạm của nút ↓ đã dọn');
+      await tk1.cookies.remove(process.env.MUSE_URL, 'muse_that');
+
       // 12) Đặt lại hàng đợi: mọi việc ảnh của dự án đang xem về Chờ, xoá chat cũ.
       ghi('-- 12. Đặt lại hàng đợi');
       await js(`window.__diToi('anh')`);

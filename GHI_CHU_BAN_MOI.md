@@ -1,4 +1,12 @@
-# AI Automation Studio 1.5.3
+# AI Automation Studio 1.5.4
+
+- **Ảnh Muse tải về đủ cỡ — sửa tiếp 1.5.3.** Bản 1.5.3 vẫn ra ảnh 498×280 vì Muse **không nhận cú bấm tự động** vào ảnh (giống nút xoá chat trước đây), nên trình xem ảnh không mở. Giờ app **bấm chuột thật** vào ảnh như bạn bấm tay → lấy ảnh cỡ đầy đủ trong trình xem; trình xem vẫn chỉ có ảnh nhỏ thì app bấm **nút tải ↓** ở góc trên bên phải để lấy file gốc; xong thì đóng trình xem (✕ hoặc Esc).
+- Nhật ký ghi rõ: `#N ảnh đủ cỡ 1920×1080 (trong chat chỉ 498×280) — lấy ở trình xem ảnh` (hoặc `— lấy bằng nút tải ↓`).
+- Nếu vẫn không lấy được, app giữ ảnh cũ, ghi `chưa lấy được ảnh đủ cỡ … đã lưu tệp chẩn đoán …` — tệp nằm ở `Tài liệu\AI Automation Studio\chan-doan-muse`, gửi tệp đó cho người phát triển.
+- **Ảnh đã bị nhỏ ở 1.5.3:** chọn các việc đó → *Tạo lại*, hoặc bấm vào việc → *Tab của việc này* → **Tải về** (chat còn trên Muse) để lấy lại bản đủ cỡ, ghi đè file nhỏ.
+- Mọi thứ khác giữ nguyên như 1.5.3.
+
+## Bản 1.5.3
 
 - **Ảnh Muse tải về đủ cỡ (full HD), không còn bị nhỏ.** Ảnh hiện trong khung chat của Muse chỉ là bản xem trước thu nhỏ (ví dụ 498×280); trước đây app lấy đúng ảnh đó. Giờ app luôn mở ảnh ra như khi bạn bấm vào ảnh trên Muse, chờ ảnh cỡ đầy đủ nạp xong rồi mới tải (lấy ảnh lớn hơn trong hai ảnh; ảnh có nhiều cỡ thì lấy cỡ lớn nhất). Một tin Muse có nhiều ảnh thì mở đúng ảnh của từng khung.
 - Nhật ký ghi cỡ ảnh đã tải, ví dụ `✅ Việc #2 xong ảnh: …\002.png (1920×1080)`. Nếu ảnh vẫn nhỏ hơn 1000 px (Muse chỉ cho bản xem trước), nhật ký cảnh báo `⚠️ … ảnh chỉ 498×280` để bạn biết mà tải lại.

@@ -121,6 +121,17 @@ function fmApi(req, res) {
   if (u.pathname === '/__fm/ghi') return json({ gui: fm.gui, tai: fm.tai, hoiWav: fm.hoiWav });
   json({ loi: 'khong-co' });
 }
+/** PNG một màu w×h (không cần thư viện ảnh). */
+function pngDon(w, h, [r, g, b]) {
+  const zlib = require('zlib');
+  const crcBang = Array.from({ length: 256 }, (_, n) => { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; return c >>> 0; });
+  const crc = (buf) => { let c = 0xffffffff; for (const x of buf) c = crcBang[(c ^ x) & 0xff] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; };
+  const khoi = (loai, data) => { const d = Buffer.concat([Buffer.from(loai), data]); const len = Buffer.alloc(4); len.writeUInt32BE(data.length); const c = Buffer.alloc(4); c.writeUInt32BE(crc(d)); return Buffer.concat([len, d, c]); };
+  const ihdr = Buffer.alloc(13); ihdr.writeUInt32BE(w, 0); ihdr.writeUInt32BE(h, 4); ihdr[8] = 8; ihdr[9] = 2;
+  const dong = Buffer.alloc(1 + w * 3); for (let x = 0; x < w; x++) { dong[1 + x * 3] = r; dong[2 + x * 3] = g; dong[3 + x * 3] = b; }
+  const tho = Buffer.concat(Array.from({ length: h }, () => dong));
+  return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), khoi('IHDR', ihdr), khoi('IDAT', zlib.deflateSync(tho)), khoi('IEND', Buffer.alloc(0))]);
+}
 const sv = http.createServer((req, res) => {
   if (req.method === 'POST' && req.url === '/__flow-ghi') {
     let b = '';
@@ -180,6 +191,15 @@ const sv = http.createServer((req, res) => {
   }
   if (req.url.startsWith('/fx/')) { res.setHeader('content-type', 'text/html; charset=utf-8'); res.end(trangFlow); return; }
   if (req.url.startsWith('/signin/')) { res.setHeader('content-type', 'text/html; charset=utf-8'); res.end('<!doctype html><title>Đăng nhập Google giả</title><input type=email>'); return; }
+  // 1.5.4: ảnh gốc của nút tải ↓ trong trình xem ảnh Muse giả (muse_that=1) — PNG w×h thật, tải dạng đính kèm.
+  if (req.url.startsWith('/__anh-goc')) {
+    const u = new URL(req.url, 'http://x');
+    const w = +u.searchParams.get('w') || 64, h = +u.searchParams.get('h') || 64, mau = +u.searchParams.get('k') ? [85, 170, 153] : [204, 136, 170];
+    const than = pngDon(w, h, mau);
+    res.writeHead(200, { 'content-type': 'image/png', 'content-length': than.length, 'content-disposition': `attachment; filename="muse_goc_${w}x${h}.png"` });
+    res.end(than);
+    return;
+  }
   if (req.method === 'POST' && req.url === '/__gui') {
     let b = '';
     // Giải mã UTF-8 theo luồng: cộng thẳng Buffer làm vỡ ký tự tiếng Việt nằm vắt qua hai gói mạng

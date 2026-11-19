@@ -197,6 +197,7 @@ function phien(tk) {
       // Muse (đăng nhập Meta): bỏ chữ "Electron/…" khỏi user agent — đã chạy thật từ Muse Automation Studio.
       // Xin Muse giao diện tiếng Anh (nhãn đã đo); Muse vẫn hiện tiếng Việt thì muse-trang.js cũng hiểu.
       ses.setUserAgent(ses.getUserAgent().replace(/\s(Electron|AIAutomationStudio|ai-automation-studio|MuseAutomationStudio|muse-automation-studio)\/\S+/gi, ''), 'en-US,en');
+      ganTaiMuse(ses);   // 1.5.4: ảnh gốc tải bằng nút ↓ của trình xem ảnh Muse
     }
   }
   return ses;
@@ -239,6 +240,57 @@ function choTaiVeNhac(wc, ms) {
   });
   return { hua, huy: () => { clearTimeout(hen); choTaiNhac.delete(wc.id); }, daBatDau: () => daBatDau };
 }
+
+/**
+ * 1.5.4 — Ảnh gốc Muse tải bằng nút ↓ của trình xem ảnh (luồng bấm chuột thật khi ảnh trong chat chỉ là bản xem
+ * trước). Chỉ nhận tải của cửa sổ đang chờ (choTaiMuse); tải khác (người dùng bấm ↓ ở "Mở tab") để Electron lo.
+ */
+const choTaiMuseDs = new Map();   // webContents.id → { xong(kq) }
+function ganTaiMuse(ses) {
+  ses.on('will-download', (_e, item, wc) => {
+    const c = wc && choTaiMuseDs.get(wc.id);
+    if (!c) return;
+    choTaiMuseDs.delete(wc.id);
+    const thuMuc = path.join(app.getPath('userData'), 'muse-tai-tam');
+    fs.mkdirSync(thuMuc, { recursive: true });
+    const duoi = (item.getFilename().match(/\.[a-z0-9]{2,5}$/i) || ['.png'])[0];
+    const p = path.join(thuMuc, `${Date.now()}-${wc.id}${duoi}`);
+    item.setSavePath(p);
+    item.once('done', (_ev, st) => {
+      const mime = hd.mimeTuDuoi(p);
+      c.xong(st === 'completed' ? { ok: true, duongDan: p, mime: /octet/.test(mime) ? item.getMimeType() || 'image/png' : mime }
+        : { ok: false, loi: `Tải ảnh từ Muse không xong (${st})` });
+    });
+  });
+}
+function choTaiMuse(wc, ms) {
+  let hen = null;
+  const hua = new Promise((res) => {
+    hen = setTimeout(() => { choTaiMuseDs.delete(wc.id); res({ ok: false, hetGio: true }); }, ms);
+    choTaiMuseDs.set(wc.id, { xong: (kq) => { clearTimeout(hen); res(kq); } });
+  });
+  return { hua, huy: () => { clearTimeout(hen); choTaiMuseDs.delete(wc.id); } };
+}
+/** Đọc file ảnh vừa tải (base64) rồi xoá file tạm. */
+function docB64Xoa(p) {
+  try { return fs.readFileSync(p).toString('base64'); } finally { fs.rm(p, { force: true }, () => {}); }
+}
+/** 1.5.4: không lấy được ảnh Muse đủ cỡ → lưu HTML khung ảnh + lớp phủ trình xem để sửa theo giao diện Muse thật. */
+function luuChanDoanAnh(ten, cd) {
+  try {
+    const thuMuc = process.env.MUSE_DATA_DIR ? path.join(app.getPath('userData'), 'chan-doan-muse')
+      : path.join(app.getPath('documents'), 'AI Automation Studio', 'chan-doan-muse');
+    fs.mkdirSync(thuMuc, { recursive: true });
+    const t = new Date(), so = (n) => String(n).padStart(2, '0');
+    const p = path.join(thuMuc, `${ten}-${t.getFullYear()}${so(t.getMonth() + 1)}${so(t.getDate())}-${so(t.getHours())}${so(t.getMinutes())}${so(t.getSeconds())}.html`);
+    const esc = (x) => String(x || '').replace(/</g, '&lt;');
+    fs.writeFileSync(p, `<!-- Chẩn đoán ảnh Muse nhỏ · ${t.toISOString()}\n url: ${esc(cd.url)}\n` +
+      `\n Ảnh trên trang:\n${(cd.anh || []).map((x) => '  ' + esc(x)).join('\n')}\n\n Nút đang hiện:\n${(cd.nut || []).map((x) => '  ' + esc(x)).join('\n')} -->\n` +
+      `<h3>Tin nhắn có ảnh</h3>\n${cd.khung || ''}\n<h3>Lớp phủ trình xem</h3>\n${cd.lop || ''}\n`, 'utf8');
+    return p;
+  } catch (_) { return ''; }
+}
+const tuyChonLuongMuse = () => ({ choTai: choTaiMuse, docB64: docB64Xoa, luuChanDoan: luuChanDoanAnh });
 
 const WEB_PREFS = (tk) => (tk.nen === 'flow'
   // Engine Flow chạy trong main world, nói chuyện với tiến trình chính qua preload-flow.js (contextBridge).
@@ -466,7 +518,7 @@ function taoLuong(tk, stt, duAnId) {
   // Giữ kích thước thật 1280×800 (không thu nhỏ): trang quá nhỏ có thể không vẽ ảnh.
   const w = taoCuaSoAn(tk, `Muse · ${id}`);
   if (xemLuong) w.showInactive();
-  const l = new Luong({ id, taiKhoan: tk, wc: w.webContents, nguon: NGUON_TRANG, goc: GOC_MUSE, log });
+  const l = new Luong({ id, taiKhoan: tk, wc: w.webContents, nguon: NGUON_TRANG, goc: GOC_MUSE, log, ...tuyChonLuongMuse() });
   viewCuaLuong.set(l, w);
   return l;
 }
@@ -1160,7 +1212,7 @@ const LENH = {
         if (!tk) { hong.push(...ds.map((j) => `#${j.so}: tài khoản đã bị xoá khỏi app`)); continue; }
         log('info', `⬇ "${tk.ten}": lấy lại ${ds.length} file từ chat Muse cũ…`);
         const w = taoCuaSoAn(tk, 'Muse · tải lại từ chat');
-        const l = new Luong({ id: 'tai-lai', taiKhoan: tk, wc: w.webContents, nguon: NGUON_TRANG, goc: GOC_MUSE, log });
+        const l = new Luong({ id: 'tai-lai', taiKhoan: tk, wc: w.webContents, nguon: NGUON_TRANG, goc: GOC_MUSE, log, ...tuyChonLuongMuse() });
         try {
           for (const j of ds) {
             // Bản sao có thread → luồng chỉ mở chat và chờ lấy kết quả, không bao giờ gửi prompt.
