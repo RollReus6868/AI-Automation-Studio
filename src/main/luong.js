@@ -10,6 +10,7 @@
 // ============================================================================
 
 const hd = require('./hang-doi');
+const { ensureDebugger, bamChuotThat } = require('../flow/main/paste');
 
 // 1.4.9: hạn cho từng thao tác với trang Muse (biến môi trường chỉ để bài kiểm rút ngắn).
 const HAN_GOI_MS = Number(process.env.MUSE_HAN_GOI_MS) || 60000;           // một lần hỏi trang (trạng thái, kết quả…)
@@ -33,10 +34,13 @@ class Luong {
    * @param o.nguon         mã trình trợ giúp src/inject/muse-trang.js
    * @param o.goc           địa chỉ gốc, mặc định https://muse.ai
    * @param o.log(muc, chu)
+   * @param o.choTai(wc, ms) → { hua: Promise<{ok, duongDan, mime}>, huy() }  1.5.4: bắt file Muse tải qua nút ↓ của trình xem
+   * @param o.luuChanDoan(ten, duLieu) → đường dẫn tệp chẩn đoán ('' = không lưu)
    */
   constructor(o) {
     Object.assign(this, { id: o.id, taiKhoan: o.taiKhoan, wc: o.wc, nguon: o.nguon,
-      goc: (o.goc || 'https://muse.ai').replace(/\/$/, ''), log: o.log || (() => {}) });
+      goc: (o.goc || 'https://muse.ai').replace(/\/$/, ''), log: o.log || (() => {}), choTai: o.choTai || null,
+      luuChanDoan: o.luuChanDoan || null, docB64: o.docB64 || null });
     this.viec = null;
     this.huy = 0;
     // Muse kẹt "Connecting..." quá lâu chừng này → coi là mất kết nối (vừa mở trang Muse cũng hiện thoáng qua).
@@ -69,6 +73,67 @@ class Luong {
     const co = await hanChot(this.wc.executeJavaScript('!!(window.__muse && window.__muse.phienBan === 1)', true), HAN_GOI_MS, 'trang Muse').catch(() => false);
     if (!co) await hanChot(this.wc.executeJavaScript(this.nguon, true), HAN_GOI_MS, 'trang Muse');
     return await hanChot(this.wc.executeJavaScript(bieuThuc, true), hanMs, 'trang Muse');
+  }
+
+  /** Phím thật (kênh debugger) — Escape đóng trình xem khi không thấy nút ✕. */
+  async phimThat(key, code, vk) {
+    if (!ensureDebugger(this.wc)) return;
+    try {
+      await this.wc.debugger.sendCommand('Input.dispatchKeyEvent', { type: 'keyDown', key, code, windowsVirtualKeyCode: vk });
+      await this.wc.debugger.sendCommand('Input.dispatchKeyEvent', { type: 'keyUp', key, code, windowsVirtualKeyCode: vk });
+    } catch (_) { /* trang đã đóng */ }
+  }
+
+  /**
+   * 1.5.4 — Ảnh Muse CỠ ĐẦY ĐỦ bằng chuột thật. Người dùng 19/11/2026 (1.5.3): vẫn tải về 498×280; trên Muse phải
+   * "bấm thẳng vào ảnh" mới hiện đủ cỡ, kèm nút tải ↓ góc trên bên phải. Cú bấm do JavaScript tạo bị Muse bỏ qua.
+   * Bước: bấm chuột thật vào ảnh → lấy ảnh của trình xem; vẫn nhỏ → bấm nút ↓ (bắt file ở will-download của phiên);
+   * cuối cùng đóng trình xem (✕ hoặc Escape). Không được thì giữ ảnh cũ, ghi tệp chẩn đoán.
+   * @returns file đủ cỡ hơn, hoặc null (giữ ảnh đang có)
+   */
+  async anhDayDu(job, f, ctx) {
+    const k = f.chiSo || 0, png = !!(ctx && ctx.png);
+    let tot = null, cd = null;
+    try {
+      const d = await this.goi(`window.__muse.diemAnh(${k})`);
+      if (!d || !Number.isFinite(d.x)) { this.log('warning', `[${this.id}] #${job.so} ảnh ${f.w}×${f.h}: không thấy ảnh để bấm mở cỡ đầy đủ`); return null; }
+      const bam = await bamChuotThat(this.wc, d.x, d.y);
+      if (!bam || !bam.ok) { this.log('warning', `[${this.id}] #${job.so} không bấm chuột thật được vào ảnh (${(bam && bam.error) || 'debugger'})`); return null; }
+      const r = await this.goi(`window.__muse.layAnhXem(${JSON.stringify({ k, png, hanMs: HAN_LAY_FILE_MS - 15000 })})`, HAN_LAY_FILE_MS);
+      if (r && r.file) tot = r.file;
+      else cd = r && r.chanDoan;
+      if (!tot && r && r.moDuoc && this.choTai) {
+        // Trình xem mở mà ảnh vẫn nhỏ → nút tải ↓ của trình xem (file gốc).
+        const n = await this.goi(`window.__muse.diemNutXem('tai')`);
+        if (n && Number.isFinite(n.x)) {
+          const ch = this.choTai(this.wc, 45000);
+          await bamChuotThat(this.wc, n.x, n.y);
+          const t = await ch.hua;
+          if (t && t.ok && this.docB64) {
+            const b64 = this.docB64(t.duongDan);
+            const x = await this.goi(`window.__muse.docAnhTai(${JSON.stringify({ b64, mime: t.mime, png })})`, HAN_LAY_FILE_MS).catch(() => null);
+            if (x && x.b64 && x.w * x.h > f.w * f.h) tot = x;
+          } else ch.huy();
+        }
+      }
+    } finally {
+      // Đóng trình xem: nút ✕ (chuột thật), không thấy thì Escape thật.
+      for (let lan = 0; lan < 2; lan++) {
+        const c = await this.goi(`window.__muse.diemNutXem('dong')`).catch(() => ({ daDong: true }));
+        if (!c || c.daDong) break;
+        if (Number.isFinite(c.x)) await bamChuotThat(this.wc, c.x, c.y); else await this.phimThat('Escape', 'Escape', 27);
+        await new Promise((res) => setTimeout(res, 600));
+        if (lan === 1) await this.phimThat('Escape', 'Escape', 27);
+      }
+    }
+    if (tot && tot.w * tot.h > f.w * f.h) {
+      this.log('info', `[${this.id}] #${job.so} ảnh đủ cỡ ${tot.w}×${tot.h} (trong chat chỉ ${f.w}×${f.h}) — lấy ${tot.cachLay === 'nut-tai' ? 'bằng nút tải ↓' : 'ở trình xem ảnh'}`);
+      return { ...tot, chiSo: k };
+    }
+    const p = cd && this.luuChanDoan ? this.luuChanDoan(`anh-nho-${job.so}`, cd) : '';
+    this.log('warning', `[${this.id}] #${job.so} chưa lấy được ảnh đủ cỡ, giữ ảnh ${f.w}×${f.h}` +
+      (p ? ` — đã lưu tệp chẩn đoán ${p}, gửi tệp này cho người phát triển.` : ''));
+    return null;
   }
 
   /**
@@ -184,6 +249,12 @@ class Luong {
           files = await this.goi(`window.__muse.layFile(${JSON.stringify({ png: !!ctx.png, hanMs: HAN_LAY_FILE_MS - 15000 })})`, HAN_LAY_FILE_MS);
         } catch (err) { loiLay = err.message; }
         const dung = (files || []).filter((f) => f.loai === (job.loai === 'video' ? 'video' : 'anh'));
+        // 1.5.4: ảnh chỉ lấy được bản xem trước (Muse bỏ qua cú bấm JavaScript vào ảnh) → bấm CHUỘT THẬT mở trình xem.
+        for (let i = 0; i < dung.length; i++) {
+          if (!dung[i].canChuotThat) continue;
+          const tot = await this.anhDayDu(job, dung[i], ctx).catch((err) => { this.log('warning', `[${this.id}] #${job.so} lấy ảnh đủ cỡ lỗi: ${err.message}`); return null; });
+          if (tot) dung[i] = tot;
+        }
         if (dung.length) return { ok: true, files: dung, chu: kq.chu };
         // Khung có mà chưa lấy được file → thử lại vòng sau, nhưng không mãi (quá hạn lấy file: thử thêm 1 lần).
         if (loiLay) this.log('warning', `[${this.id}] #${job.so} lấy file chưa được: ${loiLay}`);

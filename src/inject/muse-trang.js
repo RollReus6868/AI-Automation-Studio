@@ -287,17 +287,10 @@
     return { w: img.naturalWidth, h: img.naturalHeight };
   }
   const dienTich = (i) => (i ? (i.naturalWidth || 0) * (i.naturalHeight || 0) : 0);
-  /** Ảnh CHÍNH của trình xem: ảnh hiện to nhất (dải ảnh nhỏ bên dưới không tính), hoà thì ảnh nhiều điểm ảnh hơn. */
-  function anhChinh(d) {
-    let tot = null, to = -1;
-    for (const i of $$('img', d)) {
-      if (!/^blob:|^data:|^https?:/.test(i.currentSrc || i.src) || !i.complete || i.naturalWidth <= 16) continue;
-      const r = i.getBoundingClientRect();
-      const k = r.width * r.height;
-      if (k > to || (k === to && dienTich(i) > dienTich(tot))) { tot = i; to = k; }
-    }
-    return tot;
-  }
+  const hienTich = (e) => { if (!e) return 0; const r = e.getBoundingClientRect(); return Math.max(0, r.width) * Math.max(0, r.height); };
+  const KHUNG_ANH = '[data-testid="hatch-chat-attachment-presentation-image"]';
+  const khungAnhDs = () => $$(KHUNG_ANH);
+  const anhCoNguon = (i) => /^blob:|^data:|^https?:/.test(i.currentSrc || i.src) && i.complete && i.naturalWidth > 16;
   /** Đường dẫn bản LỚN nhất của ảnh: ứng viên srcset có "w"/"x" lớn nhất, không có thì ảnh đang hiện. */
   function urlLonNhat(img) {
     let tot = img.currentSrc || img.src, lon = 0;
@@ -310,34 +303,138 @@
     return tot;
   }
 
-  /**
-   * Mở trình xem ảnh của Muse (bấm vào ảnh) để lấy ảnh CỠ ĐẦY ĐỦ.
-   * 1.5.3: ảnh trong khung chat chỉ là bản XEM TRƯỚC thu nhỏ (người dùng 19/11/2026: tải về 498×280 trong khi
-   * bấm vào ảnh trên Muse thấy full HD) → luôn mở trình xem. Chờ tới khi ảnh chính trong trình xem LỚN HƠN ảnh
-   * xem trước (dienTichNho), hoặc trình xem đã nạp xong và đứng yên ~1,2 giây (ảnh chat vốn đã đủ cỡ).
-   */
-  async function moTrinhXem(khung, dienTichNho) {
-    const nut = nutMoAnh(khung) || (dienTichNho ? null : $('button', khung));
-    if (!nut) return { daMo: false, img: null };
-    nut.click();
+  // ── Trình xem ảnh của Muse (bấm vào ảnh → ảnh cỡ đầy đủ, nút ✕ góc trái, nút tải ↓ góc phải) ──────────────
+  // 1.5.4 (nhật ký + ảnh chụp người dùng 19/11/2026, bản 1.5.3 vẫn ra 498×280): trình xem của Muse thật KHÔNG
+  // mở bằng cú bấm JavaScript (isTrusted = false, như nút xoá chat 1.3.2) và không chắc có role=dialog. Nên:
+  //  • ảnh của trình xem = ảnh MỚI xuất hiện sau cú bấm (không có trong `xemTruoc`), ngoài khung chat, hiện to nhất;
+  //  • trang thử bấm bằng JavaScript trước (nhanh); không mở được thì luong.js bấm CHUỘT THẬT vào ảnh
+  //    (diemAnh → layAnhXem), vẫn nhỏ thì bấm nút tải ↓ của trình xem (diemNutXem('tai')), rồi đóng (diemNutXem('dong')).
+  let xemTruoc = new Set();
+  let xemNho = { dienTich: 0, hienTich: 0 };
+  function anhTrinhXem() {
+    let tot = null, to = 0;
+    for (const i of $$('img')) {
+      if (xemTruoc.has(i) || i.closest(KHUNG_ANH) || !anhCoNguon(i)) continue;
+      const k = hienTich(i);
+      if (k > to || (k === to && dienTich(i) > dienTich(tot))) { tot = i; to = k; }
+    }
+    // Ảnh hiện nhỏ hơn ảnh xem trước trong chat (ảnh đính kèm, ảnh đại diện…) thì không phải trình xem.
+    return tot && to >= Math.max(150 * 150, xemNho.hienTich * 1.2) ? tot : null;
+  }
+  /** Lớp phủ của trình xem: tổ tiên của ảnh trình xem phủ gần kín màn hình (hoặc hộp thoại / aria-modal). */
+  function lopTrinhXem(img) {
+    const hop = $$('[role="dialog"],[aria-modal="true"]').pop();
+    if (!img) return hop || null;
+    for (let e = img.parentElement; e && e !== document.body; e = e.parentElement) {
+      const r = e.getBoundingClientRect();
+      if (e.matches('[role="dialog"],[aria-modal="true"]') || (r.width >= innerWidth * 0.8 && r.height >= innerHeight * 0.8)) return e;
+    }
+    return hop || null;
+  }
+  /** Ghi nhớ ảnh đang có + cỡ ảnh xem trước, trước khi bấm mở trình xem ảnh thứ k. */
+  function chuanBiXem(k) {
+    const khung = khungAnhDs()[k];
+    if (!khung) return null;
+    const nho = anhDaNap(khung);
+    xemTruoc = new Set($$('img'));
+    xemNho = { dienTich: dienTich(nho), hienTich: hienTich(nho) };
+    return { khung, nho };
+  }
+  /** Chờ ảnh của trình xem: LỚN HƠN ảnh xem trước → xong; cùng cỡ mà nạp xong, đứng yên ~1,2 giây → coi như đã đủ cỡ. */
+  async function choAnhXem(choMs) {
     let tot = null, onDinh = 0, truoc = '';
-    for (const het = Date.now() + 15000; Date.now() < het; await ngu(400)) {
-      const d = $$('[role="dialog"]').pop();
-      const i = d && anhChinh(d);
+    for (const het = Date.now() + choMs; Date.now() < het; await ngu(400)) {
+      const i = anhTrinhXem();
       if (!i) { onDinh = 0; continue; }
-      if (dienTich(i) > (dienTichNho || 0)) return { daMo: true, img: i };
+      if (dienTich(i) > xemNho.dienTich) return i;
       const src = i.currentSrc || i.src;
-      onDinh = $$('img', d).every((x) => x.complete) && src === truoc ? onDinh + 1 : 0;
+      onDinh = src === truoc ? onDinh + 1 : 0;
       truoc = src; tot = i;
       if (onDinh >= 3) break;
     }
-    return { daMo: true, img: tot };
+    return tot;
   }
-  function dongTrinhXem() {
-    const d = $$('[role="dialog"]').pop();
-    const nut = d && nutTheoNhan(NHAN.dong, d)[0];
-    if (nut) nut.click();
-    else document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+  const dangXem = () => !!anhTrinhXem() || !!$$('[role="dialog"],[aria-modal="true"]').length;
+  /** Nút của trình xem: 'dong' (✕) / 'tai' (↓ tải về). Theo nhãn, không có nhãn thì theo vị trí góc trên. */
+  function nutTrinhXem(loai) {
+    const lop = lopTrinhXem(anhTrinhXem());
+    const ds = $$('button,[role="button"],a[download],a[href]', lop || document).filter((b) => hienTich(b) > 0 && !b.closest('[role="log"]') && !b.closest(KHUNG_ANH));
+    const chu = (b) => `${nhan(b)} ${b.getAttribute('title') || ''} ${b.getAttribute('data-testid') || ''} ${b.hasAttribute('download') ? 'download' : ''}`;
+    const re = loai === 'tai' ? /download|tải( xuống| về)?|save/i : /^\s*(close|đóng|dismiss)|close/i;
+    const theoNhan = ds.find((b) => re.test(chu(b)));
+    if (theoNhan || !lop) return theoNhan || null;
+    // Không nhãn: ✕ là nút góc trên-TRÁI, tải ↓ là nút góc trên-PHẢI ngoài cùng (ảnh chụp trình xem Muse 19/11/2026).
+    const tren = ds.filter((b) => b.getBoundingClientRect().top < innerHeight * 0.2);
+    tren.sort((a, b) => a.getBoundingClientRect().left - b.getBoundingClientRect().left);
+    return (loai === 'tai' ? tren[tren.length - 1] : tren[0]) || null;
+  }
+  const giua = (e) => { const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; };
+  async function dongTrinhXem() {
+    const nut = nutTrinhXem('dong');
+    if (nut) bamGiua(nut);
+    else document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', keyCode: 27, bubbles: true }));
+    await cho(() => !dangXem(), 1500);
+  }
+  /** Ảnh blob → file trả về app (đổi PNG nếu cần, cỡ = cỡ file thật). */
+  async function thanhFile(b, img, p, them) {
+    if (p && p.png && b.type !== 'image/png') b = (await anhSangPng(img, b)) || b;
+    const co = await coAnh(b, img);
+    return { loai: 'anh', mime: b.type || 'image/png', w: co.w, h: co.h, ...them, b64: await blobSangB64(b) };
+  }
+  async function blobCuaAnh(img, han) {
+    let b = null;
+    const lon = urlLonNhat(img);
+    if (lon !== (img.currentSrc || img.src)) { try { b = await taiBlob(lon, han); } catch (_) { b = null; } }
+    if (!b || !/^image\//.test(b.type || '')) b = await taiBlob(img.currentSrc || img.src, han);
+    return b;
+  }
+  /** Chẩn đoán khi không lấy được ảnh đủ cỡ: khung ảnh, lớp phủ, các ảnh / nút đang hiện (gửi người phát triển). */
+  function chanDoanAnh(k) {
+    const cat = (s) => String(s || '').replace(/(https?:\/\/[^\s"']{60})[^\s"']+/g, '$1…').replace(/data:[^"']{40}[^"']*/g, 'data:…').slice(0, 60000);
+    const anh = $$('img').map((i) => `${i.naturalWidth}x${i.naturalHeight} hiện ${Math.round(i.getBoundingClientRect().width)}x${Math.round(i.getBoundingClientRect().height)} ${i.closest(KHUNG_ANH) ? '[khung]' : ''}${xemTruoc.has(i) ? '' : '[mới]'} ${cat((i.currentSrc || i.src).slice(0, 90))}`);
+    const nut = $$('button,[role="button"]').filter((b) => hienTich(b) > 0 && !b.closest('[role="log"]')).slice(0, 40)
+      .map((b) => `${b.tagName} "${nhan(b)}" title="${b.getAttribute('title') || ''}" @${Math.round(giua(b).x)},${Math.round(giua(b).y)}`);
+    const khung = khungAnhDs()[k];
+    const tin = khung && (khung.closest('[data-message-role="assistant"]') || khung);
+    return { url: location.href, anh, nut, khung: cat(tin && tin.outerHTML), lop: cat((lopTrinhXem(anhTrinhXem()) || {}).outerHTML) };
+  }
+
+  // Các bước cho luong.js khi phải bấm CHUỘT THẬT (Muse bỏ qua cú bấm JavaScript).
+  /** Toạ độ giữa ảnh thứ k trong chat (cuộn tới ảnh trước) + ghi nhớ trạng thái trước khi mở trình xem. */
+  async function diemAnh(k) {
+    if (dangXem()) await dongTrinhXem();
+    const x = chuanBiXem(k);
+    if (!x) return null;
+    const dich = x.nho || x.khung;
+    dich.scrollIntoView({ block: 'center' });
+    await ngu(300);
+    const d = giua(dich);
+    return d.x > 0 && d.y > 0 && d.x < innerWidth && d.y < innerHeight ? { x: d.x, y: d.y } : null;
+  }
+  /** Sau cú bấm chuột thật: chờ ảnh trình xem, tải về. → file | {nho:true} (vẫn chỉ ảnh nhỏ) | null (không mở được). */
+  async function layAnhXem(p) {
+    const img = await choAnhXem((p && p.choMs) || 8000);
+    if (!img) return { moDuoc: false, chanDoan: chanDoanAnh(p.k) };
+    if (dienTich(img) <= xemNho.dienTich) return { moDuoc: true, nho: true, chanDoan: chanDoanAnh(p.k) };
+    return { moDuoc: true, file: await thanhFile(await blobCuaAnh(img, p.hanMs), img, p, { cachLay: 'trinh-xem' }) };
+  }
+  /** Toạ độ nút của trình xem đang mở ('tai' / 'dong'), null nếu không thấy. */
+  function diemNutXem(loai) {
+    if (loai === 'dong' && !dangXem()) return { daDong: true };
+    const n = nutTrinhXem(loai);
+    return n ? giua(n) : null;
+  }
+  /** File ảnh app vừa tải qua nút ↓ (bytes base64) → đổi PNG nếu cần, đo cỡ thật. */
+  async function docAnhTai(p) {
+    const bin = atob(p.b64), u = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+    const b = new Blob([u], { type: p.mime || 'image/png' });
+    let img = null;
+    if (p.png && b.type !== 'image/png') {
+      img = new Image(); img.src = URL.createObjectURL(b);
+      try { await img.decode(); } catch (_) { img = null; }
+    }
+    return await thanhFile(b, img || { naturalWidth: 0, naturalHeight: 0 }, img ? p : { png: false }, { cachLay: 'nut-tai' });
   }
 
   /**
@@ -354,27 +451,43 @@
   async function layFile(p) {
     const ra = [];
     const han = (p && p.hanMs) || 0;
-    for (const khung of $$('[data-testid="hatch-chat-attachment-presentation-image"]')) {
-      const nho = anhDaNap(khung);   // ảnh trong khung chat = bản xem trước (thường thu nhỏ)
-      let img = nho;
-      let moXem = false;
+    const ds = khungAnhDs();
+    for (let k = 0; k < ds.length; k++) {
+      if (dangXem()) await dongTrinhXem();
+      const x = chuanBiXem(k);
+      const nho = x.nho;   // ảnh trong khung chat = bản xem trước (thường thu nhỏ)
+      let img = nho, moXem = false;
       try {
-        // Đã mở trình xem thì LUÔN đóng lại, kể cả khi không lấy được ảnh —
-        // nếu không, mỗi vòng lại mở thêm một trình xem chồng lên.
-        // 1.5.3: luôn mở trình xem để lấy ảnh cỡ đầy đủ; lấy ảnh lớn hơn trong hai ảnh.
-        const x = await moTrinhXem(khung, dienTich(nho));
-        moXem = x.daMo;
-        if (x.img && dienTich(x.img) >= dienTich(img)) img = x.img;
+        // Thử mở trình xem bằng JavaScript (nút "Open…" hoặc bấm vào ảnh). Muse thật bỏ qua → 3 giây không thấy thì thôi,
+        // luong.js bấm chuột thật (canChuotThat). Đã mở thì LUÔN đóng lại, kẻo trình xem chồng lên nhau.
+        // Ảnh nằm trong liên kết (bấm sẽ RỜI trang chat) → không bấm; thử tải thẳng địa chỉ liên kết (thường là ảnh gốc).
+        const lk = nho && nho.closest('a[href]');
+        if (lk && /^https?:|^blob:/.test(lk.href)) {
+          try {
+            const b = await taiBlob(lk.href, han);
+            if (/^image\//.test(b.type || '')) {
+              const co = await coAnh(b, nho);
+              if (co.w * co.h > xemNho.dienTich) {
+                ra.push(await thanhFile(b, nho, p, { chiSo: k, xemTruoc: `${nho.naturalWidth}x${nho.naturalHeight}`, cachLay: 'lien-ket' }));
+                continue;
+              }
+            }
+          } catch (_) { /* không tải được → đi đường thường */ }
+        }
+        const nut = nutMoAnh(x.khung) || (lk ? null : nho || $('button', x.khung));
+        if (nut) {
+          bamGiua(nut);
+          const v = await choAnhXem(nho ? 3000 : 15000);
+          moXem = !!v || dangXem();
+          if (v && dienTich(v) >= dienTich(img)) img = v;
+        }
         if (!img) continue;
-        let b = null;
-        const lon = urlLonNhat(img);
-        if (lon !== (img.currentSrc || img.src)) { try { b = await taiBlob(lon, han); } catch (_) { b = null; } }
-        if (!b || !/^image\//.test(b.type || '')) b = await taiBlob(img.currentSrc || img.src, han);
-        if (p && p.png && b.type !== 'image/png') b = (await anhSangPng(img, b)) || b;
-        const co = await coAnh(b, img);
-        ra.push({ loai: 'anh', mime: b.type || 'image/png', w: co.w, h: co.h, xemTruoc: nho ? `${nho.naturalWidth}x${nho.naturalHeight}` : '', b64: await blobSangB64(b) });
+        const duCo = dienTich(img) > xemNho.dienTich || (moXem && img !== nho);
+        ra.push(await thanhFile(await blobCuaAnh(img, han), img, p, {
+          chiSo: k, xemTruoc: nho ? `${nho.naturalWidth}x${nho.naturalHeight}` : '', cachLay: img === nho ? 'chat' : 'trinh-xem',
+          canChuotThat: !duCo && Math.max(img.naturalWidth, img.naturalHeight) < 1000 }));
       } finally {
-        if (moXem) { dongTrinhXem(); await ngu(400); }
+        if (moXem) await dongTrinhXem();
       }
     }
     for (const khung of $$('[data-testid="hatch-chat-attachment-presentation-video"]')) {
@@ -678,6 +791,6 @@
     return { ok: true, da, conLai: hangChat().length };
   }
 
-  window.__muse = { phienBan: 1, trangThai, gui, ketQua, layFile, hanMuc, xoaChatDangMo, xoaNhieuChat, diemXoa, chanDoanXoa: () => chanDoanXoa() };
+  window.__muse = { phienBan: 1, trangThai, gui, ketQua, layFile, diemAnh, layAnhXem, diemNutXem, docAnhTai, chanDoanAnh, hanMuc, xoaChatDangMo, xoaNhieuChat, diemXoa, chanDoanXoa: () => chanDoanXoa() };
 })();
 undefined;

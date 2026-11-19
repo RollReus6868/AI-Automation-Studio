@@ -21,6 +21,7 @@
   Cookie muse_lang=vi → giao diện tiếng Việt (như Muse trên máy Mac tiếng Việt). Vài nhãn CỐ Ý lạ
   (nút gửi, nút gỡ tệp, màn đăng nhập) để kiểm đường dự phòng không cần đọc chữ của muse-trang.js.
   Cookie muse_hong=1 → tài khoản đó luôn trả chữ (như HOI_LAI) — kiểm chuyển sang tài khoản dự phòng.
+  Cookie muse_that=1 → (1.5.4) trình xem ảnh như Muse thật: bấm thẳng vào ảnh, chỉ nhận cú bấm thật (xem dưới).
   Cookie muse_matketnoi=1 → Muse kẹt "Connecting..." (mất kết nối máy ảo, như 12/10/2026): chat không nạp.
   Danh sách chat phụ bên trái (như Muse 12/10/2026): hàng [data-testid=hatch-thread-row], nút ⋯ TRONG hàng
   mở menu bằng pointerdown; click nổi lên hàng thì chuyển sang chat đó (như thật). Xoá → hộp xác nhận.
@@ -38,7 +39,11 @@ const ngu = (ms) => new Promise((r) => setTimeout(r, ms));
 const daDangNhap = document.cookie.includes('muse_login=1');
 const VI = document.cookie.includes('muse_lang=vi');
 const MAT = document.cookie.includes('muse_matketnoi=1');
-const HONG = document.cookie.includes('muse_hong=1');   // tài khoản "hỏng": Muse chỉ trả chữ (kiểm chuyển tài khoản)
+const HONG = document.cookie.includes('muse_hong=1');
+// 1.5.4: cookie muse_that=1 → trình xem ảnh như Muse THẬT (ảnh chụp người dùng 19/11/2026): không có nút "Open…",
+// phải bấm thẳng vào ảnh; lớp phủ KHÔNG role=dialog, nút không nhãn (✕ góc trái, chia sẻ + tải ↓ góc phải);
+// mọi cú bấm JavaScript (isTrusted = false) bị bỏ qua. CHITAI → trình xem cũng chỉ hiện ảnh nhỏ, phải bấm ↓.
+const THAT = document.cookie.includes('muse_that=1');   // tài khoản "hỏng": Muse chỉ trả chữ (kiểm chuyển tài khoản)
 const L = VI
   ? { o: 'Nhắn tin', gui: 'Đẩy đi', go: 'Hủy tệp', dangGo: 'Trợ lý đang nhập', mo: 'Mở ảnh đã tạo', dong: 'Đóng', caiDat: 'Cài đặt',
       menu: ['Phím tắt', 'Báo lỗi', 'Cài đặt'],
@@ -278,9 +283,38 @@ async function veThread(id) {
     const luoi = /LUOI/.test(t.prompt);
     const img = luoi ? '' : SRCSET ? `<img src="${nho}" srcset="${nho} 1x, ${full} 4x">` : `<img src="${nho}">`;
     khungHtml += `<div data-testid="hatch-chat-attachment-presentation-image">${img}</div>` +
-      (SRCSET ? '' : `<button aria-label="${L.mo} ${luoi ? 'ảnh lười' : 'ảnh'} ${k + 1}" type="button" class="moXem" data-k="${k}"></button>`);
+      (SRCSET || THAT ? '' : `<button aria-label="${L.mo} ${luoi ? 'ảnh lười' : 'ảnh'} ${k + 1}" type="button" class="moXem" data-k="${k}"></button>`);
   }
   veKhung(user + chu + `<div data-message-item="true" data-message-role="assistant"><div aria-busy="false">${khungHtml}</div></div>`);
+  if (THAT) {
+    const CHITAI = /CHITAI/.test(t.prompt);
+    document.querySelectorAll('[data-testid="hatch-chat-attachment-presentation-image"] img').forEach((im, k) => {
+      im.style.cursor = 'pointer';
+      im.addEventListener('click', (e) => {
+        window.__soBamAnh = (window.__soBamAnh || 0) + 1;
+        if (!e.isTrusted) return;            // Muse bỏ qua cú bấm JavaScript
+        const { full, nho } = anh[k];
+        const d = document.createElement('div');
+        d.className = 'lop-xem';
+        d.style.cssText = 'position:fixed;inset:0;z-index:50;background:#000c';
+        d.innerHTML = `<button class="dong" style="position:absolute;left:16px;top:16px;width:32px;height:32px">✕</button>` +
+          `<button style="position:absolute;right:60px;top:16px;width:32px;height:32px">⇪</button>` +
+          `<button class="tai" style="position:absolute;right:16px;top:16px;width:32px;height:32px">↓</button>` +
+          `<img src="${nho}" style="position:absolute;left:10%;top:10%;width:80%;height:80%;object-fit:contain">`;
+        const that = (f) => (ev) => { if (ev.isTrusted) f(); };
+        d.querySelector('.dong').onclick = that(() => d.remove());
+        d.querySelector('.tai').onclick = that(() => {
+          window.__soTaiXem = (window.__soTaiXem || 0) + 1;
+          const a = document.createElement('a');
+          a.href = `/__anh-goc?w=${w}&h=${h}&k=${k}`; a.download = `muse-${k}.png`;
+          document.body.appendChild(a); a.click(); a.remove();
+        });
+        document.addEventListener('keydown', function esc(ev) { if (ev.isTrusted && ev.key === 'Escape') { d.remove(); document.removeEventListener('keydown', esc); } });
+        document.body.appendChild(d);
+        if (!CHITAI && nho !== full) setTimeout(() => { const c = d.querySelector('img'); if (c) c.src = full; }, 700);
+      });
+    });
+  }
   for (const b of document.querySelectorAll('.moXem')) b.onclick = () => {
     const { full, nho } = anh[+b.dataset.k];
     const d = document.createElement('div');
