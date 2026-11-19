@@ -318,8 +318,8 @@
     Object.keys(v).filter((k) => k.startsWith(`loai_${l}_`) && v[k] === false).map((k) => k.slice(`loai_${l}_`.length))]));
   // 1.4.14: tra theo bảng id (capNhatTienDo gọi cho 600 dòng mỗi giây — dò cả hàng đợi 8.000 việc mỗi dòng là thừa).
   const viecTheoId = (id) => (U.khoViec && U.khoViec.map.get(id)) || (S && S.viec.find((j) => j.id === id));
-  /** Khoá cài đặt Tải về / Tên file của từng trang Tạo (nhạc luôn tải về: không có khoá công tắc). */
-  const khoaTai = (loai = loaiTrang()) => ({ video: { tai: 'taiVideo', ten: 'tenVideo' }, nhac: { tai: '', ten: 'tenNhac' } }[loai] || { tai: 'taiAnh', ten: 'tenAnh' });
+  /** Khoá cài đặt Tải về / Tên file của từng trang Tạo (1.5.3: nhạc cũng có công tắc "Tải nhạc về"). */
+  const khoaTai = (loai = loaiTrang()) => ({ video: { tai: 'taiVideo', ten: 'tenVideo' }, nhac: { tai: 'taiNhac', ten: 'tenNhac' } }[loai] || { tai: 'taiAnh', ten: 'tenAnh' });
 
   // ── Hộp thoại (Electron không có window.prompt) ───────────────────────────
   async function hoi({ tieuDe, html, ok = 'OK', huy = 'Huỷ', nguyHiem = false }) {
@@ -1586,7 +1586,22 @@
     $('#ncNhanTai').textContent = `Tải ${ten} về`;
     $('#ncNhanThuMuc').textContent = `Thư mục lưu ${ten}`;
     $('#ncNhanTen').firstChild.textContent = `Tên file ${ten}`;
-    $('#ncTai').checked = v ? c.taiVideo : c.taiAnh;   // nhạc luôn tải về (công tắc ẩn)
+    const tai = c[khoaTai(loai).tai] !== false;
+    $('#ncTai').checked = tai;
+    // 1.5.3: tắt tải về → thư mục lưu không dùng (file giữ trong app); đang bật Google Drive thì nói rõ file đi đâu,
+    // khỏi tưởng vừa lưu ở thư mục này vừa lên Drive (người dùng 19/11/2026: nhạc ra 2 nơi).
+    const conDrive = { anh: 'images', video: 'Videos', nhac: 'BGM' }[loai] || 'images';
+    $('#ncGhiTai').textContent = loai === 'nhac' ? 'Tắt: không lưu vào thư mục máy — nhạc giữ trong app (vẫn nghe, vẫn đưa lên Drive được).'
+      : 'Tắt: chỉ giữ trong app (vẫn xem, vẫn làm video được).';
+    $('#ncKhoiThuMuc').classList.toggle('tat', !tai);
+    for (const id of ['#ncChonThuMuc', '#ncMoThuMuc']) $(id).disabled = !tai;
+    const theoDrive = $('#ncTheoDrive');
+    theoDrive.hidden = tai;
+    if (!tai) {
+      datHtml(theoDrive, c.driveBat
+        ? `☁ Đang theo Google Drive: ${ten} xong đưa lên <code>${esc((duAnHienTai() || {}).ten || 'Tên dự án')}/${conDrive}</code>, không lưu thêm vào thư mục này. Bật <b>Tải ${ten} về</b> nếu vẫn muốn có thêm một bản ở máy.`
+        : `Đang tắt tải về: ${ten} chỉ giữ trong app. Chọn việc → <b>Tải về</b> để lấy file ra.`);
+    }
     // 1.4.2: nói rõ khối này áp dụng cho loại việc nào. 1.4.5: đây là chỗ DUY NHẤT chỉnh tải về / thư mục / tên file.
     datHtml($('#ncApDung'), v ? 'Áp dụng cho <span class="ap ap-video">Chỉ video</span> mọi việc <b>Tạo video</b> của dự án này. Ảnh chỉnh ở trang Tạo ảnh.'
       : 'Áp dụng cho <span class="ap ap-anh">Chỉ ảnh</span> mọi việc <b>Tạo ảnh</b> của dự án này. Video chỉnh ở trang Tạo video; video tự tạo từ ảnh lưu theo mục <i>Ảnh xong → tự tạo video</i> ở trên (và Cài đặt → <i>Chung (Muse + Flow)</i> → <i>Video tạo từ ảnh lưu cạnh ảnh</i>).');
@@ -2130,7 +2145,7 @@
       const c = docFormCaiDat();
       if (macDinh && !await xacNhan('Lưu cài đặt đang hiện làm cài đặt mặc định?',
         '• Dự án mới tạo sẽ dùng cài đặt này.<br>• Mọi dự án đang có cũng đổi theo (mỗi dự án vẫn giữ thư mục lưu và mẫu tên file riêng).', 'Lưu làm mặc định')) return;
-      const batDrive = c.driveBat && !S.caiDat.driveBat && (S.caiDat.taiAnh || S.caiDat.taiVideo);   // 1.4.1: vừa bật Drive → app tự tắt tải về máy
+      const batDrive = c.driveBat && !S.caiDat.driveBat && (S.caiDat.taiAnh || S.caiDat.taiVideo || S.caiDat.taiNhac);   // 1.4.1: vừa bật Drive → app tự tắt tải về máy
       let r;
       if (macDinh) {
         const duAn = (duAnHienTai() || {}).id;
@@ -2145,7 +2160,7 @@
       const daLuu = macDinh ? 'Đã lưu làm mặc định' : 'Đã lưu';
       if (c.driveBat && c.driveCach === 'may' && !$('#cdThuMucDrive').value) { toast(`${daLuu} — nhưng chưa chọn thư mục Google Drive (bấm Tự tìm hoặc Chọn…)`, true); return; }
       if (c.driveBat && c.driveCach === 'web' && !$('#cdDriveTk').value) { toast(`${daLuu} — nhưng chưa chọn tài khoản Google Drive (Tài khoản → Drive)`, true); return; }
-      if (batDrive) { toast(`${daLuu} — bật đưa lên Google Drive nên đã tự tắt "Tải ảnh về" và "Tải video về"`); return; }
+      if (batDrive) { toast(`${daLuu} — bật đưa lên Google Drive nên đã tự tắt "Tải ảnh về", "Tải video về" và "Tải nhạc về"`); return; }
       toast(macDinh ? `Đã lưu làm mặc định — áp cho ${r.soDuAn} dự án và dự án mới`
         : `Đã lưu cài đặt của dự án "${(duAnHienTai() || {}).ten || ''}"`);
     }

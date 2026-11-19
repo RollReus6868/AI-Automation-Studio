@@ -348,6 +348,23 @@ module.exports = function e2e({ win, app, LENH, dieuPhoi }) {
       kiem(g11.length === 2 && g11.every((g) => g.soFile === 1), 'Muse tiếng Việt: mỗi lần gửi kèm đúng 1 ảnh');
       await tk1.cookies.remove(process.env.MUSE_URL, 'muse_lang');
 
+      // 11b) 1.5.3: ảnh trong chat Muse chỉ là bản xem trước thu nhỏ (người dùng 19/11/2026: tải về 498×280,
+      //      bấm vào ảnh trên Muse thì full HD) → phải lấy ảnh cỡ đầy đủ ở trình xem / srcset, đúng ảnh của từng khung.
+      ghi('-- 11b. Ảnh cỡ đầy đủ (không lấy bản xem trước)');
+      const truoc11b = viec().length, nk11b = LENH.trangThai().nhatKy.length;
+      LENH.them({ duAn: 'mac-dinh', loai: 'anh', tyLe: '16:9', prompts: ['DAYDU ảnh đủ cỡ', 'SRCSET ảnh có srcset', 'NHIEU hai ảnh một tin'], chay: true });
+      await cho(() => !dieuPhoi.dangChay && !dieuPhoi.coViecDangChay(), 90000, 'chạy xong việc ảnh cỡ đầy đủ');
+      const v11b = viec().slice(truoc11b);
+      for (const j of v11b) ghi(`   #${j.so} ${j.trangThai} ${(j.files || []).map((f) => ihdr(f).join('x')).join(',')} ${j.loi || ''}`);
+      kiem(v11b.length === 3 && v11b.every((j) => j.trangThai === 'xong' && j.files.length &&
+        j.files.every((f) => ihdr(f).join('x') === '1024x576')), 'ảnh tải về đủ cỡ 1024x576 (ảnh chat chỉ 256x144) — cả srcset, cả ảnh đã đủ cỡ');
+      const nhieu = v11b.find((j) => /NHIEU/.test(j.prompt));
+      kiem(nhieu && nhieu.files.length === 2 && !fs.readFileSync(nhieu.files[0]).equals(fs.readFileSync(nhieu.files[1])),
+        'một tin 2 ảnh → 2 file khác nhau (mở đúng trình xem của từng ảnh)');
+      const dayDu = v11b.find((j) => /DAYDU/.test(j.prompt));
+      kiem(dayDu && dayDu.xongLuc - dayDu.batDauLuc < 12000, `ảnh chat đã đủ cỡ → không chờ trình xem lâu (${dayDu && dayDu.xongLuc - dayDu.batDauLuc} ms)`);
+      kiem(LENH.trangThai().nhatKy.slice(nk11b).some((d) => /xong ảnh.*\(1024×576\)/.test(d.chu)), 'nhật ký ghi cỡ ảnh đã tải (1024×576)');
+
       // 12) Đặt lại hàng đợi: mọi việc ảnh của dự án đang xem về Chờ, xoá chat cũ.
       ghi('-- 12. Đặt lại hàng đợi');
       await js(`window.__diToi('anh')`);

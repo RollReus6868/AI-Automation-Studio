@@ -192,9 +192,12 @@
 
             <div class="nhom-tai">
               <p class="ghi-ap khong-nhac" id="ncApDung"></p>
-              <div class="dong-cong-tac khong-nhac"><div><b id="ncNhanTai">Tải ảnh về</b><small>Tắt: chỉ giữ trong app (vẫn xem, vẫn làm video được).</small></div><label class="cong-tac"><input type="checkbox" id="ncTai"><span></span></label></div>
-              <label id="ncNhanThuMuc">Thư mục lưu ảnh</label>
-              <div class="dong-o"><input id="ncThuMuc" readonly><button class="nut-vien nho" id="ncChonThuMuc">Đổi…</button><button class="nut-vien nho" id="ncMoThuMuc">Mở</button></div>
+              <div class="dong-cong-tac"><div><b id="ncNhanTai">Tải ảnh về</b><small id="ncGhiTai">Tắt: chỉ giữ trong app (vẫn xem, vẫn làm video được).</small></div><label class="cong-tac"><input type="checkbox" id="ncTai"><span></span></label></div>
+              <div id="ncKhoiThuMuc">
+                <label id="ncNhanThuMuc">Thư mục lưu ảnh</label>
+                <div class="dong-o"><input id="ncThuMuc" readonly><button class="nut-vien nho" id="ncChonThuMuc">Đổi…</button><button class="nut-vien nho" id="ncMoThuMuc">Mở</button></div>
+              </div>
+              <small class="mo ghi-drive" id="ncTheoDrive" hidden></small>
               <label id="ncNhanTen">Tên file ảnh<input id="ncTen" placeholder="{duAn}/{duAn}_{so}"></label>
               <small class="mo" id="ncViDu"></small>
               <small class="mo">Ký hiệu: <code>{duAn}</code> tên dự án · <code>{so}</code> số trong hàng đợi · <code>{stt}</code> dòng prompt thứ mấy · <code>{prompt}</code> vài chữ đầu · <code>{ngay}</code> ngày · <code>{loai}</code> anh/video · <code>{tenAnh}</code> tên ảnh nguồn (video từ ảnh).<span class="chi-nhac"> Trang nhạc: <code>{loai}</code> = nhac, file là .mp3.</span> <code>/</code> = thư mục con. Trùng tên tự thêm (2), không ghi đè.</small>

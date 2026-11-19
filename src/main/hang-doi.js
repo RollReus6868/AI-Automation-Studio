@@ -193,6 +193,15 @@ function mimeTuDuoi(p) {
     webp: 'image/webp', gif: 'image/gif', mp3: 'audio/mpeg', wav: 'audio/wav', m4a: 'audio/mp4' }[d] || 'application/octet-stream';
 }
 
+/** 1.5.3: " (1920×1080)" cho dòng nhật ký khi Muse cho biết cỡ ảnh/video đã tải. */
+function chuCoAnh(f) {
+  return f && f.w > 0 && f.h > 0 ? ` (${f.w}×${f.h})` : '';
+}
+/** 1.5.3: ảnh Muse nhỏ bất thường (cạnh dài < 1000 px) — dấu hiệu chỉ lấy được bản xem trước thu nhỏ. */
+function laAnhNho(f) {
+  return !!(f && f.loai === 'anh' && f.w > 0 && f.h > 0 && Math.max(f.w, f.h) < 1000);
+}
+
 /**
  * Chọn prompt từ số `tu` đến số `den` (đếm từ 1, gồm cả hai đầu; bỏ trống = tới cùng).
  * Trả [{prompt, stt}] — stt giữ đúng số thứ tự gốc để đặt tên file / ghép ảnh theo dòng.
@@ -484,7 +493,7 @@ function ghepGoiViec(kho, g) {
 }
 
 const HD = {
-  TY_LE, MAU_MAC_DINH, MAU_TEN_MAC_DINH, MAU_TEN_ANH_MAC_DINH, PROMPT_VIDEO_MAC_DINH, slugTen, tachPrompt, timNhanVat, taoTinNhan, tenFile, mimeTuDuoi, chonKhoang, DUOI_LOAI, mauKhopFile, soTuTen, soTheoTenAnh, ghepThuMucAnh,
+  TY_LE, MAU_MAC_DINH, MAU_TEN_MAC_DINH, MAU_TEN_ANH_MAC_DINH, PROMPT_VIDEO_MAC_DINH, slugTen, tachPrompt, timNhanVat, taoTinNhan, tenFile, mimeTuDuoi, chuCoAnh, laAnhNho, chonKhoang, DUOI_LOAI, mauKhopFile, soTuTen, soTheoTenAnh, ghepThuMucAnh,
   docSoChay, chonTheoSo, gonSo, chonViecTheoSo, taoGoiViec, ghepGoiViec,
   viecKeTiep, taiKhoanChoViec, taiKhoanChoViecDs, thoiGianDuKien, duDoanConLai, tienDoUoc, daXong, laTraLoiChu, laChanKhuVuc, laTuChoi, laHetLuot, soSanhTuNhien, keHoachTai
 };

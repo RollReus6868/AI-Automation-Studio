@@ -1446,6 +1446,28 @@ test('trình viewer: mở thì luôn đóng (finally), kể cả khi không lấ
   assert.ok(/moXem = x\.daMo/.test(than), 'đánh dấu đã mở theo daMo, không theo việc có ảnh');
   assert.ok(/finally \{\s*if \(moXem\) \{ dongTrinhXem\(\)/.test(than));
 });
+test('1.5.3: ảnh Muse lấy cỡ đầy đủ — luôn mở trình xem, không lấy bản xem trước trong chat', () => {
+  const s = docNguon('src/inject/muse-trang.js');
+  const than = s.slice(s.indexOf('async function layFile('), s.indexOf('window.__muse ='));
+  assert.ok(/const x = await moTrinhXem\(khung, dienTich\(nho\)\)/.test(than), 'luôn mở trình xem, kể cả khi ảnh chat đã nạp');
+  assert.ok(!/if \(!img\) \{ const x = await moTrinhXem/.test(than), 'không còn chỉ mở trình xem khi ảnh lười');
+  assert.ok(/dienTich\(x\.img\) >= dienTich\(img\)/.test(than), 'chọn ảnh lớn hơn trong hai ảnh');
+  assert.ok(/urlLonNhat\(img\)/.test(than) && /anhSangPng\(img, b\)/.test(than) && /coAnh\(b, img\)/.test(than),
+    'srcset lớn nhất; đổi PNG từ chính file đã tải; cỡ = cỡ file thật');
+  const mo = s.slice(s.indexOf('async function moTrinhXem('), s.indexOf('function dongTrinhXem('));
+  assert.ok(/dienTich\(i\) > \(dienTichNho \|\| 0\)/.test(mo) && /onDinh >= 3/.test(mo), 'chờ ảnh lớn hơn bản xem trước, hoặc trình xem đứng yên');
+  const nut = s.slice(s.indexOf('function nutMoAnh('), s.indexOf('function anhSanSang('));
+  assert.ok(/n\.contains\(khung\) \|\| khung\.contains\(n\)/.test(nut) && /khungs\.indexOf\(khung\)/.test(nut), 'tin nhiều ảnh → nút đúng khung');
+  const HD = require('../src/main/hang-doi');
+  assert.strictEqual(HD.chuCoAnh({ w: 1920, h: 1080 }), ' (1920×1080)');
+  assert.strictEqual(HD.chuCoAnh({ duongDan: 'x.png' }), '');
+  assert.strictEqual(HD.chuCoAnh(null), '');
+  assert.ok(HD.laAnhNho({ loai: 'anh', w: 498, h: 280 }));
+  assert.ok(!HD.laAnhNho({ loai: 'anh', w: 1920, h: 1080 }) && !HD.laAnhNho({ loai: 'anh', w: 1024, h: 576 }));
+  assert.ok(!HD.laAnhNho({ loai: 'video', w: 480, h: 270 }) && !HD.laAnhNho({ loai: 'anh' }) && !HD.laAnhNho(null));
+  const d = docNguon('src/main/dieu-phoi.js');
+  assert.ok(/hd\.chuCoAnh\(r\.files\[0\]\)/.test(d) && /hd\.laAnhNho\(r\.files\[0\]\)/.test(d), 'nhật ký ghi cỡ ảnh, cảnh báo ảnh nhỏ');
+});
 test('luồng chạy ngầm là CỬA SỔ ẨN (trang luôn visible), không phải WebContentsView ẩn; giữ 1280×800', () => {
   const m = docNguon('main.js');
   const luong = m.slice(m.indexOf('function taoLuong('), m.indexOf('function huyLuong('));
@@ -2324,7 +2346,7 @@ testAsync('Flow Music: việc nhạc chỉ chạy ở tài khoản Flow Music (2
   assert.deepStrictEqual(nhac.map((j) => j.files[0].replace(/\\/g, '/')), ['/nhac/001.mp3', '/nhac/002.mp3', '/nhac/003.mp3', '/nhac/004.mp3']);
   assert.ok(chuyen.some(([a, b]) => a === '/tam/nhac-1.mp3' && b === nhac[0].files[0]), 'file tải về được chuyển ra thư mục nhạc');
   assert.ok(nhatKy.some((x) => /Việc #1 xong nhạc \(bài dài hơn: 2:59 \(bài kia 2:29\)\)/.test(x)), nhatKy.join('\n'));
-  assert.ok(nhac.every((j) => !j.tam), 'nhạc luôn tải về (không có công tắc tắt)');
+  assert.ok(nhac.every((j) => !j.tam), 'Drive tắt → nhạc tải về thư mục lưu nhạc như cũ');
   // Số bài cùng lúc là cài đặt chung cả app (1–16).
   dp.datCaiDat({ luongNhacMoiTK: 1 });
   assert.strictEqual(dp.caiDat.luongNhacMoiTK, 1);
@@ -2552,7 +2574,7 @@ test('Flow Music: giao diện có mục Tạo nhạc, thẻ tài khoản Flow Mu
   assert.ok(/\$\{nhac \? '' : `<button class="nut-vien nho do" data-tk="xoa"/.test(a), 'thẻ Flow Music không có nút Xoá');
   assert.ok(/choNhacGiay: \$\('#cdChoNhac'\)\.value/.test(a) && /\$\('#cdChoNhac'\)\.value = c\.choNhacGiay/.test(a));
   assert.ok(/luongNhacMoiTK: \$\('#cdLuongNhac'\)\.value/.test(a) && /id="cdLuongNhac"/.test(h));
-  assert.ok(/nhac: \{ tai: '', ten: 'tenNhac' \}/.test(a), 'mẫu tên nhạc lưu vào tenNhac');
+  assert.ok(/nhac: \{ tai: 'taiNhac', ten: 'tenNhac' \}/.test(a), 'mẫu tên nhạc lưu vào tenNhac; 1.5.3: công tắc taiNhac');
   assert.ok(!/suno/i.test(h) && !/suno/i.test(a) && !/suno/i.test(c), 'giao diện không còn chữ Suno');
 });
 
@@ -3291,9 +3313,48 @@ console.log('\n── 1.4.0 ─────────────────�
     await dp._driveCho;
     assert.strictEqual(goi.length, truoc + 1, '1.5.2: nhạc cũng lên Drive');
     assert.deepStrictEqual([goi[truoc].loai, n.drive], ['nhac', ['/G/Mặc định/BGM/001.mp3']], 'nhạc vào thư mục BGM của dự án');
-    assert.ok(!n.tam, 'nhạc vẫn tải về máy');
+    // 1.5.3: bật Drive → "Tải nhạc về" tự tắt → nhạc chỉ lên Drive/BGM, KHÔNG lưu thêm bản ở thư mục lưu nhạc.
+    assert.ok(n.tam, `nhạc không lưu thêm ở thư mục lưu nhạc (${n.files[0]})`);
     assert.deepStrictEqual(dp.lenDriveViec([n.id]), { ok: true, so: 1, boQua: 0 }, '"Lên Drive" tay cho nhạc');
     await dp._driveCho;
+  });
+
+  testAsync('1.5.3 nhạc theo Google Drive: bản cũ đã bật Drive → thôi lưu nhạc ở thư mục máy; công tắc "Tải nhạc về" như ảnh', async () => {
+    // Nâng cấp từ 1.5.2 (chưa có khoá taiNhac): đang bật Drive → tắt tải về; không bật → giữ tải về; đã chọn thì giữ.
+    const { chuanCaiDat } = require('../src/main/dieu-phoi');
+    assert.strictEqual(chuanCaiDat({ driveBat: true, thuMucDrive: '/G' }).taiNhac, false);
+    assert.strictEqual(chuanCaiDat({ driveBat: false }).taiNhac, true);
+    assert.strictEqual(chuanCaiDat({}).taiNhac, true);
+    assert.strictEqual(chuanCaiDat(undefined).taiNhac, true);
+    assert.strictEqual(chuanCaiDat({ driveBat: true, taiNhac: true }).taiNhac, true, 'người dùng bật lại tay thì giữ');
+    assert.strictEqual(chuanCaiDat({ driveBat: false, taiNhac: false }).taiNhac, false);
+    // Mở dữ liệu thật của bản 1.5.2 (không có khoá taiNhac): chung + dự án bật Drive → theo Drive; dự án tắt Drive → tải về.
+    const cu152 = dungDieuPhoi({ duLieu: { caiDat: { driveBat: true, thuMucDrive: '/G', taiAnh: false, taiVideo: false },
+      duAn: [{ id: 'a', ten: 'Epic', so: 0, caiDat: { thuMucNhac: '/G/Epic', driveBat: true, thuMucDrive: '/G' } },
+        { id: 'b', ten: 'Khác', so: 0, caiDat: { thuMucNhac: '/nhac', driveBat: false } }, { id: 'c', ten: 'Theo chung', so: 0 }] } }).dp;
+    assert.deepStrictEqual(['a', 'b', 'c'].map((id) => cu152.cd(id).taiNhac), [false, true, false], 'nâng cấp từ 1.5.2 theo Drive từng dự án');
+    assert.strictEqual(dungDieuPhoi({ duLieu: { caiDat: { thuMucNhac: '/nhac' } } }).dp.cd().taiNhac, true, 'chưa bật Drive → vẫn tải nhạc về');
+    assert.strictEqual(dungDieuPhoi({ duLieu: { caiDat: { driveBat: true, taiNhac: true } } }).dp.cd().taiNhac, true, 'đã chọn thì giữ');
+    const { dp } = dungDieuPhoi({ lenDrive: async (x) => ({ ok: true, files: x.files.map((f) => `/G/${x.tenDuAn}/${DR.THU_MUC_LOAI[x.loai]}/${path.basename(f)}`) }) });
+    const d = dp.taoDuAn('Tập N');
+    dp.datCaiDat({ thuMucNhac: '/nhac', nghiNhac: 0 }, d.id);
+    dp.them({ duAn: d.id, loai: 'nhac', prompts: ['lofi', 'jazz'] });
+    const [n1, n2] = dp.viec.filter((j) => j.duAn === d.id);
+    dp._ketThuc(n1, { ok: true, files: [{ mime: 'audio/mpeg', b64: 'AA==' }] }, null);
+    assert.deepStrictEqual([!!n1.tam, n1.files[0].replace(/\\/g, '/')], [false, '/nhac/001.mp3'], 'Drive tắt → lưu ở thư mục lưu nhạc');
+    dp.datCaiDat({ driveBat: true, thuMucDrive: '/G' }, d.id);
+    assert.strictEqual(dp.cd(d.id).taiNhac, false, 'bật Drive → tự tắt "Tải nhạc về"');
+    dp._ketThuc(n2, { ok: true, files: [{ mime: 'audio/mpeg', b64: 'AA==' }] }, null);
+    await dp._driveCho;
+    assert.ok(n2.tam && !n2.files[0].replace(/\\/g, '/').startsWith('/nhac/'), `chỉ giữ trong app (${n2.files[0]})`);
+    assert.deepStrictEqual(n2.drive, ['/G/Tập N/BGM/002.mp3'], 'và lên Drive/BGM');
+    dp.datCaiDat({ taiNhac: true }, d.id);
+    assert.strictEqual(dp.cd(d.id).taiNhac, true, 'bật lại tay thì giữ (vẫn Drive)');
+    // Giao diện: công tắc "Tải nhạc về" hiện ở trang nhạc; tắt → thư mục lưu mờ đi + dòng nói đang theo Drive.
+    const html = docNguon('src/ui/index.html'), ui = docNguon('src/ui/app.js');
+    assert.ok(/<div class="dong-cong-tac"><div><b id="ncNhanTai">/.test(html) && /id="ncKhoiThuMuc"/.test(html) && /id="ncTheoDrive"/.test(html));
+    assert.ok(/nhac: \{ tai: 'taiNhac', ten: 'tenNhac' \}/.test(ui));
+    assert.ok(/\$\('#ncKhoiThuMuc'\)\.classList\.toggle\('tat', !tai\)/.test(ui) && /Đang theo Google Drive/.test(ui) && /nhac: 'BGM'/.test(ui));
   });
 
   testAsync('1.4.0 Drive cách 2 "tải thẳng lên drive.google.com": dùng tài khoản nền Drive; thiếu / sai tài khoản → báo, không tải', async () => {
@@ -3512,10 +3573,10 @@ console.log('\n── 1.4.0 ─────────────────�
     const { dp, nhatKy } = dungDieuPhoi();
     const d = dp.taoDuAn('Tập C');
     dp.datCaiDat({ thuMucAnh: '/anh' }, d.id);
-    assert.deepStrictEqual([dp.cd(d.id).taiAnh, dp.cd(d.id).taiVideo], [true, true]);
+    assert.deepStrictEqual([dp.cd(d.id).taiAnh, dp.cd(d.id).taiVideo, dp.cd(d.id).taiNhac], [true, true, true]);
     dp.datCaiDat({ driveBat: true, thuMucDrive: '/G' }, d.id);
-    assert.deepStrictEqual([dp.cd(d.id).taiAnh, dp.cd(d.id).taiVideo, dp.cd(d.id).thuMucAnh], [false, false, '/anh']);
-    assert.ok(nhatKy.some((x) => /đã tự tắt "Tải ảnh về" và "Tải video về"/.test(x)));
+    assert.deepStrictEqual([dp.cd(d.id).taiAnh, dp.cd(d.id).taiVideo, dp.cd(d.id).taiNhac, dp.cd(d.id).thuMucAnh], [false, false, false, '/anh']);
+    assert.ok(nhatKy.some((x) => /đã tự tắt "Tải ảnh về", "Tải video về" và "Tải nhạc về"/.test(x)));
     assert.deepStrictEqual([dp.caiDat.taiAnh, dp.caiDat.driveBat], [true, false], 'dự án khác / cài đặt chung không đổi');
     dp.datCaiDat({ taiAnh: true }, d.id);
     dp.datCaiDat({ driveBat: true, luongMoiTK: 3 }, d.id);   // lưu lại khi Drive vẫn bật → không tắt nữa
