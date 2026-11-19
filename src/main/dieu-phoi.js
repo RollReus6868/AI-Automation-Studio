@@ -66,6 +66,7 @@ const CAI_DAT_MAC_DINH = {
   thuMucVideo: '',
   taiAnh: true,           // tắt: file chỉ giữ trong bộ nhớ tạm của app (vẫn xem được, vẫn làm video được)
   taiVideo: true,
+  taiNhac: true,          // 1.5.3: như ảnh / video — bật Google Drive thì tự tắt (nhạc chỉ lên Drive <dự án>/BGM, không lưu 2 nơi)
   tenAnh: hd.MAU_TEN_ANH_MAC_DINH,
   tenVideo: hd.MAU_TEN_MAC_DINH,
   videoCanhAnh: true,     // video nối từ ảnh: lưu cạnh ảnh nguồn, cùng tên (325.jpg → 325.mp4)
@@ -159,6 +160,9 @@ function chuanCaiDat(c, flowGoc, flowMoi) {
   m.tenAnh = String(m.tenAnh || '').trim() || hd.MAU_TEN_ANH_MAC_DINH;
   m.tenVideo = String(m.tenVideo || '').trim() || hd.MAU_TEN_MAC_DINH;
   m.taiAnh = m.taiAnh !== false; m.taiVideo = m.taiVideo !== false; m.tatMayKhiXong = !!m.tatMayKhiXong;
+  // 1.5.3: bản cũ (≤1.5.2) nhạc LUÔN tải về máy kể cả khi đã bật Drive → nhạc vừa ở thư mục lưu nhạc, vừa ở Drive/BGM.
+  // Chưa từng có khoá này: đang bật Drive thì coi như tắt "Tải nhạc về" (theo Drive), không bật thì giữ như cũ.
+  m.taiNhac = c && c.taiNhac !== undefined ? c.taiNhac !== false : !(c && c.driveBat);
   m.doiNenKhiLoi = m.doiNenKhiLoi !== false;
   m.videoCanhAnh = m.videoCanhAnh !== false; m.xoaChatKhiXong = !!m.xoaChatKhiXong; m.xoaDuAnFlowKhiXong = !!m.xoaDuAnFlowKhiXong;
   m.thuMucAnh = String(m.thuMucAnh || '').trim();
@@ -210,6 +214,8 @@ class DieuPhoi {
     this.nhanVat = Array.isArray(s.nhanVat) ? s.nhanVat : [];
     this.mauPrompt = Array.isArray(s.mauPrompt) ? s.mauPrompt : [];
     this.caiDat = { ...CAI_DAT_MAC_DINH, ...(s.caiDat || {}) };
+    // 1.5.3: dữ liệu bản cũ chưa có "Tải nhạc về" (≤1.5.2 nhạc luôn tải về máy) → đang bật Drive thì theo Drive.
+    if (!s.caiDat || s.caiDat.taiNhac === undefined) this.caiDat.taiNhac = !this.caiDat.driveBat;
     tachTheoNen(s.caiDat, this.caiDat);
     this.henGio = HG.chuanBoHen(s.henGio);   // 1.3.6 / 1.4.14: danh sách hẹn giờ (chung cả app)
     this.caiDat.mau = { ...hd.MAU_MAC_DINH, ...(this.caiDat.mau || {}) };
@@ -281,6 +287,7 @@ class DieuPhoi {
       }
       if (d.caiDat && moc5 && d.caiDat.flow && d.caiDat.flow.chatLuongAnh === 'img_2k') d.caiDat.flow.chatLuongAnh = 'img_1k';
       tachTheoNen(d.caiDat, d.caiDat);
+      if (d.caiDat && d.caiDat.taiNhac === undefined) d.caiDat.taiNhac = !{ ...this.caiDat, ...d.caiDat }.driveBat;   // 1.5.3 (như trên)
       if (d.caiDat) d.caiDat = rieng(chuanCaiDat({ ...this.caiDat, ...d.caiDat }, this.caiDat.flow, d.caiDat.flow));
       if (moc6) {
         const c = this.cd(d.id);
@@ -737,7 +744,7 @@ class DieuPhoi {
       }
       return ds.get(thuMuc);
     };
-    const tai = (l) => l === 'nhac' || (l === 'video' ? c.taiVideo : c.taiAnh);
+    const tai = (l) => (l === 'nhac' ? c.taiNhac : l === 'video' ? c.taiVideo : c.taiAnh);
     const noiLuu = (l) => (tai(l) ? this.thuMucRa(l, d.id) : this.thuMucTamDuAn(d.id));
     const mauCua = (l) => (l === 'nhac' ? c.tenNhac : l === 'video' ? c.tenVideo : c.tenAnh);
     const daChon = d.thuMucQuet && d.thuMucQuet[loai];
@@ -1182,7 +1189,7 @@ class DieuPhoi {
     this._taiChat.add(j.id);
     const l = this.o.taoLuong(tk, 'kiem', null);
     const cd = this.cd(j.duAn);
-    this.log('info', `📥 #${j.so}: mở chat ở "${tk.ten}" để tải video (không gửi lại prompt) — ${thread}`);
+    this.log('info', `📥 #${j.so}: mở chat ở "${tk.ten}" để tải ${TEN_LOAI[j.loai] || 'ảnh'} (không gửi lại prompt) — ${thread}`);
     let r;
     try {
       r = await l.chay({ ...j, thread, taiKhoan: tk.id, files: [] }, {
@@ -1579,9 +1586,9 @@ class DieuPhoi {
     // của dự án rồi lên Drive, khỏi lưu lẫn vào thư mục máy). Sau đó người dùng bật lại tay thì vẫn được.
     if (c.driveBat === true && !this.cd(d && d.id).driveBat) {
       const cd = this.cd(d && d.id);
-      if (cd.taiAnh || cd.taiVideo) {
-        c = { ...c, taiAnh: false, taiVideo: false };
-        this.log('info', `☁ Bật đưa lên Google Drive${d ? ` (dự án "${d.ten}")` : ''} → đã tự tắt "Tải ảnh về" và "Tải video về": ảnh / video giữ trong app (thư mục tạm riêng của dự án) rồi đưa lên Drive.`);
+      if (cd.taiAnh || cd.taiVideo || cd.taiNhac) {
+        c = { ...c, taiAnh: false, taiVideo: false, taiNhac: false };
+        this.log('info', `☁ Bật đưa lên Google Drive${d ? ` (dự án "${d.ten}")` : ''} → đã tự tắt "Tải ảnh về", "Tải video về" và "Tải nhạc về": ảnh / video / nhạc giữ trong app (thư mục tạm riêng của dự án) rồi đưa lên Drive.`);
       }
     }
     // 1.4.3: đổi thư mục lưu ở chỗ khác → thôi quét thư mục đã chọn trước đó (quét lại thư mục lưu mới).
@@ -2543,7 +2550,7 @@ class DieuPhoi {
     if (r.ok) {
       try {
         const video = j.loai === 'video', nhac = j.loai === 'nhac';
-        const tai = nhac || (video ? c.taiVideo : c.taiAnh);   // nhạc luôn tải về
+        const tai = nhac ? c.taiNhac : video ? c.taiVideo : c.taiAnh;   // 1.5.3: nhạc cũng tắt được (bật Drive → tự tắt)
         let goc = tai ? this.thuMucRa(j.loai, j.duAn) : this.thuMucTamDuAn(j.duAn);
         let mau = nhac ? c.tenNhac : video ? c.tenVideo : c.tenAnh;
         // Video nối từ ảnh (Flow ⇄ Muse): lưu NGAY CẠNH ảnh nguồn, cùng tên — 325.jpg → 325.mp4. Người dùng
@@ -2593,7 +2600,12 @@ class DieuPhoi {
         // 1.4.7: đếm việc xong kể từ lần bị báo "bất thường" gần nhất — bị báo lại chỉ sau vài việc là dấu hiệu bị đánh dấu.
         if (j.taiKhoan) this.xongTuBatThuong[j.taiKhoan] = (this.xongTuBatThuong[j.taiKhoan] || 0) + 1;
         this.log('success', `✅ [HỆ THỐNG] Việc #${j.so} xong ${TEN_LOAI[j.loai] || 'ảnh'}${r.ghiChu ? ` (${r.ghiChu})` : ''}: ` +
-          (tai ? j.files[0] : `${path.basename(j.files[0])} (không tải về — chỉ giữ trong app)`));
+          (tai ? j.files[0] : `${path.basename(j.files[0])} (không tải về — chỉ giữ trong app)`) + hd.chuCoAnh(r.files[0]));
+        // 1.5.3: ảnh Muse nhỏ bất thường (chỉ lấy được bản xem trước) → báo để người dùng biết mà tải lại.
+        if (hd.laAnhNho(r.files[0])) {
+          this.log('warning', `⚠️ [HỆ THỐNG] Việc #${j.so}: ảnh chỉ ${r.files[0].w}×${r.files[0].h} — có thể Muse chỉ cho bản xem trước. ` +
+            'Mở "Tab của việc này" để xem / tải lại ảnh.');
+        }
         this._lenDrive(j);   // 1.4.0: bật "tự đưa lên Google Drive" thì chép sang thư mục Drive (chạy nền)
         this._noiVideo(j, d);
       } catch (err) {
@@ -2745,4 +2757,4 @@ class DieuPhoi {
   }
 }
 
-module.exports = { DieuPhoi, CAI_DAT_MAC_DINH, NGHI_HET_LUOT_MS };
+module.exports = { DieuPhoi, CAI_DAT_MAC_DINH, NGHI_HET_LUOT_MS, chuanCaiDat };

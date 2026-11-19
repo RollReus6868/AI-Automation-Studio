@@ -10,6 +10,8 @@
     HOI_LAI  → Muse chỉ trả chữ, không ảnh
     NOTFOUND → khung ảnh hiện "chat-image-not-found" 2 giây rồi mới có ảnh
     LUOI     → khung ảnh không có <img>, phải bấm "Open generated image" mới thấy
+    (1.5.3) Ảnh trong chat là bản xem trước 1/4 cạnh; trình xem mới có cỡ đầy đủ (đổi sau 0,7 giây).
+    DAYDU    → ảnh chat đã đủ cỡ   SRCSET → không nút mở, srcset có bản đầy đủ   NHIEU → 2 ảnh / tin
     CHAM     → tạo mất 6 giây (mặc định 2 giây)
     TU_CHOI  → Muse từ chối: "Mình không thể tạo video từ ảnh này." (ảnh chụp người dùng 16/10/2026)
     HET_LUOT → 1.4.12: Muse báo hết lượt: "Bạn đã hết lượt tạo video trong 24 giờ qua…" (chữ thật chưa đo — theo lời người dùng)
@@ -47,9 +49,9 @@ const L = VI
 // Như Muse thật: chat lưu ở MÁY CHỦ (máy chủ kiểm thử), không ở trình duyệt.
 const docThread = async (id) => { try { return await (await fetch('/__thread/' + id)).json(); } catch (_) { return null; } };
 
-function anhBlob(w, h, loai) {
+function anhBlob(w, h, loai, mau) {
   const c = document.createElement('canvas'); c.width = w; c.height = h;
-  const g = c.getContext('2d'); g.fillStyle = '#c8a'; g.fillRect(0, 0, w, h); g.fillStyle = '#123'; g.fillRect(10, 10, w / 2, h / 3);
+  const g = c.getContext('2d'); g.fillStyle = mau ? '#5a9' : '#c8a'; g.fillRect(0, 0, w, h); g.fillStyle = '#123'; g.fillRect(10, 10, w / 2, h / 3);
   return new Promise((r) => c.toBlob(r, loai || 'image/webp'));
 }
 
@@ -262,17 +264,34 @@ async function veThread(id) {
     henVe = setTimeout(() => veThread(id), tre + 2050 - daQua);
     return;
   }
-  const url = URL.createObjectURL(await anhBlob(w, h));
-  const luoi = /LUOI/.test(t.prompt);
-  veKhung(user + chu + `<div data-message-item="true" data-message-role="assistant"><div aria-busy="false">
-    <div data-testid="hatch-chat-attachment-presentation-image">${luoi ? '' : `<img src="${url}">`}</div>
-    <button aria-label="${L.mo} ${luoi ? 'ảnh lười' : 'ảnh'}" type="button" id="moXem"></button></div></div>`);
-  document.getElementById('moXem').onclick = () => {
+  // 1.5.3: như Muse thật (người dùng 19/11/2026) — ảnh trong khung chat là bản XEM TRƯỚC thu nhỏ (1/4 cạnh);
+  // bấm vào ảnh, trình xem hiện bản xem trước trước rồi ~0,7 giây sau mới đổi sang ảnh cỡ đầy đủ.
+  const DAYDU = /DAYDU/.test(t.prompt);       // ảnh chat đã đủ cỡ (trình xem cùng ảnh) — không được chờ lâu
+  const SRCSET = /SRCSET/.test(t.prompt);     // không có nút mở; ảnh có srcset chứa bản đầy đủ
+  const soAnh = /NHIEU/.test(t.prompt) ? 2 : 1;   // một tin nhiều ảnh, mỗi ảnh một nút mở (ảnh 2 màu khác)
+  let khungHtml = '';
+  const anh = [];
+  for (let k = 0; k < soAnh; k++) {
+    const full = URL.createObjectURL(await anhBlob(w, h, null, k));
+    const nho = DAYDU ? full : URL.createObjectURL(await anhBlob(w / 4, h / 4, null, k));
+    anh.push({ full, nho });
+    const luoi = /LUOI/.test(t.prompt);
+    const img = luoi ? '' : SRCSET ? `<img src="${nho}" srcset="${nho} 1x, ${full} 4x">` : `<img src="${nho}">`;
+    khungHtml += `<div data-testid="hatch-chat-attachment-presentation-image">${img}</div>` +
+      (SRCSET ? '' : `<button aria-label="${L.mo} ${luoi ? 'ảnh lười' : 'ảnh'} ${k + 1}" type="button" class="moXem" data-k="${k}"></button>`);
+  }
+  veKhung(user + chu + `<div data-message-item="true" data-message-role="assistant"><div aria-busy="false">${khungHtml}</div></div>`);
+  for (const b of document.querySelectorAll('.moXem')) b.onclick = () => {
+    const { full, nho } = anh[+b.dataset.k];
     const d = document.createElement('div');
     d.setAttribute('role', 'dialog');
-    d.innerHTML = `<button aria-label="${L.dong}">x</button><img src="${url}">`;
+    // Dải ảnh nhỏ (mọi ảnh của tin, hiện bé) + ảnh chính hiện to.
+    d.innerHTML = `<button aria-label="${L.dong}">x</button><img class="chinh" src="${nho}" style="width:400px;max-width:none">` +
+      anh.map((a) => `<img src="${a.full}" style="width:40px">`).join('');
     d.querySelector('button').onclick = () => d.remove();
     document.body.appendChild(d);
+    window.__soLanMoXem = (window.__soLanMoXem || 0) + 1;
+    if (nho !== full) setTimeout(() => { const c = d.querySelector('.chinh'); if (c) c.src = full; }, 700);
   };
 }
 

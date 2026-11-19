@@ -91,10 +91,12 @@ module.exports = function e2eKiemDo({ win, LENH, dieuPhoi, taiKhoan }) {
       await js(`document.querySelector('#dsHang .dong-viec[data-id="${b.id}"] .dong-prompt, #dsHang .dong-viec[data-id="${b.id}"]').click(); 1`);
       const coMuc = await cho(async () => Number(await js(`document.querySelectorAll('#chiTiet .ct-chat').length`)) === 2, 10000, 'mục Tab của việc này có 2 chat');
       kiem(coMuc, 'cột chi tiết có mục "Tab của việc này" với 2 chat (chat hiện tại + chat cũ)');
-      const truocCuaSo = require('electron').BrowserWindow.getAllWindows().length;
+      // 1.5.3: đếm cửa sổ CỦA CHAT NÀY (không đếm tổng: luồng chạy ngầm có thể mở / đóng cửa sổ ẩn cùng lúc).
+      const cuaChatCu = () => require('electron').BrowserWindow.getAllWindows().filter((w) => /\/thread\/kiem-cu-xong/.test(w.webContents.getURL()));
+      const truocCuaSo = cuaChatCu().length;
       await js(`document.querySelector('#chiTiet [data-chat="mo"][data-thread$="/thread/kiem-cu-xong"]').click(); 1`);
       const coCuaSo = await cho(() => require('electron').BrowserWindow.getAllWindows().some((w) => w.isVisible() && /\/thread\/kiem-cu-xong/.test(w.webContents.getURL())), 10000, 'cửa sổ chat cũ');
-      kiem(coCuaSo && require('electron').BrowserWindow.getAllWindows().length === truocCuaSo + 1, '"Mở tab" mở cửa sổ xem đúng chat cũ (phiên của Muse 1)');
+      kiem(coCuaSo && truocCuaSo === 0 && cuaChatCu().length === 1, '"Mở tab" mở cửa sổ xem đúng chat cũ (phiên của Muse 1)');
       const gui3 = (await daGui()).length;
       await js(`document.querySelector('#chiTiet [data-chat="tai"][data-thread$="/thread/kiem-dang"]').click(); 1`);
       await ngu(1500);
@@ -118,6 +120,7 @@ module.exports = function e2eKiemDo({ win, LENH, dieuPhoi, taiKhoan }) {
       Object.assign(e, { trangThai: 'cho', taiKhoan: tk2.id, thread: `${URL_}/thread/kiem-lau`, kiemSo: 6 });
       LENH.chay({ duAn: d.id });
       await cho(() => e.trangThai === 'chay' && dieuPhoi._luongCuaViec(e), 30000, 'E đang chạy ở luồng');
+      await cho(() => js(`!!document.querySelector('#dsHang .dong-viec[data-id="${e.id}"]')`), 10000, 'dòng E hiện');
       await js(`document.querySelector('#dsHang .dong-viec[data-id="${e.id}"]').click(); 1`);
       await cho(() => js(`!!document.querySelector('#chiTiet [data-ct="xemTab"]')`), 10000, 'nút Hiện tab đang chạy');
       await js(`document.querySelector('#chiTiet [data-ct="xemTab"]').click(); 1`);

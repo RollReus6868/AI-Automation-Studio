@@ -1,4 +1,16 @@
-# AI Automation Studio 1.5.2
+# AI Automation Studio 1.5.3
+
+- **Ảnh Muse tải về đủ cỡ (full HD), không còn bị nhỏ.** Ảnh hiện trong khung chat của Muse chỉ là bản xem trước thu nhỏ (ví dụ 498×280); trước đây app lấy đúng ảnh đó. Giờ app luôn mở ảnh ra như khi bạn bấm vào ảnh trên Muse, chờ ảnh cỡ đầy đủ nạp xong rồi mới tải (lấy ảnh lớn hơn trong hai ảnh; ảnh có nhiều cỡ thì lấy cỡ lớn nhất). Một tin Muse có nhiều ảnh thì mở đúng ảnh của từng khung.
+- Nhật ký ghi cỡ ảnh đã tải, ví dụ `✅ Việc #2 xong ảnh: …\002.png (1920×1080)`. Nếu ảnh vẫn nhỏ hơn 1000 px (Muse chỉ cho bản xem trước), nhật ký cảnh báo `⚠️ … ảnh chỉ 498×280` để bạn biết mà tải lại.
+- **Tải lại ảnh đã bị nhỏ:** bấm vào việc → *Tab của việc này* → **Tải về** ở chat của việc (nếu chat còn trên Muse) — app lấy lại ảnh đủ cỡ, ghi đè file cũ, không gửi lại prompt. Chat đã bị xoá thì chỉ còn cách *Tạo lại* việc đó.
+- **Nhạc không còn lưu 2 nơi khi bật Google Drive.** Trước đây nhạc luôn tải vào *Thư mục lưu nhạc* (Cài đặt nâng cao) **và** lên Drive `<dự án>/BGM` — thư mục lưu nhạc lại nằm trong Google Drive thì thành 2 bản. Giờ trang Tạo nhạc có công tắc **Tải nhạc về** như ảnh / video:
+  - Bật Google Drive → app tự tắt *Tải nhạc về* (cùng lúc với *Tải ảnh về*, *Tải video về*): nhạc chỉ lên Drive `<dự án>/BGM`, giữ một bản trong app để nghe.
+  - Bản cũ đã bật Drive sẵn: lên 1.5.3 là tự theo Drive, không cần chỉnh gì.
+  - Khi đang tắt, ô *Thư mục lưu nhạc* mờ đi và có dòng *"☁ Đang theo Google Drive: nhạc xong đưa lên `<dự án>/BGM`…"*. Vẫn muốn có thêm một bản ở máy thì bật lại *Tải nhạc về*.
+  - Ảnh / video cũng vậy: tắt *Tải … về* thì ô thư mục lưu mờ đi kèm dòng ghi rõ file đi đâu.
+- Mọi thứ khác giữ nguyên như 1.5.2.
+
+## Bản 1.5.2
 
 - **Nhạc lên Google Drive:** bật *tự đưa lên Google Drive* (Cài đặt → Google Drive) thì nhạc Flow Music cũng lên Drive, vào thư mục **`<Tên dự án>/BGM`** — cùng thư mục dự án với `images` và `Videos`. Nhạc vẫn tải về máy như cũ. Nút *Lên Drive* (từng việc / hàng loạt) cũng dùng được ở trang Tạo nhạc.
 - **Xem lại tab của video đang chạy / đã lỗi:** bấm vào việc → cột *Chi tiết kết quả* có mục mới **Tab của việc này**:

@@ -613,3 +613,8 @@ label > .ap { margin-left: 6px; }
 .ct-chat-ten span { overflow-wrap: anywhere; line-height: 1.35; }
 .ct-chat-ten svg { width: 14px; height: 14px; flex: none; }
 .ct-chat-nut { display: flex; gap: 6px; flex: none; }
+/* 1.5.3: tắt "Tải … về" (vd đang theo Google Drive) → thư mục lưu không dùng: mờ đi, kèm dòng nói file đi đâu */
+#ncKhoiThuMuc.tat { opacity: .45; }
+#ncKhoiThuMuc.tat input { pointer-events: none; }
+.nhom-tai .ghi-drive { display: block; margin: -4px 0 10px; line-height: 1.6; }
+.nhom-tai .ghi-drive[hidden] { display: none; }
