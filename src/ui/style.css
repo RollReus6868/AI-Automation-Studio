@@ -141,7 +141,7 @@ code { background: var(--the-hover); padding: 1px 6px; border-radius: 6px; font-
 .phan-doan button { padding: 8px; border-radius: 9px; color: var(--chu-phu); font-weight: 600; border: 1px solid transparent; }
 .phan-doan button.on { color: #fff; background: var(--tim-nen); border-color: rgba(179, 140, 255, .45); }
 .o-prompt { position: relative; }
-textarea, input[type=text], input[type=number], input:not([type]), input[type=time], select {
+textarea, input[type=text], input[type=number], input:not([type]), input[type=time], input[type=password], select {
   width: 100%; background: rgba(0, 0, 0, .25); border: 1px solid var(--vien-dam); border-radius: var(--bo); padding: 9px 11px; outline: none; }
 textarea:focus, input:focus, select:focus { border-color: rgba(179, 140, 255, .6); box-shadow: 0 0 0 3px rgba(179, 140, 255, .12); }
 select option { background: var(--panel-dac); }
@@ -618,3 +618,43 @@ label > .ap { margin-left: 6px; }
 #ncKhoiThuMuc.tat input { pointer-events: none; }
 .nhom-tai .ghi-drive { display: block; margin: -4px 0 10px; line-height: 1.6; }
 .nhom-tai .ghi-drive[hidden] { display: none; }
+
+/* ── 1.6.0 Footage (trang Footage: stock video cho cảnh qua API Pexels / Pixabay) ── */
+.ft-hang-nut { flex-wrap: wrap; margin-bottom: 10px; }
+.ft-thu-muc { margin-left: 0; }
+.ft-tom-tat { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin: 4px 0 10px; font-size: 13px; color: var(--chu-phu); }
+.ft-tom-tat b { color: var(--chu); }
+.ft-tom-tat .ft-so { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+.ft-tom-tat code { white-space: normal; word-break: break-word; }
+.ft-bang { display: flex; flex-direction: column; gap: 6px; }
+.ft-trong { padding: 16px; border: 1px dashed var(--vien-dam); border-radius: 12px; color: var(--chu-phu); font-size: 13px; }
+.ft-dong { display: grid; grid-template-columns: 52px minmax(0, 1.6fr) 64px 120px minmax(0, 1.4fr) auto; gap: 10px; align-items: center;
+  padding: 8px 10px; border: 1px solid var(--vien); border-radius: 12px; background: rgba(255, 255, 255, .02); min-height: 62px; }
+.ft-canh { font-weight: 800; font-variant-numeric: tabular-nums; }
+.ft-tu { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: 13px; }
+.ft-tu span { overflow-wrap: anywhere; }
+.ft-tu small, .ft-tt small { font-size: 11.5px; overflow-wrap: anywhere; }
+.ft-can { font-size: 12px; color: var(--chu-phu); }
+.ft-tt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ft-tt .the-tt { align-self: flex-start; padding: 2px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 700; background: rgba(255, 255, 255, .08); color: var(--chu-phu); }
+.ft-dong.tt-xong .the-tt { background: var(--xanh-nen); color: var(--xanh); }
+.ft-dong.tt-loi .the-tt { background: var(--do-nen); color: var(--do); }
+.ft-dong.tt-tim .the-tt, .ft-dong.tt-tai .the-tt { background: var(--tim-nen); color: var(--tim); }
+.ft-dong.tt-bo { opacity: .6; }
+.ft-clip { display: flex; align-items: center; gap: 10px; min-width: 0; font-size: 12.5px; }
+.ft-clip img { width: 80px; height: 45px; object-fit: cover; border-radius: 6px; flex-shrink: 0; background: var(--panel-dac); }
+.ft-clip div { min-width: 0; overflow-wrap: anywhere; }
+.ft-nut { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; }
+.ft-dong .ft-nut .nut-vien.nho { padding: 5px 9px; }
+@media (max-width: 1280px) {
+  .ft-dong { grid-template-columns: 48px minmax(0, 1fr) 104px minmax(0, 1fr); }
+  .ft-can { display: none; }
+  .ft-nut { grid-column: 2 / -1; justify-content: flex-start; }
+}
+/* 1.6.0: thanh trái thêm mục Footage — cửa sổ thấp thì thu nhỏ khoảng đệm cho đủ chỗ, vẫn không đủ thì cuộn. */
+.rail { overflow-y: auto; scrollbar-width: none; }
+@media (max-height: 800px) {
+  .rail { gap: 10px; }
+  #nav { gap: 3px; }
+  #nav button { padding: 6px 2px; gap: 3px; }
+}

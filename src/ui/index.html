@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
   <meta charset="utf-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' file: data: blob:; media-src 'self' file: blob:; style-src 'self' 'unsafe-inline'; font-src 'self'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' file: data: blob: https:; media-src 'self' file: blob:; style-src 'self' 'unsafe-inline'; font-src 'self'">
   <title>AI Automation Studio</title>
   <link rel="stylesheet" href="fonts.css">
   <link rel="stylesheet" href="style.css">
@@ -17,6 +17,7 @@
       <button data-trang="anh"><i data-icon="image"></i><span>Tạo ảnh</span></button>
       <button data-trang="video"><i data-icon="video"></i><span>Tạo video</span></button>
       <button data-trang="nhac"><i data-icon="music"></i><span>Tạo nhạc</span></button>
+      <button data-trang="footage"><i data-icon="film"></i><span>Footage</span></button>
       <button data-trang="hengio"><i data-icon="clock"></i><span>Hẹn giờ</span></button>
       <button data-trang="nhanvat"><i data-icon="user-plus"></i><span>Nhân vật</span></button>
       <button data-trang="thuvien"><i data-icon="layout-grid"></i><span>Thư viện</span></button>
@@ -371,8 +372,41 @@
           <li><b>Chạy lại tài khoản đang nghỉ:</b> tài khoản đỏ vì lỗi mà bạn đã sửa được (đăng nhập lại, đổi mạng…) → bấm <i>Chạy lại ngay</i> ở thẻ tài khoản (hoặc <i>Chạy lại TK đang nghỉ</i> cho mọi tài khoản): tài khoản nhận việc lại luôn, dự án đã tự tạm dừng thì chạy tiếp.</li>
           <li><b>App ngốn RAM khi chạy Muse:</b> mỗi luồng Muse là một trang Muse chạy ngầm (thường 0,3–1,5 GB, phình dần theo số việc) — tổng RAM ≈ số tài khoản Muse chạy × số luồng mỗi tài khoản. App tự <i>làm mới luồng</i> (đóng hẳn trang, mở trang mới) sau 10 việc hoặc khi trang quá 900 MB (Cài đặt → Muse), và không để cả app vượt <i>RAM tối đa</i> (Cài đặt → Cả app, mặc định 75% RAM máy). Máy ít RAM: giảm <i>Số luồng mỗi tài khoản Muse</i> (3 → 2) hoặc bớt tài khoản vai Chạy. Nhật ký ghi 🧠 RAM từng luồng mỗi 10 phút, ♻ khi làm mới, ⏸ / ▶ khi chạm giới hạn.</li>
           <li><b>Ổ C đầy / app nặng:</b> Cài đặt → <i>Cả app</i> → <i>Dọn dữ liệu thừa…</i>: xoá bộ nhớ đệm trang web của các tài khoản, dữ liệu của tài khoản đã xoá, file tạm, nhật ký / file chẩn đoán / bộ cài cũ. Không đăng xuất tài khoản, không xoá ảnh / video đã tạo, nhân vật hay dự án. Trang chạy lâu ngày lại đầy dần — thỉnh thoảng dọn lại. Muốn file dữ liệu dự án (du-lieu.json) nhỏ đi thì xoá bớt dự án cũ.</li>
+          <li><b>Footage cho cảnh (1.6.0):</b> nhờ skill chia cảnh "tìm footage" để có thêm file <code>&lt;tên&gt;_footage.xlsx</code> (cảnh nào dùng stock video, từ khoá tiếng Anh, số giây cần, chữ cần tránh). Lấy khoá API miễn phí ở pexels.com/api và pixabay.com/api/docs → mục <i>Footage</i> → dán khoá → <i>Lưu</i> → <i>Mở file footage…</i> → <i>Chọn…</i> thư mục <code>Videos</code> của project CapCut Draft Studio → <i>Tải footage</i>. Mỗi cảnh thành <code>0047.mp4</code>…; CapCut Draft Studio dùng video đó thay ảnh của cảnh (giữ bật <i>Cắt video</i> trong CapCut Draft Studio — mặc định đã bật — để clip dài được cắt vừa cảnh, không bị tua nhanh). Clip không hợp: <i>Đổi clip</i> (clip kế tiếp) hoặc <i>Bỏ</i> (file chuyển vào <code>_bo</code>, cảnh dùng lại ảnh AI). Nút <i>Chép số</i> cho dãy số cảnh dùng footage — dán vào <i>Chọn số</i> ở trang Tạo video để dừng / xoá video AI của các cảnh đó cho đỡ tốn lượt. Clip Storyblocks: tự tải trên web (hoặc qua Storyblocks MCP trong Claude / ChatGPT), đặt tên <code>0047.mp4</code> vào cùng thư mục — app bỏ qua cảnh đã có file. Ghi công tác giả: file <code>nguon-footage.txt</code> trong thư mục lưu.</li>
           <li><b>Lỗi lạ:</b> Cài đặt → <i>Cả app</i> → bật <i>Hiện các luồng chạy ngầm</i> để nhìn thấy trang Muse / Flow của từng luồng; nhật ký đầy đủ ở thư mục dữ liệu (<code>nhat-ky.txt</code>).</li>
         </ol>
+      </section>
+    </main>
+
+    <!-- ── Footage (1.6.0): stock video cho cảnh qua API Pexels / Pixabay ─── -->
+    <main class="trang" id="trang-footage" hidden>
+      <section class="panel trang-don cuon">
+        <div class="panel-dau"><h2><i data-icon="film"></i>Footage cho cảnh — Pexels · Pixabay</h2></div>
+        <p class="ghi-cai-dat-du-an">Mở file <code>&lt;tên&gt;_footage.xlsx</code> (skill chia cảnh xuất khi bạn yêu cầu tìm footage) → bấm <b>Tải footage</b>. Mỗi cảnh trong file, app tìm theo từ khoá trên <b>Pexels</b> (rồi <b>Pixabay</b> nếu cần), chọn clip <b>ngang</b>, đủ dài cho cảnh, không chứa chữ cần tránh, không trùng clip của cảnh khác, rồi tải về thành file mang số cảnh (vd cảnh 47 → <code>0047.mp4</code>). Chọn thư mục lưu là thư mục <b>Videos</b> của project CapCut Draft Studio thì cảnh đó tự dùng footage thay cho ảnh AI. Chỉ dùng API chính thức (miễn phí, khoá của bạn) — app <b>không</b> tự tải Storyblocks hay trang trả phí nào (điều khoản của họ cấm tải bằng máy).</p>
+        <div class="the-cai" id="ftKhoaThe">
+          <h3><i data-icon="shield-check"></i>Khoá API</h3>
+          <div class="luoi-3">
+            <label>Khoá Pexels<input id="ftPexels" type="password" autocomplete="off" placeholder="Dán khoá API Pexels"><small class="ghi-o"><span id="ftPexelsGhi"></span> <a href="#" data-link="https://www.pexels.com/api/">Lấy khoá miễn phí</a> (đăng nhập Pexels → Your API Key). Mặc định 200 lượt tìm / giờ.</small></label>
+            <label>Khoá Pixabay<input id="ftPixabay" type="password" autocomplete="off" placeholder="Dán khoá API Pixabay"><small class="ghi-o"><span id="ftPixabayGhi"></span> <a href="#" data-link="https://pixabay.com/api/docs/">Lấy khoá miễn phí</a> (đăng nhập Pixabay → mục Parameters có khoá của bạn). Dùng khi Pexels không có clip hợp / hết lượt.</small></label>
+            <label>Cỡ clip muốn tải<select id="ftRong"><option value="1280">720p (nhẹ)</option><option value="1920">1080p (khuyên dùng)</option><option value="3840">4K (nặng)</option></select><small class="ghi-o">App lấy bản gần cỡ này nhất; clip không có bản đủ to thì lấy bản to nhất.</small></label>
+          </div>
+          <div class="dong-cong-tac"><div><b>Bỏ qua cảnh đã có file</b><small>Thư mục lưu đã có <code>0047.mp4</code> (vd bạn tự tải từ Storyblocks) thì không tải đè.</small></div><label class="cong-tac"><input type="checkbox" id="ftBoQua"><span></span></label></div>
+          <div class="dong-o"><button class="nut-gradient" id="ftLuuKhoa"><i data-icon="check"></i>Lưu</button><small class="mo">Khoá lưu trong máy (thư mục dữ liệu app), không gửi đi đâu ngoài Pexels / Pixabay. Để trống ô khoá = giữ khoá cũ.</small></div>
+        </div>
+        <div class="the-cai" id="ftDsThe">
+          <h3><i data-icon="list"></i>Danh sách cảnh<span class="mo" id="ftTenDs"></span></h3>
+          <div class="dong-o ft-hang-nut">
+            <button class="nut-vien" id="ftMoFile"><i data-icon="file-text"></i>Mở file footage…</button>
+            <button class="nut-gradient" id="ftChay"><i data-icon="download"></i>Tải footage</button>
+            <button class="nut-vien" id="ftXoaDs" title="Đóng danh sách (không xoá file đã tải)"><i data-icon="x"></i>Đóng danh sách</button>
+          </div>
+          <div class="o-thu-muc-video ft-thu-muc"><b>Thư mục lưu</b>
+            <div class="dong-o"><input id="ftThuMuc" readonly placeholder="Mở file footage trước"><button class="nut-vien nho" id="ftChonThuMuc"><i data-icon="folder-open"></i>Chọn…</button><button class="nut-vien nho" id="ftMoThuMuc">Mở</button></div>
+            <small class="mo">Nên chọn thư mục <code>Videos</code> của project CapCut Draft Studio. Kèm theo là <code>nguon-footage.txt</code> (cảnh, nguồn, tác giả, link) để ghi công trong mô tả video.</small>
+          </div>
+          <div id="ftTomTat" class="ft-tom-tat"></div>
+          <div id="ftBang" class="ft-bang"></div>
+        </div>
       </section>
     </main>
 

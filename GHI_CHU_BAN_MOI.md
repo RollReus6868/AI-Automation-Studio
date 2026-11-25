@@ -1,4 +1,16 @@
-# AI Automation Studio 1.5.5
+# AI Automation Studio 1.6.0
+
+- **Mục mới: Footage** (thanh bên trái, dưới *Tạo nhạc*) — tải stock video cho các cảnh của kịch bản, tự động, miễn phí, qua **API chính thức của Pexels và Pixabay**.
+  1. Lấy khoá API miễn phí: đăng nhập **pexels.com/api** (Your API Key) và **pixabay.com/api/docs** (khoá nằm ở mục Parameters). Mục *Footage* → dán khoá → **Lưu**. App chỉ hiện 4 ký tự cuối của khoá.
+  2. Nhờ skill chia cảnh **tìm footage** để có thêm file `<tên>_footage.xlsx` (cảnh nào dùng footage, từ khoá tiếng Anh, số giây cần, chữ cần tránh). Không yêu cầu thì skill vẫn chia cảnh như cũ.
+  3. **Mở file footage…** → **Chọn…** thư mục `Videos` của project CapCut Draft Studio → **Tải footage**. Mỗi cảnh thành `0047.mp4`…, CapCut Draft Studio dùng video đó thay ảnh của cảnh.
+- App chọn clip **ngang**, đủ dài cho cảnh (không dài quá nhiều), không chứa chữ cần tránh (vd `people`), **không trùng clip giữa các cảnh**, tải bản gần cỡ chọn (mặc định 1080p). Pexels trước, không có clip hợp hoặc hết lượt (200 lượt tìm / giờ) thì sang Pixabay.
+- Trên từng dòng: **Đổi clip** (clip kế tiếp), mở trang gốc của clip, **Bỏ** (file chuyển vào thư mục `_bo`, cảnh dùng lại ảnh AI) / **Lấy lại**. Nút **Chép số** cho dãy số cảnh dùng footage (vd `3, 5, 9-11`) — dán vào *Chọn số* ở trang Tạo video để dừng / xoá video AI của các cảnh đó, đỡ tốn lượt.
+- Thư mục lưu có thêm `nguon-footage.txt` (cảnh, nguồn, tác giả, link) để ghi công trong mô tả video.
+- **Storyblocks:** app **không** tự tải (điều khoản Storyblocks cấm tải bằng script / bot). Tải tay trên web, hoặc dùng **Storyblocks MCP** trong Claude / ChatGPT, rồi đặt tên `0047.mp4` vào cùng thư mục — bật *Bỏ qua cảnh đã có file* (mặc định bật) thì app không tải đè cảnh đó.
+- Mọi thứ khác giữ nguyên như 1.5.5.
+
+## Bản 1.5.5
 
 - **Ảnh Muse tải về đủ cỡ (2048×1152) — đã đo trực tiếp trên Muse thật.** Nguyên nhân thật: khi mở ảnh, trình xem của Muse có **hai ảnh** — ảnh nền mờ (chính là bản xem trước 498×280, nhưng phủ kín màn hình) và ảnh thật 2048×1152 ở giữa. Bản 1.5.3/1.5.4 chọn ảnh "hiện to nhất trên màn hình" nên lấy nhầm ảnh nền. Giờ app chọn ảnh **nhiều điểm ảnh nhất** và chờ tới khi ảnh thật (≥ 1000 px) nạp xong mới tải.
 - Ảnh Muse thật là file 2048×1152; nhật ký ghi `✅ Việc #N xong ảnh: … (2048×1152)`.
