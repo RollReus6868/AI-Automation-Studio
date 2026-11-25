@@ -37,6 +37,7 @@ Chạy thẳng từ mã nguồn (Windows): bấm đúp `CHAY_TU_NGUON.bat` (tự
 - **Tạo nhạc (Flow Music)**: mỗi tài khoản Google Flow có sẵn một tài khoản Flow Music dùng chung đăng nhập. Mỗi dòng (hoặc file .txt) một prompt, gửi **nguyên văn** vào ô chat của Producer trên flowmusic.app (muốn không lời thì ghi `instrumental`); mỗi prompt một phiên mới, Flow Music ra 2 bài, app tải MP3 của bài **dài hơn** (More options → Download → MP3) và đặt tên theo số prompt (`001.mp3`…). Gửi theo thứ tự prompt, mỗi tài khoản 2 bài cùng lúc. Producer chỉ hỏi lại → app nhắn thêm một lần "tạo bài luôn"; tải hỏng → tải lại đúng bài, không gửi lại prompt; hết credit → bài tạo lại ở tài khoản dự phòng, tài khoản đó nghỉ 6 giờ (bấm Kiểm tra để dùng lại sớm).
 - **Google Drive (1.4.0)**: ảnh / video xong tự đưa lên Drive vào `Tên dự án/images` và `Tên dự án/Videos`, theo một trong hai cách: chép vào thư mục Google Drive trên máy (Google Drive cho máy tính tự tải lên), hoặc tải thẳng lên drive.google.com bằng trình duyệt trong app (tài khoản ở thẻ **Drive** của mục Tài khoản). Việc xong từ trước: chọn → *Lên Drive*.
 - **1.4.0**: chọn hết → **Đổi prompt** (thay hẳn / tìm và thay chữ); **đổi ngay sang Muse / Flow** ở từng việc hoặc nhiều việc; **đồng hồ dự án** (đã chạy + dự đoán còn bao lâu); **Chạy lại ngay** tài khoản đang nghỉ vì lỗi; chế độ **nhẹ máy** (trang chạy ngầm ưu tiên CPU thấp, giao diện báo thưa hơn khi nhiều việc).
+- **Footage cho cảnh (1.6.0)**: mục **Footage** mở file `<tên>_footage.xlsx` (skill chia cảnh xuất khi được yêu cầu tìm footage), tìm stock video qua **API chính thức của Pexels và Pixabay** (miễn phí, khoá API của bạn), chọn clip ngang, đủ dài, không chứa chữ cần tránh, không trùng giữa các cảnh, tải bản gần 1080p thành `0047.mp4`… vào thư mục `Videos` của project CapCut Draft Studio (cảnh đó dùng footage thay ảnh AI). *Đổi clip*, *Bỏ* (file sang `_bo`), *Chép số* cảnh dùng footage, `nguon-footage.txt` để ghi công. Không tự tải Storyblocks / trang trả phí (điều khoản cấm tải bằng máy) — clip Storyblocks đặt tên `0047.mp4` vào cùng thư mục thì app bỏ qua cảnh đó.
 - **1.5.5**: ảnh Muse đủ cỡ 2048×1152 — trình xem của Muse có ảnh nền mờ (bản xem trước) hiện to hơn ảnh thật; chọn ảnh nhiều điểm ảnh nhất (đo trên Muse thật).
 - **1.5.4**: ảnh Muse đủ cỡ thật sự — bấm chuột thật vào ảnh (Muse bỏ qua cú bấm tự động) để mở trình xem, vẫn nhỏ thì bấm nút tải ↓; không được thì lưu tệp chẩn đoán.
 - **1.5.3**: ảnh Muse tải về đủ cỡ (lấy ảnh ở trình xem / cỡ lớn nhất, không lấy bản xem trước thu nhỏ trong chat); nhật ký ghi cỡ ảnh, cảnh báo ảnh nhỏ; nhạc có công tắc "Tải nhạc về" — bật Google Drive thì tự tắt (nhạc chỉ lên Drive `<dự án>/BGM`, không lưu 2 nơi).
@@ -63,6 +64,7 @@ Chạy thẳng từ mã nguồn (Windows): bấm đúp `CHAY_TU_NGUON.bat` (tự
 - Google Flow chỉ có tỷ lệ **16:9** và **9:16** (tỷ lệ khác tự đổi về gần nhất).
 - Nhận diện tài khoản lỗi **không qua mặt** được kiểm tra của Google: nó chỉ đổi sang tài khoản khác / cho tài khoản nghỉ khi bị nhắc. App không có proxy / VPN / giả vân tay trình duyệt; cảnh báo tài khoản nghi bị đánh dấu chỉ giúp bạn chọn tài khoản.
 - Flow Music: chỉ tải bằng menu Download của chính trang, không giải captcha hộ; cửa sổ chạy ngầm tắt tiếng.
+- Footage: chỉ Pexels / Pixabay qua API (Pexels mặc định 200 lượt tìm mỗi giờ — hết lượt thì app sang Pixabay). Độ hợp của clip với cảnh do từ khoá quyết định — xem lại trước khi dựng.
 - Các bài kiểm thử tự động chạy trên **trang Muse giả, trang Google Flow giả, trang Flow Music giả và trang Google Drive giả**; giao diện thật của hai trang có thể đổi bất cứ lúc nào. Lần đầu nên chạy thử vài prompt và xem **Nhật ký**.
 
 ## Nhật ký và dữ liệu
@@ -80,7 +82,8 @@ xvfb-run -a node tests/e2e.js              # đầu-cuối Muse (trang Muse gi�
 xvfb-run -a node tests/e2e.js flow         # đầu-cuối Flow + nối Flow ⇄ Muse (trang + engine Flow giả)
 xvfb-run -a node tests/e2e.js nhac         # đầu-cuối Tạo nhạc (trang Flow Music giả)
 xvfb-run -a node tests/e2e.js drive        # đầu-cuối Google Drive tải thẳng lên (trang Drive giả)
+xvfb-run -a node tests/e2e.js footage      # đầu-cuối Footage (API Pexels / Pixabay giả)
 xvfb-run -a npx electron --no-sandbox tests/flow/<bài>-main.js   # bài DOM Flow: paste, mode, model, bam-tao, bam-tao-that, kiem-truoc, tham-chieu
 ```
 
-Cấu trúc: `main.js` (cửa sổ, luồng, IPC) · `src/main/` (hàng đợi, điều phối, tài khoản, luồng Muse, cập nhật) · `src/flow/` (tab Flow, máy Flow, luồng Flow, engine + trình tiêm của Flow Automation Studio) · `src/inject/muse-trang.js` (mọi selector Muse) · `src/main/luong-nhac.js` + `src/inject/nhac-trang.js` (luồng và mọi selector Flow Music) · `src/ui/`.
+Cấu trúc: `main.js` (cửa sổ, luồng, IPC) · `src/main/` (hàng đợi, điều phối, tài khoản, luồng Muse, cập nhật) · `src/flow/` (tab Flow, máy Flow, luồng Flow, engine + trình tiêm của Flow Automation Studio) · `src/inject/muse-trang.js` (mọi selector Muse) · `src/main/luong-nhac.js` + `src/inject/nhac-trang.js` (luồng và mọi selector Flow Music) · `src/main/footage.js` + `src/main/doc-xlsx.js` (Footage Pexels / Pixabay, đọc .xlsx) · `src/ui/`.

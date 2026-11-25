@@ -32,6 +32,7 @@ const { chepLenDrive, timThuMucDrive } = require('./src/main/drive');
 const { DriveWeb } = require('./src/main/drive-web');
 const { ensureDebugger } = require('./src/flow/main/paste');
 const DD = require('./src/main/don-dep');   // 1.4.12 dọn dữ liệu thừa (khác donDep = dọn chat / dự án Flow)
+const { QuanLyFootage } = require('./src/main/footage');   // 1.6.0 tải footage Pexels / Pixabay theo cảnh
 
 // Thư mục dữ liệu riêng (phiên đăng nhập, cài đặt, hàng đợi) — PHẢI trước whenReady.
 app.setPath('userData', process.env.MUSE_DATA_DIR ||
@@ -48,7 +49,7 @@ const DUOI_ANH = /\.(png|jpe?g|webp|gif|bmp)$/i;
 const MIME = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif', bmp: 'image/bmp' };
 
 let win = null;
-let store, storeFlow, taiKhoan, dieuPhoi, capNhat, tabsFlow, mayFlow, taiVeFlow;
+let store, storeFlow, taiKhoan, dieuPhoi, capNhat, tabsFlow, mayFlow, taiVeFlow, footage;
 const nhatKy = [];
 let henBao = null;
 let soDongGhi = 0;
@@ -173,6 +174,7 @@ function trangThai() {
     phienBan: pkg.version,
     ramMayGB: Math.round(os.totalmem() / 1073741824 * 10) / 10,   // 1.4.13: gợi ý ô RAM tối đa
     nenTang: process.platform,
+    footage: footage ? footage.trangThai() : null,   // 1.6.0
     dangNhap: dangNhap ? { id: dangNhap.id, khung: dangNhap.view.getBounds() } : null
   };
 }
@@ -776,6 +778,19 @@ async function donDuLieu(muc) {
   } finally { dangDon = false; }
 }
 
+/** 1.6.0: tải một clip footage về file tạm (.part) rồi đổi tên — tải hỏng giữa chừng không để lại file dở. */
+async function taiFootageVe(url, tep) {
+  const r = await net.fetch(url);
+  if (!r.ok) throw new Error(`tải clip lỗi ${r.status}`);
+  const tam = `${tep}.part`;
+  const buf = Buffer.from(await r.arrayBuffer());
+  if (buf.length < 1024) throw new Error('clip tải về rỗng / hỏng');
+  await fs.promises.writeFile(tam, buf);
+  await fs.promises.rm(tep, { force: true });
+  await fs.promises.rename(tam, tep);
+  return buf.length;
+}
+
 function thuMucChanDoan(ten) {
   return process.env.MUSE_DATA_DIR ? path.join(app.getPath('userData'), ten) : path.join(app.getPath('documents'), 'AI Automation Studio', ten);
 }
@@ -1244,6 +1259,35 @@ const LENH = {
     return { ok: true, da, layLai, hong: hong.length, thuMuc };
   },
 
+  // 1.6.0 Footage (Pexels / Pixabay qua API chính thức) — src/main/footage.js
+  footageDatCaiDat: (c) => footage.datCaiDat(c),
+  footageMoFile: async () => {
+    const r = await dialog.showOpenDialog(win, { title: 'Mở danh sách footage (<tên>_footage.xlsx)', properties: ['openFile'],
+      filters: [{ name: 'Danh sách footage', extensions: ['xlsx', 'csv'] }] });
+    if (r.canceled || !r.filePaths[0]) return null;
+    return footage.napTep(r.filePaths[0]);
+  },
+  footageNapTep: ({ tep }) => footage.napTep(tep),
+  footageChonThuMuc: async () => {
+    const d = footage.ds;
+    const r = await dialog.showOpenDialog(win, { title: 'Thư mục lưu footage (vd thư mục Videos của project CapCut Draft Studio)',
+      defaultPath: d && d.thuMuc, properties: ['openDirectory', 'createDirectory'] });
+    if (r.canceled || !r.filePaths[0]) return null;
+    footage.datThuMuc(r.filePaths[0]);
+    return r.filePaths[0];
+  },
+  footageChay: () => {
+    const loi = footage.loiTruocChay();
+    if (loi) return { ok: false, loi };
+    footage.chay().catch((e) => log('error', `❌ Footage: ${e.message}`));   // chạy nền, giao diện theo dõi qua trạng thái
+    return { ok: true };
+  },
+  footageDung: () => footage.dungLai(),
+  footageDoi: ({ so }) => footage.doi(so),
+  footageBo: ({ so }) => footage.bo(so),
+  footageLayLai: ({ so }) => footage.layLai(so),
+  footageXoaDs: () => footage.xoaDs(),
+
   kiemCapNhat: () => capNhat && capNhat.kiemTra(),
   caiCapNhat: ({ epBuoc }) => capNhat && capNhat.caiDat({ moLai: true, epBuoc: !!epBuoc })
 };
@@ -1313,6 +1357,14 @@ app.whenReady().then(() => {
   // chính) — gom ghi mỗi 1,5 s thay vì 0,25 s. Thoát app vẫn ghi nốt (store.close()).
   store = new Store(path.join(app.getPath('userData'), 'du-lieu.json'), (m) => log('warning', m), { nhipMs: 1500 });
   taiKhoan = new QuanLyTaiKhoan(store, log);
+  // 1.6.0: tải footage theo cảnh qua API Pexels / Pixabay (FOOTAGE_*_URL: máy chủ giả của bài kiểm).
+  footage = new QuanLyFootage({
+    store, log, bao: () => baoTrangThai(),
+    fetch: (u, o) => net.fetch(u, o),
+    taiVe: taiFootageVe,
+    thuMucGoc: thuMucChanDoan(''),
+    goc: { pexels: process.env.FOOTAGE_PEXELS_URL || undefined, pixabay: process.env.FOOTAGE_PIXABAY_URL || undefined }
+  });
 
   // ── Google Flow: kho của engine (thay chrome.storage.local), tab ngầm, tải về, "background" ──
   // 1.4.5: kho engine Flow gom ghi 1 giây (engine lưu dự án gần như mỗi lần prompt đổi trạng thái), không thụt lề.
@@ -1435,7 +1487,7 @@ app.whenReady().then(() => {
     setInterval(() => capNhat.kiemTra({ imLang: true }), 4 * 3600 * 1000);
   }
   // Bài kiểm thử: MUSE_TEST=tests/<bài>.js nhận đúng các đối tượng app đang dùng.
-  if (process.env.MUSE_TEST) require(path.resolve(process.env.MUSE_TEST))({ win, app, LENH, dieuPhoi, taiKhoan, nhatKy, tabsFlow, mayFlow, storeFlow, docRam, baoRam, store });
+  if (process.env.MUSE_TEST) require(path.resolve(process.env.MUSE_TEST))({ win, app, LENH, dieuPhoi, taiKhoan, nhatKy, tabsFlow, mayFlow, storeFlow, docRam, baoRam, store, footage });
 });
 
 let dangThoat = false;       // đang cài bản mới lúc thoát

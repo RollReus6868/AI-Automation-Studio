@@ -4135,6 +4135,238 @@ console.log('\n── 1.4.14 ─────────────────
   });
 }
 
+console.log('\n── 1.6.0 Footage (Pexels / Pixabay) ─────────────');
+{
+  const os = require('os');
+  const X = require('../src/main/doc-xlsx');
+  const F = require('../src/main/footage');
+  // Kết quả API giả đúng hình dạng thật (Pexels /v1/videos/search, Pixabay /api/videos/).
+  const pexelsVid = (id, o = {}) => ({ id, width: o.w || 1920, height: o.h || 1080, duration: o.giay || 10,
+    url: `https://www.pexels.com/video/${o.slug || 'desert-dunes'}-${id}/`, image: `https://images.pexels.com/v/${id}.jpg`,
+    user: { name: `Tac gia ${id}`, url: `https://www.pexels.com/@tg${id}` },
+    video_files: o.files || [
+      { id: 1, quality: 'hd', file_type: 'video/mp4', width: 1280, height: 720, link: `https://v.pexels/${id}-720.mp4` },
+      { id: 2, quality: 'hd', file_type: 'video/mp4', width: 1920, height: 1080, link: `https://v.pexels/${id}-1080.mp4` },
+      { id: 3, quality: 'uhd', file_type: 'video/mp4', width: 3840, height: 2160, link: `https://v.pexels/${id}-4k.mp4` }] });
+  const pixabayVid = (id, o = {}) => ({ id, pageURL: `https://pixabay.com/videos/${o.slug || 'night-sky'}-${id}/`, tags: o.tags || 'night, sky, stars',
+    duration: o.giay || 12, user: `pxu${id}`, user_id: id * 10,
+    videos: { large: { url: `https://cdn.pixabay/${id}-l.mp4`, width: 1920, height: 1080, thumbnail: `https://cdn.pixabay/${id}.jpg` },
+      medium: { url: `https://cdn.pixabay/${id}-m.mp4`, width: 1280, height: 720 }, small: { url: `https://cdn.pixabay/${id}-s.mp4`, width: 960, height: 540 } } });
+
+  test('doc-xlsx: đọc đúng sheet FOOTAGE theo tên (sheet HUONG DAN đứng đầu), chữ dùng chung + số + ô trống', () => {
+    const r = X.docXlsx(fs.readFileSync(path.join(__dirname, 'fixture-footage.xlsx')), { sheet: 'footage' });
+    assert.strictEqual(r.sheet, 'FOOTAGE');
+    assert.deepStrictEqual(r.dsSheet, ['HUONG DAN', 'FOOTAGE']);
+    assert.deepStrictEqual(r.hang[0], ['scene', 'che_do', 'nguon', 'tu_khoa', 'giay_can', 'tranh', 'ghi_chu']);
+    assert.deepStrictEqual(r.hang[1].slice(0, 5), ['0003', 'thay', 'auto', 'desert dunes aerial; sand dunes sunrise', '7']);
+    assert.strictEqual(r.hang[1][6], 'Sa mạc & tôi', 'giải thực thể XML + tiếng Việt');
+    assert.strictEqual(r.hang[3][2] || '', '', 'ô trống');
+    assert.strictEqual(r.hang[6][0], '11', 'số cảnh viết dạng số');
+    assert.strictEqual(X.cotTu('AB12'), 27);
+  });
+  test('doc-xlsx: ô inlineStr (file ghi bằng công cụ khác) + CSV có ngoặc kép, chấm phẩy', () => {
+    // Dựng một .xlsx tối thiểu (zip deflate) có ô inlineStr, không có sharedStrings.
+    const zlib = require('zlib');
+    const tep = { 'xl/workbook.xml': '<workbook><sheets><sheet name="Sheet1" sheetId="1" r:id="rId1"/></sheets></workbook>',
+      'xl/_rels/workbook.xml.rels': '<Relationships><Relationship Id="rId1" Target="worksheets/sheet1.xml"/></Relationships>',
+      'xl/worksheets/sheet1.xml': '<worksheet><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>scene</t></is></c><c r="C1" t="inlineStr"><is><t>tu_khoa</t></is></c></row>' +
+        '<row r="3"><c r="A3" t="str"><v>7</v></c><c r="C3" t="inlineStr"><is><r><t>sea </t></r><r><t xml:space="preserve">waves</t></r></is></c></row></sheetData></worksheet>' };
+    const phan = [], muc = [];
+    let off = 0;
+    for (const [ten, chu] of Object.entries(tep)) {
+      const du = zlib.deflateRawSync(Buffer.from(chu)), t = Buffer.from(ten);
+      const h = Buffer.alloc(30); h.writeUInt32LE(0x04034b50, 0); h.writeUInt16LE(8, 8); h.writeUInt32LE(du.length, 18); h.writeUInt16LE(t.length, 26);
+      const c = Buffer.alloc(46); c.writeUInt32LE(0x02014b50, 0); c.writeUInt16LE(8, 10); c.writeUInt32LE(du.length, 20); c.writeUInt16LE(t.length, 28); c.writeUInt32LE(off, 42);
+      phan.push(h, t, du); muc.push(c, t); off += 30 + t.length + du.length;
+    }
+    const md = Buffer.concat(muc), e = Buffer.alloc(22);
+    e.writeUInt32LE(0x06054b50, 0); e.writeUInt16LE(Object.keys(tep).length, 10); e.writeUInt32LE(md.length, 12); e.writeUInt32LE(off, 16);
+    const r = X.docXlsx(Buffer.concat([...phan, md, e]));
+    assert.deepStrictEqual(r.hang, [['scene', '', 'tu_khoa'], [], ['7', '', 'sea waves']]);
+    assert.deepStrictEqual(F.docHang(r.hang).ds.map((x) => [x.canh, x.tuKhoa]), [['0007', ['sea waves']]]);
+    assert.deepStrictEqual(X.docCsv('scene;tu_khoa\r\n3;"a; ""b"""\n'), [['scene', 'tu_khoa'], ['3', 'a; "b"']]);
+    assert.throws(() => X.docXlsx(Buffer.from('không phải zip')), /xlsx/);
+  });
+  test('docHang: bỏ dòng số cảnh sai / chế độ phủ / trùng / thiếu từ khoá, báo lý do; sắp theo số; đệm 4 chữ số', () => {
+    const r = F.docFileFootage(path.join(__dirname, 'fixture-footage.xlsx'));
+    assert.deepStrictEqual(r.ds.map((x) => x.canh), ['0003', '0005', '0009', '0011']);
+    assert.deepStrictEqual(r.ds[0].tuKhoa, ['desert dunes aerial', 'sand dunes sunrise']);
+    assert.deepStrictEqual(r.ds[0].tranh, ['people', 'city']);
+    assert.strictEqual(r.ds[1].nguon, 'pixabay'); assert.strictEqual(r.ds[2].nguon, 'auto'); assert.strictEqual(r.ds[1].giay, 6.5);
+    assert.strictEqual(r.loi.length, 2);
+    assert.ok(/x12/.test(r.loi[0]) && /phu/.test(r.loi[1]));
+    const t = F.docHang([['Scene', 'Keywords'], ['5', 'a'], ['5', 'b'], ['6', '']]);
+    assert.deepStrictEqual(t.ds.map((x) => x.so), [5]);
+    assert.ok(/lặp/.test(t.loi[0]) && /từ khoá/.test(t.loi[1]));
+    assert.ok(/scene/.test(F.docHang([['a', 'b'], ['1', '2']]).loi[0]));
+    assert.strictEqual(F.tenDanhSach('/x/Thien_su_footage.xlsx'), 'Thien_su');
+  });
+  test('chọn clip: bản mp4 gần 1080p, ngang; lọc dọc / ngắn / chữ cần tránh / đã dùng; xếp đủ dài trước, dài quá xuống sau', () => {
+    const ds = F.chuanPexels({ videos: [
+      pexelsVid(1, { giay: 40 }),                                  // dài gấp 5,7 lần → xuống sau
+      pexelsVid(2, { w: 1080, h: 1920, files: [{ file_type: 'video/mp4', width: 1080, height: 1920, link: 'd' }] }),   // dọc → bỏ
+      pexelsVid(3, { giay: 3 }),                                   // quá ngắn → bỏ
+      pexelsVid(4, { giay: 9, slug: 'man-walking-in-desert' }),    // có "man"? không tránh; có "people"? không
+      pexelsVid(5, { giay: 8, slug: 'people-in-desert' }),         // chứa "people" → bỏ
+      pexelsVid(6, { giay: 8 }), pexelsVid(7, { giay: 7 })
+    ] }, 1920);
+    assert.strictEqual(ds[0].tep.url, 'https://v.pexels/1-1080.mp4');
+    assert.strictEqual(F.chuanPexels({ videos: [pexelsVid(9)] }, 3840)[0].tep.w, 3840);
+    assert.strictEqual(F.chuanPexels({ videos: [pexelsVid(9)] }, 1280)[0].tep.w, 1280);
+    const xep = F.xepUngVien(ds, { giay: 7, tranh: ['people'], rong: 1920, daDung: new Set(['pexels-6']) });
+    assert.deepStrictEqual(xep.map((c) => c.id), ['pexels-4', 'pexels-7', 'pexels-1']);
+    assert.ok(F.coChuTranh({ chu: ' a person walking ' }, ['persons']) && F.coChuTranh({ chu: ' two persons ' }, ['person']));
+    assert.ok(!F.coChuTranh({ chu: ' personal ' }, ['person']), 'khớp nguyên từ');
+    const px = F.chuanPixabay({ hits: [pixabayVid(1), pixabayVid(2, { tags: 'city, night' })] }, 1920);
+    assert.strictEqual(px[0].tep.url, 'https://cdn.pixabay/1-l.mp4');
+    assert.strictEqual(px[0].anh, 'https://cdn.pixabay/1.jpg');
+    assert.deepStrictEqual(F.xepUngVien(px, { giay: 6, tranh: ['city'] }).map((c) => c.id), ['pixabay-1']);
+    assert.strictEqual(F.tenFootage('{canh}', { canh: '0047' }), '0047.mp4');
+    assert.strictEqual(F.tenFootage('canh_{so}', { canh: '0047' }), 'canh_47.mp4');
+    assert.strictEqual(F.chuoiSo([11, 3, 9, 10, 5, 3]), '3, 5, 9-11');
+  });
+
+  /** Bộ tải với mạng giả: ghi lại URL đã gọi; trả 429 cho Pexels khi pexels429 = true. */
+  function dungFootage(o = {}) {
+    const goi = [], tai = [];
+    const store = { data: {}, set(x) { Object.assign(this.data, x); } };
+    const tam = fs.mkdtempSync(path.join(os.tmpdir(), 'footage-'));
+    const kq = (status, json, hdr = {}) => ({ status, ok: status < 300, json: async () => json, headers: { get: (k) => (hdr[k.toLowerCase()] != null ? String(hdr[k.toLowerCase()]) : null) } });
+    const m = { pexels429: false, pexelsVid: o.pexelsVid, pixabayVid: o.pixabayVid };
+    const ql = new F.QuanLyFootage({
+      store, thuMucGoc: tam, ngu: async () => {},
+      fetch: async (url, opt) => {
+        goi.push({ url, auth: (opt && opt.headers && opt.headers.Authorization) || '' });
+        const q = new URL(url).searchParams;
+        if (url.includes('/v1/videos/search')) {
+          if (m.pexels429) return kq(429, {}, { 'x-ratelimit-reset': Math.floor(Date.now() / 1000) + 1800 });
+          return kq(200, { videos: (m.pexelsVid || (() => []))(q.get('query')) }, { 'x-ratelimit-remaining': 150 });
+        }
+        return kq(200, { hits: (m.pixabayVid || (() => []))(q.get('q')) });
+      },
+      taiVe: async (url, tep) => { tai.push(url); fs.writeFileSync(tep, `clip ${url}`); return 2048; }
+    });
+    return { ql, goi, tai, tam, m, store };
+  }
+  const tuKhoaPexels = (q) => (/desert/.test(q) ? [pexelsVid(11, { giay: 9 }), pexelsVid(12, { giay: 8, slug: 'people-city' }), pexelsVid(13, { giay: 12 })]
+    : /cave/.test(q) ? [pexelsVid(11, { giay: 9 }), pexelsVid(21, { giay: 10, slug: 'cave' })] : /olive/.test(q) ? [pexelsVid(31, { giay: 7 })] : []);
+
+  testAsync('footage: tải cả danh sách — đúng tên 0003.mp4…, nguồn auto/pixabay, không trùng clip, ghi nguon-footage.txt, khoá không lộ ra giao diện', async () => {
+    const { ql, goi, tai, tam, m } = dungFootage({ pexelsVid: tuKhoaPexels, pixabayVid: (q) => (/night/.test(q) ? [pixabayVid(41)] : []) });
+    try {
+      assert.strictEqual((await ql.chay()).ok, false, 'chưa mở danh sách');
+      ql.napTep(path.join(__dirname, 'fixture-footage.xlsx'));
+      assert.ok(/chưa có khoá|Chưa có khoá/i.test((await ql.chay()).loi));
+      assert.ok(/Chưa có khoá/.test(ql.loiTruocChay()));
+      assert.ok(/if \(loi\) return \{ ok: false, loi \};/.test(docNguon('main.js')), 'nút Tải footage báo ngay khi chưa có khoá');
+      ql.datCaiDat({ pexelsKey: ' PEXELS-KHOA-1234 ', pixabayKey: 'PIXA-9876', rong: 1920 });
+      const tt = JSON.stringify(ql.trangThai());
+      assert.ok(!tt.includes('PEXELS-KHOA') && !tt.includes('PIXA-9876') && /"pexelsDuoi":"1234"/.test(tt), 'giao diện không thấy nguyên khoá');
+      const r = await ql.chay();
+      assert.deepStrictEqual([r.xong, r.hong], [4, 0]);
+      const d = ql.ds;
+      const thu = d.thuMuc;
+      assert.strictEqual(thu, path.join(tam, 'Footage', 'fixture'));
+      assert.deepStrictEqual(fs.readdirSync(thu).sort(), ['0003.mp4', '0005.mp4', '0009.mp4', '0011.mp4', 'nguon-footage.txt']);
+      const clip = Object.fromEntries(d.canh.map((x) => [x.canh, x.clip.id]));
+      assert.deepStrictEqual(clip, { '0003': 'pexels-11', '0005': 'pixabay-41', '0009': 'pexels-21', '0011': 'pexels-31' }, 'cảnh 9 không lấy lại clip 11 của cảnh 3');
+      assert.ok(tai.includes('https://v.pexels/11-1080.mp4') && tai.includes('https://cdn.pixabay/41-l.mp4'));
+      assert.ok(goi.filter((g) => g.url.includes('pexels') || g.url.includes('/v1/')).every((g) => g.auth === 'PEXELS-KHOA-1234'), 'khoá Pexels ở header Authorization');
+      assert.ok(goi.some((g) => g.url.includes('/api/videos/?key=PIXA-9876')));
+      assert.ok(!goi.some((g) => /pixabay|api\/videos/.test(g.url) && /desert/.test(g.url)), 'Pexels đủ clip thì không gọi Pixabay');
+      assert.ok(goi[0].url.startsWith('https://pixabay.com/api/videos/') === false && goi.some((g) => g.url.startsWith('https://api.pexels.com/v1/videos/search?query=desert%20dunes%20aerial&orientation=landscape')));
+      assert.ok(/0003\tPexels\tTac gia 11\thttps:\/\/www\.pexels\.com\/video\/desert-dunes-11\//.test(fs.readFileSync(path.join(thu, 'nguon-footage.txt'), 'utf8')));
+      // Chạy lại: không gọi API lại (đã xong hết).
+      const n = goi.length;
+      await ql.chay();
+      assert.strictEqual(goi.length, n);
+      // Tìm cùng từ khoá trong 24 giờ dùng kết quả giữ lại (Pixabay yêu cầu), không gọi lại.
+      await ql.goiApi('pexels', 'desert dunes aerial', 7);
+      assert.strictEqual(goi.length, n);
+      m.x = 1;
+    } finally { fs.rmSync(tam, { recursive: true, force: true }); }
+  });
+
+  testAsync('footage: Pexels hết lượt (429) → cảnh sau sang Pixabay ngay, không gọi Pexels nữa; không có clip hợp → Lỗi có lý do', async () => {
+    const { ql, goi, tam, m } = dungFootage({ pexelsVid: tuKhoaPexels, pixabayVid: (q) => (/desert|sand/.test(q) ? [pixabayVid(51, { tags: 'desert' })] : []) });
+    try {
+      ql.datCaiDat({ pexelsKey: 'k', pixabayKey: 'p' });
+      ql.napTep(path.join(__dirname, 'fixture-footage.xlsx'));
+      m.pexels429 = true;
+      await ql.chay();
+      const d = ql.ds;
+      const x3 = d.canh.find((x) => x.so === 3);
+      assert.strictEqual(x3.clip.id, 'pixabay-51');
+      assert.strictEqual(goi.filter((g) => g.url.includes('/v1/videos/')).length, 1, 'chỉ gọi Pexels một lần rồi thôi');
+      const x9 = d.canh.find((x) => x.so === 9);
+      assert.strictEqual(x9.trangThai, 'loi');
+      assert.ok(/không có clip hợp/.test(x9.loi) && /hết lượt/.test(x9.loi), x9.loi);
+      // Chỉ có khoá Pexels mà Pexels hết lượt → báo lỗi, không treo.
+      ql.datCaiDat({ pixabayKey: '' });
+      assert.strictEqual(ql.nguonCho({ nguon: 'pixabay' }).join(), 'pexels');
+    } finally { fs.rmSync(tam, { recursive: true, force: true }); }
+  });
+
+  testAsync('footage: Đổi clip (clip kế, file thay), Bỏ (file sang _bo), Lấy lại; Bỏ qua cảnh đã có file; mở lại đúng file giữ clip cũ', async () => {
+    const { ql, tam, tai, store } = dungFootage({ pexelsVid: tuKhoaPexels, pixabayVid: () => [pixabayVid(61), pixabayVid(62)] });
+    try {
+      ql.datCaiDat({ pexelsKey: 'k', pixabayKey: 'p', boQuaDaCo: true });
+      const tep = path.join(__dirname, 'fixture-footage.xlsx');
+      ql.napTep(tep);
+      const thu = ql.ds.thuMuc;
+      fs.mkdirSync(thu, { recursive: true });
+      fs.writeFileSync(path.join(thu, '0005.mp4'), 'tu tai Storyblocks');
+      await ql.chay();
+      const x5 = ql.ds.canh.find((x) => x.so === 5);
+      assert.ok(x5.coSan && x5.trangThai === 'xong' && !x5.clip);
+      assert.strictEqual(fs.readFileSync(path.join(thu, '0005.mp4'), 'utf8'), 'tu tai Storyblocks', 'không tải đè');
+      assert.ok(!tai.some((u) => /pixabay\/6/.test(u)));
+      // Đổi clip cảnh 3: 11 → 13 (12 bị tránh "people").
+      assert.strictEqual((await ql.doi(3)).ok, true);
+      const x3 = ql.ds.canh.find((x) => x.so === 3);
+      assert.strictEqual(x3.clip.id, 'pexels-13');
+      assert.strictEqual(fs.readFileSync(path.join(thu, '0003.mp4'), 'utf8'), 'clip https://v.pexels/13-1080.mp4');
+      // Đổi tiếp: hết Pexels → tìm thêm (Pixabay).
+      await ql.doi(3);
+      assert.strictEqual(ql.ds.canh.find((x) => x.so === 3).clip.id, 'pixabay-61');
+      // Bỏ / Lấy lại.
+      ql.bo(3);
+      assert.ok(!fs.existsSync(path.join(thu, '0003.mp4')) && fs.existsSync(path.join(thu, '_bo', '0003.mp4')));
+      assert.ok(!/^0003\t/m.test(fs.readFileSync(path.join(thu, 'nguon-footage.txt'), 'utf8')));
+      assert.strictEqual(ql.trangThai().ds.canh.find((x) => x.so === 3).trangThai, 'bo');
+      ql.layLai(3);
+      assert.ok(fs.existsSync(path.join(thu, '0003.mp4')) && ql.ds.canh.find((x) => x.so === 3).trangThai === 'xong');
+      assert.ok(!('ungVien' in ql.trangThai().ds.canh[0]), 'không gửi danh sách ứng viên cho giao diện');
+      // Mở lại cùng file: giữ clip đã có + thư mục đã chọn.
+      ql.datThuMuc(thu);
+      ql.napTep(tep);
+      assert.strictEqual(ql.ds.canh.find((x) => x.so === 3).clip.id, 'pixabay-61');
+      assert.strictEqual(ql.ds.canh.find((x) => x.so === 3).trangThai, 'xong');
+      assert.strictEqual(ql.ds.thuMuc, thu);
+      // Danh sách nhớ theo file bỏ ứng viên (du-lieu.json gọn) — Đổi clip vẫn tìm lại được clip khác.
+      assert.ok(Object.values(store.data.footageLuu || {}).every((d) => d.canh.every((x) => !('ungVien' in x))));
+      assert.ok(ql.ds.canh.every((x) => !x.ungVien || x.ungVien.length <= 8));
+      const doi = await ql.doi(3);
+      assert.ok(doi.ok && doi.clip.id !== 'pixabay-61', JSON.stringify(doi));
+      assert.strictEqual(fs.readFileSync(path.join(thu, '0003.mp4'), 'utf8'), `clip ${tai[tai.length - 1]}`);
+    } finally { fs.rmSync(tam, { recursive: true, force: true }); }
+  });
+
+  test('1.6.0 Footage: trang Footage trong thanh trái + TEN_TRANG + vòng ẩn/hiện; lệnh có trong LENH; không tải Storyblocks bằng máy; ảnh nhỏ https được hiện', () => {
+    const html = docNguon('src/ui/index.html', true), ui = docNguon('src/ui/app.js'), m = docNguon('main.js'), f = docNguon('src/main/footage.js', true);
+    assert.ok(/data-trang="footage"/.test(html) && /id="trang-footage"/.test(html));
+    assert.ok(/footage: 'Footage'/.test(ui) && /\['footage', 'hengio'/.test(ui) && /if \(trang === 'footage'\) napFootage\(\);/.test(ui) && /if \(U\.trang === 'footage'\) veFootage\(\);/.test(ui));
+    for (const l of ['footageDatCaiDat', 'footageMoFile', 'footageNapTep', 'footageChonThuMuc', 'footageChay', 'footageDung', 'footageDoi', 'footageBo', 'footageLayLai', 'footageXoaDs']) {
+      assert.ok(new RegExp(`\\n  ${l}: `).test(m), `LENH.${l}`);
+    }
+    assert.ok(/footage: footage \? footage\.trangThai\(\) : null/.test(m));
+    assert.ok(!/storyblocks\.com/i.test(f.replace(/\/\/.*$/gm, '')), 'footage.js không gọi Storyblocks');
+    assert.ok(/img-src 'self' file: data: blob: https:;/.test(html) && !/script-src[^;]*https/.test(html));
+    for (const w of ['build-windows.yml', 'build-mac.yml']) assert.ok(/run: node tests\/e2e\.js footage/.test(docNguon(`.github/workflows/${w}`, true)), `${w} chạy e2e footage`);
+    assert.ok(/FOOTAGE \? 'tests\/footage-e2e-chay\.js'/.test(docNguon('tests/e2e.js', true)));
+  });
+}
+
 Promise.all(choAsync).then(() => {
   console.log('\n──────────────────────────────────────────────');
   console.log(`KẾT QUẢ: ${pass}/${pass + loi.length} PASS`);

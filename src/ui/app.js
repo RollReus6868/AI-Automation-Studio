@@ -395,7 +395,7 @@
   }
 
   // ── Điều hướng ──────────────────────────────────────────────────────────
-  const TEN_TRANG = { anh: 'Tạo ảnh', video: 'Tạo video', nhac: 'Tạo nhạc', hengio: 'Hẹn giờ', nhanvat: 'Nhân vật', thuvien: 'Thư viện', taikhoan: 'Tài khoản', huongdan: 'Hướng dẫn', caidat: 'Cài đặt' };
+  const TEN_TRANG = { anh: 'Tạo ảnh', video: 'Tạo video', nhac: 'Tạo nhạc', footage: 'Footage', hengio: 'Hẹn giờ', nhanvat: 'Nhân vật', thuvien: 'Thư viện', taikhoan: 'Tài khoản', huongdan: 'Hướng dẫn', caidat: 'Cài đặt' };
   function diToi(trang) {
     if (U.trang === 'taikhoan' && trang !== 'taikhoan' && U.dangNhapMo) dongDangNhap();
     const cu = U.trang;
@@ -405,7 +405,7 @@
     const tao = trang === 'anh' || trang === 'video' || trang === 'nhac';
     document.body.classList.toggle('trang-nhac', trang === 'nhac');
     $('#trang-tao').hidden = !tao;
-    for (const t of ['hengio', 'nhanvat', 'thuvien', 'taikhoan', 'huongdan', 'caidat']) $(`#trang-${t}`).hidden = t !== trang;
+    for (const t of ['footage', 'hengio', 'nhanvat', 'thuvien', 'taikhoan', 'huongdan', 'caidat']) $(`#trang-${t}`).hidden = t !== trang;
     $('#khuDuAn').style.visibility = tao ? 'visible' : 'hidden';
     if (tao) {
       if (cu !== trang) { U.chon.clear(); U.chiTiet = null; }
@@ -425,6 +425,7 @@
     }
     if (trang === 'caidat') { veCaiDat(); if (cu !== 'caidat') doDuLieu(); }   // 1.4.12: đo dữ liệu app mỗi lần vào Cài đặt
     if (trang === 'hengio') napHenGio();
+    if (trang === 'footage') napFootage();
     luuUi();
     ve();
   }
@@ -440,6 +441,7 @@
     if (U.trang === 'thuvien') veThuVien();
     if (U.trang === 'taikhoan') veTaiKhoan();
     if (U.trang === 'hengio') veHenGio();
+    if (U.trang === 'footage') veFootage();
   }
 
   function veTopbar() {
@@ -2180,9 +2182,122 @@
     $('#nutXoaLog').onclick = () => { U.log = []; api.call('xoaNhatKy'); $('#dongCuoi').textContent = ''; veLog(); };
   }
 
+  // ── Footage (1.6.0): stock video cho cảnh qua API Pexels / Pixabay (src/main/footage.js) ─────────────
+  const TT_FOOTAGE = { cho: 'Chờ', tim: 'Đang tìm…', tai: 'Đang tải…', xong: 'Đã có', loi: 'Lỗi', bo: 'Đã bỏ' };
+  const giayDep = (s) => `${Math.round((+s || 0) * 10) / 10}s`;
+  /** Ô khoá / cỡ / công tắc: nạp từ trạng thái khi vào trang (không ghi đè lúc đang gõ). */
+  function napFootage() {
+    const f = S && S.footage;
+    if (!f) return;
+    const c = f.caiDat;
+    $('#ftPexels').value = ''; $('#ftPixabay').value = '';
+    $('#ftPexels').placeholder = c.coPexels ? `Đã có khoá …${c.pexelsDuoi} — dán khoá mới để đổi` : 'Dán khoá API Pexels';
+    $('#ftPixabay').placeholder = c.coPixabay ? `Đã có khoá …${c.pixabayDuoi} — dán khoá mới để đổi` : 'Dán khoá API Pixabay';
+    $('#ftRong').value = String(c.rong);
+    $('#ftBoQua').checked = !!c.boQuaDaCo;
+    veFootage();
+  }
+  function veFootage() {
+    const f = S && S.footage;
+    if (!f) return;
+    const c = f.caiDat, d = f.ds;
+    $('#ftPexelsGhi').textContent = c.coPexels ? `✓ Đã lưu khoá (…${c.pexelsDuoi}).` : 'Chưa có khoá.';
+    $('#ftPixabayGhi').textContent = c.coPixabay ? `✓ Đã lưu khoá (…${c.pixabayDuoi}).` : 'Chưa có khoá.';
+    $('#ftTenDs').textContent = d ? ` — ${d.ten} (${d.canh.length} cảnh)` : '';
+    if (document.activeElement !== $('#ftThuMuc')) $('#ftThuMuc').value = d ? d.thuMuc : '';
+    for (const id of ['#ftChonThuMuc', '#ftMoThuMuc', '#ftXoaDs']) $(id).disabled = !d;
+    const nut = $('#ftChay');
+    nut.disabled = !d;
+    nut.classList.toggle('dung', !!f.dangChay);
+    datHtml(nut, f.dangChay ? `${ic('pause')}<span>Dừng</span>` : `${ic('download')}<span>Tải footage</span>`);
+    if (!d) {
+      datHtml($('#ftTomTat'), '');
+      datHtml($('#ftBang'), `<div class="ft-trong">Chưa mở danh sách. Bấm <b>Mở file footage…</b> và chọn file <code>&lt;tên&gt;_footage.xlsx</code> (cột <code>scene</code>, <code>tu_khoa</code>, <code>giay_can</code>, <code>tranh</code>…).</div>`);
+      return;
+    }
+    const dem = (t) => d.canh.filter((x) => x.trangThai === t).length;
+    const coFile = d.canh.filter((x) => x.trangThai === 'xong').map((x) => x.so);
+    datHtml($('#ftTomTat'),
+      `<span>Đã có <b>${dem('xong')}</b>/${d.canh.length}</span>` +
+      (dem('loi') ? `<span class="do">Lỗi ${dem('loi')}</span>` : '') + (dem('bo') ? `<span>Đã bỏ ${dem('bo')}</span>` : '') +
+      (coFile.length ? `<span class="ft-so" title="Dán vào nút Chọn số ở trang Tạo video để dừng / bỏ video AI của các cảnh này">Cảnh dùng footage: <code>${esc(window.HD_CHUOI_SO ? window.HD_CHUOI_SO(coFile) : coFile.join(', '))}</code> <button class="nut-vien nho" data-ft="chepSo">${ic('copy')}Chép số</button></span>` : '') +
+      ((d.loiDoc || []).length ? `<span class="mo" title="${esc(d.loiDoc.join('\n'))}">${d.loiDoc.length} dòng trong file bị bỏ qua (rê chuột để xem)</span>` : ''));
+    datHtml($('#ftBang'), d.canh.map((x) => {
+      const k = x.clip;
+      const clip = k && x.trangThai !== 'bo'
+        ? `<div class="ft-clip">${k.anh ? `<img src="${esc(k.anh)}" alt="" loading="lazy">` : ''}<div><b>${esc(k.nguon === 'pexels' ? 'Pexels' : 'Pixabay')}</b> · ${esc(k.tacGia || '?')}<br><small>${giayDep(k.giay)} · ${k.w}×${k.h}</small></div></div>`
+        : x.coSan && x.trangThai === 'xong' ? '<small class="mo">File có sẵn trong thư mục</small>' : '';
+      const nut = [
+        k && x.trangThai !== 'bo' ? `<button class="nut-vien nho" data-ft="doi" data-so="${x.so}" title="Tải clip khác cho cảnh này${x.conLuaChon ? ` (còn ${x.conLuaChon} lựa chọn)` : ' (tìm thêm)'}"${f.dangChay ? ' disabled' : ''}>${ic('refresh-cw')}Đổi clip</button>` : '',
+        k && k.trang ? `<button class="nut-vien nho" data-ft="xem" data-url="${esc(k.trang)}" title="Mở trang gốc của clip">${ic('external-link')}</button>` : '',
+        x.trangThai === 'xong' && k ? `<button class="nut-vien nho" data-ft="bo" data-so="${x.so}" title="Không dùng footage cho cảnh này (file chuyển vào thư mục _bo)">${ic('x')}Bỏ</button>` : '',
+        x.trangThai === 'bo' ? `<button class="nut-vien nho" data-ft="layLai" data-so="${x.so}">${ic('rotate-ccw')}Lấy lại</button>` : ''
+      ].join('');
+      return `<div class="ft-dong tt-${x.trangThai}"><div class="ft-canh">${esc(x.canh)}</div>` +
+        `<div class="ft-tu"><span>${esc(x.tuKhoa.join(' · '))}</span>${x.tranh.length ? `<small>Tránh: ${esc(x.tranh.join(', '))}</small>` : ''}${x.ghiChu ? `<small>${esc(x.ghiChu)}</small>` : ''}</div>` +
+        `<div class="ft-can">${x.giay ? `cần ${giayDep(x.giay)}` : ''}</div>` +
+        `<div class="ft-tt"><span class="the-tt">${TT_FOOTAGE[x.trangThai] || x.trangThai}</span>${x.loi ? `<small class="do">${esc(x.loi)}</small>` : ''}</div>` +
+        `<div class="ft-k">${clip}</div><div class="ft-nut">${nut}</div></div>`;
+    }).join(''));
+  }
+  function ganFootage() {
+    $('#ftLuuKhoa').onclick = async () => {
+      const m = { rong: +$('#ftRong').value, boQuaDaCo: $('#ftBoQua').checked };
+      if ($('#ftPexels').value.trim()) m.pexelsKey = $('#ftPexels').value.trim();
+      if ($('#ftPixabay').value.trim()) m.pixabayKey = $('#ftPixabay').value.trim();
+      const r = await api.call('footageDatCaiDat', m);
+      if (r && r.ok) { S.footage.caiDat = r.caiDat; napFootage(); toast('Đã lưu khoá và cài đặt footage'); } else toast(`Lưu lỗi: ${(r && r.loi) || '?'}`, true);
+    };
+    $('#ftMoFile').onclick = async () => {
+      const r = await api.call('footageMoFile');
+      if (!r) return;
+      if (!r.ok) { toast(`Không mở được: ${r.loi}`, true); return; }
+      toast(`Đã mở ${r.so} cảnh${r.loi && r.loi.length ? ` · ${r.loi.length} dòng bỏ qua` : ''}`);
+    };
+    $('#ftChay').onclick = async () => {
+      const f = S && S.footage;
+      if (!f || !f.ds) return;
+      const r = await api.call(f.dangChay ? 'footageDung' : 'footageChay');
+      if (r && r.ok === false) toast(r.loi || 'Không chạy được', true);
+    };
+    $('#ftXoaDs').onclick = async () => {
+      if (!await xacNhan('Đóng danh sách footage?', 'File đã tải trong thư mục lưu vẫn giữ nguyên.', 'Đóng')) return;
+      const r = await api.call('footageXoaDs');
+      if (r && r.ok === false) toast(r.loi, true);
+    };
+    $('#ftChonThuMuc').onclick = () => api.call('footageChonThuMuc');
+    $('#ftMoThuMuc').onclick = () => { const d = S.footage && S.footage.ds; if (d) api.call('moThuMuc', { dir: d.thuMuc }); };
+    for (const a of $$('#trang-footage a[data-link]')) a.onclick = (e) => { e.preventDefault(); api.call('moLink', { url: a.dataset.link }); };
+    $('#trang-footage').addEventListener('click', async (e) => {
+      const b = e.target.closest('[data-ft]');
+      if (!b || b.disabled) return;
+      const so = +b.dataset.so;
+      if (b.dataset.ft === 'xem') { api.call('moLink', { url: b.dataset.url }); return; }
+      if (b.dataset.ft === 'chepSo') {
+        const d = S.footage.ds;
+        await navigator.clipboard.writeText(window.HD_CHUOI_SO(d.canh.filter((x) => x.trangThai === 'xong').map((x) => x.so)));
+        toast('Đã chép số cảnh — dán vào nút Chọn số ở trang Tạo video');
+        return;
+      }
+      const lenh = { doi: 'footageDoi', bo: 'footageBo', layLai: 'footageLayLai' }[b.dataset.ft];
+      if (!lenh) return;
+      b.disabled = true;
+      const r = await api.call(lenh, { so });
+      if (r && r.ok === false) toast(r.loi || 'Lỗi', true);
+      else if (lenh === 'footageDoi') toast(`Cảnh ${so}: đã đổi clip`);
+    });
+  }
+  /** [3,5,9,10,11] → "3, 5, 9-11" (dán được vào ô Chọn số). */
+  window.HD_CHUOI_SO = (ds) => {
+    const so = [...new Set(ds)].sort((a, b) => a - b), ra = [];
+    for (let i = 0; i < so.length; i++) { let k = i; while (k + 1 < so.length && so[k + 1] === so[k] + 1) k++; ra.push(k > i ? `${so[i]}-${so[k]}` : String(so[i])); i = k; }
+    return ra.join(', ');
+  };
+
   // ── Khởi động ────────────────────────────────────────────────────────────
   veIcon(document);
   ganSuKien();
+  ganFootage();
   // 1.4.14: hàng đợi tới theo phần đổi (s.goiViec) — ghép vào bản đang có; gói lệch bản thì xin lại bản đủ.
   let xinDu = null;
   const nhanGoi = (s) => {
