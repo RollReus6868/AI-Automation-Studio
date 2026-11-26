@@ -57,6 +57,7 @@ module.exports = function e2eFootage({ win, app, footage }) {
       await cho(() => footage.caiDat.pexelsKey === 'KHOA-PEXELS-E2E' && footage.caiDat.pixabayKey === 'KHOA-PIXABAY-E2E', 5000, 'lưu khoá');
       kiem(footage.caiDat.pexelsKey === 'KHOA-PEXELS-E2E' && footage.caiDat.pixabayKey === 'KHOA-PIXABAY-E2E', 'khoá lưu vào app');
       await cho(() => js("/…-E2E/.test(document.querySelector('#ftPexels').placeholder) && document.querySelector('#ftPexels').value === ''"), 5000, 'ô khoá xoá trắng, chỉ ghi đuôi khoá');
+      kiem(await js("document.querySelector('#ftHienDai').checked") && footage.caiDat.boHienDai === true, '1.6.2: "Bỏ clip có đồ vật hiện đại" mặc định bật');
       kiem(await js("/Đã lưu khoá/.test(document.querySelector('#ftPexelsGhi').textContent) && !document.body.innerHTML.includes('KHOA-PEXELS-E2E')"), 'giao diện không chứa nguyên khoá');
 
       ghi('-- 2. Mở file footage, chọn thư mục lưu, Tải footage');
@@ -112,7 +113,7 @@ module.exports = function e2eFootage({ win, app, footage }) {
       kiem(thu2 === path.join(tam, 'data', 'Footage', 'Ban_2'), `thư mục mặc định theo tên file (${thu2})`);
       await taiVaCho('lần 2');
       kiem(canh(20).trangThai === 'xong' && canh(20).clip.id === 'pixabay-501', `cảnh 20 lấy Pixabay khi Pexels hết lượt, bỏ clip có "city" (${canh(20).clip && canh(20).clip.id})`);
-      kiem(canh(22).trangThai === 'loi' && /không có clip hợp/.test(canh(22).loi), `cảnh 22 lỗi có lý do (${canh(22).loi})`);
+      kiem(canh(22).trangThai === 'loi' && /không có clip khớp từ khoá/.test(canh(22).loi), `cảnh 22 lỗi có lý do (${canh(22).loi})`);
       kiem((await ghiApi()).goi.filter((g) => g.nguon === 'pexels' && ['sand dunes wind', 'olive tree'].includes(g.q)).length === 1, 'Pexels hết lượt chỉ bị gọi một lần');
       await cho(() => js("/Lỗi 1/.test(document.querySelector('#ftTomTat').textContent) && document.querySelector('#ftBang .tt-loi small.do')"), 5000, 'giao diện hiện Lỗi');
       kiem(await js("!!document.querySelector('#ftBang .tt-loi small.do')"), 'dòng lỗi hiện lý do');
@@ -126,6 +127,13 @@ module.exports = function e2eFootage({ win, app, footage }) {
       await taiVaCho('lần 4');
       kiem(canh(22).trangThai === 'xong' && fs.existsSync(path.join(thu2, '0022.mp4')), 'Tải footage lần nữa: cảnh lỗi tải lại được');
 
+      ghi('-- 5b. 1.6.2 Tìm lại tất cả (nút trên giao diện): clip cũ sang _bo, tải lại theo chấm khớp mới');
+      const truocTL = footage.luotXong;
+      await bam('#ftTimLai');
+      await cho(() => js("!document.querySelector('#phu').hidden && /Tìm lại footage/.test(document.querySelector('#hopTieuDe').textContent)"), 5000, 'hộp xác nhận Tìm lại');
+      kiem(await bam('#hopOk'), 'xác nhận Tìm lại');
+      await cho(() => footage.luotXong > truocTL, 60000, 'tìm lại xong');
+      kiem(fs.existsSync(path.join(thu2, '_bo', '0020.mp4')) && fs.existsSync(path.join(thu2, '0020.mp4')) && canh(20).clip && /^(pexels-103|pixabay-501)$/.test(canh(20).clip.id), `Tìm lại: clip cũ vào _bo, cảnh 20 tải lại clip khớp (${canh(20).clip && canh(20).clip.id})`);
       ghi('-- 6. Danh sách lưu trong dữ liệu app (mở lại app còn)');
       kiem(footage.store.data.footageDs && footage.store.data.footageDs.tep === tep2 && footage.store.data.footage.pexelsKey === 'KHOA-PEXELS-E2E', 'danh sách + khoá nằm trong du-lieu.json');
       footage.napTep(tep);
