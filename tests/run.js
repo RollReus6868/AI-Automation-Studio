@@ -4352,6 +4352,23 @@ console.log('\n── 1.6.0 Footage (Pexels / Pixabay) ────────�
     } finally { fs.rmSync(tam, { recursive: true, force: true }); }
   });
 
+  testAsync('1.6.1 footage: địa chỉ API thật khi main truyền goc { …: undefined } (lỗi "undefined/api/videos/" 1.6.0); lỗi mạng không lộ khoá', async () => {
+    const goi = [];
+    const store = { data: {}, set(x) { Object.assign(this.data, x); } };
+    const ql = new F.QuanLyFootage({ store, ngu: async () => {}, thuMucGoc: os.tmpdir(),
+      goc: { pexels: undefined, pixabay: undefined },   // đúng như main.js khi không có FOOTAGE_*_URL
+      fetch: async (u) => { goi.push(u); throw new Error(`Failed to fetch ${u}`); }, taiVe: async () => 0 });
+    assert.deepStrictEqual(ql.goc, { pexels: 'https://api.pexels.com', pixabay: 'https://pixabay.com' });
+    ql.datCaiDat({ pixabayKey: 'KHOA-GIA-PIXABAY-1', pexelsKey: 'KHOA/GIA+PEXELS' });
+    await assert.rejects(() => ql.goiApi('pixabay', 'roman ruins', 6), (e) => /Pixabay: không kết nối được/.test(e.message) && !e.message.includes('KHOA-GIA') && e.message.includes('•••'));
+    assert.ok(goi[0].startsWith('https://pixabay.com/api/videos/?key=KHOA-GIA-PIXABAY-1&q=roman%20ruins'), goi[0]);
+    await assert.rejects(() => ql.goiApi('pexels', 'x', 6), (e) => !e.message.includes('KHOA/GIA'));
+    assert.ok(goi[1].startsWith('https://api.pexels.com/v1/videos/search?query=x'));
+    assert.ok(!ql.anKhoa(`a ${encodeURIComponent('KHOA/GIA+PEXELS')} b KHOA/GIA+PEXELS`).includes('GIA'));
+    assert.strictEqual(new F.QuanLyFootage({ store, goc: { pixabay: 'http://127.0.0.1:9/pixabay/' } }).goc.pixabay, 'http://127.0.0.1:9/pixabay');
+    assert.ok(/goc: \{ pexels: process\.env\.FOOTAGE_PEXELS_URL \|\| undefined, pixabay: process\.env\.FOOTAGE_PIXABAY_URL \|\| undefined \}/.test(docNguon('main.js')), 'main vẫn truyền undefined khi không kiểm — footage.js phải tự bỏ qua');
+  });
+
   test('1.6.0 Footage: trang Footage trong thanh trái + TEN_TRANG + vòng ẩn/hiện; lệnh có trong LENH; không tải Storyblocks bằng máy; ảnh nhỏ https được hiện', () => {
     const html = docNguon('src/ui/index.html', true), ui = docNguon('src/ui/app.js'), m = docNguon('main.js'), f = docNguon('src/main/footage.js', true);
     assert.ok(/data-trang="footage"/.test(html) && /id="trang-footage"/.test(html));

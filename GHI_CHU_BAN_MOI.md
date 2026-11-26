@@ -1,4 +1,11 @@
-# AI Automation Studio 1.6.0
+# AI Automation Studio 1.6.1
+
+- **Sửa lỗi mục Footage**: bản 1.6.0 gọi sai địa chỉ API (nhật ký ghi "Failed to parse URL from undefined/api/videos/…"), nên mọi cảnh báo "không có clip hợp". Nay gọi đúng `pixabay.com` / `api.pexels.com`.
+- Chỉ có khoá **Pixabay** (Pexels đang tạm ngừng cấp khoá mới) vẫn chạy bình thường: app chỉ tìm trên Pixabay.
+- Chữ lỗi trong nhật ký và trên dòng cảnh **không còn hiện khoá API** (thay bằng •••).
+- Cảnh đang báo Lỗi: cập nhật xong, mở mục Footage, bấm **Tải footage** lần nữa — app chỉ làm lại các cảnh lỗi.
+
+## Bản 1.6.0
 
 - **Mục mới: Footage** (thanh bên trái, dưới *Tạo nhạc*) — tải stock video cho các cảnh của kịch bản, tự động, miễn phí, qua **API chính thức của Pexels và Pixabay**.
   1. Lấy khoá API miễn phí: đăng nhập **pexels.com/api** (Your API Key) và **pixabay.com/api/docs** (khoá nằm ở mục Parameters). Mục *Footage* → dán khoá → **Lưu**. App chỉ hiện 4 ký tự cuối của khoá.
