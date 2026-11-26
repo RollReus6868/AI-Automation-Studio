@@ -199,7 +199,10 @@ class QuanLyFootage {
     this.store = o.store;
     this.log = o.log || (() => {});
     this.bao = o.bao || (() => {});
-    this.goc = Object.assign({ pexels: 'https://api.pexels.com', pixabay: 'https://pixabay.com' }, o.goc || {});
+    // 1.6.1: chỉ nhận địa chỉ có giá trị — main truyền { pixabay: undefined } khi không chạy bài kiểm, Object.assign
+    // chép cả undefined đè địa chỉ thật → gọi "undefined/api/videos/…" (lỗi "Failed to parse URL" ở 1.6.0).
+    this.goc = { pexels: 'https://api.pexels.com', pixabay: 'https://pixabay.com' };
+    for (const [k, v] of Object.entries(o.goc || {})) if (typeof v === 'string' && /^https?:\/\//.test(v)) this.goc[k] = v.replace(/\/+$/, '');
     this.ngu = o.ngu || ((ms) => new Promise((r) => setTimeout(r, ms)));
     this.dangChay = false;
     this.dung = false;
@@ -299,7 +302,10 @@ class QuanLyFootage {
       url = `${this.goc.pixabay}/api/videos/?key=${encodeURIComponent(c.pixabayKey)}&q=${encodeURIComponent(tuKhoa.slice(0, 100))}&video_type=film&safesearch=true&per_page=50` +
         (can ? `&min_width=1280` : '');
     }
-    const r = await this.o.fetch(url, { headers });
+    let r;
+    try { r = await this.o.fetch(url, { headers }); } catch (e) {
+      throw new Error(`${TEN_NGUON[nguon]}: không kết nối được (${this.anKhoa(e.message)})`);
+    }
     if (r.status === 429) {
       const dat = parseInt(r.headers.get('x-ratelimit-reset'), 10);
       // Pexels: thời điểm (giây UNIX) đổi tháng; Pixabay: số giây còn lại. Không rõ thì nghỉ 10 phút.
@@ -318,6 +324,15 @@ class QuanLyFootage {
     const ds = nguon === 'pexels' ? chuanPexels(json, c.rong) : chuanPixabay(json, c.rong);
     this.boNho.set(khoa, { luc: Date.now(), ds });
     return ds;
+  }
+
+  /** 1.6.1: che khoá API trong chữ lỗi (nhật ký, giao diện, ảnh chụp gửi đi). */
+  anKhoa(chu) {
+    let s = String(chu || '');
+    for (const k of [this.caiDat.pexelsKey, this.caiDat.pixabayKey]) {
+      if (k && k.length >= 4) for (const v of new Set([k, encodeURIComponent(k)])) s = s.split(v).join('•••');
+    }
+    return s;
   }
 
   /** Nguồn dùng được cho một cảnh, theo thứ tự (auto = Pexels rồi Pixabay); chỉ nguồn đã có khoá. */
@@ -339,7 +354,7 @@ class QuanLyFootage {
         if (this.dung) return { ds, loi };
         let kq;
         try { kq = await this.goiApi(n, tk, x.giay); } catch (e) {
-          loi.push(e.message);
+          loi.push(this.anKhoa(e.message));
           if (e.hetLuot || e.saiKhoa) break;   // nguồn này hết lượt / sai khoá → sang nguồn kế
           continue;
         }
@@ -412,8 +427,8 @@ class QuanLyFootage {
           await this.taiClip(d, x);
           xong++;
         } catch (e) {
-          x.trangThai = 'loi'; x.loi = e.message; hong++;
-          this.log('warning', `🎞 Cảnh ${x.canh}: ${e.message}`);
+          x.trangThai = 'loi'; x.loi = this.anKhoa(e.message); hong++;
+          this.log('warning', `🎞 Cảnh ${x.canh}: ${x.loi}`);
           this.luu(d);
         }
       }
@@ -453,8 +468,8 @@ class QuanLyFootage {
       await this.taiClip(d, x);
       return { ok: true, clip: x.clip };
     } catch (e) {
-      x.trangThai = x.clip ? 'xong' : 'loi'; x.loi = e.message; this.luu(d);
-      return { ok: false, loi: e.message };
+      x.trangThai = x.clip ? 'xong' : 'loi'; x.loi = this.anKhoa(e.message); this.luu(d);
+      return { ok: false, loi: x.loi };
     } finally { this.dangChay = false; this.bao(); }
   }
 
