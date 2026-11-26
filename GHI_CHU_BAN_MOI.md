@@ -1,4 +1,12 @@
-# AI Automation Studio 1.6.2
+# AI Automation Studio 1.6.3
+
+- **Footage chọn clip chặt hơn nữa.** Cụm từ khoá có 1–2 danh từ chính thì clip phải khớp **hết** (trước chỉ cần một nửa: "stone steps" ra clip biển hoàng hôn vì chỉ có thẻ "Stone"; "scales of justice" ra clip lật hồ sơ vì có thẻ "Justice"). Cụm dài hơn vẫn cần khớp ít nhất một nửa.
+- Cột **tranh** có `people` / `person` / `man` / `woman` thì bỏ luôn clip có tay, nam, nữ, trẻ em… (Pixabay hay ghi thẻ "Hand", "Male").
+- Lọc đồ vật hiện đại bắt thêm: thư viện trường học, lớp học, hồ sơ / tủ hồ sơ, xích đu, ghế băng, nghĩa trang bia chữ, đèn phố nhoè (bokeh), băng từ, đĩa than, máy ảnh Polaroid, bến du thuyền, mandala / yoga.
+- **Sửa file footage rồi mở lại**: cảnh bị bỏ khỏi file hoặc đổi từ khoá thì clip app đã tải cho cảnh đó tự chuyển vào `_bo` (trước đó clip cũ vẫn nằm trong thư mục Videos và bị coi là file bạn tự đặt). File bạn tự đặt vào thư mục không bị đụng.
+- Cách dùng sau khi sửa từ khoá: mục Footage → **Mở file footage…** (chọn lại đúng file) → **Tải footage**.
+
+## Bản 1.6.2
 
 - **Footage chọn clip đúng cảnh hơn.** Bản trước nhận cả clip chỉ trùng chữ phụ của từ khoá (vd tìm "candle flame close up" ra clip thịt xông khói vì có thẻ "Close Up"; "cinema projector" ra ghế sofa vì có thẻ "Old", "Books"). Nay app chấm khớp theo thẻ của clip: phải khớp **danh từ chính** của từ khoá (ít nhất một nửa), không tính chữ chung như *old, ancient, light, sunset, aerial, close up*. Không có clip khớp → cảnh báo **Lỗi** và cảnh đó dùng ảnh AI, không tải clip lạc đề.
 - **Bỏ clip có đồ vật hiện đại** (công tắc mới ở thẻ Khoá API, mặc định bật): bỏ clip có thành phố, nhà cao tầng, xe, đường, máy tính, bàn phím, điện thoại, tua-bin gió, tàu du lịch, sofa, đồ ăn hiện đại… — hợp video lịch sử / Kinh Thánh. Chữ có trong chính từ khoá của cảnh thì không bị bỏ (vd cảnh "roman road" vẫn nhận clip có đường).
