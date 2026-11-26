@@ -107,10 +107,13 @@ const TU_HIEN_DAI = ['city', 'cityscape', 'skyline', 'skyscraper', 'downtown', '
   'christmas', 'santa', 'diwali', 'notebook', 'jeans', 'sneakers', 'glasses', 'apartment', 'hotel', 'pool', 'bar', 'coffee',
   // 1.6.3 (clip lạc đề thật 26/11/2026: thư viện trường học, lật hồ sơ, xích đu, nghĩa trang có bia chữ, đèn phố nhoè, băng từ)
   'school', 'classroom', 'student', 'university', 'reading room', 'file', 'folder', 'spreadsheet', 'cabinet', 'swing', 'porch', 'bench',
-  'cemetery', 'gravestone', 'headstone', 'bokeh', 'tape', 'cassette', 'vinyl', 'polaroid', 'marina', 'mandala', 'yoga', 'meditation', 'zen'];
+  'cemetery', 'gravestone', 'headstone', 'bokeh', 'tape', 'cassette', 'vinyl', 'polaroid', 'marina', 'mandala', 'yoga', 'meditation', 'zen',
+  // 1.6.4 (lần soát thứ ba: đường nhựa cho "roman road", Bitcoin cho "old coins", hiệu sách cho "old books shelf")
+  'asphalt', 'bitcoin', 'crypto', 'cryptocurrency', 'blockchain', 'finance', 'trading', 'stock market', 'bookstore', 'shop', 'store'];
 /** 1.6.3: "people / person / man / woman" trong cột tranh → bỏ cả clip có tay, nam, nữ, trẻ em… (thẻ Pixabay hay ghi "Hand", "Male"). */
 const TU_NGUOI = ['man', 'men', 'woman', 'women', 'male', 'female', 'girl', 'boy', 'child', 'children', 'kid', 'hand', 'hands', 'finger',
-  'face', 'portrait', 'human', 'adult', 'lady', 'guy', 'couple', 'family', 'businessman', 'worker', 'student', 'tourist'];
+  'face', 'portrait', 'human', 'adult', 'lady', 'guy', 'couple', 'family', 'businessman', 'worker', 'student', 'tourist',
+  'musician', 'music', 'guitar', 'cello', 'violin', 'dancer', 'dance', 'singer', 'runner', 'hiker', 'athlete', 'worshipper', 'pilgrim'];
 
 /** Chữ của cụm từ khoá → danh sách từ (thường, bỏ từ vô nghĩa). */
 const tachTu = (cum) => String(cum || '').toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').split(/\s+/).filter((w) => w && !TU_BO_QUA.has(w));
@@ -461,7 +464,7 @@ class QuanLyFootage {
     const tep = path.join(d.thuMuc, tenFootage(this.caiDat.mauTen, x));
     x.trangThai = 'tai'; this.luu(d);
     const byte = await this.o.taiVe(c.tep.url, tep);
-    x.clip = { id: c.id, nguon: c.nguon, trang: c.trang, tacGia: c.tacGia, tacGiaUrl: c.tacGiaUrl, anh: c.anh, giay: c.giay, w: c.tep.w, h: c.tep.h, byte };
+    x.clip = { id: c.id, nguon: c.nguon, trang: c.trang, tacGia: c.tacGia, tacGiaUrl: c.tacGiaUrl, anh: c.anh, giay: c.giay, w: c.tep.w, h: c.tep.h, byte, url: c.tep.url };
     x.tepRa = tep; x.trangThai = 'xong'; x.loi = '';
     this.ghiNguon(d);
     this.luu(d);
@@ -492,7 +495,20 @@ class QuanLyFootage {
     if (this.dangChay) return { ok: true, dangChay: true };
     this.dangChay = true; this.dung = false;
     this.bao();
-    let xong = 0, hong = 0, boQua = 0;
+    let xong = 0, hong = 0, boQua = 0, mat = 0, chep = 0;
+    // 1.6.4: cảnh "Đã có" mà file không còn trong thư mục lưu (bị xoá ngoài app, hoặc đổi thư mục lưu) → lấy lại:
+    // còn file ở chỗ cũ thì chép sang, không thì tải lại đúng clip đó (hoặc tìm lại nếu clip cũ không ghi địa chỉ).
+    for (const x of d.canh) {
+      if (x.trangThai !== 'xong') continue;
+      const dung = path.join(d.thuMuc, tenFootage(this.caiDat.mauTen, x));
+      if (fs.existsSync(dung)) { if (x.tepRa !== dung) { x.tepRa = dung; } continue; }
+      if (x.tepRa && fs.existsSync(x.tepRa) && x.clip) {
+        try { fs.mkdirSync(d.thuMuc, { recursive: true }); fs.copyFileSync(x.tepRa, dung); x.tepRa = dung; chep++; continue; } catch (_) {}
+      }
+      Object.assign(x, { trangThai: 'cho', coSan: false, matFile: true, loi: '' });
+      mat++;
+    }
+    if (mat || chep) this.log('warning', `🎞 ${mat ? `${mat} cảnh "Đã có" nhưng file không còn trong ${d.thuMuc} → tải lại` : ''}${mat && chep ? ' · ' : ''}${chep ? `${chep} cảnh chép từ thư mục lưu cũ` : ''}`);
     const lam = d.canh.filter((x) => x.trangThai === 'cho' || x.trangThai === 'loi' || x.trangThai === 'tim' || x.trangThai === 'tai');
     this.log('info', `🎞 Bắt đầu tải footage "${d.ten}": ${lam.length} cảnh → ${d.thuMuc}`);
     try {
@@ -502,6 +518,15 @@ class QuanLyFootage {
         if (this.caiDat.boQuaDaCo && fs.existsSync(tep) && !x.clip) {
           x.trangThai = 'xong'; x.tepRa = tep; x.loi = ''; x.coSan = true; boQua++; this.luu(d); continue;
         }
+        if (x.matFile && x.clip && x.clip.url) {   // 1.6.4: file mất → tải lại đúng clip đã chọn, không tìm lại
+          try {
+            x.ungVien = [{ ...x.clip, tep: { url: x.clip.url, w: x.clip.w, h: x.clip.h } }]; x.viTri = 0;
+            await this.taiClip(d, x);
+            delete x.matFile; xong++;
+            continue;
+          } catch (_) { /* clip không còn trên trang → tìm lại như thường */ }
+        }
+        delete x.matFile;
         x.trangThai = 'tim'; x.loi = ''; this.luu(d);
         try {
           const { ds, loi } = await this.timUngVien(x, this.daDungTru(d, x));

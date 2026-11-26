@@ -1,4 +1,11 @@
-# AI Automation Studio 1.6.3
+# AI Automation Studio 1.6.4
+
+- **Sửa lỗi Footage: cảnh "Đã có" mà file đã bị xoá khỏi thư mục lưu thì không tải lại.** Nay bấm **Tải footage** là app thấy file mất và tải lại **đúng clip đã chọn** (không tìm lại; clip tải từ bản cũ chưa ghi địa chỉ thì tìm lại theo luật mới). Đổi thư mục lưu thì file ở thư mục cũ được chép sang, không tải lại.
+- Lọc đồ vật hiện đại bắt thêm: đường nhựa (asphalt), Bitcoin / tiền mã hoá, tài chính, hiệu sách, cửa hàng.
+- Cột tranh có `people` thì bỏ thêm clip có người chơi nhạc, nhạc cụ, người nhảy, người chạy, người hành hương…
+- Cách lấy lại file đã mất: mục Footage → **Tải footage**.
+
+## Bản 1.6.3
 
 - **Footage chọn clip chặt hơn nữa.** Cụm từ khoá có 1–2 danh từ chính thì clip phải khớp **hết** (trước chỉ cần một nửa: "stone steps" ra clip biển hoàng hôn vì chỉ có thẻ "Stone"; "scales of justice" ra clip lật hồ sơ vì có thẻ "Justice"). Cụm dài hơn vẫn cần khớp ít nhất một nửa.
 - Cột **tranh** có `people` / `person` / `man` / `woman` thì bỏ luôn clip có tay, nam, nữ, trẻ em… (Pixabay hay ghi thẻ "Hand", "Male").

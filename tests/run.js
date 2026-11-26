@@ -4470,6 +4470,40 @@ console.log('\n── 1.6.0 Footage (Pexels / Pixabay) ────────�
     } finally { fs.rmSync(tam, { recursive: true, force: true }); }
   });
 
+  testAsync('1.6.4 footage: cảnh "Đã có" mà file bị xoá ngoài app → Tải footage tải lại đúng clip đó (không tìm lại); đổi thư mục lưu → chép file sang; Bitcoin / đường nhựa / người chơi nhạc bị bỏ', async () => {
+    const pbx = (id, tags) => ({ id, pageURL: `https://pixabay.com/videos/id-${id}/`, tags, duration: 12, user: `u${id}`, user_id: id,
+      videos: { large: { url: `https://cdn.pixabay/${id}-l.mp4`, width: 1920, height: 1080 } } });
+    const { ql, tam, tai, goi } = dungFootage({ pixabayVid: (q) => /coin/.test(q) ? [pbx(1, 'bitcoin, coin, crypto'), pbx(2, 'roman, coin, ancient')]
+      : /road/.test(q) ? [pbx(3, 'roman, road, asphalt'), pbx(4, 'roman, road, cobblestone')] : /sunrise/.test(q) ? [pbx(5, 'sunrise, mountains, musician, cello'), pbx(6, 'sunrise, mountains')] : [] });
+    try {
+      ql.datCaiDat({ pixabayKey: 'p' });
+      const tep = path.join(tam, 'mat_footage.csv');
+      fs.writeFileSync(tep, 'scene,tu_khoa,giay_can,tranh\n1,roman coin,6,\n2,roman road,6,\n3,sunrise mountains,6,people\n');
+      ql.napTep(tep);
+      await ql.chay();
+      const id = (so) => { const x = ql.ds.canh.find((y) => y.so === so); return x.clip ? x.clip.id : x.trangThai; };
+      assert.deepStrictEqual([id(1), id(2), id(3)], ['pixabay-2', 'pixabay-4', 'pixabay-6']);
+      const thu = ql.ds.thuMuc;
+      // Xoá file ngoài app (như người dùng xoá thư mục Videos) — app vẫn ghi "Đã có".
+      fs.rmSync(path.join(thu, '0001.mp4')); fs.rmSync(path.join(thu, '0002.mp4'));
+      const nGoi = goi.length, nTai = tai.length;
+      const r = await ql.chay();
+      assert.strictEqual(r.xong, 2);
+      assert.ok(fs.existsSync(path.join(thu, '0001.mp4')) && fs.existsSync(path.join(thu, '0002.mp4')));
+      assert.deepStrictEqual([id(1), id(2)], ['pixabay-2', 'pixabay-4'], 'đúng clip cũ');
+      assert.strictEqual(goi.length, nGoi, 'không gọi API tìm lại');
+      assert.deepStrictEqual(tai.slice(nTai).sort(), ['https://cdn.pixabay/2-l.mp4', 'https://cdn.pixabay/4-l.mp4']);
+      // Đổi thư mục lưu → file chép sang, không tải.
+      const moi = path.join(tam, 'Videos2');
+      ql.datThuMuc(moi);
+      const nTai2 = tai.length;
+      await ql.chay();
+      assert.deepStrictEqual(fs.readdirSync(moi).filter((f) => f.endsWith('.mp4')).sort(), ['0001.mp4', '0002.mp4', '0003.mp4']);
+      assert.strictEqual(tai.length, nTai2, 'chép, không tải lại');
+      assert.ok(ql.ds.canh.every((x) => x.tepRa.startsWith(moi)));
+    } finally { fs.rmSync(tam, { recursive: true, force: true }); }
+  });
+
   test('1.6.0 Footage: trang Footage trong thanh trái + TEN_TRANG + vòng ẩn/hiện; lệnh có trong LENH; không tải Storyblocks bằng máy; ảnh nhỏ https được hiện', () => {
     const html = docNguon('src/ui/index.html', true), ui = docNguon('src/ui/app.js'), m = docNguon('main.js'), f = docNguon('src/main/footage.js', true);
     assert.ok(/data-trang="footage"/.test(html) && /id="trang-footage"/.test(html));
