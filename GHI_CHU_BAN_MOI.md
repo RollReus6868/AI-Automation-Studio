@@ -1,4 +1,12 @@
-# AI Automation Studio 1.6.1
+# AI Automation Studio 1.6.2
+
+- **Footage chọn clip đúng cảnh hơn.** Bản trước nhận cả clip chỉ trùng chữ phụ của từ khoá (vd tìm "candle flame close up" ra clip thịt xông khói vì có thẻ "Close Up"; "cinema projector" ra ghế sofa vì có thẻ "Old", "Books"). Nay app chấm khớp theo thẻ của clip: phải khớp **danh từ chính** của từ khoá (ít nhất một nửa), không tính chữ chung như *old, ancient, light, sunset, aerial, close up*. Không có clip khớp → cảnh báo **Lỗi** và cảnh đó dùng ảnh AI, không tải clip lạc đề.
+- **Bỏ clip có đồ vật hiện đại** (công tắc mới ở thẻ Khoá API, mặc định bật): bỏ clip có thành phố, nhà cao tầng, xe, đường, máy tính, bàn phím, điện thoại, tua-bin gió, tàu du lịch, sofa, đồ ăn hiện đại… — hợp video lịch sử / Kinh Thánh. Chữ có trong chính từ khoá của cảnh thì không bị bỏ (vd cảnh "roman road" vẫn nhận clip có đường).
+- Từ khoá gửi lên Pixabay / Pexels bỏ chữ "close up", "shot", "4k"… (những chữ này làm trang trả clip lạc đề). Cụm từ khoá đứng trước được ưu tiên.
+- Nút mới **Tìm lại tất cả**: clip app đã tải chuyển vào thư mục `_bo` (không xoá), rồi tìm và tải lại mọi cảnh theo cách chấm mới. File bạn tự đặt vào thư mục và cảnh đã Bỏ giữ nguyên.
+- Dùng cho danh sách đang mở: cập nhật xong → mục Footage → **Tìm lại tất cả**. Cảnh báo Lỗi nghĩa là không có clip đủ khớp — sửa từ khoá trong file hoặc để cảnh dùng ảnh AI.
+
+## Bản 1.6.1
 
 - **Sửa lỗi mục Footage**: bản 1.6.0 gọi sai địa chỉ API (nhật ký ghi "Failed to parse URL from undefined/api/videos/…"), nên mọi cảnh báo "không có clip hợp". Nay gọi đúng `pixabay.com` / `api.pexels.com`.
 - Chỉ có khoá **Pixabay** (Pexels đang tạm ngừng cấp khoá mới) vẫn chạy bình thường: app chỉ tìm trên Pixabay.

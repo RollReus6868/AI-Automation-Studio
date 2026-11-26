@@ -391,6 +391,7 @@
             <label>Cỡ clip muốn tải<select id="ftRong"><option value="1280">720p (nhẹ)</option><option value="1920">1080p (khuyên dùng)</option><option value="3840">4K (nặng)</option></select><small class="ghi-o">App lấy bản gần cỡ này nhất; clip không có bản đủ to thì lấy bản to nhất.</small></label>
           </div>
           <div class="dong-cong-tac"><div><b>Bỏ qua cảnh đã có file</b><small>Thư mục lưu đã có <code>0047.mp4</code> (vd bạn tự tải từ Storyblocks) thì không tải đè.</small></div><label class="cong-tac"><input type="checkbox" id="ftBoQua"><span></span></label></div>
+          <div class="dong-cong-tac"><div><b>Bỏ clip có đồ vật hiện đại</b><small>Cho video lịch sử / Kinh Thánh: bỏ clip có thành phố, xe, đường, máy tính, điện thoại, tua-bin gió, đồ ăn hiện đại… (trừ chữ có trong chính từ khoá của cảnh).</small></div><label class="cong-tac"><input type="checkbox" id="ftHienDai"><span></span></label></div>
           <div class="dong-o"><button class="nut-gradient" id="ftLuuKhoa"><i data-icon="check"></i>Lưu</button><small class="mo">Khoá lưu trong máy (thư mục dữ liệu app), không gửi đi đâu ngoài Pexels / Pixabay. Để trống ô khoá = giữ khoá cũ.</small></div>
         </div>
         <div class="the-cai" id="ftDsThe">
@@ -398,6 +399,7 @@
           <div class="dong-o ft-hang-nut">
             <button class="nut-vien" id="ftMoFile"><i data-icon="file-text"></i>Mở file footage…</button>
             <button class="nut-gradient" id="ftChay"><i data-icon="download"></i>Tải footage</button>
+            <button class="nut-vien" id="ftTimLai" title="Clip app đã tải chuyển vào thư mục _bo, tìm và tải lại mọi cảnh theo cách chấm khớp từ khoá mới (file bạn tự đặt vào thư mục giữ nguyên)"><i data-icon="refresh-cw"></i>Tìm lại tất cả</button>
             <button class="nut-vien" id="ftXoaDs" title="Đóng danh sách (không xoá file đã tải)"><i data-icon="x"></i>Đóng danh sách</button>
           </div>
           <div class="o-thu-muc-video ft-thu-muc"><b>Thư mục lưu</b>

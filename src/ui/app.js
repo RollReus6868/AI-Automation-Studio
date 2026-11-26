@@ -2195,6 +2195,7 @@
     $('#ftPixabay').placeholder = c.coPixabay ? `Đã có khoá …${c.pixabayDuoi} — dán khoá mới để đổi` : 'Dán khoá API Pixabay';
     $('#ftRong').value = String(c.rong);
     $('#ftBoQua').checked = !!c.boQuaDaCo;
+    $('#ftHienDai').checked = c.boHienDai !== false;
     veFootage();
   }
   function veFootage() {
@@ -2206,6 +2207,7 @@
     $('#ftTenDs').textContent = d ? ` — ${d.ten} (${d.canh.length} cảnh)` : '';
     if (document.activeElement !== $('#ftThuMuc')) $('#ftThuMuc').value = d ? d.thuMuc : '';
     for (const id of ['#ftChonThuMuc', '#ftMoThuMuc', '#ftXoaDs']) $(id).disabled = !d;
+    $('#ftTimLai').disabled = !d || !!f.dangChay;
     const nut = $('#ftChay');
     nut.disabled = !d;
     nut.classList.toggle('dung', !!f.dangChay);
@@ -2242,7 +2244,7 @@
   }
   function ganFootage() {
     $('#ftLuuKhoa').onclick = async () => {
-      const m = { rong: +$('#ftRong').value, boQuaDaCo: $('#ftBoQua').checked };
+      const m = { rong: +$('#ftRong').value, boQuaDaCo: $('#ftBoQua').checked, boHienDai: $('#ftHienDai').checked };
       if ($('#ftPexels').value.trim()) m.pexelsKey = $('#ftPexels').value.trim();
       if ($('#ftPixabay').value.trim()) m.pixabayKey = $('#ftPixabay').value.trim();
       const r = await api.call('footageDatCaiDat', m);
@@ -2259,6 +2261,11 @@
       if (!f || !f.ds) return;
       const r = await api.call(f.dangChay ? 'footageDung' : 'footageChay');
       if (r && r.ok === false) toast(r.loi || 'Không chạy được', true);
+    };
+    $('#ftTimLai').onclick = async () => {
+      if (!await xacNhan('Tìm lại footage cho mọi cảnh?', 'Clip app đã tải chuyển vào thư mục _bo (không xoá), rồi app tìm và tải lại theo cách chấm khớp từ khoá mới. File bạn tự đặt vào thư mục và cảnh đã Bỏ giữ nguyên.', 'Tìm lại')) return;
+      const r = await api.call('footageTimLai');
+      if (r && r.ok === false) toast(r.loi, true); else if (r) toast(`Tìm lại ${r.so} cảnh…`);
     };
     $('#ftXoaDs').onclick = async () => {
       if (!await xacNhan('Đóng danh sách footage?', 'File đã tải trong thư mục lưu vẫn giữ nguyên.', 'Đóng')) return;

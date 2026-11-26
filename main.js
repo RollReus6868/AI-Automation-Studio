@@ -1283,6 +1283,14 @@ const LENH = {
     return { ok: true };
   },
   footageDung: () => footage.dungLai(),
+  footageTimLai: () => {   // 1.6.2: clip cũ sang _bo, tìm + tải lại theo cách chấm khớp mới
+    const r = footage.timLai();
+    if (!r.ok) return r;
+    const loi = footage.loiTruocChay();
+    if (loi) return { ok: false, loi };
+    footage.chay().catch((e) => log('error', `❌ Footage: ${e.message}`));
+    return r;
+  },
   footageDoi: ({ so }) => footage.doi(so),
   footageBo: ({ so }) => footage.bo(so),
   footageLayLai: ({ so }) => footage.layLai(so),

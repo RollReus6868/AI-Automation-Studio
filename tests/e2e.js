@@ -167,7 +167,7 @@ function footageApi(req, res, goc) {
     const q = u.searchParams.get('q') || '';
     const hit = (id, giay, tags) => ({ id, pageURL: `https://pixabay.com/videos/${tags.split(',')[0]}-${id}/`, tags, duration: giay, user: `pixa${id}`, user_id: id,
       videos: { large: { url: `${goc}/__ft/clip/pb${id}-l.mp4`, width: 1920, height: 1080, thumbnail: ANH_NHO }, medium: { url: `${goc}/__ft/clip/pb${id}-m.mp4`, width: 1280, height: 720 } } });
-    const ds = /night|stars/.test(q) ? [hit(201, 12, 'night, sky, stars')] : /desert|sand/.test(q) ? [hit(501, 10, 'desert, dunes'), hit(502, 9, 'city, desert')] : [];
+    const ds = /night|stars/.test(q) ? [hit(201, 12, 'night, sky, stars')] : /desert|sand/.test(q) ? [hit(501, 10, 'desert, dunes, sand'), hit(502, 9, 'city, desert, dunes, sand'), hit(503, 9, 'meal, pan, close up, sand')] : [];
     return json({ total: ds.length, totalHits: ds.length, hits: ds });
   }
   json({ loi: 'khong-co' }, 404);

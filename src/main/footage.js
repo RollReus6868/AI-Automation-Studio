@@ -18,7 +18,7 @@ const { docXlsx, docCsv } = require('./doc-xlsx');
 
 const NGUON = ['pexels', 'pixabay'];
 const TEN_NGUON = { pexels: 'Pexels', pixabay: 'Pixabay' };
-const FOOTAGE_MAC_DINH = { pexelsKey: '', pixabayKey: '', rong: 1920, boQuaDaCo: true, mauTen: '{canh}' };
+const FOOTAGE_MAC_DINH = { pexelsKey: '', pixabayKey: '', rong: 1920, boQuaDaCo: true, mauTen: '{canh}', boHienDai: true };
 const CHO_GIUA_LAN_GOI_MS = 1200;      // giãn lượt gọi API (Pexels mặc định 200 lượt/giờ)
 const GIU_TIM_MS = 24 * 3600 * 1000;
 const GIU_UNG_VIEN = 8;                 // số clip dự phòng giữ cho mỗi cảnh (nút Đổi clip)   // Pixabay yêu cầu giữ kết quả tìm 24 giờ (dùng chung cho cả hai)
@@ -84,6 +84,53 @@ function docFileFootage(tep) {
 
 /** "Thien_su_footage.xlsx" → "Thien_su". */
 const tenDanhSach = (tep) => path.basename(String(tep || ''), path.extname(String(tep || ''))).replace(/[ _-]*footage$/i, '') || 'Footage';
+
+// ── 1.6.2: độ khớp từ khoá + bỏ đồ vật hiện đại ─────────────────────────────
+// Pixabay (và Pexels) trả cả clip chỉ khớp chữ phụ: "candle flame close up" → clip thịt xông khói (thẻ "Close Up"),
+// "cinema projector beam" → ghế sofa (thẻ "Old", "Books"). Nay chấm khớp theo thẻ / mô tả của clip: phải khớp danh
+// từ chính của cụm từ khoá, không đủ thì cảnh báo Lỗi (dùng ảnh AI) thay vì tải clip lạc đề.
+const TU_BO_QUA = new Set(['a', 'an', 'the', 'of', 'in', 'on', 'at', 'with', 'and', 'or', 'to', 'from', 'by', 'for', 'into', 'over',
+  'close', 'up', 'closeup', 'shot', 'view', 'footage', 'video', 'clip', '4k', 'hd', 'slow', 'motion', 'scene', 'broll', 'roll']);
+const TU_CHUNG = new Set(['old', 'ancient', 'aged', 'antique', 'vintage', 'historic', 'historical', 'light', 'lights', 'golden', 'gold',
+  'dark', 'night', 'day', 'sunset', 'sunrise', 'dawn', 'dusk', 'evening', 'morning', 'aerial', 'beautiful', 'nature', 'landscape',
+  'soft', 'warm', 'cold', 'cinematic', 'dramatic', 'glow', 'glowing', 'shadow', 'shadows', 'rays', 'time', 'lapse', 'timelapse', 'top',
+  'overhead', 'detail', 'details', 'texture', 'abstract', 'silhouette', 'big', 'small', 'large', 'empty', 'quiet', 'slowly', 'moving',
+  'wide', 'low', 'high', 'angle', 'background', 'color', 'colour', 'red', 'blue', 'green', 'white', 'black', 'brown']);
+/** Đồ vật / cảnh hiện đại — bỏ khi bật "Bỏ clip có đồ vật hiện đại" (trừ chữ có trong chính từ khoá của cảnh). */
+const TU_HIEN_DAI = ['city', 'cityscape', 'skyline', 'skyscraper', 'downtown', 'urban', 'office', 'car', 'traffic', 'highway', 'road',
+  'street', 'bus', 'truck', 'train', 'railway', 'airplane', 'aircraft', 'airport', 'cruise', 'yacht', 'ferry', 'computer', 'laptop',
+  'keyboard', 'mouse', 'typing', 'phone', 'smartphone', 'mobile', 'technology', 'screen', 'monitor', 'television', 'tv', 'cinema',
+  'projector', 'escalator', 'mall', 'shopping', 'supermarket', 'turbine', 'windmill', 'wind energy', 'electricity', 'power line',
+  'solar', 'factory', 'industry', 'industrial', 'neon', 'plastic', 'bacon', 'sofa', 'couch', 'furniture', 'chromakey', 'green screen',
+  'greenscreen', 'gaming', 'game', 'business', 'modern', 'motorcycle', 'scooter', 'bicycle', 'bike', 'camera', 'photographer', 'selfie',
+  'skateboard', 'gym', 'fitness', 'tourist', 'tourism', 'concert', 'party', 'fireworks', 'headphones', 'microphone', 'robot',
+  'christmas', 'santa', 'diwali', 'notebook', 'jeans', 'sneakers', 'glasses', 'apartment', 'hotel', 'pool', 'bar', 'coffee'];
+
+/** Chữ của cụm từ khoá → danh sách từ (thường, bỏ từ vô nghĩa). */
+const tachTu = (cum) => String(cum || '').toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').split(/\s+/).filter((w) => w && !TU_BO_QUA.has(w));
+/** Từ có trong mô tả clip (khớp nguyên từ, số nhiều đơn giản). */
+function coTu(chu, w) {
+  const c = ` ${chu} `;
+  if (c.includes(` ${w} `) || c.includes(` ${w}s `) || c.includes(` ${w}es `)) return true;
+  if (w.endsWith('ies') && c.includes(` ${w.slice(0, -3)}y `)) return true;
+  if (w.endsWith('s') && w.length > 3 && c.includes(` ${w.slice(0, -1)} `)) return true;
+  return false;
+}
+/**
+ * Độ khớp clip ↔ một cụm từ khoá: { dat, diem }. Đạt khi khớp ít nhất một nửa số TỪ CHÍNH (không tính từ chung như
+ * old / light / sunset / aerial) và ít nhất 1 từ chính; cụm toàn từ chung thì phải khớp ≥ một nửa số từ.
+ */
+function doKhop(c, cum) {
+  const tu = [...new Set(tachTu(cum))];
+  if (!tu.length) return { dat: false, diem: 0 };
+  const chinh = tu.filter((w) => !TU_CHUNG.has(w));
+  const khop = tu.filter((w) => coTu(c.chu || '', w));
+  const khopChinh = khop.filter((w) => !TU_CHUNG.has(w));
+  const dat = chinh.length ? khopChinh.length >= 1 && khopChinh.length * 2 >= chinh.length : khop.length >= 1 && khop.length * 2 >= tu.length;
+  return { dat, diem: khopChinh.length * 2 + (khop.length - khopChinh.length) };
+}
+/** Từ khoá gửi lên API: bỏ "close up", "shot", "4k"… (chữ đó làm Pixabay trả clip lạc đề). */
+const cauTim = (cum) => tachTu(cum).join(' ') || String(cum || '').trim();
 
 // ── Chuẩn hoá kết quả API ──────────────────────────────────────────────────
 /** Chọn tệp gần cỡ mong muốn: nhỏ nhất mà rộng ≥ rong; không có thì lớn nhất. */
@@ -220,6 +267,7 @@ class QuanLyFootage {
     c.pixabayKey = String(c.pixabayKey || '').trim();
     c.rong = [1280, 1920, 3840].includes(+c.rong) ? +c.rong : 1920;
     c.boQuaDaCo = !!c.boQuaDaCo;
+    c.boHienDai = c.boHienDai !== false;
     c.mauTen = String(c.mauTen || '{canh}').trim() || '{canh}';
     this.store.set({ footage: c });
     this.bao();
@@ -232,7 +280,7 @@ class QuanLyFootage {
   trangThai() {
     const c = this.caiDat;
     return {
-      caiDat: { coPexels: !!c.pexelsKey, coPixabay: !!c.pixabayKey, rong: c.rong, boQuaDaCo: c.boQuaDaCo, mauTen: c.mauTen,
+      caiDat: { coPexels: !!c.pexelsKey, coPixabay: !!c.pixabayKey, rong: c.rong, boQuaDaCo: c.boQuaDaCo, mauTen: c.mauTen, boHienDai: c.boHienDai,
         pexelsDuoi: c.pexelsKey.slice(-4), pixabayDuoi: c.pixabayKey.slice(-4) },
       dangChay: this.dangChay,
       // Không gửi danh sách ứng viên (có thể vài nghìn mục) — giao diện chỉ cần clip đang dùng.
@@ -296,10 +344,10 @@ class QuanLyFootage {
     this.lanGoiCuoi = Date.now();
     let url, headers = {};
     if (nguon === 'pexels') {
-      url = `${this.goc.pexels}/v1/videos/search?query=${encodeURIComponent(tuKhoa)}&orientation=landscape&per_page=40`;
+      url = `${this.goc.pexels}/v1/videos/search?query=${encodeURIComponent(cauTim(tuKhoa))}&orientation=landscape&per_page=40`;
       headers = { Authorization: c.pexelsKey };
     } else {
-      url = `${this.goc.pixabay}/api/videos/?key=${encodeURIComponent(c.pixabayKey)}&q=${encodeURIComponent(tuKhoa.slice(0, 100))}&video_type=film&safesearch=true&per_page=50` +
+      url = `${this.goc.pixabay}/api/videos/?key=${encodeURIComponent(c.pixabayKey)}&q=${encodeURIComponent(cauTim(tuKhoa).slice(0, 100))}&video_type=film&safesearch=true&per_page=50` +
         (can ? `&min_width=1280` : '');
     }
     let r;
@@ -343,29 +391,45 @@ class QuanLyFootage {
     return thuTu.filter((n) => co[n]);
   }
 
-  /** Tìm ứng viên cho một cảnh qua mọi cụm từ khoá / nguồn tới khi có (gộp, bỏ trùng). */
+  /**
+   * Tìm ứng viên cho một cảnh (1.6.2): gọi MỌI cụm từ khoá của nguồn đầu, giữ clip KHỚP từ khoá (doKhop), bỏ clip có
+   * chữ cần tránh / đồ vật hiện đại, rồi xếp: cụm đứng trước trước, khớp nhiều hơn trước, rồi độ dài / cỡ (xepUngVien).
+   * Nguồn đầu không có clip khớp → nguồn kế. Không có clip khớp nào → trả rỗng (cảnh báo Lỗi, dùng ảnh AI).
+   */
   async timUngVien(x, daDung) {
-    const ds = [];
     const loi = [];
     const nguon = this.nguonCho(x);
     if (!nguon.length) throw new Error('Chưa có khoá API Pexels hay Pixabay (nhập ở thẻ Khoá API)');
+    const tranh = [...(x.tranh || [])];
+    if (this.caiDat.boHienDai) {
+      const cua = ` ${x.tuKhoa.join(' ').toLowerCase()} `;
+      for (const w of TU_HIEN_DAI) if (!cua.includes(` ${w} `) && !cua.includes(` ${w}s `)) tranh.push(w);
+    }
+    let lac = 0;
     for (const n of nguon) {
-      for (const tk of x.tuKhoa) {
-        if (this.dung) return { ds, loi };
+      const gom = new Map();   // id → { c, diem, cum, thu }
+      for (let k = 0; k < x.tuKhoa.length; k++) {
+        if (this.dung) return { ds: [], loi };
         let kq;
-        try { kq = await this.goiApi(n, tk, x.giay); } catch (e) {
+        try { kq = await this.goiApi(n, x.tuKhoa[k], x.giay); } catch (e) {
           loi.push(this.anKhoa(e.message));
           if (e.hetLuot || e.saiKhoa) break;   // nguồn này hết lượt / sai khoá → sang nguồn kế
           continue;
         }
-        for (const c of xepUngVien(kq, { giay: x.giay, tranh: x.tranh, rong: this.caiDat.rong, daDung })) {
-          if (!ds.some((d) => d.id === c.id)) ds.push(c);
-        }
-        if (ds.length >= 3) return { ds, loi };
+        const xep = xepUngVien(kq, { giay: x.giay, tranh, rong: this.caiDat.rong, daDung });
+        xep.forEach((c, thu) => {
+          const kh = doKhop(c, x.tuKhoa[k]);
+          if (!kh.dat) { lac++; return; }
+          const cu = gom.get(c.id);
+          if (!cu) gom.set(c.id, { c, diem: kh.diem, cum: k, thu });   // cụm đầu tiên khớp clip này là cụm tính điểm
+        });
       }
+      // Cụm đứng trước (cụ thể nhất) trước; cùng cụm thì khớp nhiều từ hơn trước; rồi độ dài / cỡ / thứ tự trang.
+      const ds = [...gom.values()].sort((a, b) => a.cum - b.cum || b.diem - a.diem || a.thu - b.thu).map((v) => v.c);
       if (ds.length) return { ds, loi };
     }
-    return { ds, loi };
+    if (lac) loi.push(`${lac} clip tìm được không khớp từ khoá (chỉ trùng chữ phụ) — đã bỏ`);
+    return { ds: [], loi };
   }
 
   daDungTru(d, x) { return new Set(d.canh.filter((y) => y !== x && y.clip && y.trangThai !== 'bo').map((y) => y.clip.id)); }
@@ -422,7 +486,7 @@ class QuanLyFootage {
         try {
           const { ds, loi } = await this.timUngVien(x, this.daDungTru(d, x));
           if (this.dung) { x.trangThai = 'cho'; break; }
-          if (!ds.length) throw new Error(`không có clip hợp (ngang, ≥ ${Math.round(x.giay * 0.8)} giây${x.tranh.length ? `, không có: ${x.tranh.join(', ')}` : ''})${loi.length ? ` — ${loi[loi.length - 1]}` : ''}`);
+          if (!ds.length) throw new Error(`không có clip khớp từ khoá (ngang, ≥ ${Math.round(x.giay * 0.8)} giây${x.tranh.length ? `, không có: ${x.tranh.join(', ')}` : ''}${this.caiDat.boHienDai ? ', không đồ vật hiện đại' : ''})${loi.length ? ` — ${loi[loi.length - 1]}` : ''} — sửa từ khoá hoặc để cảnh dùng ảnh AI`);
           x.ungVien = ds.slice(0, GIU_UNG_VIEN); x.viTri = 0;   // giữ ít ứng viên cho du-lieu.json gọn
           await this.taiClip(d, x);
           xong++;
@@ -473,6 +537,32 @@ class QuanLyFootage {
     } finally { this.dangChay = false; this.bao(); }
   }
 
+  /**
+   * 1.6.2 "Tìm lại tất cả": clip do app tải (không đụng file bạn tự đặt vào thư mục) chuyển vào _bo, cảnh về Chờ,
+   * rồi tải lại theo cách chấm khớp mới. Cảnh đã Bỏ giữ nguyên.
+   */
+  timLai() {
+    const d = this.ds;
+    if (!d) return { ok: false, loi: 'Chưa mở danh sách footage' };
+    if (this.dangChay) return { ok: false, loi: 'Đang tải — bấm Dừng trước' };
+    let so = 0;
+    for (const x of d.canh) {
+      if (x.trangThai === 'bo' || x.coSan) continue;
+      if (x.tepRa && x.clip && fs.existsSync(x.tepRa)) {
+        const dich = path.join(path.dirname(x.tepRa), '_bo', path.basename(x.tepRa));
+        fs.mkdirSync(path.dirname(dich), { recursive: true });
+        try { fs.rmSync(dich, { force: true }); } catch (_) {}
+        fs.renameSync(x.tepRa, dich);
+      }
+      Object.assign(x, { trangThai: 'cho', clip: null, ungVien: null, viTri: -1, loi: '', tepRa: '' });
+      so++;
+    }
+    this.ghiNguon(d);
+    this.luu(d);
+    this.log('info', `🎞 Tìm lại footage "${d.ten}": ${so} cảnh về Chờ (clip cũ chuyển vào _bo)`);
+    return { ok: true, so };
+  }
+
   /** Bỏ footage của cảnh: chuyển file sang thư mục con _bo (CapCut chỉ đọc file nằm ngay trong Videos/). */
   bo(so) {
     const d = this.ds;
@@ -508,4 +598,4 @@ class QuanLyFootage {
   }
 }
 
-module.exports = { QuanLyFootage, docHang, docFileFootage, chuanPexels, chuanPixabay, xepUngVien, chonTep, coChuTranh, tenFootage, chuoiSo, tenDanhSach, FOOTAGE_MAC_DINH };
+module.exports = { QuanLyFootage, doKhop, tachTu, cauTim, TU_HIEN_DAI, docHang, docFileFootage, chuanPexels, chuanPixabay, xepUngVien, chonTep, coChuTranh, tenFootage, chuoiSo, tenDanhSach, FOOTAGE_MAC_DINH };
