@@ -104,7 +104,13 @@ const TU_HIEN_DAI = ['city', 'cityscape', 'skyline', 'skyscraper', 'downtown', '
   'solar', 'factory', 'industry', 'industrial', 'neon', 'plastic', 'bacon', 'sofa', 'couch', 'furniture', 'chromakey', 'green screen',
   'greenscreen', 'gaming', 'game', 'business', 'modern', 'motorcycle', 'scooter', 'bicycle', 'bike', 'camera', 'photographer', 'selfie',
   'skateboard', 'gym', 'fitness', 'tourist', 'tourism', 'concert', 'party', 'fireworks', 'headphones', 'microphone', 'robot',
-  'christmas', 'santa', 'diwali', 'notebook', 'jeans', 'sneakers', 'glasses', 'apartment', 'hotel', 'pool', 'bar', 'coffee'];
+  'christmas', 'santa', 'diwali', 'notebook', 'jeans', 'sneakers', 'glasses', 'apartment', 'hotel', 'pool', 'bar', 'coffee',
+  // 1.6.3 (clip lạc đề thật 26/11/2026: thư viện trường học, lật hồ sơ, xích đu, nghĩa trang có bia chữ, đèn phố nhoè, băng từ)
+  'school', 'classroom', 'student', 'university', 'reading room', 'file', 'folder', 'spreadsheet', 'cabinet', 'swing', 'porch', 'bench',
+  'cemetery', 'gravestone', 'headstone', 'bokeh', 'tape', 'cassette', 'vinyl', 'polaroid', 'marina', 'mandala', 'yoga', 'meditation', 'zen'];
+/** 1.6.3: "people / person / man / woman" trong cột tranh → bỏ cả clip có tay, nam, nữ, trẻ em… (thẻ Pixabay hay ghi "Hand", "Male"). */
+const TU_NGUOI = ['man', 'men', 'woman', 'women', 'male', 'female', 'girl', 'boy', 'child', 'children', 'kid', 'hand', 'hands', 'finger',
+  'face', 'portrait', 'human', 'adult', 'lady', 'guy', 'couple', 'family', 'businessman', 'worker', 'student', 'tourist'];
 
 /** Chữ của cụm từ khoá → danh sách từ (thường, bỏ từ vô nghĩa). */
 const tachTu = (cum) => String(cum || '').toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').split(/\s+/).filter((w) => w && !TU_BO_QUA.has(w));
@@ -117,8 +123,8 @@ function coTu(chu, w) {
   return false;
 }
 /**
- * Độ khớp clip ↔ một cụm từ khoá: { dat, diem }. Đạt khi khớp ít nhất một nửa số TỪ CHÍNH (không tính từ chung như
- * old / light / sunset / aerial) và ít nhất 1 từ chính; cụm toàn từ chung thì phải khớp ≥ một nửa số từ.
+ * Độ khớp clip ↔ một cụm từ khoá: { dat, diem }. Đạt khi khớp HẾT từ chính nếu cụm có ≤ 2 từ chính, còn lại ≥ một
+ * nửa (từ chính = không phải từ chung như old / light / sunset / aerial); cụm toàn từ chung thì phải khớp ≥ một nửa số từ.
  */
 function doKhop(c, cum) {
   const tu = [...new Set(tachTu(cum))];
@@ -126,7 +132,10 @@ function doKhop(c, cum) {
   const chinh = tu.filter((w) => !TU_CHUNG.has(w));
   const khop = tu.filter((w) => coTu(c.chu || '', w));
   const khopChinh = khop.filter((w) => !TU_CHUNG.has(w));
-  const dat = chinh.length ? khopChinh.length >= 1 && khopChinh.length * 2 >= chinh.length : khop.length >= 1 && khop.length * 2 >= tu.length;
+  // 1.6.3: cụm ≤ 2 từ chính phải khớp HẾT ("stone steps" mà clip chỉ có thẻ "Stone" → biển lúc hoàng hôn, 26/11/2026);
+  // cụm dài hơn khớp ≥ một nửa.
+  const canChinh = chinh.length <= 2 ? chinh.length : Math.ceil(chinh.length / 2);
+  const dat = chinh.length ? khopChinh.length >= canChinh : khop.length >= 1 && khop.length * 2 >= tu.length;
   return { dat, diem: khopChinh.length * 2 + (khop.length - khopChinh.length) };
 }
 /** Từ khoá gửi lên API: bỏ "close up", "shot", "4k"… (chữ đó làm Pixabay trả clip lạc đề). */
@@ -304,15 +313,25 @@ class QuanLyFootage {
     const moi = { tep, ten, thuMuc, napLuc: Date.now(), loiDoc: loi,
       canh: ds.map((x) => ({ ...x, trangThai: 'cho', clip: null, ungVien: null, viTri: -1, loi: '', tepRa: '' })) };
     // Mở lại đúng file cũ: giữ clip đã tải của cảnh có cùng từ khoá.
+    let chuyen = 0;
     if (cu) {
       for (const x of moi.canh) {
         const y = cu.canh.find((z) => z.so === x.so && z.tuKhoa.join('|') === x.tuKhoa.join('|'));
         if (y && (y.trangThai === 'xong' || y.trangThai === 'bo')) Object.assign(x, { trangThai: y.trangThai, clip: y.clip, ungVien: y.ungVien, viTri: y.viTri, tepRa: y.tepRa });
       }
+      // 1.6.3: file sửa lại (bỏ cảnh / đổi từ khoá) → clip APP đã tải cho cảnh đó chuyển vào _bo, kẻo CapCut vẫn dùng clip cũ
+      // hoặc "Bỏ qua cảnh đã có file" coi nó là file bạn tự đặt. File bạn tự đặt (coSan, không có clip) giữ nguyên.
+      for (const y of cu.canh) {
+        if (!y.clip || !y.tepRa || y.trangThai === 'bo') continue;
+        const x = moi.canh.find((z) => z.so === y.so);
+        if (x && x.clip) continue;
+        if (this.chuyenBo(y.tepRa)) chuyen++;
+      }
     }
     this.luu(moi);
+    if (chuyen) this.log('info', `🎞 File footage đã sửa: ${chuyen} clip của cảnh bị bỏ / đổi từ khoá chuyển vào _bo`);
     this.log('info', `🎞 Mở danh sách footage "${ten}": ${moi.canh.length} cảnh${loi.length ? ` · ${loi.length} dòng bỏ qua (${loi.slice(0, 3).join(' · ')}${loi.length > 3 ? '…' : ''})` : ''}`);
-    return { ok: true, so: moi.canh.length, loi };
+    return { ok: true, so: moi.canh.length, loi, chuyen };
   }
 
   datThuMuc(thuMuc) {
@@ -401,6 +420,7 @@ class QuanLyFootage {
     const nguon = this.nguonCho(x);
     if (!nguon.length) throw new Error('Chưa có khoá API Pexels hay Pixabay (nhập ở thẻ Khoá API)');
     const tranh = [...(x.tranh || [])];
+    if (tranh.some((w) => ['people', 'person', 'man', 'woman', 'human'].includes(w))) tranh.push(...TU_NGUOI.filter((w) => !tranh.includes(w)));
     if (this.caiDat.boHienDai) {
       const cua = ` ${x.tuKhoa.join(' ').toLowerCase()} `;
       for (const w of TU_HIEN_DAI) if (!cua.includes(` ${w} `) && !cua.includes(` ${w}s `)) tranh.push(w);
@@ -561,6 +581,16 @@ class QuanLyFootage {
     this.luu(d);
     this.log('info', `🎞 Tìm lại footage "${d.ten}": ${so} cảnh về Chờ (clip cũ chuyển vào _bo)`);
     return { ok: true, so };
+  }
+
+  /** Chuyển một file footage vào thư mục con _bo (ghi đè bản cũ trong _bo). true nếu đã chuyển. */
+  chuyenBo(tep) {
+    if (!tep || !fs.existsSync(tep)) return false;
+    const dich = path.join(path.dirname(tep), '_bo', path.basename(tep));
+    fs.mkdirSync(path.dirname(dich), { recursive: true });
+    try { fs.rmSync(dich, { force: true }); } catch (_) {}
+    fs.renameSync(tep, dich);
+    return true;
   }
 
   /** Bỏ footage của cảnh: chuyển file sang thư mục con _bo (CapCut chỉ đọc file nằm ngay trong Videos/). */

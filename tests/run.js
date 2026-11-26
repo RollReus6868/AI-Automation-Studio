@@ -4249,7 +4249,7 @@ console.log('\n── 1.6.0 Footage (Pexels / Pixabay) ────────�
     return { ql, goi, tai, tam, m, store };
   }
   const tuKhoaPexels = (q) => (/desert/.test(q) ? [pexelsVid(11, { giay: 9 }), pexelsVid(12, { giay: 8, slug: 'people-city' }), pexelsVid(13, { giay: 12 })]
-    : /cave/.test(q) ? [pexelsVid(11, { giay: 9 }), pexelsVid(21, { giay: 10, slug: 'cave' })] : /olive/.test(q) ? [pexelsVid(31, { giay: 7, slug: 'olive-tree-branches' })] : []);
+    : /cave/.test(q) ? [pexelsVid(11, { giay: 9 }), pexelsVid(21, { giay: 10, slug: 'cave-entrance' })] : /olive/.test(q) ? [pexelsVid(31, { giay: 7, slug: 'olive-tree-branches' })] : []);
 
   testAsync('footage: tải cả danh sách — đúng tên 0003.mp4…, nguồn auto/pixabay, không trùng clip, ghi nguon-footage.txt, khoá không lộ ra giao diện', async () => {
     const { ql, goi, tai, tam, m } = dungFootage({ pexelsVid: tuKhoaPexels, pixabayVid: (q) => (/night/.test(q) ? [pixabayVid(41)] : []) });
@@ -4288,7 +4288,7 @@ console.log('\n── 1.6.0 Footage (Pexels / Pixabay) ────────�
   });
 
   testAsync('footage: Pexels hết lượt (429) → cảnh sau sang Pixabay ngay, không gọi Pexels nữa; không có clip hợp → Lỗi có lý do', async () => {
-    const { ql, goi, tam, m } = dungFootage({ pexelsVid: tuKhoaPexels, pixabayVid: (q) => (/desert|sand/.test(q) ? [pixabayVid(51, { tags: 'desert' })] : []) });
+    const { ql, goi, tam, m } = dungFootage({ pexelsVid: tuKhoaPexels, pixabayVid: (q) => (/desert|sand/.test(q) ? [pixabayVid(51, { tags: 'desert, dunes' })] : []) });
     try {
       ql.datCaiDat({ pexelsKey: 'k', pixabayKey: 'p' });
       ql.napTep(path.join(__dirname, 'fixture-footage.xlsx'));
@@ -4378,7 +4378,8 @@ console.log('\n── 1.6.0 Footage (Pexels / Pixabay) ────────�
     assert.strictEqual(F.doKhop(sofa, 'cinema projector beam').dat, false);
     assert.strictEqual(F.doKhop(sofa, 'aged books close up').dat, true, 'khớp "books" (danh từ chính) thì vẫn đạt — phần lọc đồ hiện đại bắt "sofa"');
     assert.strictEqual(F.doKhop(the('Candle, Flame, Light, Fire, Wax'), 'candle flame close up').dat, true);
-    assert.strictEqual(F.doKhop(the('Cave, Rock, Stone'), 'ancient cave entrance').dat, true, '"ancient" là từ chung — khớp cave đủ một nửa từ chính');
+    assert.strictEqual(F.doKhop(the('Cave, Entrance, Rock'), 'ancient cave entrance').dat, true, '"ancient" là từ chung — khớp cave + entrance');
+    assert.strictEqual(F.doKhop(the('Cave, Rock, Stone'), 'ancient cave entrance').dat, false, '1.6.3: cụm 2 từ chính phải khớp hết');
     assert.strictEqual(F.doKhop(the('Statue, Neptune, Sculpture, Sky'), 'roman marble ruins columns').dat, false, 'cần ≥ 2/4 từ chính');
     assert.strictEqual(F.doKhop(the('Rome, Ruins, Columns, Forum'), 'roman marble ruins columns').dat, true);
     assert.strictEqual(F.doKhop(the('Sunset, Sky, Clouds'), 'golden sunset').dat, true, 'cụm toàn từ chung: khớp một nửa');
@@ -4395,7 +4396,7 @@ console.log('\n── 1.6.0 Footage (Pexels / Pixabay) ────────�
       videos: { large: { url: `https://cdn.pixabay/${id}-l.mp4`, width: 1920, height: 1080 } } });
     const { ql, tam, tai } = dungFootage({ pixabayVid: (q) => /ruins/.test(q) ? [pbx(1, 'ruins, city, skyline, sunset'), pbx(2, 'ruins, rome, columns, sunset')]
       : /road/.test(q) ? [pbx(3, 'roman, road, stones')] : /desert/.test(q) ? [pbx(4, 'desert, wind turbine, energy'), pbx(5, 'desert, dunes')]
-        : /cave/.test(q) ? [pbx(6, 'cave, keyboard')] : /olive/.test(q) ? [pbx(7, 'olive, tree')] : /candle/.test(q) ? [pbx(8, 'meal, pan, close up')] : [] });
+        : /cave/.test(q) ? [pbx(6, 'cave, entrance, keyboard')] : /olive/.test(q) ? [pbx(7, 'olive, tree')] : /candle/.test(q) ? [pbx(8, 'meal, pan, close up')] : [] });
     try {
       ql.datCaiDat({ pixabayKey: 'p' });
       const tep = path.join(tam, 'thu_footage.csv');
@@ -4429,6 +4430,43 @@ console.log('\n── 1.6.0 Footage (Pexels / Pixabay) ────────�
       assert.strictEqual(id(1), 'pixabay-2'); assert.strictEqual(id(4), 'loi');
       assert.strictEqual(tai.length, n + 1, 'chỉ tải lại cảnh khớp');
       assert.ok(/footageTimLai: \(\) => \{/.test(docNguon('main.js')) && /id="ftTimLai"/.test(docNguon('src/ui/index.html', true)) && /id="ftHienDai"/.test(docNguon('src/ui/index.html', true)));
+    } finally { fs.rmSync(tam, { recursive: true, force: true }); }
+  });
+
+  test('1.6.3 footage: cụm 2 từ chính phải khớp hết — thẻ thật của clip lạc đề lần 2 (biển cho "stone steps", hồ sơ cho "scales of justice", đèn phố cho "dusk city walls")', () => {
+    const the = (tags) => ({ chu: tags.toLowerCase().replace(/[^a-z0-9]+/g, ' ') });
+    assert.strictEqual(F.doKhop(the('Sunset, Ocean, Sea, Sky, Drone, Dji, Stone, Evening, Nature'), 'stone steps evening').dat, false);
+    assert.strictEqual(F.doKhop(the('File, Folder, Document, Cabinet, Archive, Spreadsheet, Paper, Law, Libra, Justice, Weigh, Judge, Paragraph, Balance'), 'scales of justice').dat, false);
+    assert.strictEqual(F.doKhop(the('Bokeh, Blur, Lights, Night, City, Walking, Town, Beautiful Wallpaper, Evening, Relaxed, Background'), 'dusk city walls').dat, false);
+    assert.strictEqual(F.doKhop(the('Stone, Stairs, Steps, Old'), 'stone steps evening').dat, true);
+    assert.strictEqual(F.doKhop(the('Roman, Forum, Ruins, Columns'), 'roman forum ruins columns').dat, true, 'cụm 4 từ chính: khớp ≥ 2');
+    assert.strictEqual(F.doKhop(the('Jerusalem, Israel'), 'jerusalem').dat, true);
+  });
+
+  testAsync('1.6.3 footage: "people" trong cột tranh bỏ cả clip có tay / nam / nữ; thư viện trường học, hồ sơ bị coi là hiện đại; sửa file (bỏ cảnh, đổi từ khoá) → clip app tải chuyển vào _bo', async () => {
+    const pbx = (id, tags) => ({ id, pageURL: `https://pixabay.com/videos/id-${id}/`, tags, duration: 12, user: `u${id}`, user_id: id,
+      videos: { large: { url: `https://cdn.pixabay/${id}-l.mp4`, width: 1920, height: 1080 } } });
+    const { ql, tam } = dungFootage({ pixabayVid: (q) => /books/.test(q) ? [pbx(1, 'book, shelf, books, old, hand, male'), pbx(2, 'library, books, old, shelves, school'), pbx(3, 'books, shelf')]
+      : /olive/.test(q) ? [pbx(4, 'olive, tree')] : /ruins/.test(q) ? [pbx(5, 'roman, ruins')] : [] });
+    try {
+      ql.datCaiDat({ pixabayKey: 'p' });
+      const tep = path.join(tam, 'sua_footage.csv');
+      fs.writeFileSync(tep, 'scene,tu_khoa,giay_can,tranh\n1,old books shelf,6,people\n2,olive tree,6,\n3,roman ruins,6,\n');
+      ql.napTep(tep);
+      await ql.chay();
+      const id = (so) => { const x = ql.ds.canh.find((y) => y.so === so); return x ? (x.clip ? x.clip.id : x.trangThai) : 'khong'; };
+      assert.strictEqual(id(1), 'pixabay-3', 'bỏ clip có "hand, male" (tranh people) và thư viện có "school"');
+      const thu = ql.ds.thuMuc;
+      fs.writeFileSync(path.join(thu, '0009.mp4'), 'tu dat');   // file người dùng tự đặt, không có trong danh sách
+      // Sửa file: bỏ cảnh 2, đổi từ khoá cảnh 3, giữ cảnh 1.
+      fs.writeFileSync(tep, 'scene,tu_khoa,giay_can,tranh\n1,old books shelf,6,people\n3,roman forum,6,\n');
+      const r = ql.napTep(tep);
+      assert.strictEqual(r.chuyen, 2);
+      assert.ok(!fs.existsSync(path.join(thu, '0002.mp4')) && fs.existsSync(path.join(thu, '_bo', '0002.mp4')), 'cảnh bị bỏ khỏi file → clip vào _bo');
+      assert.ok(!fs.existsSync(path.join(thu, '0003.mp4')) && fs.existsSync(path.join(thu, '_bo', '0003.mp4')), 'đổi từ khoá → clip cũ vào _bo (không bị coi là file tự đặt)');
+      assert.ok(fs.existsSync(path.join(thu, '0001.mp4')) && id(1) === 'pixabay-3', 'cảnh giữ nguyên từ khoá giữ clip');
+      assert.ok(fs.existsSync(path.join(thu, '0009.mp4')), 'file tự đặt không đụng');
+      assert.strictEqual(id(3), 'cho');
     } finally { fs.rmSync(tam, { recursive: true, force: true }); }
   });
 
