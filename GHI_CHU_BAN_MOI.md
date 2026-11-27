@@ -1,4 +1,23 @@
-# AI Automation Studio 1.6.6
+# AI Automation Studio 1.7.0
+
+- **Mục mới: Motion** (thanh bên trái, dưới *Footage*) — tạo **video motion graphic** cho những cảnh của kịch bản nên làm bằng đồ họa chuyển động, bằng **Remotion**. 5 mẫu:
+  - **Bản đồ hành trình**: bản đồ cổ vùng đất Kinh Thánh (bờ biển, sông Giô-đanh, Nin, Ơ-phơ-rát, Ti-gơ-rơ, biển Ga-li-lê, Biển Chết), đường đi vẽ dần qua từng địa danh, mỗi nơi bật lên khi đường đi tới. App biết sẵn ~170 địa danh (Jerusalén / Giê-ru-sa-lem / Jerusalem đều được); nơi lạ ghi thêm toạ độ, vd `Mari @ 34.55, 40.89`.
+  - **Dòng thời gian lớn**: trục vẽ dần, mốc bật lên lần lượt, mốc đang kể sáng hơn; nhiều mốc thì khung hình trôi theo.
+  - **Câu Kinh Thánh toàn màn hình**: chữ hiện dần từng chữ, chữ nhấn màu vàng, dòng nguyên ngữ Hê-bơ-rơ / Hy Lạp phía trên, tham chiếu ở dưới.
+  - **Cây phả hệ**: các thế hệ hiện lần lượt, đường nối vẽ từ cha xuống con, người đang kể tới tô màu.
+  - **So sánh**: hai cột đối nhau, từng cặp dòng hiện xen kẽ, câu kết luận ở cuối.
+- **Nền là ảnh AI của chính cảnh** (thư mục `images`), làm mờ và tối dần để chữ nổi lên. **Video dài bằng giọng đọc của cảnh** (thư mục `Audio`) cộng một đoạn đệm (mặc định 1 giây), lưu thành `Videos/0012.mp4` — CapCut Draft Studio thấy video có số cảnh thì dùng thay cho ảnh. Video không trong suốt (H.264) nên CapCut chạy nhẹ.
+- Cách dùng:
+  1. Nhờ skill chia cảnh xuất thêm file `<tên>_motion.xlsx` (skill tự chọn cảnh nào nên làm motion).
+  2. Đặt file vào thư mục dự án (chỗ có `images` và `Audio`).
+  3. Mục **Motion** → **Mở file motion…** → **Tạo video**.
+- Video AI cũ cùng số cảnh (nếu có) chuyển vào thư mục `Videos/_bo`, không xoá. Mỗi dòng cảnh có **Xem**, **Tạo lại**, **Bỏ** / **Lấy lại**. Nút **Chép số** cho dãy số cảnh dùng motion — dán vào *Chọn số* ở trang Tạo video để khỏi tốn lượt tạo video AI cho các cảnh đó.
+- Cài đặt: khung hình (720p / 1080p / 4K), số khung hình / giây (nên trùng project CapCut, mặc định 30), đệm sau giọng đọc, màu nhấn, thay video đã có.
+- Dòng nào trong file ghi sai (địa danh lạ, thiếu mốc…), app báo rõ lý do ở đầu danh sách; các dòng khác vẫn chạy.
+- Lần đầu bấm Tạo video, app tải trình vẽ của Remotion (~100 MB, một lần). Không tải được thì app dùng Chrome / Edge có sẵn trên máy.
+- Mọi thứ khác giữ nguyên như 1.6.6.
+
+## Bản 1.6.6
 
 - **Footage: chế độ Tải tay.** Dùng khi không có khoá API (Pexels đã ngừng cấp khoá mới) hoặc muốn tự chọn clip, kể cả Storyblocks nếu bạn có gói. Mục Footage → mở file footage → khung **Tải tay** → chọn trang (Pexels / Pixabay / Storyblocks) → **Mở trang tải tay**.
 - App mở một cửa sổ trang tìm video **đúng từ khoá của cảnh** đầu tiên còn thiếu footage. Lần đầu bạn tự đăng nhập trong cửa sổ đó; app nhớ đăng nhập riêng cho từng trang.

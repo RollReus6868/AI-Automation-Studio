@@ -4644,7 +4644,7 @@ console.log('\n── 1.6.0 Footage (Pexels / Pixabay) ────────�
   test('1.6.0 Footage: trang Footage trong thanh trái + TEN_TRANG + vòng ẩn/hiện; lệnh có trong LENH; không tải Storyblocks bằng máy; ảnh nhỏ https được hiện', () => {
     const html = docNguon('src/ui/index.html', true), ui = docNguon('src/ui/app.js'), m = docNguon('main.js'), f = docNguon('src/main/footage.js', true);
     assert.ok(/data-trang="footage"/.test(html) && /id="trang-footage"/.test(html));
-    assert.ok(/footage: 'Footage'/.test(ui) && /\['footage', 'hengio'/.test(ui) && /if \(trang === 'footage'\) napFootage\(\);/.test(ui) && /if \(U\.trang === 'footage'\) veFootage\(\);/.test(ui));
+    assert.ok(/footage: 'Footage'/.test(ui) && /\['footage', 'motion', 'hengio'/.test(ui) && /if \(trang === 'footage'\) napFootage\(\);/.test(ui) && /if \(U\.trang === 'footage'\) veFootage\(\);/.test(ui));
     for (const l of ['footageDatCaiDat', 'footageMoFile', 'footageNapTep', 'footageChonThuMuc', 'footageChay', 'footageDung', 'footageDoi', 'footageBo', 'footageLayLai', 'footageXoaDs']) {
       assert.ok(new RegExp(`\\n  ${l}: `).test(m), `LENH.${l}`);
     }
@@ -4655,6 +4655,262 @@ console.log('\n── 1.6.0 Footage (Pexels / Pixabay) ────────�
     assert.ok(/img-src 'self' file: data: blob: https:;/.test(html) && !/script-src[^;]*https/.test(html));
     for (const w of ['build-windows.yml', 'build-mac.yml']) assert.ok(/run: node tests\/e2e\.js footage/.test(docNguon(`.github/workflows/${w}`, true)), `${w} chạy e2e footage`);
     assert.ok(/FOOTAGE \? 'tests\/footage-e2e-chay\.js'/.test(docNguon('tests/e2e.js', true)));
+  });
+}
+
+console.log('\n── 1.7.0 Motion graphic theo cảnh (Remotion) ─────');
+{
+  const os = require('os');
+  const M = require('../src/main/motion');
+  const DD2 = require('../src/main/motion-dia-danh');
+  const mp3 = fs.readFileSync(path.join(__dirname, 'fixture-giong.mp3'));
+  const giaStore = (data = {}) => ({ data, set(o) { Object.assign(this.data, o); } });
+  /** Dự án mẫu: images 003/009/011/012.png, Audio 0003… .mp3, Videos có 0003.mp4 (video AI cũ). */
+  const duAnMau = () => {
+    const goc = fs.mkdtempSync(path.join(os.tmpdir(), 'motion-'));
+    for (const d of ['images', 'Audio', 'Videos']) fs.mkdirSync(path.join(goc, d));
+    for (const so of [3, 9, 11, 12]) {
+      fs.writeFileSync(path.join(goc, 'images', `${String(so).padStart(3, '0')}.png`), 'png');
+      fs.writeFileSync(path.join(goc, 'Audio', `${String(so).padStart(4, '0')}.mp3`), mp3);
+    }
+    fs.writeFileSync(path.join(goc, 'Videos', '0003.mp4'), 'video AI cu');
+    fs.copyFileSync(path.join(__dirname, 'fixture-motion.xlsx'), path.join(goc, 'Naaman_motion.xlsx'));
+    return goc;
+  };
+  /** Tiến trình vẽ giả: start → progress → ghi file → done; hong = { so: 'lỗi' } → fail; dungSau = dừng sau n việc. */
+  const veGia = (o = {}) => () => {
+    let dung = false;
+    return {
+      async chay(spec, on) {
+        on({ event: 'browser', kind: 'system', path: '/usr/bin/chrome' });
+        for (let i = 0; i < spec.jobs.length; i++) {
+          if (dung) break;
+          const j = spec.jobs[i];
+          (o.ghi || []).push(j);
+          on({ event: 'start', i });
+          on({ event: 'progress', i, p: 0.5 });
+          if (o.cho) await new Promise((r) => setTimeout(r, o.cho));
+          if (dung) break;
+          if (o.hong && o.hong[j.so]) { on({ event: 'fail', i, error: o.hong[j.so] }); continue; }
+          fs.writeFileSync(j.out, `mp4 ${j.comp} ${j.props.frames}`);
+          on({ event: 'done', i, out: j.out, sec: 1 });
+        }
+        if (o.chet) on({ event: 'error', text: 'Tiến trình vẽ dừng (mã 1)' });
+        on({ event: 'finished' });
+      },
+      dung() { dung = true; return Promise.resolve(); }
+    };
+  };
+
+  test('motion: đọc fixture-motion.xlsx — sheet MOTION theo tên, 5 cảnh, bí danh mẫu, dòng lỗi có lý do', () => {
+    const r = M.docFileMotion(path.join(__dirname, 'fixture-motion.xlsx'));
+    assert.deepStrictEqual(r.ds.map((x) => `${x.so}:${x.mau}`), ['3:BAN_DO', '5:CAU_KINH', '9:SO_SANH', '11:DONG_THOI_GIAN', '12:PHA_HE']);
+    assert.strictEqual(r.loi.length, 2);
+    assert.ok(/Atlántida/.test(r.loi[0]) && /vĩ độ, kinh độ/.test(r.loi[0]) && /HOAT_HINH/.test(r.loi[1]), r.loi.join(' | '));
+    const [bd, ck, ss, tg, ph] = r.ds;
+    assert.strictEqual(bd.canh, '0003');
+    assert.deepStrictEqual(bd.props.diem.map((d) => d.ten), ['Damasco', 'Samaria', 'Río Jordán']);
+    assert.ok(bd.props.tuyen && bd.props.nhan === '2 Reyes 5' && bd.props.chuThich === 'c. 850 a.C.');
+    assert.ok(Math.abs(bd.props.diem[0].lat - 33.51) < 0.01 && Math.abs(bd.props.diem[0].lon - 36.29) < 0.01);
+    assert.ok(ck.props.cau.includes('*siete veces*') && ck.props.tham === '2 Reyes 5:10' && /שֶׁבַע/.test(ck.props.goc) && ck.giay === 3);
+    assert.deepStrictEqual(ss.props.trai, { tieuDe: 'Naamán', dong: ['Se humilló'] });
+    assert.deepStrictEqual(ss.props.phai, { tieuDe: 'Giezi', dong: ['Se aprovechó'] });
+    assert.strictEqual(ss.props.ketLuan, 'La misma palabra');
+    assert.deepStrictEqual(tg.props.suKien, [{ nam: '930 a.C.', ten: 'Reino dividido', hienTai: false }, { nam: '850 a.C.', ten: 'Eliseo', hienTai: true }]);
+    assert.deepStrictEqual(ph.props.nut.map((n) => `${n.ten}<${n.cha || ''}${n.nhan ? '*' : ''}`), ['Abraham<', 'Isaac<n0', 'Ismael<n0', 'Jacob<n1*']);
+  });
+
+  test('motion: nội dung sai từng mẫu báo lý do rõ, không làm hỏng dòng khác', () => {
+    const doc = (mau, nd, phu = '') => M.docHangMotion([['scene', 'mau', 'noi_dung', 'phu'], [1, mau, nd, phu]]);
+    assert.ok(/ít nhất 2 mốc/.test(doc('DONG_THOI_GIAN', '1000 | A').loi[0]));
+    assert.ok(/Tiêu đề trái \| Tiêu đề phải/.test(doc('SO_SANH', 'A | B; chỉ một cột').loi[0]));
+    assert.ok(/Cha > Con1/.test(doc('PHA_HE', 'Abraham, Isaac').loi[0]));
+    assert.ok(/tối đa 420/.test(doc('CAU_KINH', 'x'.repeat(500)).loi[0]));
+    assert.ok(/tối đa 12/.test(doc('timeline', Array.from({ length: 13 }, (_, i) => `${i} | e`).join(';')).loi[0]));
+    const toaDo = doc('mapa', 'Mari @ 34.55, 40.89 > Siria @ Damascus > Ur; Babilonia');
+    assert.deepStrictEqual(toaDo.loi, []);
+    assert.deepStrictEqual(toaDo.ds[0].props.diem.map((d) => [d.ten, d.lat, d.lon]), [['Mari', 34.55, 40.89], ['Siria', 33.51, 36.29], ['Ur', 30.96, 46.1], ['Babilonia', 32.54, 44.42]]);
+    assert.ok(toaDo.ds[0].props.tuyen, 'có ">" → vẽ đường đi');
+    assert.ok(!doc('BAN_DO', 'Ur; Harán').ds[0].props.tuyen, 'chỉ ";" → chỉ chấm điểm');
+    assert.ok(/không biết địa danh "Narnia"/.test(doc('BAN_DO', 'X @ Narnia').loi[0]));
+    assert.ok(/không hợp lệ/.test(doc('BAN_DO', 'X @ 95, 40').loi[0]));
+    assert.ok(/Thiếu cột "mau"/.test(M.docHangMotion([['scene', 'noi_dung'], [1, 'x']]).loi[0]));
+    const lap = M.docHangMotion([['scene', 'mau', 'noi_dung'], [4, 'CAU_KINH', 'a'], ['4', 'verse', 'b']]);
+    assert.strictEqual(lap.ds.length, 1); assert.ok(/lặp lại/.test(lap.loi[0]));
+  });
+
+  test('motion: tra địa danh bỏ dấu, nhiều thứ tiếng (Anh / Tây Ban Nha / Việt)', () => {
+    for (const ten of ['Jerusalem', 'Jerusalén', 'Giê-ru-sa-lem', 'JERUSALEM']) assert.strictEqual(DD2.traDiaDanh(ten).ten, 'Jerusalem', ten);
+    assert.strictEqual(DD2.khoaTen('Đa-mách'), 'damach');
+    assert.strictEqual(DD2.traDiaDanh('Đa-mách').ten, 'Damascus');
+    assert.strictEqual(DD2.traDiaDanh('Nínive').ten, 'Nineveh');
+    assert.strictEqual(DD2.traDiaDanh('Antioquía de Pisidia').ten, 'Pisidian Antioch');
+    assert.ok(DD2.DIA_DANH.length > 150);
+    for (const [lat, lon, ten] of DD2.DIA_DANH) assert.ok(lat > 8 && lat < 50 && lon > -12 && lon < 66, `${ten} nằm trong vùng bản đồ (dat-lien.json)`);
+  });
+
+  test('motion: độ dài giọng đọc không cần ffmpeg — MP3 (Info/Xing, có thẻ ID3, đếm khung), WAV, file hỏng → 0', () => {
+    assert.ok(Math.abs(M.thoiLuongAmThanh(mp3) - 2.0637) < 0.01, String(M.thoiLuongAmThanh(mp3)));
+    const id3 = Buffer.concat([Buffer.from('ID3\x03\x00\x00\x00\x00\x02\x00', 'latin1'), Buffer.alloc(256), mp3]);
+    assert.ok(Math.abs(M.thoiLuongAmThanh(id3) - 2.0637) < 0.01, 'bỏ qua thẻ ID3');
+    const khongTag = Buffer.from(mp3);
+    const i = khongTag.indexOf('Info') >= 0 ? khongTag.indexOf('Info') : khongTag.indexOf('Xing');
+    assert.ok(i > 0, 'fixture có khung Info/Xing');
+    khongTag.write('ZZZZ', i, 'latin1');
+    assert.ok(Math.abs(M.thoiLuongAmThanh(khongTag) - 2.0637) < 0.06, `đếm khung: ${M.thoiLuongAmThanh(khongTag)}`);
+    const wav = Buffer.alloc(44 + 44100 * 2 * 3);
+    wav.write('RIFF', 0); wav.writeUInt32LE(wav.length - 8, 4); wav.write('WAVE', 8); wav.write('fmt ', 12); wav.writeUInt32LE(16, 16);
+    wav.writeUInt16LE(1, 20); wav.writeUInt16LE(1, 22); wav.writeUInt32LE(44100, 24); wav.writeUInt32LE(88200, 28); wav.writeUInt16LE(2, 32); wav.writeUInt16LE(16, 34);
+    wav.write('data', 36); wav.writeUInt32LE(44100 * 2 * 3, 40);
+    assert.ok(Math.abs(M.thoiLuongAmThanh(wav) - 3) < 0.001);
+    assert.strictEqual(M.thoiLuongAmThanh(Buffer.from('không phải âm thanh'.repeat(10))), 0);
+  });
+
+  testAsync('motion: mở file trong thư mục dự án → ghép ảnh / giọng đọc theo số, độ dài = giọng đọc + đệm, video ra Videos/<số>.mp4, video AI cũ vào _bo', async () => {
+    const goc = duAnMau();
+    const ghi = [];
+    const ql = new M.QuanLyMotion({ store: giaStore(), taoTienTrinh: veGia({ ghi }) });
+    const r = ql.napTep(path.join(goc, 'Naaman_motion.xlsx'));
+    assert.ok(r.ok && r.so === 5, JSON.stringify(r));
+    assert.strictEqual(ql.ds.goc, goc);
+    assert.strictEqual(ql.thuMucRa(), path.join(goc, 'Videos'));
+    const c = (so) => ql.ds.canh.find((x) => x.so === so);
+    assert.strictEqual(c(3).anh, path.join(goc, 'images', '003.png'));
+    assert.strictEqual(c(3).amThanh, path.join(goc, 'Audio', '0003.mp3'));
+    assert.ok(Math.abs(c(3).thoiLuong - 2.06) < 0.01 && c(5).anh === '' && c(5).thoiLuong === 0);
+    const kq = await ql.chay();
+    assert.deepStrictEqual(kq, { ok: true, so: 5, xong: 5, loi: 0 });
+    assert.deepStrictEqual(fs.readdirSync(path.join(goc, 'Videos')).sort(), ['0003.mp4', '0005.mp4', '0009.mp4', '0011.mp4', '0012.mp4', '_bo']);
+    assert.strictEqual(fs.readFileSync(path.join(goc, 'Videos', '_bo', '0003.mp4'), 'utf8'), 'video AI cu', 'video AI cũ chuyển vào _bo, không xoá');
+    const j3 = ghi.find((j) => j.so === 3), j5 = ghi.find((j) => j.so === 5);
+    assert.strictEqual(j3.props.frames, Math.ceil((c(3).thoiLuong + 1) * 30), 'giọng đọc + đệm 1 s, 30 fps');
+    assert.strictEqual(j5.props.frames, 3 * 30, 'không có giọng đọc → cột giay');
+    assert.ok(j3.comp === 'BanDo' && j3.props.width === 1920 && j3.props.height === 1080 && j3.props.mau === '#C9A45C' && j3.anh === c(3).anh);
+    assert.ok(ghi.every((j) => /\.motion-tam\.mp4$/.test(j.out)), 'vẽ vào file tạm rồi mới đổi tên');
+    assert.ok(ql.ds.canh.every((x) => x.trangThai === 'xong' && x.tepRa === path.join(goc, 'Videos', `${x.canh}.mp4`)));
+    // cài đặt đổi cỡ / fps / màu
+    ql.datCaiDat({ rong: 1280, fps: 24, mau: 'ff0000', duoi: 0.5 });
+    const v = ql.viecCho(c(9));
+    assert.ok(v.props.width === 1280 && v.props.height === 720 && v.props.fps === 24 && v.props.mau === '#FF0000' && v.props.frames === 3 * 24, 'clip ít nhất 3 s');
+    ql.datCaiDat({ duoi: 2 });
+    assert.strictEqual(ql.viecCho(c(9)).props.frames, Math.ceil((c(9).thoiLuong + 2) * 24));
+    assert.deepStrictEqual(ql.datCaiDat({ rong: 999, fps: 7, mau: 'xanh' }).caiDat.rong, 1920, 'giá trị lạ về mặc định');
+  });
+
+  testAsync('motion: lỗi một cảnh không chặn cảnh khác; tắt "Thay video đã có" → bỏ qua cảnh có video khác; tiến trình vẽ chết → Lỗi có lý do', async () => {
+    const goc = duAnMau();
+    const ql = new M.QuanLyMotion({ store: giaStore(), taoTienTrinh: veGia({ hong: { 9: 'Thiếu phông số 2' } }) });
+    ql.datCaiDat({ thayVideoCu: false });
+    ql.napTep(path.join(goc, 'Naaman_motion.xlsx'));
+    const kq = await ql.chay();
+    const c = (so) => ql.ds.canh.find((x) => x.so === so);
+    assert.ok(c(3).trangThai === 'loi' && /Đã có 0003\.mp4/.test(c(3).loi), c(3).loi);
+    assert.strictEqual(fs.readFileSync(path.join(goc, 'Videos', '0003.mp4'), 'utf8'), 'video AI cu', 'không đụng video có sẵn');
+    assert.ok(c(9).trangThai === 'loi' && c(9).loi === 'Thiếu phông số 2');
+    assert.ok(['5', '11', '12'].every((so) => c(+so).trangThai === 'xong'));
+    assert.deepStrictEqual(kq, { ok: true, so: 4, xong: 3, loi: 1 });
+    const ql2 = new M.QuanLyMotion({ store: giaStore(), taoTienTrinh: veGia({ chet: true, hong: { 3: 'x', 5: 'x', 9: 'x', 11: 'x', 12: 'x' } }) });
+    ql2.napTep(path.join(goc, 'Naaman_motion.xlsx'));
+    ql2.ds.canh.forEach((x) => { x.trangThai = 'cho'; });
+    const ql3 = new M.QuanLyMotion({ store: giaStore(), taoTienTrinh: () => ({ async chay(spec, on) { on({ event: 'start', i: 0 }); on({ event: 'error', text: 'Tiến trình vẽ dừng (mã 1): ENOMEM' }); on({ event: 'finished' }); }, dung: async () => {} }) });
+    const goc3 = duAnMau();
+    fs.rmSync(path.join(goc3, 'Videos', '0003.mp4'));
+    ql3.napTep(path.join(goc3, 'Naaman_motion.xlsx'));
+    await ql3.chay();
+    assert.ok(ql3.ds.canh.every((x) => x.trangThai === 'loi' && /ENOMEM/.test(x.loi)), ql3.ds.canh.map((x) => `${x.so}:${x.trangThai}:${x.loi}`).join(' | '));
+    assert.ok(!ql3.dangChay && !fs.readdirSync(path.join(goc3, 'Videos')).some((f) => /motion-tam/.test(f)));
+  });
+
+  testAsync('motion: Dừng giữa chừng — cảnh chưa vẽ về Chờ, cảnh đang vẽ lại có video cũ vẫn Đã có; Bỏ / Lấy lại; mở lại đúng file giữ trạng thái; mở app lại giữa lúc vẽ → Chờ', async () => {
+    const goc = duAnMau();
+    const store = giaStore();
+    let ql = new M.QuanLyMotion({ store, taoTienTrinh: veGia() });
+    ql.napTep(path.join(goc, 'Naaman_motion.xlsx'));
+    await ql.chay([3]);
+    const c = (so) => ql.ds.canh.find((x) => x.so === so);
+    assert.strictEqual(c(3).trangThai, 'xong');
+    ql.o.taoTienTrinh = veGia({ cho: 150 });
+    const p = ql.chay([3, 5, 9]);
+    await new Promise((r) => setTimeout(r, 60));
+    assert.ok(ql.dangChay && c(3).trangThai === 'dang');
+    await ql.dungLai();
+    await p;
+    assert.ok(!ql.dangChay && c(3).trangThai === 'xong' && c(5).trangThai === 'cho' && c(9).trangThai === 'cho', ql.ds.canh.map((x) => `${x.so}:${x.trangThai}`).join(' '));
+    assert.ok(!fs.readdirSync(path.join(goc, 'Videos')).some((f) => /motion-tam/.test(f)));
+    assert.ok(ql.bo(3).ok && c(3).trangThai === 'bo' && !fs.existsSync(path.join(goc, 'Videos', '0003.mp4')) && fs.existsSync(path.join(goc, 'Videos', '_bo', '0003 (2).mp4')));
+    assert.ok(ql.layLai(3).ok && c(3).trangThai === 'cho');
+    ql.o.taoTienTrinh = veGia();
+    await ql.chay();
+    assert.ok(ql.ds.canh.every((x) => x.trangThai === 'xong'));
+    ql.xoaDs();
+    assert.strictEqual(ql.ds, null);
+    ql.napTep(path.join(goc, 'Naaman_motion.xlsx'));
+    assert.ok(ql.ds.canh.every((x) => x.trangThai === 'xong'), 'mở lại đúng file: giữ video đã tạo');
+    fs.rmSync(path.join(goc, 'Videos', '0009.mp4'));
+    ql.quet();
+    assert.strictEqual(c(9).trangThai, 'cho', 'video bị xoá ngoài app → về Chờ');
+    // sửa nội dung một cảnh trong file → cảnh đó phải vẽ lại
+    store.data.motionDs.canh.find((x) => x.so === 11).props.suKien[0].ten = 'khác';
+    const tep = path.join(goc, 'Naaman_motion.xlsx');
+    ql.xoaDs(); ql.napTep(tep);
+    assert.strictEqual(c(11).trangThai, 'cho', 'nội dung đổi → Chờ');
+    store.data.motionDs.canh[0].trangThai = 'dang';
+    ql = new M.QuanLyMotion({ store, taoTienTrinh: veGia() });
+    assert.strictEqual(ql.ds.canh[0].trangThai, 'cho', 'mở app lại: cảnh đang vẽ dở về Chờ');
+  });
+
+  test('motion: thư mục dự án — file nằm trong thư mục có Audio / images → dùng thư mục đó; không thì thư mục của dự án đang mở', () => {
+    const goc = duAnMau();
+    const ngoai = fs.mkdtempSync(path.join(os.tmpdir(), 'motion-ngoai-'));
+    fs.copyFileSync(path.join(__dirname, 'fixture-motion.xlsx'), path.join(ngoai, 'x_motion.xlsx'));
+    const ql = new M.QuanLyMotion({ store: giaStore(), thuMucDuAn: () => ({ thuMuc: path.join(goc, 'Videos'), ten: 'Naaman' }) });
+    ql.napTep(path.join(ngoai, 'x_motion.xlsx'), 'da1');
+    assert.strictEqual(ql.ds.goc, goc);
+    assert.ok(ql.ds.canh.find((x) => x.so === 3).anh, 'ghép ảnh từ thư mục dự án');
+    assert.ok(ql.datThuMucVideo('/khac/Videos').ok && ql.thuMucRa() === '/khac/Videos');
+    assert.ok(ql.datGoc(ngoai).ok && ql.thuMucRa() === path.join(ngoai, 'Videos') && !ql.ds.canh.some((x) => x.anh));
+    assert.strictEqual(M.tenDanhSach('/a/Naaman_motion.xlsx'), 'Naaman');
+    assert.deepStrictEqual([...M.fileTheoSo(path.join(goc, 'images'), /\.png$/i).keys()].sort((a, b) => a - b), [3, 9, 11, 12]);
+    assert.strictEqual(M.soTuTen('0047.mp4'), 47); assert.strictEqual(M.soTuTen('Naaman_47.mp4'), null);
+  });
+
+  test('1.7.0 Motion: trang + lệnh + đóng gói (asarUnpack, bundle không vào git), tiến trình vẽ chạy Electron như Node, e2e motion trên CI', () => {
+    const html = docNguon('src/ui/index.html', true), ui = docNguon('src/ui/app.js'), m = docNguon('main.js'), tt = docNguon('src/main/motion-tien-trinh.js');
+    assert.ok(/data-trang="motion"/.test(html) && /id="trang-motion"/.test(html));
+    assert.ok(/motion: 'Motion'/.test(ui) && /if \(trang === 'motion'\) napMotion\(\);/.test(ui) && /if \(U\.trang === 'motion'\) veMotion\(\);/.test(ui) && /\n  ganMotion\(\);/.test(ui));
+    for (const l of ['motionDatCaiDat', 'motionMoFile', 'motionNapTep', 'motionChonGoc', 'motionChonThuMucVideo', 'motionVideoMacDinh', 'motionQuet', 'motionChay', 'motionDung', 'motionBo', 'motionLayLai', 'motionXoaDs', 'motionMoVideo']) {
+      assert.ok(new RegExp(`\\n  ${l}: `).test(m), `LENH.${l}`);
+    }
+    for (const l of (ui.match(/api\.call\('motion[A-Za-z]+'/g) || [])) assert.ok(new RegExp(`\\n  ${l.slice(10, -1)}: `).test(m), `giao diện gọi ${l} có trong LENH`);
+    assert.ok(/motion: motion \? motion\.trangThai\(\) : null/.test(m));
+    assert.ok(/env: \{ ELECTRON_RUN_AS_NODE: '1' \}/.test(m) && /cwd: path\.join\(app\.getPath\('userData'\), 'motion-engine'\)/.test(m), 'tiến trình vẽ: Electron như Node, thư mục ghi được');
+    assert.ok(/motion && motion\.dangChay && motion\.dungLai\(\)/.test(m), 'thoát app → dừng tiến trình vẽ');
+    assert.ok(/fork\(__filename, \['ensure'\]/.test(tt), 'tải Chrome Headless Shell ở tiến trình riêng (lỗi tải của Remotion dính cả tiến trình)');
+    assert.ok(/'127\.0\.0\.1'/.test(tt) && !/listen\(0\)/.test(tt), 'máy chủ ảnh chỉ nghe 127.0.0.1');
+    const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
+    assert.strictEqual(pkg.dependencies['@remotion/renderer'], '4.0.547');
+    assert.ok(pkg.devDependencies['@remotion/bundler'] === '4.0.547' && pkg.dependencies.remotion === '4.0.547', 'phiên bản Remotion khớp nhau');
+    // @remotion/renderer cần react, react-dom, remotion LÚC CHẠY (peer) — để ở devDependencies là bản cài thiếu (CI Windows 28/11/2026:
+    // "Cannot find module 'react/jsx-runtime'" từ app.asar)
+    for (const k of ['react', 'react-dom', 'remotion']) assert.ok(pkg.dependencies[k] && !(pkg.devDependencies || {})[k], `${k} nằm ở dependencies`);
+    assert.deepStrictEqual(pkg.build.asarUnpack, ['node_modules/@remotion/compositor-*/**', 'src/motion/bundle/**']);
+    assert.ok(pkg.build.files.includes('!src/motion/src/**') && pkg.build.files.includes('!src/motion/public/**'));
+    assert.ok(/src\/motion\/bundle\//.test(fs.readFileSync(path.join(__dirname, '..', '.gitignore'), 'utf8')), 'bundle dựng lúc build, không vào git');
+    for (const w of ['build-windows.yml', 'build-mac.yml']) {
+      const y = docNguon(`.github/workflows/${w}`, true);
+      assert.ok(/run: node tests\/e2e\.js motion/.test(y), `${w} chạy e2e motion`);
+      assert.ok(y.indexOf('node tools/dong-goi-motion.js') > 0 && y.indexOf('node tools/dong-goi-motion.js') < y.indexOf('npm test'), `${w} đóng gói mẫu motion trước khi kiểm thử / đóng gói app`);
+    }
+    assert.ok(/MOTION \? 'tests\/motion-e2e-chay\.js'/.test(docNguon('tests/e2e.js', true)));
+    // Không dùng nội dung mạng trong mẫu: mọi phông, bản đồ đều nằm trong gói
+    for (const f of fs.readdirSync(path.join(__dirname, '..', 'src', 'motion', 'src'))) assert.ok(!/https?:\/\//.test(fs.readFileSync(path.join(__dirname, '..', 'src', 'motion', 'src', f), 'utf8')), `${f} không tải gì từ mạng`);
+  });
+
+  test('1.7.0 Motion: mẫu đã đóng gói khớp nguồn (quên chạy node tools/dong-goi-motion.js sau khi sửa mẫu là đỏ)', () => {
+    const b = path.join(__dirname, '..', 'src', 'motion', 'bundle', 'nguon.json');
+    if (!fs.existsSync(b)) { console.log('     (chưa đóng gói mẫu motion — bỏ qua; CI đóng gói trước npm test)'); return; }
+    assert.strictEqual(JSON.parse(fs.readFileSync(b, 'utf8')).dau, M.dauNguonMotion(path.join(__dirname, '..', 'src', 'motion')));
+    for (const f of ['index.html', 'bundle.js', 'bundle.js.map']) assert.ok(fs.existsSync(path.join(path.dirname(b), f)), f);
   });
 }
 

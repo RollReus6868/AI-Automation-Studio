@@ -18,6 +18,7 @@
       <button data-trang="video"><i data-icon="video"></i><span>Tạo video</span></button>
       <button data-trang="nhac"><i data-icon="music"></i><span>Tạo nhạc</span></button>
       <button data-trang="footage"><i data-icon="film"></i><span>Footage</span></button>
+      <button data-trang="motion"><i data-icon="wand-sparkles"></i><span>Motion</span></button>
       <button data-trang="hengio"><i data-icon="clock"></i><span>Hẹn giờ</span></button>
       <button data-trang="nhanvat"><i data-icon="user-plus"></i><span>Nhân vật</span></button>
       <button data-trang="thuvien"><i data-icon="layout-grid"></i><span>Thư viện</span></button>
@@ -374,6 +375,7 @@
           <li><b>Ổ C đầy / app nặng:</b> Cài đặt → <i>Cả app</i> → <i>Dọn dữ liệu thừa…</i>: xoá bộ nhớ đệm trang web của các tài khoản, dữ liệu của tài khoản đã xoá, file tạm, nhật ký / file chẩn đoán / bộ cài cũ. Không đăng xuất tài khoản, không xoá ảnh / video đã tạo, nhân vật hay dự án. Trang chạy lâu ngày lại đầy dần — thỉnh thoảng dọn lại. Muốn file dữ liệu dự án (du-lieu.json) nhỏ đi thì xoá bớt dự án cũ.</li>
           <li><b>Footage cho cảnh (1.6.0):</b> nhờ skill chia cảnh "tìm footage" để có thêm file <code>&lt;tên&gt;_footage.xlsx</code> (cảnh nào dùng stock video, từ khoá tiếng Anh, số giây cần, chữ cần tránh). Lấy khoá API miễn phí ở pexels.com/api và pixabay.com/api/docs → mục <i>Footage</i> → dán khoá → <i>Lưu</i> → <i>Mở file footage…</i> → <i>Chọn…</i> thư mục <code>Videos</code> của project CapCut Draft Studio → <i>Tải footage</i>. Mỗi cảnh thành <code>0047.mp4</code>…; CapCut Draft Studio dùng video đó thay ảnh của cảnh (giữ bật <i>Cắt video</i> trong CapCut Draft Studio — mặc định đã bật — để clip dài được cắt vừa cảnh, không bị tua nhanh). Clip không hợp: <i>Đổi clip</i> (clip kế tiếp) hoặc <i>Bỏ</i> (file chuyển vào <code>_bo</code>, cảnh dùng lại ảnh AI). Nút <i>Chép số</i> cho dãy số cảnh dùng footage — dán vào <i>Chọn số</i> ở trang Tạo video để dừng / xoá video AI của các cảnh đó cho đỡ tốn lượt. Clip Storyblocks: tự tải trên web (hoặc qua Storyblocks MCP trong Claude / ChatGPT), đặt tên <code>0047.mp4</code> vào cùng thư mục — app bỏ qua cảnh đã có file. Ghi công tác giả: file <code>nguon-footage.txt</code> trong thư mục lưu.</li>
           <li><b>Tải tay footage (1.6.6):</b> không có khoá API (Pexels đã ngừng cấp khoá mới) hoặc muốn tự chọn clip, kể cả Storyblocks nếu bạn có gói → mục <i>Footage</i> → mở file footage → ở khung <i>Tải tay</i> chọn trang (Pexels / Pixabay / Storyblocks) → <i>Mở trang tải tay</i>. App mở cửa sổ trang tìm video đúng từ khoá của cảnh đầu tiên còn thiếu; lần đầu bạn tự đăng nhập trong cửa sổ đó (app nhớ đăng nhập riêng từng trang). Bạn xem, chọn clip và <b>tự bấm Download</b> (chọn bản MP4, nên 1080p) → app lưu thành <code>0047.mp4</code> vào thư mục lưu (mặc định <code>Videos</code> của dự án) rồi mở trang của cảnh kế. <i>Từ khoá khác</i> mở cụm từ khoá kế của cảnh, <i>Bỏ qua cảnh</i> để cảnh đó dùng ảnh AI, nút <i>Tải tay</i> ở mỗi dòng tải lại riêng cảnh đó (clip cũ vào <code>_bo</code>). Trang Storyblocks không mở đúng kết quả tìm thì bấm <i>Chép từ khoá</i> rồi dán vào ô tìm của trang. App không tự bấm gì trên trang — mỗi clip do bạn chọn và tải, đúng điều khoản của các trang.</li>
+          <li><b>Motion graphic theo cảnh (1.7.0):</b> nhờ skill chia cảnh xuất thêm file <code>&lt;tên&gt;_motion.xlsx</code> (skill tự chọn cảnh nên làm motion: hành trình, mốc thời gian, câu Kinh Thánh then chốt, gia phả, so sánh). Đặt file vào thư mục dự án (cùng chỗ có <code>images</code> và <code>Audio</code>) → mục <i>Motion</i> → <i>Mở file motion…</i> → <i>Tạo video</i>. Mỗi cảnh thành <code>Videos/0047.mp4</code> dài bằng giọng đọc của cảnh cộng phần đệm, nền là ảnh AI của cảnh; video AI cũ cùng số (nếu có) chuyển vào <code>Videos/_bo</code>. Cột của file: <code>scene</code>, <code>mau</code> (<code>BAN_DO</code>, <code>DONG_THOI_GIAN</code>, <code>CAU_KINH</code>, <code>PHA_HE</code>, <code>SO_SANH</code>), <code>nhan</code>, <code>tieu_de</code>, <code>noi_dung</code>, <code>phu</code>, <code>goc</code>, <code>giay</code>. Cách ghi <code>noi_dung</code>: bản đồ <code>Ur &gt; Harán &gt; Canaán</code> (địa danh lạ: <code>Mari @ 34.55, 40.89</code>); dòng thời gian <code>930 a.C. | Reino dividido; *850 a.C. | Eliseo</code> (dấu * = mốc đang kể); câu Kinh Thánh ghi nguyên câu, chữ cần nhấn để giữa hai dấu *, tham chiếu ở <code>phu</code>, nguyên ngữ ở <code>goc</code>; phả hệ <code>Abraham &gt; Isaac, Ismael; Isaac &gt; *Jacob*</code>; so sánh dòng đầu là hai tiêu đề <code>Saúl | David</code> rồi từng cặp <code>trái | phải</code>, kết luận ở <code>phu</code>. Dòng sai được báo rõ lý do ở đầu danh sách. Lần đầu app tải trình vẽ của Remotion (~100 MB); không tải được thì dùng Chrome / Edge có sẵn. Nút <i>Chép số</i> cho dãy số cảnh dùng motion — dán vào <i>Chọn số</i> ở trang Tạo video để khỏi tạo video AI cho các cảnh đó.</li>
           <li><b>Lỗi lạ:</b> Cài đặt → <i>Cả app</i> → bật <i>Hiện các luồng chạy ngầm</i> để nhìn thấy trang Muse / Flow của từng luồng; nhật ký đầy đủ ở thư mục dữ liệu (<code>nhat-ky.txt</code>).</li>
         </ol>
       </section>
@@ -423,6 +425,44 @@
           </div>
           <div id="ftTomTat" class="ft-tom-tat"></div>
           <div id="ftBang" class="ft-bang"></div>
+        </div>
+      </section>
+    </main>
+
+    <!-- ── Motion (1.7.0): video motion graphic theo cảnh bằng Remotion ─── -->
+    <main class="trang" id="trang-motion" hidden>
+      <section class="panel trang-don cuon">
+        <div class="panel-dau"><h2><i data-icon="wand-sparkles"></i>Motion graphic theo cảnh — Remotion</h2></div>
+        <p class="ghi-cai-dat-du-an">Mở file <code>&lt;tên&gt;_motion.xlsx</code> (skill chia cảnh xuất cho những cảnh nên làm bằng motion graphic) → bấm <b>Tạo video</b>. Mỗi cảnh trong file được dựng bằng một mẫu — <b>bản đồ hành trình</b>, <b>dòng thời gian</b>, <b>câu Kinh Thánh toàn màn hình</b>, <b>cây phả hệ</b>, <b>so sánh</b> — trên nền <b>ảnh AI của chính cảnh đó</b> (thư mục <code>images</code>), dài bằng <b>giọng đọc của cảnh</b> (thư mục <code>Audio</code>) cộng một đoạn đệm, rồi lưu thành <code>Videos/0047.mp4</code>. CapCut Draft Studio thấy video có số cảnh thì dùng video đó thay cho ảnh. Video không trong suốt (H.264) nên CapCut chạy nhẹ. Lần đầu app tải trình vẽ của Remotion (~100 MB); không tải được thì dùng Chrome / Edge có sẵn trên máy.</p>
+        <div class="the-cai" id="mtCaiThe">
+          <h3><i data-icon="sliders-horizontal"></i>Cài đặt video</h3>
+          <div class="luoi-3 mt-luoi">
+            <label>Khung hình<select id="mtRong"><option value="1280">1280×720 (nhanh)</option><option value="1920">1920×1080 (khuyên dùng)</option><option value="3840">3840×2160 (rất chậm)</option></select><small class="ghi-o">Nên trùng cỡ project CapCut.</small></label>
+            <label>Số khung hình / giây<select id="mtFps"><option value="24">24</option><option value="25">25</option><option value="30">30</option><option value="50">50</option><option value="60">60</option></select><small class="ghi-o">Nên trùng fps của project (CapCut Draft Studio mặc định 30).</small></label>
+            <label>Đệm sau giọng đọc (giây)<input id="mtDuoi" type="number" min="0" max="5" step="0.1"><small class="ghi-o">Video dài hơn giọng đọc một chút để phủ khoảng nghỉ giữa hai cảnh; CapCut Draft Studio cắt phần thừa.</small></label>
+            <label>Màu nhấn<input id="mtMau" type="color"><small class="ghi-o">Màu đường đi, mốc thời gian, chữ nhấn. Mặc định vàng đồng như đồ họa chữ của CapCut Draft Studio.</small></label>
+          </div>
+          <div class="dong-cong-tac"><div><b>Thay video đã có của cảnh</b><small>Thư mục lưu đã có video cùng số cảnh (vd video AI tạo từ ảnh) thì chuyển nó vào thư mục <code>_bo</code> (không xoá) rồi đặt video motion vào. Tắt → bỏ qua cảnh đó, báo lỗi.</small></div><label class="cong-tac"><input type="checkbox" id="mtThay"><span></span></label></div>
+          <div class="dong-o"><button class="nut-gradient" id="mtLuu"><i data-icon="check"></i>Lưu</button><small class="mo">Đổi cài đặt xong, bấm <b>Tạo lại</b> ở dòng cảnh muốn vẽ lại.</small></div>
+        </div>
+        <div class="the-cai" id="mtDsThe">
+          <h3><i data-icon="list"></i>Danh sách cảnh<span class="mo" id="mtTenDs"></span></h3>
+          <div class="dong-o mt-hang-nut">
+            <button class="nut-vien" id="mtMoFile"><i data-icon="file-text"></i>Mở file motion…</button>
+            <button class="nut-gradient" id="mtChay"><i data-icon="play"></i>Tạo video</button>
+            <button class="nut-vien" id="mtQuet" title="Tìm lại ảnh / giọng đọc của các cảnh (sau khi bạn thêm ảnh hoặc tạo giọng đọc)"><i data-icon="refresh-cw"></i>Quét lại ảnh, giọng đọc</button>
+            <button class="nut-vien" id="mtXoaDs" title="Đóng danh sách (không xoá video đã tạo)"><i data-icon="x"></i>Đóng danh sách</button>
+          </div>
+          <div class="o-thu-muc-video mt-thu-muc"><b>Thư mục dự án</b>
+            <div class="dong-o"><input id="mtGoc" readonly placeholder="Mở file motion trước"><button class="nut-vien nho" id="mtChonGoc"><i data-icon="folder-open"></i>Chọn…</button><button class="nut-vien nho" id="mtMoGoc">Mở</button></div>
+            <small class="mo">Thư mục có <code>images</code> (ảnh cảnh <code>012.png</code>…) và <code>Audio</code> (giọng đọc <code>0012.mp3</code>…) bên trong. Mặc định: thư mục chứa file motion; không có thì thư mục của dự án đang mở.</small>
+          </div>
+          <div class="o-thu-muc-video mt-thu-muc"><b>Thư mục lưu video</b>
+            <div class="dong-o"><input id="mtThuMuc" readonly placeholder="Mở file motion trước"><button class="nut-vien nho" id="mtThuMucMacDinh" title="Về thư mục Videos trong thư mục dự án">Videos của dự án</button><button class="nut-vien nho" id="mtChonThuMuc"><i data-icon="folder-open"></i>Chọn…</button><button class="nut-vien nho" id="mtMoThuMuc">Mở</button></div>
+          </div>
+          <div id="mtTrinh" class="mt-trinh"></div>
+          <div id="mtTomTat" class="ft-tom-tat"></div>
+          <div id="mtBang" class="mt-bang"></div>
         </div>
       </section>
     </main>

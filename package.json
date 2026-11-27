@@ -1,7 +1,7 @@
 {
   "name": "ai-automation-studio",
   "productName": "AI Automation Studio",
-  "version": "1.6.6",
+  "version": "1.7.0",
   "description": "Tool desktop gop Muse Automation Studio va Flow Automation Studio: mot hang doi chung, tu dong qua lai giua Google Flow va muse.ai",
   "main": "main.js",
   "author": "RollReus6868",
@@ -10,9 +10,11 @@
     "start": "electron .",
     "test": "node tests/run.js && node tests/flow/run.js && node tests/cap-nhat-test.js",
     "build:win": "electron-builder --win --x64",
-    "build:mac": "electron-builder --mac --arm64 --x64"
+    "build:mac": "electron-builder --mac --arm64 --x64",
+    "motion": "node tools/dong-goi-motion.js"
   },
   "devDependencies": {
+    "@remotion/bundler": "4.0.547",
     "electron": "33.4.11",
     "electron-builder": "25.1.8"
   },
@@ -25,8 +27,14 @@
     "files": [
       "main.js",
       "src/**/*",
+      "!src/motion/src/**",
+      "!src/motion/public/**",
       "icons/**/*",
       "package.json"
+    ],
+    "asarUnpack": [
+      "node_modules/@remotion/compositor-*/**",
+      "src/motion/bundle/**"
     ],
     "afterPack": "tools/ky-mac.js",
     "win": {
@@ -74,5 +82,11 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/RollReus6868/AI-Automation-Studio.git"
+  },
+  "dependencies": {
+    "@remotion/renderer": "4.0.547",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "remotion": "4.0.547"
   }
 }

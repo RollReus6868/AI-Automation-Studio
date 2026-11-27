@@ -73,7 +73,11 @@ REM --- Thu vien --------------------------------------------------------------
 REM  Dieu kien "da cai xong" phai la mot file THAT SU can den luc chay, khong
 REM  phai chi la thu muc node_modules co ton tai: mot lan npm install dut giua
 REM  chung van de lai thu muc do, va app se chet voi loi kho hieu.
-if not exist "node_modules\electron\package.json" (
+set "CAN_CAI="
+if not exist "node_modules\electron\package.json" set "CAN_CAI=1"
+REM 1.7.0: Motion can them Remotion (cap nhat ma nguon tu ban cu thi cai bo sung)
+if not exist "node_modules\@remotion\bundler\package.json" set "CAN_CAI=1"
+if defined CAN_CAI (
     echo.
     echo   Lan dau chay - dang cai thu vien, mat 3-10 phut...
     echo   ^(tai khoang 250 MB, can mang^)
@@ -91,6 +95,9 @@ if not exist "node_modules\electron\package.json" (
         exit /b 1
     )
 )
+
+REM 1.7.0: mau motion graphic (Remotion) dong goi thanh trang tinh - lan dau / khi mau doi sau cap nhat
+call node tools\dong-goi-motion.js --neu-cu >>"%LOG%" 2>&1
 
 echo.
 echo   Dang mo app...
