@@ -5,7 +5,7 @@
 // FT_ANH=<thư mục> → chụp trang Footage (1440 và 1100 px) để xem bằng mắt.
 const fs = require('fs');
 const path = require('path');
-const { net } = require('electron');
+const { net, BrowserWindow } = require('electron');
 
 module.exports = function e2eFootage({ win, app, footage, LENH, dieuPhoi }) {
   const tam = process.env.MUSE_E2E_TAM;
@@ -151,6 +151,61 @@ module.exports = function e2eFootage({ win, app, footage, LENH, dieuPhoi }) {
       kiem(footage.store.data.footageDs && footage.store.data.footageDs.tep === tep2 && footage.store.data.footage.pexelsKey === 'KHOA-PEXELS-E2E', 'danh sách + khoá nằm trong du-lieu.json');
       footage.napTep(tep);
       kiem(canh(3).clip && canh(3).clip.id === 'pexels-103' && footage.ds.thuMuc === thu, 'mở lại file cũ: giữ clip đã chọn + thư mục lưu');
+      ghi('-- 7. 1.6.6 Tải tay: app mở trang tìm của cảnh, NGƯỜI DÙNG bấm Download (bài kiểm giả lập cú bấm đó), app lưu <số cảnh>.mp4');
+      const tep3 = path.join(tam, 'Tay_footage.csv');
+      fs.writeFileSync(tep3, 'scene,tu_khoa,giay_can\n30,ancient harbor boats,6\n31,stone well village; old well water,6\n');
+      LENH.datCaiDat({ duAn: da.id, driveBat: true, driveCach: 'may', thuMucDrive: drive });
+      LENH.footageNapTep({ tep: tep3, duAn: da.id });
+      const thu3 = footage.ds.thuMuc;
+      kiem(thu3 === thu2, `Tải tay cũng lưu vào Videos của dự án (${thu3})`);
+      const cuaSoTay = () => BrowserWindow.getAllWindows().find((w) => !w.isDestroyed() && /^Tải tay/.test(w.getTitle()));
+      await cho(() => js("!document.querySelector('#ftTayMo').disabled"), 5000, 'nút Mở trang tải tay sẵn sàng');
+      await js("(() => { const o = document.querySelector('#ftTayTrang'); o.value = 'pixabay'; return true; })()");
+      kiem(await bam('#ftTayMo'), 'bấm Mở trang tải tay (Pixabay)');
+      await cho(() => cuaSoTay() && /ancient%20harbor%20boats/.test(cuaSoTay().webContents.getURL()), 10000, 'cửa sổ tải tay mở trang của cảnh 30');
+      let w = cuaSoTay();
+      kiem(!!w && w.isVisible() && /cảnh 0030/.test(w.getTitle()), `cửa sổ HIỆN, tiêu đề ghi cảnh (${w && w.getTitle()})`);
+      kiem(!!w && /trang=pixabay/.test(w.webContents.getURL()) && w.webContents.session !== win.webContents.session, 'mở đúng trang đã chọn, phiên riêng');
+      await cho(() => js("!document.querySelector('#ftTayDang').hidden && /0030/.test(document.querySelector('#ftTayChu').textContent)"), 5000, 'giao diện hiện cảnh đang chờ');
+      kiem(await js("document.querySelector('#ftChay').disabled && document.querySelector('#ftTimLai').disabled"), 'đang tải tay: nút tải bằng API tắt');
+      await cho(() => w.webContents.executeJavaScript("!!document.querySelector('#tai')").catch(() => false), 10000, 'trang stock giả nạp xong');
+      // File không phải video (ảnh) → app huỷ, không lưu.
+      await w.webContents.executeJavaScript("document.querySelector('#anh').click()");
+      await ngu(1500);
+      kiem(!fs.existsSync(path.join(thu3, '0030.mp4')) && !fs.readdirSync(thu3).some((f) => /^0030|anh\.jpg/.test(f)) && canh(30).trangThai === 'cho', 'tải ảnh (không phải video) → huỷ, cảnh vẫn Chờ');
+      // Người dùng bấm Download trên trang (giả lập trong bài kiểm — app không tự bấm).
+      await w.webContents.executeJavaScript("document.querySelector('#tai').click()");
+      await cho(() => canh(30).trangThai === 'xong', 15000, 'cảnh 30 lưu xong');
+      kiem(fs.existsSync(path.join(thu3, '0030.mp4')) && fs.statSync(path.join(thu3, '0030.mp4')).size === videoMau && !fs.existsSync(path.join(thu3, '0030.mp4.part')), 'file tải tay lưu thành 0030.mp4 đủ byte, không còn .part');
+      kiem(canh(30).clip && canh(30).clip.tay && canh(30).clip.nguon === 'pixabay' && /__stock\/tim/.test(canh(30).clip.trang), 'cảnh 30: nguồn Pixabay · tải tay, ghi trang gốc');
+      await cho(() => /stone%20well%20village/.test(w.webContents.getURL()), 10000, 'tự chuyển trang cảnh 31');
+      kiem(/stone%20well%20village/.test(w.webContents.getURL()) && /cảnh 0031/.test(w.getTitle()), 'tự mở trang của cảnh kế (31)');
+      await cho(() => js("/0031/.test(document.querySelector('#ftTayChu').textContent)"), 5000, 'giao diện chuyển cảnh 31');
+      kiem(await bam('#ftTayTuKhoa'), 'bấm Từ khoá khác');
+      await cho(() => /old%20well%20water/.test(w.webContents.getURL()), 10000, 'mở cụm từ khoá thứ 2');
+      kiem(/old%20well%20water/.test(w.webContents.getURL()), 'Từ khoá khác: trang tìm cụm thứ 2 của cảnh 31');
+      await cho(() => w.webContents.executeJavaScript("document.querySelector('#q') && document.querySelector('#q').textContent === 'old well water'").catch(() => false), 10000, 'trang cụm 2 nạp xong');
+      await w.webContents.executeJavaScript("document.querySelector('#tai').click()");
+      await cho(() => canh(31).trangThai === 'xong', 15000, 'cảnh 31 lưu xong');
+      kiem(fs.existsSync(path.join(thu3, '0031.mp4')), 'cảnh 31 lưu thành 0031.mp4');
+      await cho(() => js("/Mọi cảnh đã có footage/.test(document.querySelector('#ftTayChu').textContent)"), 5000, 'giao diện báo xong mọi cảnh');
+      kiem(await js("/Mọi cảnh đã có footage/.test(document.querySelector('#ftTayChu').textContent)"), 'hết cảnh: báo "Mọi cảnh đã có footage"');
+      kiem(/^0030\tPixabay\t\t/m.test(fs.readFileSync(path.join(thu3, 'nguon-footage.txt'), 'utf8')), 'nguon-footage.txt ghi cảnh tải tay');
+      if (process.env.FT_ANH) { await js("document.querySelector('#ftTayKhoi').scrollIntoView()"); await chup('footage-tay.png'); }
+      // Tải lại cảnh 30 bằng nút "Tải tay" của dòng: clip cũ vào _bo.
+      kiem(await bam('#ftBang [data-ft="tay"][data-so="30"]'), 'bấm Tải tay ở dòng cảnh 30');
+      await cho(() => /ancient%20harbor/.test(w.webContents.getURL()) && /cảnh 0030/.test(w.getTitle()), 10000, 'mở lại trang cảnh 30');
+      await cho(() => w.webContents.executeJavaScript("document.querySelector('#q') && /harbor/.test(document.querySelector('#q').textContent)").catch(() => false), 10000, 'trang cảnh 30 nạp xong');
+      await w.webContents.executeJavaScript("document.querySelector('#tai').click()");
+      await cho(() => fs.existsSync(path.join(thu3, '_bo', '0030.mp4')) && fs.existsSync(path.join(thu3, '0030.mp4')) && !footage.tay.dangTai, 15000, 'tải lại cảnh 30');
+      kiem(fs.existsSync(path.join(thu3, '_bo', '0030.mp4')) && fs.existsSync(path.join(thu3, '0030.mp4')), 'tải lại một cảnh: clip cũ vào _bo, file mới thay chỗ');
+      kiem(await bam('#ftTayDong'), 'bấm Đóng tải tay');
+      await cho(() => !cuaSoTay() && !footage.tay.bat, 5000, 'đóng cửa sổ tải tay');
+      kiem(!cuaSoTay() && !footage.tay.bat, 'cửa sổ tải tay đóng, hết chế độ tải tay');
+      await cho(() => js("document.querySelector('#ftTayDang').hidden && !document.querySelector('#ftChay').disabled"), 5000, 'giao diện về bình thường');
+      kiem(await js("document.querySelector('#ftTayDang').hidden && !document.querySelector('#ftChay').disabled"), 'đóng tải tay: nút Tải footage bật lại');
+      LENH.datCaiDat({ duAn: da.id, driveBat: false });
+
       if (process.env.FT_ANH) {
         win.setSize(1100, 700);
         await chup('footage-1100.png');

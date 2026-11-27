@@ -143,6 +143,15 @@ function footageApi(req, res, goc) {
   const json = (o, st = 200, hdr = {}) => { res.writeHead(st, { 'content-type': 'application/json', ...hdr }); res.end(JSON.stringify(o)); };
   const u = new URL(req.url, 'http://x');
   if (u.pathname === '/__ft/ghi') return json(ft);
+  // 1.6.6 trang stock giả cho Tải tay: chỉ có link Download — người dùng (bài kiểm giả lập) tự bấm.
+  if (u.pathname === '/__stock/tim') {
+    const q = u.searchParams.get('q') || '', slug = q.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    ft.stock = (ft.stock || []).concat([{ q, trang: u.searchParams.get('trang') }]);
+    res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+    res.end(`<!doctype html><title>Stock giả</title><h1 id="q">${q.replace(/</g, '')}</h1><a id="tai" download="stock-${slug}.mp4" href="/__ft/clip/tay-${slug}.mp4">Download</a> <a id="anh" download="anh.jpg" href="/__ft/anh.jpg">Ảnh</a>`);
+    return;
+  }
+  if (u.pathname === '/__ft/anh.jpg') { res.writeHead(200, { 'content-type': 'image/jpeg' }); res.end(Buffer.alloc(3000, 7)); return; }
   if (u.pathname === '/__ft/cau-hinh') { let b = ''; req.setEncoding('utf8'); req.on('data', (d) => { b += d; }); req.on('end', () => { try { Object.assign(ft, JSON.parse(b)); } catch (_) {} json({ ok: true }); }); return; }
   const clip = u.pathname.match(/^\/__ft\/clip\/([\w-]+)\.mp4$/);
   if (clip) { ft.tai.push(clip[1]); if (ft.hongTai.includes(clip[1])) { res.writeHead(404); res.end(); return; } res.writeHead(200, { 'content-type': 'video/mp4' }); res.end(videoMau); return; }
@@ -173,7 +182,7 @@ function footageApi(req, res, goc) {
   json({ loi: 'khong-co' }, 404);
 }
 const sv = http.createServer((req, res) => {
-  if (/^\/(pexels|pixabay|__ft)\//.test(req.url)) { footageApi(req, res, `http://127.0.0.1:${sv.address().port}`); return; }
+  if (/^\/(pexels|pixabay|__ft|__stock)\//.test(req.url)) { footageApi(req, res, `http://127.0.0.1:${sv.address().port}`); return; }
   if (req.method === 'POST' && req.url === '/__flow-ghi') {
     let b = '';
     req.setEncoding('utf8');
@@ -279,6 +288,7 @@ sv.listen(0, '127.0.0.1', () => {
     cwd: path.join(__dirname, '..'),
     env: { ...process.env, MUSE_URL: url, MUSE_TEST: FLOW ? 'tests/flow-e2e-chay.js' : NHAC ? 'tests/nhac-e2e-chay.js' : DRIVE ? 'tests/drive-e2e-chay.js' : QUET ? 'tests/quet-e2e-chay.js' : THEODOI ? 'tests/theo-doi-e2e-chay.js' : KIEMDO ? 'tests/kiem-do-e2e-chay.js' : DONDEP ? 'tests/don-dep-e2e-chay.js' : FOOTAGE ? 'tests/footage-e2e-chay.js' : 'tests/e2e-chay.js', DRIVE_URL: url, NHAC_URL: `${url}/fmusic/`, MUSE_DATA_DIR: path.join(tam, 'data'),
       MUSE_E2E_TAM: tam, MUSE_NO_UPDATE_CHECK: '1', MUSE_CHO_KET_NOI_MS: '4000', FOOTAGE_PEXELS_URL: `${url}/pexels`, FOOTAGE_PIXABAY_URL: `${url}/pixabay`,
+      FOOTAGE_TAY_URL: `${url}/__stock/tim?q={q}&trang={trang}`,
       ...(FLOW ? { FLOW_TEST_URL: `${url}/fx/vi/tools/flow`, FLOW_TEST_HOST: '^http://127\\.0\\.0\\.1:\\d+/fx/',
         FLOW_TEST_NGUON: 'tests/flow-gia/nguon.js', FLOW_CHO_SAN_SANG_MS: '30000', FLOW_CHO_TAI_MS: '45000' } : {}) },
     stdio: ['ignore', 'pipe', 'pipe']

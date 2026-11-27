@@ -4532,6 +4532,115 @@ console.log('\n── 1.6.0 Footage (Pexels / Pixabay) ────────�
     } finally { fs.rmSync(tam, { recursive: true, force: true }); }
   });
 
+  testAsync('1.6.6 Tải tay: mở trang tìm đúng từ khoá, file bạn tải → <số cảnh>.mp4 trong thư mục lưu, clip cũ vào _bo, sang cảnh kế', async () => {
+    const { ql, tam, store } = dungFootage({});
+    const mo = [];
+    let dong = 0;
+    ql.o.tay = { mo: (trang, url, tieuDe) => mo.push({ trang, url, tieuDe }), dong: () => { dong++; } };
+    try {
+      assert.strictEqual(ql.tayBatDau({}).ok, false, 'chưa mở danh sách');
+      assert.strictEqual(ql.tayNhanTai('a.mp4'), null, 'không ở chế độ tải tay → để Electron tự lo');
+      ql.napTep(path.join(__dirname, 'fixture-footage.xlsx'));
+      const thu = ql.ds.thuMuc;
+      // Không cần khoá API.
+      let r = ql.tayBatDau({});
+      assert.ok(r.ok && r.canh === '0003', JSON.stringify(r));
+      assert.strictEqual(mo[0].trang, 'pexels');
+      assert.strictEqual(mo[0].url, 'https://www.pexels.com/search/videos/desert%20dunes%20aerial/?orientation=landscape');
+      assert.ok(/cảnh 0003/.test(mo[0].tieuDe) && /0003\.mp4/.test(mo[0].tieuDe));
+      assert.ok(/Đang Tải tay/.test(ql.loiTruocChay()) && (await ql.chay()).ok === false, 'không chạy API khi đang tải tay');
+      assert.strictEqual(ql.napTep(path.join(__dirname, 'fixture-footage.xlsx')).ok, false);
+      assert.strictEqual(ql.timLai().ok, false);
+      assert.strictEqual(ql.xoaDs().ok, false);
+      // Từ khoá khác → cụm thứ 2, rồi vòng lại.
+      ql.tayTuKhoaKhac();
+      assert.ok(/sand%20dunes%20sunrise/.test(mo[1].url));
+      assert.strictEqual(ql.trangThai().tay.k, 1);
+      ql.tayTuKhoaKhac();
+      assert.strictEqual(ql.trangThai().tay.k, 0);
+      // File không phải video → huỷ.
+      assert.ok(/không phải video/.test(ql.tayNhanTai('anh.jpg').loi));
+      // File bạn tải.
+      const n = ql.tayNhanTai('pexels-3045163-hd_1920_1080_25fps.mp4');
+      assert.strictEqual(n.tep, path.join(thu, '0003.mp4'));
+      assert.strictEqual(n.tepTam, path.join(thu, '0003.mp4.part'));
+      assert.strictEqual(ql.ds.canh[0].trangThai, 'tai');
+      assert.ok(/Đang tải clip cho cảnh 0003/.test(ql.tayNhanTai('b.mp4').loi), 'bấm Download lần 2 khi chưa xong → huỷ lần 2');
+      fs.mkdirSync(thu, { recursive: true });
+      fs.writeFileSync(n.tepTam, Buffer.alloc(4096, 1));
+      ql.tayTienDo(2048, 4096);
+      assert.deepStrictEqual([ql.trangThai().tay.dangTai.nhan, ql.trangThai().tay.dangTai.tong], [2048, 4096]);
+      const so0 = mo.length;
+      assert.ok(ql.tayXongTai(true, 'https://www.pexels.com/video/desert-3045163/', 'completed').ok);
+      const x3 = ql.ds.canh[0];
+      assert.deepStrictEqual([x3.trangThai, x3.clip.nguon, x3.clip.tay, x3.clip.byte, x3.tepRa], ['xong', 'pexels', true, 4096, path.join(thu, '0003.mp4')]);
+      assert.ok(fs.existsSync(path.join(thu, '0003.mp4')) && !fs.existsSync(n.tepTam));
+      assert.ok(/0003\tPexels\t\thttps:\/\/www\.pexels\.com\/video\/desert-3045163\//.test(fs.readFileSync(path.join(thu, 'nguon-footage.txt'), 'utf8')));
+      assert.strictEqual(mo.length, so0 + 1, 'tự mở cảnh kế');
+      assert.ok(/night%20sky%20stars%20timelapse/.test(mo[so0].url) && ql.trangThai().tay.canh === '0005');
+      // Cảnh 5 đã có file .mov cũ → sau khi tải .mp4 thì .mov vào _bo (CapCut chỉ thấy một file).
+      fs.writeFileSync(path.join(thu, '0005.mov'), 'cu');
+      const n5 = ql.tayNhanTai('clip.MP4');
+      // Tải hỏng → xoá .part, cảnh Lỗi, cửa sổ vẫn ở cảnh đó.
+      fs.writeFileSync(n5.tepTam, 'dở');
+      assert.strictEqual(ql.tayXongTai(false, '', 'cancelled').ok, false);
+      assert.ok(!fs.existsSync(n5.tepTam) && ql.ds.canh[1].trangThai === 'loi' && /cancelled/.test(ql.ds.canh[1].loi));
+      assert.strictEqual(ql.trangThai().tay.canh, '0005');
+      const n5b = ql.tayNhanTai('clip.mp4');
+      fs.writeFileSync(n5b.tepTam, Buffer.alloc(2048, 2));
+      ql.tayXongTai(true, 'https://www.pexels.com/video/night-1/', 'completed');
+      assert.ok(fs.existsSync(path.join(thu, '0005.mp4')) && fs.existsSync(path.join(thu, '_bo', '0005.mov')) && !fs.existsSync(path.join(thu, '0005.mov')));
+      // Bỏ qua cảnh 9 → cảnh 11; tải 11 → hết cảnh (9 bỏ qua) → không mở thêm.
+      ql.tayBoQua();
+      assert.strictEqual(ql.trangThai().tay.canh, '0011');
+      const n11 = ql.tayNhanTai('olive.webm');
+      assert.strictEqual(n11.tep, path.join(thu, '0011.webm'), 'giữ đuôi gốc');
+      fs.writeFileSync(n11.tepTam, Buffer.alloc(2048, 3));
+      const truoc = mo.length;
+      ql.tayXongTai(true, 'https://www.pexels.com/video/olive-1/', 'completed');
+      const tt = ql.trangThai().tay;
+      assert.deepStrictEqual([tt.so, tt.xong, tt.con, tt.boQua], [null, 3, 1, [9]]);
+      assert.strictEqual(mo.length, truoc, 'hết cảnh → không mở trang mới');
+      assert.ok(/Mọi cảnh đã xong/.test(ql.tayNhanTai('x.mp4').loi));
+      JSON.stringify(ql.trangThai());
+      // Tải lại cảnh 3 bằng nút của dòng, đổi sang Storyblocks: clip cũ 0003.mp4 → _bo.
+      r = ql.tayBatDau({ trang: 'storyblocks', so: 3 });
+      assert.ok(r.ok && mo[mo.length - 1].trang === 'storyblocks' && mo[mo.length - 1].url === 'https://www.storyblocks.com/video/search/desert-dunes-aerial');
+      assert.strictEqual(store.data.footage.tayTrang, 'storyblocks', 'nhớ trang đã chọn');
+      const n3 = ql.tayNhanTai('SB_123.mp4');
+      fs.writeFileSync(n3.tepTam, Buffer.alloc(3000, 4));
+      ql.tayXongTai(true, 'https://www.storyblocks.com/video/stock/x', 'completed');
+      assert.ok(fs.existsSync(path.join(thu, '_bo', '0003.mp4')) && fs.statSync(path.join(thu, '0003.mp4')).size === 3000);
+      assert.strictEqual(ql.ds.canh[0].clip.nguon, 'storyblocks');
+      assert.ok(/0003\tStoryblocks/.test(fs.readFileSync(path.join(thu, 'nguon-footage.txt'), 'utf8')));
+      // Đóng.
+      ql.tayDong();
+      assert.strictEqual(dong, 1);
+      assert.strictEqual(ql.trangThai().tay.bat, false);
+      assert.strictEqual(ql.loiTruocChay(), 'Chưa có khoá API Pexels hay Pixabay — nhập ở thẻ Khoá API rồi Lưu');
+      // Tải xong sau khi đã đóng cửa sổ vẫn lưu, không mở lại cửa sổ.
+      assert.strictEqual(ql.tayNhanTai('z.mp4'), null);
+      // Bài kiểm: một mẫu địa chỉ thay cho mọi trang.
+      assert.strictEqual(F.urlTimTay('pixabay', 'a b', 'http://127.0.0.1:9/__stock/tim?q={q}&trang={trang}'), 'http://127.0.0.1:9/__stock/tim?q=a%20b&trang=pixabay');
+      assert.strictEqual(F.urlTimTay('pixabay', 'olive tree'), 'https://pixabay.com/videos/search/olive%20tree/');
+      ql.datCaiDat({ tayTrang: 'abc' });
+      assert.strictEqual(store.data.footage.tayTrang, 'pexels');
+    } finally { fs.rmSync(tam, { recursive: true, force: true }); }
+  });
+
+  test('1.6.6 Tải tay: cửa sổ hiện, phiên riêng, không tự bấm / không chạy script trên trang stock; lệnh + giao diện', () => {
+    const m = docNguon('main.js'), ui = docNguon('src/ui/app.js'), html = docNguon('src/ui/index.html', true);
+    const khoi = m.slice(m.indexOf('let cuaSoTay = null;'), m.indexOf('function dongCuaSoTay()'));
+    assert.ok(khoi.length > 500);
+    assert.ok(/persist:stock-\$\{trang\}/.test(khoi) && /show: true/.test(khoi));
+    for (const cam of ['executeJavaScript', 'sendInputEvent', 'debugger', 'setUserAgent', 'insertCSS', 'preload']) assert.ok(!khoi.includes(cam), `không ${cam} trong cửa sổ tải tay`);
+    assert.ok(/footage\.tayNhanTai\(item\.getFilename\(\)\)/.test(khoi) && /item\.setSavePath\(r\.tepTam\)/.test(khoi) && /footage\.tayXongTai\(st === 'completed'/.test(khoi));
+    for (const l of ['footageTayMo', 'footageTayTuKhoa', 'footageTayBoQua', 'footageTayHien', 'footageTayDong']) assert.ok(new RegExp(`\\n  ${l}: `).test(m), `LENH.${l}`);
+    assert.ok(/tay: \{ mo: moCuaSoTay, dong: dongCuaSoTay \}/.test(m) && /mauTay: process\.env\.FOOTAGE_TAY_URL/.test(m));
+    for (const id of ['ftTayTrang', 'ftTayMo', 'ftTayDang', 'ftTayTuKhoa', 'ftTayChep', 'ftTayBoQua', 'ftTayHien', 'ftTayDong']) assert.ok(html.includes(`id="${id}"`), id);
+    assert.ok(/data-ft="tay"/.test(ui) && /goiTay\('footageTayMo', \{ trang: \$\('#ftTayTrang'\)\.value, so \}\)/.test(ui));
+  });
+
   test('1.6.0 Footage: trang Footage trong thanh trái + TEN_TRANG + vòng ẩn/hiện; lệnh có trong LENH; không tải Storyblocks bằng máy; ảnh nhỏ https được hiện', () => {
     const html = docNguon('src/ui/index.html', true), ui = docNguon('src/ui/app.js'), m = docNguon('main.js'), f = docNguon('src/main/footage.js', true);
     assert.ok(/data-trang="footage"/.test(html) && /id="trang-footage"/.test(html));
@@ -4540,7 +4649,9 @@ console.log('\n── 1.6.0 Footage (Pexels / Pixabay) ────────�
       assert.ok(new RegExp(`\\n  ${l}: `).test(m), `LENH.${l}`);
     }
     assert.ok(/footage: footage \? footage\.trangThai\(\) : null/.test(m));
-    assert.ok(!/storyblocks\.com/i.test(f.replace(/\/\/.*$/gm, '')), 'footage.js không gọi Storyblocks');
+    // 1.6.6: storyblocks.com chỉ được có trong TRANG_TAY (trang mở cho bạn tự tải) — không gọi / tải Storyblocks bằng máy.
+    const fBoTay = f.replace(/\/\/.*$/gm, '').replace(/const TRANG_TAY = \{[\s\S]*?\n\};/, '');
+    assert.ok(!/storyblocks\.com/i.test(fBoTay), 'footage.js không gọi Storyblocks');
     assert.ok(/img-src 'self' file: data: blob: https:;/.test(html) && !/script-src[^;]*https/.test(html));
     for (const w of ['build-windows.yml', 'build-mac.yml']) assert.ok(/run: node tests\/e2e\.js footage/.test(docNguon(`.github/workflows/${w}`, true)), `${w} chạy e2e footage`);
     assert.ok(/FOOTAGE \? 'tests\/footage-e2e-chay\.js'/.test(docNguon('tests/e2e.js', true)));

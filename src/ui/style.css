@@ -622,6 +622,18 @@ label > .ap { margin-left: 6px; }
 /* ── 1.6.0 Footage (trang Footage: stock video cho cảnh qua API Pexels / Pixabay) ── */
 .ft-hang-nut { flex-wrap: wrap; margin-bottom: 10px; }
 .ft-thu-muc { margin-left: 0; }
+/* 1.6.6 Tải tay */
+.ft-tay { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 12px; padding: 12px; border: 1px solid var(--vien-dam); border-radius: 12px; }
+.ft-tay > .dong-o { flex-wrap: wrap; gap: 8px; }
+.ft-tay select { width: auto; min-width: 140px; }
+.ft-tay-dang { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border-radius: 10px; background: var(--tim-nen); }
+.ft-tay-chu { display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+.ft-tay-chu code { overflow-wrap: anywhere; }
+.ft-tay-so { color: var(--tim); }
+.ft-tay-tai { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--chu); }
+.ft-tay-tai svg { width: 14px; height: 14px; }
+.ft-dong.ft-dang-tay { outline: 2px solid var(--tim); outline-offset: -2px; }
+.ft-nut .nut-vien.nho.dang { border-color: var(--tim); color: var(--tim); }
 .ft-tom-tat { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin: 4px 0 10px; font-size: 13px; color: var(--chu-phu); }
 .ft-tom-tat b { color: var(--chu); }
 .ft-tom-tat .ft-so { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }

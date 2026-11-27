@@ -9,6 +9,8 @@
 //  (CapCut Draft Studio đọc Videos/<số>.mp4 thay cho ảnh của cảnh đó).
 //
 //  KHÔNG tải Storyblocks hay trang trả phí nào bằng máy: điều khoản của họ cấm script tải hàng loạt.
+//  1.6.6 "Tải tay": app chỉ mở trang tìm (Pexels / Pixabay / Storyblocks) đúng từ khoá của cảnh trong cửa sổ HIỆN,
+//  bạn tự đăng nhập, tự chọn và tự bấm Download; app chỉ đặt tên + nơi lưu file bạn vừa tải rồi chuyển sang cảnh kế.
 //  Phần logic chọn clip ở đây thuần (không Electron) để kiểm bằng node; mạng / file truyền vào.
 // ============================================================================
 
@@ -17,8 +19,23 @@ const path = require('path');
 const { docXlsx, docCsv } = require('./doc-xlsx');
 
 const NGUON = ['pexels', 'pixabay'];
-const TEN_NGUON = { pexels: 'Pexels', pixabay: 'Pixabay' };
-const FOOTAGE_MAC_DINH = { pexelsKey: '', pixabayKey: '', rong: 1920, boQuaDaCo: true, mauTen: '{canh}', boHienDai: true };
+const TEN_NGUON = { pexels: 'Pexels', pixabay: 'Pixabay', storyblocks: 'Storyblocks' };
+const FOOTAGE_MAC_DINH = { pexelsKey: '', pixabayKey: '', rong: 1920, boQuaDaCo: true, mauTen: '{canh}', boHienDai: true, tayTrang: 'pexels' };
+
+// ── 1.6.6 Tải tay: trang tìm video của từng trang (chỉ mở trang, không đọc / bấm gì trên trang) ──
+const slugTim = (q) => String(q || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+const TRANG_TAY = {
+  pexels: { ten: 'Pexels', tim: (q) => `https://www.pexels.com/search/videos/${encodeURIComponent(q)}/?orientation=landscape` },
+  pixabay: { ten: 'Pixabay', tim: (q) => `https://pixabay.com/videos/search/${encodeURIComponent(q)}/` },
+  // Dạng địa chỉ tìm của Storyblocks chưa đo trên trang thật — trang không mở đúng thì bấm "Chép từ khoá" rồi dán vào ô tìm.
+  storyblocks: { ten: 'Storyblocks', tim: (q) => `https://www.storyblocks.com/video/search/${slugTim(q)}` }
+};
+const DUOI_VIDEO = /\.(mp4|mov|m4v|webm|mkv)$/i;
+/** Địa chỉ trang tìm của cảnh; mau (bài kiểm) = địa chỉ có {q} dùng thay cho mọi trang. */
+function urlTimTay(trang, cau, mau) {
+  if (mau) return String(mau).replace(/\{q\}/g, encodeURIComponent(cau)).replace(/\{trang\}/g, trang);
+  return (TRANG_TAY[trang] || TRANG_TAY.pexels).tim(cau);
+}
 const CHO_GIUA_LAN_GOI_MS = 1200;      // giãn lượt gọi API (Pexels mặc định 200 lượt/giờ)
 const GIU_TIM_MS = 24 * 3600 * 1000;
 const GIU_UNG_VIEN = 8;                 // số clip dự phòng giữ cho mỗi cảnh (nút Đổi clip)   // Pixabay yêu cầu giữ kết quả tìm 24 giờ (dùng chung cho cả hai)
@@ -269,6 +286,9 @@ class QuanLyFootage {
     this.lanGoiCuoi = 0;
     this.hetLuot = {};   // nguồn → thời điểm được gọi lại (429 / hết lượt)
     this.boNho = new Map();   // khoá tìm → { luc, json }
+    // 1.6.6 Tải tay: { bat, trang, so (cảnh đang chờ bạn tải), k (cụm từ khoá đang mở), boQua:Set, dangTai, xong (số clip phiên này) }
+    this.tay = { bat: false, trang: 'pexels', so: null, k: 0, boQua: new Set(), dangTai: null, xong: 0 };
+    this.lanBaoTienDo = 0;
   }
 
   get caiDat() { return Object.assign({}, FOOTAGE_MAC_DINH, this.store.data.footage || {}); }
@@ -281,6 +301,7 @@ class QuanLyFootage {
     c.boQuaDaCo = !!c.boQuaDaCo;
     c.boHienDai = c.boHienDai !== false;
     c.mauTen = String(c.mauTen || '{canh}').trim() || '{canh}';
+    if (!TRANG_TAY[c.tayTrang]) c.tayTrang = 'pexels';
     this.store.set({ footage: c });
     this.bao();
     return { ok: true, caiDat: this.trangThai().caiDat };
@@ -293,8 +314,9 @@ class QuanLyFootage {
     const c = this.caiDat;
     return {
       caiDat: { coPexels: !!c.pexelsKey, coPixabay: !!c.pixabayKey, rong: c.rong, boQuaDaCo: c.boQuaDaCo, mauTen: c.mauTen, boHienDai: c.boHienDai,
-        pexelsDuoi: c.pexelsKey.slice(-4), pixabayDuoi: c.pixabayKey.slice(-4) },
+        pexelsDuoi: c.pexelsKey.slice(-4), pixabayDuoi: c.pixabayKey.slice(-4), tayTrang: c.tayTrang },
       dangChay: this.dangChay,
+      tay: this.trangThaiTay(),
       // Không gửi danh sách ứng viên (có thể vài nghìn mục) — giao diện chỉ cần clip đang dùng.
       ds: this.ds && { ...this.ds, canh: this.ds.canh.map(({ ungVien, ...x }) => ({ ...x, conLuaChon: Math.max(0, (ungVien || []).length - 1 - x.viTri) })) }
     };
@@ -312,6 +334,7 @@ class QuanLyFootage {
     const { ds, loi } = docFileFootage(tep);
     if (!ds.length) return { ok: false, loi: loi.join(' · ') || 'Không có dòng cảnh nào' };
     if (this.dangChay) return { ok: false, loi: 'Đang tải footage — bấm Dừng trước khi mở file khác' };
+    if (this.tay.bat) return { ok: false, loi: 'Đang Tải tay — bấm Đóng tải tay trước khi mở file khác' };
     const ten = tenDanhSach(tep);
     // Nhớ danh sách đã mở theo đường dẫn file (tối đa 20 file gần nhất): mở lại file cũ thì giữ clip + thư mục lưu.
     const luu = { ...(this.store.data.footageLuu || {}) };
@@ -368,6 +391,7 @@ class QuanLyFootage {
 
   xoaDs() {
     if (this.dangChay) return { ok: false, loi: 'Đang tải — bấm Dừng trước' };
+    if (this.tay.bat) return { ok: false, loi: 'Đang Tải tay — bấm Đóng tải tay trước' };
     const d = this.ds;
     if (d && d.tep) this.store.set({ footageLuu: { ...(this.store.data.footageLuu || {}), [d.tep]: gon(d) } });
     this.store.set({ footageDs: null });
@@ -498,13 +522,14 @@ class QuanLyFootage {
       .map((x) => `${x.canh}\t${TEN_NGUON[x.clip.nguon]}\t${x.clip.tacGia}\t${x.clip.trang}`);
     try {
       fs.writeFileSync(path.join(d.thuMuc, 'nguon-footage.txt'),
-        `Footage của "${d.ten}" — cảnh, nguồn, tác giả, trang gốc (Pexels / Pixabay không bắt buộc ghi công, nhưng nên ghi trong mô tả video)\n${dong.join('\n')}\n`);
+        `Footage của "${d.ten}" — cảnh, nguồn, tác giả, trang gốc (Pexels / Pixabay không bắt buộc ghi công, nhưng nên ghi trong mô tả video; Storyblocks dùng theo giấy phép gói của bạn)\n${dong.join('\n')}\n`);
     } catch (_) {}
   }
 
   /** Lý do chưa chạy được (giao diện báo ngay khi bấm), null = chạy được. */
   loiTruocChay() {
     if (!this.ds) return 'Chưa mở danh sách footage';
+    if (this.tay.bat) return 'Đang Tải tay — bấm Đóng tải tay trước khi tải bằng API';
     if (!this.nguonCho({ nguon: 'auto' }).length) return 'Chưa có khoá API Pexels hay Pixabay — nhập ở thẻ Khoá API rồi Lưu';
     return null;
   }
@@ -611,6 +636,7 @@ class QuanLyFootage {
     const d = this.ds;
     if (!d) return { ok: false, loi: 'Chưa mở danh sách footage' };
     if (this.dangChay) return { ok: false, loi: 'Đang tải — bấm Dừng trước' };
+    if (this.tay.bat) return { ok: false, loi: 'Đang Tải tay — bấm Đóng tải tay trước' };
     let so = 0;
     for (const x of d.canh) {
       if (x.trangThai === 'bo' || x.coSan) continue;
@@ -672,6 +698,177 @@ class QuanLyFootage {
     this.luu(d);
     return { ok: true };
   }
+
+  // ── 1.6.6 Tải tay có hỗ trợ ────────────────────────────────────────────────
+  // App KHÔNG bấm gì trên trang: o.tay.mo(trang, url, tieuDe) chỉ mở cửa sổ hiện ở trang tìm của cảnh, bạn tự chọn clip
+  // và bấm Download. main bắt file bạn tải (will-download của phiên trang đó) → tayNhanTai → tayXongTai → cảnh kế.
+
+  /** Cảnh còn cần footage (Chờ / Lỗi), chưa bỏ qua trong phiên tải tay này; ưu tiên cảnh sau tuSo. */
+  tayCanhKe(tuSo) {
+    const d = this.ds;
+    if (!d) return null;
+    const con = d.canh.filter((x) => (x.trangThai === 'cho' || x.trangThai === 'loi') && !this.tay.boQua.has(x.so));
+    return con.find((x) => tuSo == null || x.so > tuSo) || con[0] || null;
+  }
+
+  trangThaiTay() {
+    const t = this.tay, d = this.ds;
+    const x = d && t.so != null ? d.canh.find((y) => y.so === t.so) : null;
+    return {
+      bat: t.bat, trang: t.trang, tenTrang: (TRANG_TAY[t.trang] || {}).ten || t.trang, xong: t.xong,
+      so: x ? x.so : null, canh: x ? x.canh : '', tuKhoa: x ? x.tuKhoa[t.k] || '' : '', k: t.k, soTuKhoa: x ? x.tuKhoa.length : 0,
+      url: x ? this.tayUrl(x) : '', boQua: [...t.boQua],
+      con: d ? d.canh.filter((y) => y.trangThai === 'cho' || y.trangThai === 'loi').length : 0,
+      dangTai: t.dangTai && { so: t.dangTai.so, canh: t.dangTai.canh, ten: t.dangTai.tenGoc, nhan: t.dangTai.nhan || 0, tong: t.dangTai.tong || 0 }
+    };
+  }
+
+  tayUrl(x) { return urlTimTay(this.tay.trang, cauTim(x.tuKhoa[this.tay.k] || x.tuKhoa[0]), this.o.mauTay); }
+
+  /** Mở (hoặc chuyển) cửa sổ tải tay tới trang tìm của cảnh đang chờ; không còn cảnh thì báo xong. */
+  tayMoCanh() {
+    const d = this.ds, t = this.tay;
+    const x = d && t.so != null ? d.canh.find((y) => y.so === t.so) : null;
+    if (!x) {
+      this.bao();
+      return { ok: true, het: true };
+    }
+    const tieuDe = `Tải tay · cảnh ${x.canh} · ${x.tuKhoa[t.k]} — chọn clip rồi bấm Download, app tự lưu thành ${tenFootage(this.caiDat.mauTen, x)}`;
+    if (this.o.tay) this.o.tay.mo(t.trang, this.tayUrl(x), tieuDe);
+    this.bao();
+    return { ok: true, so: x.so, canh: x.canh, url: this.tayUrl(x) };
+  }
+
+  /** Bắt đầu tải tay (nút "Tải tay" của danh sách, hoặc nút của một dòng → so). */
+  tayBatDau({ trang, so } = {}) {
+    const d = this.ds;
+    if (!d) return { ok: false, loi: 'Chưa mở danh sách footage' };
+    if (this.dangChay) return { ok: false, loi: 'Đang tải bằng API — bấm Dừng trước' };
+    const t = this.tay;
+    if (trang && TRANG_TAY[trang]) {
+      t.trang = trang;
+      if (this.caiDat.tayTrang !== trang) this.store.set({ footage: { ...this.caiDat, tayTrang: trang } });
+    } else if (!t.bat) t.trang = this.caiDat.tayTrang;
+    if (!t.bat) { t.boQua = new Set(); t.xong = 0; }
+    let x = null;
+    if (so != null) {
+      x = d.canh.find((y) => y.so === +so);
+      if (!x) return { ok: false, loi: 'Không thấy cảnh' };
+      if (x.trangThai === 'bo') this.traLai(d, x);
+      t.boQua.delete(x.so);
+    } else x = this.tayCanhKe(null);
+    if (!x) return { ok: false, loi: 'Mọi cảnh đã có footage (hoặc đã bỏ) — bấm "Tải tay" ở một dòng để tải lại cảnh đó' };
+    t.bat = true; t.so = x.so; t.k = 0;
+    if (!t.daBao) {
+      t.daBao = true;
+      this.log('info', `🖐 Tải tay ${TRANG_TAY[t.trang].ten}: đăng nhập trong cửa sổ nếu cần, chọn clip rồi tự bấm Download — app lưu thành <số cảnh>.mp4 vào ${d.thuMuc} rồi mở cảnh kế`);
+    }
+    return this.tayMoCanh();
+  }
+
+  /** Mở cụm từ khoá kế của cảnh đang chờ (vòng lại cụm đầu). */
+  tayTuKhoaKhac() {
+    const d = this.ds, t = this.tay;
+    const x = t.bat && d && d.canh.find((y) => y.so === t.so);
+    if (!x) return { ok: false, loi: 'Chưa mở Tải tay' };
+    t.k = (t.k + 1) % x.tuKhoa.length;
+    return this.tayMoCanh();
+  }
+
+  /** Bỏ qua cảnh đang chờ (cảnh đó vẫn Chờ, dùng ảnh AI nếu bạn không quay lại tải). */
+  tayBoQua() {
+    const t = this.tay;
+    if (!t.bat || t.so == null) return { ok: false, loi: 'Chưa mở Tải tay' };
+    t.boQua.add(t.so);
+    const x = this.tayCanhKe(t.so);
+    t.so = x ? x.so : null; t.k = 0;
+    return this.tayMoCanh();
+  }
+
+  /** Cửa sổ tải tay đã đóng (bạn bấm X hoặc nút Đóng). */
+  tayDaDong() {
+    const t = this.tay;
+    if (!t.bat) return { ok: true };
+    t.bat = false; t.so = null; t.daBao = false;
+    if (t.xong) this.log('info', `🖐 Đóng Tải tay: phiên này lưu ${t.xong} clip`);
+    this.bao();
+    return { ok: true };
+  }
+  tayDong() {
+    if (this.o.tay) this.o.tay.dong();
+    return this.tayDaDong();
+  }
+
+  /**
+   * Bạn vừa bấm Download trong cửa sổ tải tay. Trả { tepTam, tep, so } để main đặt nơi lưu; { loi } để huỷ file đó;
+   * null = không ở chế độ tải tay (để Electron tự hỏi nơi lưu).
+   */
+  tayNhanTai(tenGoc) {
+    const d = this.ds, t = this.tay;
+    if (!t.bat || !d) return null;
+    const x = t.so != null && d.canh.find((y) => y.so === t.so);
+    if (!x) return { loi: 'Mọi cảnh đã xong — chọn cảnh bằng nút "Tải tay" ở dòng của cảnh đó trước khi tải' };
+    if (t.dangTai) return { loi: `Đang tải clip cho cảnh ${t.dangTai.canh} — chờ tải xong rồi bấm Download cho cảnh kế` };
+    const duoi = ((String(tenGoc || '').match(DUOI_VIDEO) || [])[0] || '').toLowerCase();
+    if (!duoi) return { loi: `File "${tenGoc}" không phải video (.mp4 / .mov / .webm) — chọn bản tải video của clip` };
+    const tep = path.join(d.thuMuc, tenFootage(this.caiDat.mauTen, x).replace(/\.mp4$/i, duoi));
+    t.dangTai = { so: x.so, canh: x.canh, tenGoc: String(tenGoc || ''), tep, tepTam: `${tep}.part`, nhan: 0, tong: 0 };
+    x.trangThai = 'tai'; x.loi = '';
+    this.luu(d);
+    this.log('info', `🖐 Cảnh ${x.canh}: đang tải "${tenGoc}" → ${path.basename(tep)}`);
+    return { so: x.so, tep, tepTam: t.dangTai.tepTam };
+  }
+
+  tayTienDo(nhan, tong) {
+    const g = this.tay.dangTai;
+    if (!g) return;
+    g.nhan = nhan; g.tong = tong;
+    if (Date.now() - this.lanBaoTienDo > 500) { this.lanBaoTienDo = Date.now(); this.bao(); }
+  }
+
+  /**
+   * File tải tay xong (ok) hoặc hỏng / bị huỷ: đổi .part → <số cảnh>.<đuôi>; file cũ của cảnh (kể cả khác đuôi) chuyển
+   * vào _bo; ghi nguồn; chuyển cửa sổ sang cảnh kế. trangUrl = trang đang mở lúc bấm Download (ghi công).
+   */
+  tayXongTai(ok, trangUrl, trangThaiTai) {
+    const d = this.ds, t = this.tay, g = t.dangTai;
+    t.dangTai = null;
+    if (!g || !d) return { ok: false };
+    const x = d.canh.find((y) => y.so === g.so);
+    let byte = 0;
+    try { byte = ok ? fs.statSync(g.tepTam).size : 0; } catch (_) { ok = false; }
+    if (ok && byte < 1024) ok = false;
+    if (!ok || !x) {
+      try { fs.rmSync(g.tepTam, { force: true }); } catch (_) {}
+      if (x) { x.trangThai = x.clip ? 'xong' : 'loi'; x.loi = `Tải tay không xong (${trangThaiTai || 'file rỗng'}) — bấm Download lại`; }
+      this.luu(d);
+      this.log('warning', `🖐 Cảnh ${g.canh}: tải không xong (${trangThaiTai || 'file rỗng'})`);
+      return { ok: false };
+    }
+    // Clip cũ của cảnh (mọi đuôi video cùng tên) → _bo, để CapCut chỉ thấy đúng một file của cảnh.
+    const goc = g.tep.replace(DUOI_VIDEO, '');
+    for (const tep of new Set([x.tepRa, ...['.mp4', '.mov', '.m4v', '.webm', '.mkv'].map((e) => goc + e)])) {
+      if (tep && path.resolve(tep) !== path.resolve(g.tepTam)) this.chuyenBo(tep);
+    }
+    fs.renameSync(g.tepTam, g.tep);
+    const nguon = TRANG_TAY[t.trang] ? t.trang : 'pexels';
+    x.clip = { id: `tay-${Date.now()}`, nguon, tay: true, trang: /^https?:/.test(trangUrl || '') ? trangUrl : '', tacGia: '', anh: '', giay: 0, w: 0, h: 0, byte, tenGoc: g.tenGoc };
+    Object.assign(x, { tepRa: g.tep, trangThai: 'xong', loi: '', coSan: false, ungVien: null, viTri: -1 });
+    delete x.matFile;
+    t.xong++;
+    this.ghiNguon(d);
+    this.log('success', `🖐 Cảnh ${x.canh}: ${TEN_NGUON[nguon]} · ${(byte / 1048576).toFixed(1)} MB → ${g.tep}`);
+    if (!/\.mp4$/i.test(g.tep)) this.log('warning', `🖐 Cảnh ${x.canh} lưu đuôi ${path.extname(g.tep)} — CapCut Draft Studio có thể chỉ đọc .mp4, nên chọn bản MP4 nếu trang có`);
+    // Cảnh kế: chỉ chuyển trang nếu cửa sổ vẫn đang chờ đúng cảnh vừa tải (bạn chưa tự chuyển cảnh khác).
+    if (t.bat && t.so === x.so) {
+      const ke = this.tayCanhKe(x.so);
+      t.so = ke ? ke.so : null; t.k = 0;
+      this.luu(d);
+      if (!ke) this.log('success', `🖐 Tải tay: mọi cảnh trong danh sách đã có footage (hoặc đã bỏ qua)`);
+      this.tayMoCanh();
+    } else this.luu(d);
+    return { ok: true, tep: g.tep };
+  }
 }
 
-module.exports = { QuanLyFootage, doKhop, tachTu, cauTim, TU_HIEN_DAI, docHang, docFileFootage, chuanPexels, chuanPixabay, xepUngVien, chonTep, coChuTranh, tenFootage, chuoiSo, tenDanhSach, FOOTAGE_MAC_DINH };
+module.exports = { QuanLyFootage, TRANG_TAY, urlTimTay, slugTim, doKhop, tachTu, cauTim, TU_HIEN_DAI, docHang, docFileFootage, chuanPexels, chuanPixabay, xepUngVien, chonTep, coChuTranh, tenFootage, chuoiSo, tenDanhSach, FOOTAGE_MAC_DINH };
