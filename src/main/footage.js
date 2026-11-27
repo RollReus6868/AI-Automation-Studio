@@ -300,7 +300,15 @@ class QuanLyFootage {
     };
   }
 
-  napTep(tep) {
+  /**
+   * 1.6.5: thư mục Videos của dự án (o.thuMucDuAn(duAnId) → { thuMuc, ten, drive }): Drive trên máy bật thì
+   * <thư mục Drive>/<Tên dự án>/Videos, không thì <thư mục lưu video>/<Tên dự án>/Videos. Tạo khi tải clip đầu tiên.
+   */
+  thuMucDuAn(duAnId) {
+    try { return (this.o.thuMucDuAn && this.o.thuMucDuAn(duAnId)) || null; } catch (_) { return null; }
+  }
+
+  napTep(tep, duAnId) {
     const { ds, loi } = docFileFootage(tep);
     if (!ds.length) return { ok: false, loi: loi.join(' · ') || 'Không có dòng cảnh nào' };
     if (this.dangChay) return { ok: false, loi: 'Đang tải footage — bấm Dừng trước khi mở file khác' };
@@ -312,8 +320,10 @@ class QuanLyFootage {
     delete luu[tep];
     const giu = Object.entries(luu).sort((a, b) => (b[1].luuLuc || 0) - (a[1].luuLuc || 0)).slice(0, 20);
     this.store.set({ footageLuu: Object.fromEntries(giu) });
-    const thuMuc = cu && cu.thuMuc ? cu.thuMuc : path.join(this.o.thuMucGoc || '.', 'Footage', ten);
-    const moi = { tep, ten, thuMuc, napLuc: Date.now(), loiDoc: loi,
+    // Mở lại file cũ → giữ thư mục đã dùng; file mới → thư mục Videos của dự án đang mở (1.6.5).
+    const da = this.thuMucDuAn(duAnId || (cu && cu.duAn));
+    const thuMuc = cu && cu.thuMuc ? cu.thuMuc : (da && da.thuMuc) || path.join(this.o.thuMucGoc || '.', 'Footage', ten);
+    const moi = { tep, ten, thuMuc, napLuc: Date.now(), loiDoc: loi, duAn: duAnId || (cu && cu.duAn) || '', duAnTen: (da && da.ten) || (cu && cu.duAnTen) || '',
       canh: ds.map((x) => ({ ...x, trangThai: 'cho', clip: null, ungVien: null, viTri: -1, loi: '', tepRa: '' })) };
     // Mở lại đúng file cũ: giữ clip đã tải của cảnh có cùng từ khoá.
     let chuyen = 0;
@@ -335,6 +345,17 @@ class QuanLyFootage {
     if (chuyen) this.log('info', `🎞 File footage đã sửa: ${chuyen} clip của cảnh bị bỏ / đổi từ khoá chuyển vào _bo`);
     this.log('info', `🎞 Mở danh sách footage "${ten}": ${moi.canh.length} cảnh${loi.length ? ` · ${loi.length} dòng bỏ qua (${loi.slice(0, 3).join(' · ')}${loi.length > 3 ? '…' : ''})` : ''}`);
     return { ok: true, so: moi.canh.length, loi, chuyen };
+  }
+
+  /** 1.6.5: đặt thư mục lưu về thư mục Videos của dự án (nút "Videos của dự án"). */
+  veThuMucDuAn(duAnId) {
+    const d = this.ds;
+    if (!d) return { ok: false, loi: 'Chưa mở danh sách footage' };
+    const da = this.thuMucDuAn(duAnId || d.duAn);
+    if (!da || !da.thuMuc) return { ok: false, loi: 'Không xác định được thư mục của dự án' };
+    d.thuMuc = da.thuMuc; d.duAn = duAnId || d.duAn; d.duAnTen = da.ten;
+    this.luu(d);
+    return { ok: true, thuMuc: da.thuMuc };
   }
 
   datThuMuc(thuMuc) {

@@ -1,4 +1,11 @@
-# AI Automation Studio 1.6.4
+# AI Automation Studio 1.6.5
+
+- **Footage tải mặc định vào thư mục `Videos` của dự án.** Mở file footage khi đang mở dự án nào thì clip lưu vào thư mục Videos của dự án đó — cùng chỗ app đưa video của dự án lên Drive: Google Drive bật (chép vào thư mục Drive trên máy) → `<thư mục Drive>/<Tên dự án>/Videos` (vd `G:\My Drive\Epic_18\Videos`); Drive tắt → `<thư mục lưu video>/<Tên dự án>/Videos`. Chưa có thư mục thì app tự tạo.
+- Nút mới **Videos của dự án** cạnh ô Thư mục lưu: đưa thư mục lưu về Videos của dự án đang mở. Tên dự án hiện cạnh tên danh sách.
+- Mở lại một file footage đã dùng thì vẫn giữ thư mục đã chọn trước đó.
+- Footage vẫn chỉ tải qua API Pixabay (và Pexels nếu có khoá). App không tự bấm tải trên trang Pexels / Storyblocks: điều khoản của họ cấm dùng chương trình / robot để tải.
+
+## Bản 1.6.4
 
 - **Sửa lỗi Footage: cảnh "Đã có" mà file đã bị xoá khỏi thư mục lưu thì không tải lại.** Nay bấm **Tải footage** là app thấy file mất và tải lại **đúng clip đã chọn** (không tìm lại; clip tải từ bản cũ chưa ghi địa chỉ thì tìm lại theo luật mới). Đổi thư mục lưu thì file ở thư mục cũ được chép sang, không tải lại.
 - Lọc đồ vật hiện đại bắt thêm: đường nhựa (asphalt), Bitcoin / tiền mã hoá, tài chính, hiệu sách, cửa hàng.

@@ -4504,6 +4504,34 @@ console.log('\n── 1.6.0 Footage (Pexels / Pixabay) ────────�
     } finally { fs.rmSync(tam, { recursive: true, force: true }); }
   });
 
+  test('1.6.5 footage: file mới → thư mục Videos của dự án (o.thuMucDuAn); mở lại giữ thư mục cũ; nút về Videos của dự án; main tính đúng như đưa video lên Drive', () => {
+    const tam = fs.mkdtempSync(path.join(os.tmpdir(), 'ft-da-'));
+    try {
+      const store = { data: {}, set(x) { Object.assign(this.data, x); } };
+      const da = { a: { thuMuc: path.join(tam, 'Drive', 'Epic_18', 'Videos'), ten: 'Epic_18' }, b: { thuMuc: path.join(tam, 'B', 'Videos'), ten: 'B' } };
+      const ql = new F.QuanLyFootage({ store, thuMucGoc: tam, thuMucDuAn: (id) => da[id] || null, fetch: async () => ({}), taiVe: async () => 0 });
+      const tep = path.join(tam, 'x_footage.csv');
+      fs.writeFileSync(tep, 'scene,tu_khoa\n1,olive tree\n');
+      ql.napTep(tep, 'a');
+      assert.strictEqual(ql.ds.thuMuc, da.a.thuMuc);
+      assert.strictEqual(ql.ds.duAnTen, 'Epic_18');
+      ql.datThuMuc(path.join(tam, 'khac'));
+      ql.napTep(tep, 'b');
+      assert.strictEqual(ql.ds.thuMuc, path.join(tam, 'khac'), 'mở lại cùng file giữ thư mục đã chọn');
+      assert.deepStrictEqual(ql.veThuMucDuAn('b'), { ok: true, thuMuc: da.b.thuMuc });
+      const tep2 = path.join(tam, 'y_footage.csv');
+      fs.writeFileSync(tep2, 'scene,tu_khoa\n1,olive tree\n');
+      const ql2 = new F.QuanLyFootage({ store: { data: {}, set() {} }, thuMucGoc: tam, fetch: async () => ({}), taiVe: async () => 0 });
+      ql2.store.set = function (x) { Object.assign(this.data, x); };
+      ql2.napTep(tep2);
+      assert.strictEqual(ql2.ds.thuMuc, path.join(tam, 'Footage', 'y'), 'không có thông tin dự án → như cũ');
+      const m = docNguon('main.js');
+      assert.ok(/if \(c\.driveBat && c\.driveCach !== 'web' && c\.thuMucDrive\) return \{ thuMuc: thuMucDich\(c\.thuMucDrive, d\.ten, 'video'\)/.test(m), 'cùng chỗ với video đưa lên Drive');
+      assert.ok(/thuMucDuAn: thuMucVideosDuAn/.test(m) && /footageThuMucDuAn: /.test(m));
+      assert.ok(/api\.call\('footageMoFile', \{ duAn: /.test(docNguon('src/ui/app.js')));
+    } finally { fs.rmSync(tam, { recursive: true, force: true }); }
+  });
+
   test('1.6.0 Footage: trang Footage trong thanh trái + TEN_TRANG + vòng ẩn/hiện; lệnh có trong LENH; không tải Storyblocks bằng máy; ảnh nhỏ https được hiện', () => {
     const html = docNguon('src/ui/index.html', true), ui = docNguon('src/ui/app.js'), m = docNguon('main.js'), f = docNguon('src/main/footage.js', true);
     assert.ok(/data-trang="footage"/.test(html) && /id="trang-footage"/.test(html));
