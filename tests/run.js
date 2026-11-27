@@ -4889,7 +4889,10 @@ console.log('\n── 1.7.0 Motion graphic theo cảnh (Remotion) ────�
     assert.ok(/'127\.0\.0\.1'/.test(tt) && !/listen\(0\)/.test(tt), 'máy chủ ảnh chỉ nghe 127.0.0.1');
     const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
     assert.strictEqual(pkg.dependencies['@remotion/renderer'], '4.0.547');
-    assert.ok(pkg.devDependencies['@remotion/bundler'] === '4.0.547' && pkg.devDependencies.remotion === '4.0.547', 'phiên bản Remotion khớp nhau');
+    assert.ok(pkg.devDependencies['@remotion/bundler'] === '4.0.547' && pkg.dependencies.remotion === '4.0.547', 'phiên bản Remotion khớp nhau');
+    // @remotion/renderer cần react, react-dom, remotion LÚC CHẠY (peer) — để ở devDependencies là bản cài thiếu (CI Windows 28/11/2026:
+    // "Cannot find module 'react/jsx-runtime'" từ app.asar)
+    for (const k of ['react', 'react-dom', 'remotion']) assert.ok(pkg.dependencies[k] && !(pkg.devDependencies || {})[k], `${k} nằm ở dependencies`);
     assert.deepStrictEqual(pkg.build.asarUnpack, ['node_modules/@remotion/compositor-*/**', 'src/motion/bundle/**']);
     assert.ok(pkg.build.files.includes('!src/motion/src/**') && pkg.build.files.includes('!src/motion/public/**'));
     assert.ok(/src\/motion\/bundle\//.test(fs.readFileSync(path.join(__dirname, '..', '.gitignore'), 'utf8')), 'bundle dựng lúc build, không vào git');

@@ -16,10 +16,7 @@
   "devDependencies": {
     "@remotion/bundler": "4.0.547",
     "electron": "33.4.11",
-    "electron-builder": "25.1.8",
-    "react": "19.2.0",
-    "react-dom": "19.2.0",
-    "remotion": "4.0.547"
+    "electron-builder": "25.1.8"
   },
   "build": {
     "appId": "com.rollreus.aiautomationstudio",
@@ -87,6 +84,9 @@
     "url": "https://github.com/RollReus6868/AI-Automation-Studio.git"
   },
   "dependencies": {
-    "@remotion/renderer": "4.0.547"
+    "@remotion/renderer": "4.0.547",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "remotion": "4.0.547"
   }
 }
