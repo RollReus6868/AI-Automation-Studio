@@ -2196,6 +2196,7 @@
     $('#ftRong').value = String(c.rong);
     $('#ftBoQua').checked = !!c.boQuaDaCo;
     $('#ftHienDai').checked = c.boHienDai !== false;
+    if (document.activeElement !== $('#ftTayTrang')) $('#ftTayTrang').value = (f.tay && f.tay.bat ? f.tay.trang : c.tayTrang) || 'pexels';
     veFootage();
   }
   function veFootage() {
@@ -2207,11 +2208,13 @@
     $('#ftTenDs').textContent = d ? ` — ${d.ten} (${d.canh.length} cảnh)${d.duAnTen ? ` · dự án ${d.duAnTen}` : ''}` : '';
     if (document.activeElement !== $('#ftThuMuc')) $('#ftThuMuc').value = d ? d.thuMuc : '';
     for (const id of ['#ftChonThuMuc', '#ftMoThuMuc', '#ftXoaDs', '#ftThuMucDuAn']) $(id).disabled = !d;
-    $('#ftTimLai').disabled = !d || !!f.dangChay;
+    const tay = f.tay || {};
+    $('#ftTimLai').disabled = !d || !!f.dangChay || !!tay.bat;
     const nut = $('#ftChay');
-    nut.disabled = !d;
+    nut.disabled = !d || (!!tay.bat && !f.dangChay);
     nut.classList.toggle('dung', !!f.dangChay);
     datHtml(nut, f.dangChay ? `${ic('pause')}<span>Dừng</span>` : `${ic('download')}<span>Tải footage</span>`);
+    veTay(f);
     if (!d) {
       datHtml($('#ftTomTat'), '');
       datHtml($('#ftBang'), `<div class="ft-trong">Chưa mở danh sách. Bấm <b>Mở file footage…</b> và chọn file <code>&lt;tên&gt;_footage.xlsx</code> (cột <code>scene</code>, <code>tu_khoa</code>, <code>giay_can</code>, <code>tranh</code>…).</div>`);
@@ -2227,20 +2230,43 @@
     datHtml($('#ftBang'), d.canh.map((x) => {
       const k = x.clip;
       const clip = k && x.trangThai !== 'bo'
-        ? `<div class="ft-clip">${k.anh ? `<img src="${esc(k.anh)}" alt="" loading="lazy">` : ''}<div><b>${esc(k.nguon === 'pexels' ? 'Pexels' : 'Pixabay')}</b> · ${esc(k.tacGia || '?')}<br><small>${giayDep(k.giay)} · ${k.w}×${k.h}</small></div></div>`
+        ? (k.tay
+          ? `<div class="ft-clip"><div><b>${esc(TEN_NGUON_FT[k.nguon] || k.nguon)}</b> · tải tay<br><small>${esc(k.tenGoc || '')}${k.byte ? ` · ${k.byte >= 1048576 ? `${(k.byte / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(k.byte / 1024))} KB`}` : ''}</small></div></div>`
+          : `<div class="ft-clip">${k.anh ? `<img src="${esc(k.anh)}" alt="" loading="lazy">` : ''}<div><b>${esc(TEN_NGUON_FT[k.nguon] || k.nguon)}</b> · ${esc(k.tacGia || '?')}<br><small>${giayDep(k.giay)} · ${k.w}×${k.h}</small></div></div>`)
         : x.coSan && x.trangThai === 'xong' ? '<small class="mo">File có sẵn trong thư mục</small>' : '';
       const nut = [
-        k && x.trangThai !== 'bo' ? `<button class="nut-vien nho" data-ft="doi" data-so="${x.so}" title="Tải clip khác cho cảnh này${x.conLuaChon ? ` (còn ${x.conLuaChon} lựa chọn)` : ' (tìm thêm)'}"${f.dangChay ? ' disabled' : ''}>${ic('refresh-cw')}Đổi clip</button>` : '',
+        k && !k.tay && x.trangThai !== 'bo' ? `<button class="nut-vien nho" data-ft="doi" data-so="${x.so}" title="Tải clip khác cho cảnh này${x.conLuaChon ? ` (còn ${x.conLuaChon} lựa chọn)` : ' (tìm thêm)'}"${f.dangChay ? ' disabled' : ''}>${ic('refresh-cw')}Đổi clip</button>` : '',
+        `<button class="nut-vien nho${tay.bat && tay.so === x.so ? ' dang' : ''}" data-ft="tay" data-so="${x.so}" title="Mở trang tìm của cảnh này để tự chọn và tải clip (tải tay)"${f.dangChay ? ' disabled' : ''}>${ic('external-link')}Tải tay</button>`,
         k && k.trang ? `<button class="nut-vien nho" data-ft="xem" data-url="${esc(k.trang)}" title="Mở trang gốc của clip">${ic('external-link')}</button>` : '',
         x.trangThai === 'xong' && k ? `<button class="nut-vien nho" data-ft="bo" data-so="${x.so}" title="Không dùng footage cho cảnh này (file chuyển vào thư mục _bo)">${ic('x')}Bỏ</button>` : '',
         x.trangThai === 'bo' ? `<button class="nut-vien nho" data-ft="layLai" data-so="${x.so}">${ic('rotate-ccw')}Lấy lại</button>` : ''
       ].join('');
-      return `<div class="ft-dong tt-${x.trangThai}"><div class="ft-canh">${esc(x.canh)}</div>` +
+      return `<div class="ft-dong tt-${x.trangThai}${tay.bat && tay.so === x.so ? ' ft-dang-tay' : ''}"><div class="ft-canh">${esc(x.canh)}</div>` +
         `<div class="ft-tu"><span>${esc(x.tuKhoa.join(' · '))}</span>${x.tranh.length ? `<small>Tránh: ${esc(x.tranh.join(', '))}</small>` : ''}${x.ghiChu ? `<small>${esc(x.ghiChu)}</small>` : ''}</div>` +
         `<div class="ft-can">${x.giay ? `cần ${giayDep(x.giay)}` : ''}</div>` +
         `<div class="ft-tt"><span class="the-tt">${TT_FOOTAGE[x.trangThai] || x.trangThai}</span>${x.loi ? `<small class="do">${esc(x.loi)}</small>` : ''}</div>` +
         `<div class="ft-k">${clip}</div><div class="ft-nut">${nut}</div></div>`;
     }).join(''));
+  }
+  const TEN_NGUON_FT = { pexels: 'Pexels', pixabay: 'Pixabay', storyblocks: 'Storyblocks' };
+  /** 1.6.6: khung Tải tay — cảnh đang chờ bạn tải, từ khoá, tiến độ file đang tải. */
+  function veTay(f) {
+    const t = f.tay || {}, d = f.ds;
+    $('#ftTayMo').disabled = !d || !!f.dangChay;
+    $('#ftTayTrang').disabled = !d || !!f.dangChay;
+    datHtml($('#ftTayMo'), `${ic('external-link')}<span>${t.bat ? 'Mở lại trang của cảnh' : 'Mở trang tải tay'}</span>`);
+    const khung = $('#ftTayDang');
+    khung.hidden = !t.bat;
+    if (!t.bat) return;
+    const g = t.dangTai;
+    const tienDo = g ? `<div class="ft-tay-tai">${ic('download')}Đang tải cảnh <b>${esc(g.canh)}</b>: ${esc(g.ten)} — ${g.tong ? `${Math.round(g.nhan * 100 / g.tong)}%` : `${(g.nhan / 1048576).toFixed(1)} MB`}</div>` : '';
+    const chu = t.so != null
+      ? `<div><b>${esc(t.tenTrang)}</b> · chờ bạn tải cảnh <b class="ft-tay-so">${esc(t.canh)}</b> — từ khoá <code>${esc(t.tuKhoa)}</code>${t.soTuKhoa > 1 ? ` <small class="mo">(cụm ${t.k + 1}/${t.soTuKhoa})</small>` : ''}</div>` +
+        `<small class="mo">Chọn clip trong cửa sổ ${esc(t.tenTrang)} rồi bấm Download → app lưu thành số cảnh và mở cảnh kế. Phiên này đã lưu ${t.xong} clip · còn ${t.con} cảnh chưa có footage${t.boQua && t.boQua.length ? ` · bỏ qua ${t.boQua.length}` : ''}.</small>`
+      : `<div><b>${esc(t.tenTrang)}</b> · ✓ Mọi cảnh đã có footage (hoặc đã bỏ qua). Phiên này lưu ${t.xong} clip.</div><small class="mo">Muốn tải lại một cảnh: bấm <b>Tải tay</b> ở dòng của cảnh đó.</small>`;
+    datHtml($('#ftTayChu'), tienDo + chu);
+    for (const id of ['#ftTayTuKhoa', '#ftTayChep', '#ftTayBoQua']) $(id).disabled = t.so == null;
+    $('#ftTayTuKhoa').disabled = t.so == null || t.soTuKhoa < 2;
   }
   function ganFootage() {
     $('#ftLuuKhoa').onclick = async () => {
@@ -2272,6 +2298,24 @@
       const r = await api.call('footageXoaDs');
       if (r && r.ok === false) toast(r.loi, true);
     };
+    const goiTay = async (lenh, tham) => {
+      const r = await api.call(lenh, tham);
+      if (r && r.ok === false) toast(r.loi || 'Lỗi', true);
+      else if (r && r.het) toast('Mọi cảnh đã có footage');
+      return r;
+    };
+    $('#ftTayMo').onclick = () => goiTay('footageTayMo', { trang: $('#ftTayTrang').value });
+    $('#ftTayTrang').onchange = () => { const t = S.footage && S.footage.tay; if (t && t.bat) goiTay('footageTayMo', { trang: $('#ftTayTrang').value, so: t.so == null ? undefined : t.so }); };
+    $('#ftTayTuKhoa').onclick = () => goiTay('footageTayTuKhoa');
+    $('#ftTayBoQua').onclick = () => goiTay('footageTayBoQua');
+    $('#ftTayHien').onclick = () => goiTay('footageTayHien');
+    $('#ftTayDong').onclick = () => goiTay('footageTayDong');
+    $('#ftTayChep').onclick = async () => {
+      const t = S.footage && S.footage.tay;
+      if (!t || !t.tuKhoa) return;
+      await navigator.clipboard.writeText(t.tuKhoa);
+      toast(`Đã chép "${t.tuKhoa}" — dán vào ô tìm của trang`);
+    };
     $('#ftChonThuMuc').onclick = () => api.call('footageChonThuMuc');
     $('#ftThuMucDuAn').onclick = async () => {   // 1.6.5
       const r = await api.call('footageThuMucDuAn', { duAn: (duAnHienTai() || {}).id });
@@ -2290,6 +2334,7 @@
         toast('Đã chép số cảnh — dán vào nút Chọn số ở trang Tạo video');
         return;
       }
+      if (b.dataset.ft === 'tay') { goiTay('footageTayMo', { trang: $('#ftTayTrang').value, so }); return; }
       const lenh = { doi: 'footageDoi', bo: 'footageBo', layLai: 'footageLayLai' }[b.dataset.ft];
       if (!lenh) return;
       b.disabled = true;

@@ -1,4 +1,14 @@
-# AI Automation Studio 1.6.5
+# AI Automation Studio 1.6.6
+
+- **Footage: chế độ Tải tay.** Dùng khi không có khoá API (Pexels đã ngừng cấp khoá mới) hoặc muốn tự chọn clip, kể cả Storyblocks nếu bạn có gói. Mục Footage → mở file footage → khung **Tải tay** → chọn trang (Pexels / Pixabay / Storyblocks) → **Mở trang tải tay**.
+- App mở một cửa sổ trang tìm video **đúng từ khoá của cảnh** đầu tiên còn thiếu footage. Lần đầu bạn tự đăng nhập trong cửa sổ đó; app nhớ đăng nhập riêng cho từng trang.
+- Bạn xem, chọn clip và **tự bấm Download** (nên chọn bản MP4 1080p). App nhận file vừa tải, đặt tên theo số cảnh (vd `0047.mp4`), lưu vào thư mục lưu (mặc định thư mục `Videos` của dự án, Drive bật thì trong Drive) rồi **tự mở trang của cảnh kế**.
+- Nút trong khung Tải tay: **Từ khoá khác** (cụm từ khoá kế của cảnh), **Chép từ khoá**, **Bỏ qua cảnh** (cảnh đó dùng ảnh AI), **Hiện cửa sổ**, **Đóng tải tay**. Mỗi dòng cảnh có nút **Tải tay** để tải lại riêng cảnh đó; clip cũ của cảnh chuyển vào `_bo`.
+- File tải không phải video (vd ảnh) thì app huỷ, không lưu. Clip tải tay được ghi vào `nguon-footage.txt` (cảnh, trang, link trang clip).
+- App **không tự bấm gì** trên trang Pexels / Pixabay / Storyblocks: mỗi clip do bạn chọn và bấm tải, nên đúng điều khoản của các trang. Trong lúc Tải tay, nút Tải footage (API) tạm khoá.
+- Địa chỉ trang tìm của Storyblocks chưa đo trên trang thật: nếu trang không ra kết quả tìm, bấm **Chép từ khoá** rồi dán vào ô tìm của Storyblocks.
+
+## Bản 1.6.5
 
 - **Footage tải mặc định vào thư mục `Videos` của dự án.** Mở file footage khi đang mở dự án nào thì clip lưu vào thư mục Videos của dự án đó — cùng chỗ app đưa video của dự án lên Drive: Google Drive bật (chép vào thư mục Drive trên máy) → `<thư mục Drive>/<Tên dự án>/Videos` (vd `G:\My Drive\Epic_18\Videos`); Drive tắt → `<thư mục lưu video>/<Tên dự án>/Videos`. Chưa có thư mục thì app tự tạo.
 - Nút mới **Videos của dự án** cạnh ô Thư mục lưu: đưa thư mục lưu về Videos của dự án đang mở. Tên dự án hiện cạnh tên danh sách.

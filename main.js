@@ -805,6 +805,64 @@ async function taiFootageVe(url, tep) {
   return buf.length;
 }
 
+/**
+ * 1.6.6 — Tải tay footage: cửa sổ HIỆN của trang stock (phiên riêng persist:stock-<trang>, user agent mặc định của app,
+ * không chỉnh gì để lách trang). App chỉ mở trang tìm của cảnh; bạn tự đăng nhập, chọn clip, bấm Download. Mọi file tải
+ * trong phiên này lúc đang Tải tay → footage.tayNhanTai đặt tên <số cảnh>.mp4 trong thư mục Videos của dự án.
+ */
+let cuaSoTay = null;
+const phienTayDaGan = new Set();
+function phienTay(trang) {
+  const ten = `persist:stock-${trang}`;
+  const ses = session.fromPartition(ten);
+  if (!phienTayDaGan.has(ten)) {
+    phienTayDaGan.add(ten);
+    ses.on('will-download', (_e, item, wc) => {
+      const r = footage && footage.tayNhanTai(item.getFilename());
+      if (!r) return;   // không ở chế độ tải tay → Electron tự hỏi nơi lưu
+      if (r.loi) { item.cancel(); log('warning', `🖐 ${r.loi}`); return; }
+      try { fs.mkdirSync(path.dirname(r.tep), { recursive: true }); } catch (_) {}
+      item.setSavePath(r.tepTam);
+      let trangUrl = '';
+      try { trangUrl = wc && !wc.isDestroyed() ? wc.getURL() : ''; } catch (_) {}
+      item.on('updated', () => footage.tayTienDo(item.getReceivedBytes(), item.getTotalBytes()));
+      item.once('done', (_ev, st) => {
+        try { footage.tayXongTai(st === 'completed', trangUrl, st); } catch (e) { log('error', `🖐 Lưu clip tải tay lỗi: ${e.message}`); }
+      });
+    });
+  }
+  return ses;
+}
+function moCuaSoTay(trang, url, tieuDe) {
+  if (cuaSoTay && !cuaSoTay.isDestroyed() && cuaSoTay.__trang !== trang) { cuaSoTay.__doiTrang = true; cuaSoTay.destroy(); cuaSoTay = null; }
+  if (!cuaSoTay || cuaSoTay.isDestroyed()) {
+    const ses = phienTay(trang);
+    const w = new BrowserWindow({
+      show: true, width: 1320, height: 900, title: tieuDe, autoHideMenuBar: true,
+      icon: path.join(__dirname, 'icons', process.platform === 'win32' ? 'icon.ico' : 'icon256.png'),
+      webPreferences: { session: ses, contextIsolation: true, sandbox: true, spellcheck: false }
+    });
+    w.__trang = trang;
+    // Cửa sổ con (đăng nhập Google / Apple của trang) mở trong cùng phiên để giữ đăng nhập.
+    w.webContents.setWindowOpenHandler(({ url: u }) => (/^https?:/.test(u)
+      ? { action: 'allow', overrideBrowserWindowOptions: { autoHideMenuBar: true, webPreferences: { session: ses, contextIsolation: true, sandbox: true } } }
+      : { action: 'deny' }));
+    w.on('page-title-updated', (e) => e.preventDefault());
+    w.on('closed', () => {
+      if (cuaSoTay === w) cuaSoTay = null;
+      if (!w.__doiTrang && footage) footage.tayDaDong();
+    });
+    cuaSoTay = w;
+  }
+  cuaSoTay.setTitle(tieuDe);
+  cuaSoTay.loadURL(url).catch(() => {});
+  if (cuaSoTay.isMinimized()) cuaSoTay.restore();
+  cuaSoTay.show();
+}
+function dongCuaSoTay() {
+  if (cuaSoTay && !cuaSoTay.isDestroyed()) cuaSoTay.close();
+}
+
 function thuMucChanDoan(ten) {
   return process.env.MUSE_DATA_DIR ? path.join(app.getPath('userData'), ten) : path.join(app.getPath('documents'), 'AI Automation Studio', ten);
 }
@@ -1310,6 +1368,12 @@ const LENH = {
   footageBo: ({ so }) => footage.bo(so),
   footageLayLai: ({ so }) => footage.layLai(so),
   footageXoaDs: () => footage.xoaDs(),
+  // 1.6.6 Tải tay: app mở trang tìm của cảnh, bạn tự bấm Download, app đặt tên + lưu vào thư mục của danh sách.
+  footageTayMo: ({ trang, so } = {}) => footage.tayBatDau({ trang, so }),
+  footageTayTuKhoa: () => footage.tayTuKhoaKhac(),
+  footageTayBoQua: () => footage.tayBoQua(),
+  footageTayHien: () => { if (cuaSoTay && !cuaSoTay.isDestroyed()) { cuaSoTay.show(); cuaSoTay.focus(); return { ok: true }; } return footage.tay.bat ? footage.tayMoCanh() : { ok: false, loi: 'Chưa mở Tải tay' }; },
+  footageTayDong: () => footage.tayDong(),
 
   kiemCapNhat: () => capNhat && capNhat.kiemTra(),
   caiCapNhat: ({ epBuoc }) => capNhat && capNhat.caiDat({ moLai: true, epBuoc: !!epBuoc })
@@ -1387,6 +1451,8 @@ app.whenReady().then(() => {
     taiVe: taiFootageVe,
     thuMucGoc: thuMucChanDoan(''),
     thuMucDuAn: thuMucVideosDuAn,   // 1.6.5
+    tay: { mo: moCuaSoTay, dong: dongCuaSoTay },   // 1.6.6
+    mauTay: process.env.FOOTAGE_TAY_URL || '',     // bài kiểm: trang stock giả
     goc: { pexels: process.env.FOOTAGE_PEXELS_URL || undefined, pixabay: process.env.FOOTAGE_PIXABAY_URL || undefined }
   });
 
