@@ -33,6 +33,7 @@ const { DriveWeb } = require('./src/main/drive-web');
 const { ensureDebugger } = require('./src/flow/main/paste');
 const DD = require('./src/main/don-dep');   // 1.4.12 dọn dữ liệu thừa (khác donDep = dọn chat / dự án Flow)
 const { QuanLyFootage } = require('./src/main/footage');   // 1.6.0 tải footage Pexels / Pixabay theo cảnh
+const { QuanLyMotion, taoTienTrinhCon } = require('./src/main/motion');   // 1.7.0 video motion graphic theo cảnh (Remotion)
 
 // Thư mục dữ liệu riêng (phiên đăng nhập, cài đặt, hàng đợi) — PHẢI trước whenReady.
 app.setPath('userData', process.env.MUSE_DATA_DIR ||
@@ -49,7 +50,7 @@ const DUOI_ANH = /\.(png|jpe?g|webp|gif|bmp)$/i;
 const MIME = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif', bmp: 'image/bmp' };
 
 let win = null;
-let store, storeFlow, taiKhoan, dieuPhoi, capNhat, tabsFlow, mayFlow, taiVeFlow, footage;
+let store, storeFlow, taiKhoan, dieuPhoi, capNhat, tabsFlow, mayFlow, taiVeFlow, footage, motion;
 const nhatKy = [];
 let henBao = null;
 let soDongGhi = 0;
@@ -175,6 +176,7 @@ function trangThai() {
     ramMayGB: Math.round(os.totalmem() / 1073741824 * 10) / 10,   // 1.4.13: gợi ý ô RAM tối đa
     nenTang: process.platform,
     footage: footage ? footage.trangThai() : null,   // 1.6.0
+    motion: motion ? motion.trangThai() : null,      // 1.7.0
     dangNhap: dangNhap ? { id: dangNhap.id, khung: dangNhap.view.getBounds() } : null
   };
 }
@@ -792,6 +794,29 @@ function thuMucVideosDuAn(duAnId) {
   return { thuMuc: path.join(dieuPhoi.thuMucRa('video', d.id), tenThuMucDuAn(d.ten), 'Videos'), ten: d.ten, drive: false };
 }
 
+/**
+ * 1.7.0 — tiến trình con vẽ video motion (src/main/motion-tien-trinh.js): Electron chạy như Node (ELECTRON_RUN_AS_NODE).
+ * Bản cài: trang mẫu (src/motion/bundle) và bộ dựng hình của Remotion (compositor, có ffmpeg) nằm ở app.asar.unpacked
+ * (asarUnpack trong package.json) vì Chrome và tiến trình compositor không đọc được bên trong app.asar.
+ */
+const ngoaiAsar = (p) => String(p).replace(/app\.asar(?=[\\/])/, 'app.asar.unpacked');
+function thuMucCompositor() {
+  if (!app.isPackaged) return null;
+  const ten = { win32: 'compositor-win32-x64-msvc', darwin: process.arch === 'arm64' ? 'compositor-darwin-arm64' : 'compositor-darwin-x64', linux: 'compositor-linux-x64-gnu' }[process.platform];
+  if (!ten) return null;
+  try { return ngoaiAsar(path.dirname(require.resolve(`@remotion/${ten}/package.json`))); } catch (_) { return null; }
+}
+function taoTienTrinhMotion() {
+  return taoTienTrinhCon({
+    tep: path.join(__dirname, 'src', 'main', 'motion-tien-trinh.js'),
+    execPath: process.execPath,
+    env: { ELECTRON_RUN_AS_NODE: '1' },
+    cwd: path.join(app.getPath('userData'), 'motion-engine'),
+    bundle: ngoaiAsar(path.join(__dirname, 'src', 'motion', 'bundle')),
+    binariesDirectory: thuMucCompositor()
+  });
+}
+
 /** 1.6.0: tải một clip footage về file tạm (.part) rồi đổi tên — tải hỏng giữa chừng không để lại file dở. */
 async function taiFootageVe(url, tep) {
   const r = await net.fetch(url);
@@ -1375,6 +1400,45 @@ const LENH = {
   footageTayHien: () => { if (cuaSoTay && !cuaSoTay.isDestroyed()) { cuaSoTay.show(); cuaSoTay.focus(); return { ok: true }; } return footage.tay.bat ? footage.tayMoCanh() : { ok: false, loi: 'Chưa mở Tải tay' }; },
   footageTayDong: () => footage.tayDong(),
 
+  // 1.7.0 Motion graphic theo cảnh (Remotion) — src/main/motion.js
+  motionDatCaiDat: (c) => motion.datCaiDat(c),
+  motionMoFile: async ({ duAn } = {}) => {
+    const r = await dialog.showOpenDialog(win, { title: 'Mở danh sách motion (<tên>_motion.xlsx)', properties: ['openFile'],
+      filters: [{ name: 'Danh sách motion', extensions: ['xlsx', 'csv'] }] });
+    if (r.canceled || !r.filePaths[0]) return null;
+    return motion.napTep(r.filePaths[0], duAn);
+  },
+  motionNapTep: ({ tep, duAn }) => motion.napTep(tep, duAn),
+  motionChonGoc: async () => {
+    const d = motion.ds;
+    const r = await dialog.showOpenDialog(win, { title: 'Thư mục dự án (có Audio, images, Videos bên trong)', defaultPath: d && d.goc,
+      properties: ['openDirectory'] });
+    if (r.canceled || !r.filePaths[0]) return null;
+    return motion.datGoc(r.filePaths[0]);
+  },
+  motionChonThuMucVideo: async () => {
+    const r = await dialog.showOpenDialog(win, { title: 'Thư mục lưu video motion (thư mục Videos của project CapCut Draft Studio)',
+      defaultPath: motion.thuMucRa() || undefined, properties: ['openDirectory', 'createDirectory'] });
+    if (r.canceled || !r.filePaths[0]) return null;
+    return motion.datThuMucVideo(r.filePaths[0]);
+  },
+  motionVideoMacDinh: () => motion.datThuMucVideo(''),
+  motionQuet: () => motion.quet(),
+  motionChay: ({ so } = {}) => {
+    if (!motion.ds) return { ok: false, loi: 'Chưa mở danh sách motion' };
+    if (motion.dangChay) return { ok: false, loi: 'Đang tạo video' };
+    motion.chay(Array.isArray(so) && so.length ? so : undefined).catch((e) => log('error', `❌ Motion: ${e.message}`));   // chạy nền
+    return { ok: true };
+  },
+  motionDung: () => motion.dungLai(),
+  motionBo: ({ so }) => motion.bo(so),
+  motionLayLai: ({ so }) => motion.layLai(so),
+  motionXoaDs: () => motion.xoaDs(),
+  motionMoVideo: ({ so }) => {
+    const x = motion.ds && motion.ds.canh.find((y) => y.so === so);
+    return x && x.tepRa ? shell.openPath(x.tepRa) : null;
+  },
+
   kiemCapNhat: () => capNhat && capNhat.kiemTra(),
   caiCapNhat: ({ epBuoc }) => capNhat && capNhat.caiDat({ moLai: true, epBuoc: !!epBuoc })
 };
@@ -1455,6 +1519,8 @@ app.whenReady().then(() => {
     mauTay: process.env.FOOTAGE_TAY_URL || '',     // bài kiểm: trang stock giả
     goc: { pexels: process.env.FOOTAGE_PEXELS_URL || undefined, pixabay: process.env.FOOTAGE_PIXABAY_URL || undefined }
   });
+  // 1.7.0: video motion graphic theo cảnh — vẽ ở tiến trình con (Remotion + Chrome Headless Shell / Chrome / Edge).
+  motion = new QuanLyMotion({ store, log, bao: () => baoTrangThai(), thuMucDuAn: thuMucVideosDuAn, taoTienTrinh: taoTienTrinhMotion });
 
   // ── Google Flow: kho của engine (thay chrome.storage.local), tab ngầm, tải về, "background" ──
   // 1.4.5: kho engine Flow gom ghi 1 giây (engine lưu dự án gần như mỗi lần prompt đổi trạng thái), không thụt lề.
@@ -1577,7 +1643,7 @@ app.whenReady().then(() => {
     setInterval(() => capNhat.kiemTra({ imLang: true }), 4 * 3600 * 1000);
   }
   // Bài kiểm thử: MUSE_TEST=tests/<bài>.js nhận đúng các đối tượng app đang dùng.
-  if (process.env.MUSE_TEST) require(path.resolve(process.env.MUSE_TEST))({ win, app, LENH, dieuPhoi, taiKhoan, nhatKy, tabsFlow, mayFlow, storeFlow, docRam, baoRam, store, footage });
+  if (process.env.MUSE_TEST) require(path.resolve(process.env.MUSE_TEST))({ win, app, LENH, dieuPhoi, taiKhoan, nhatKy, tabsFlow, mayFlow, storeFlow, docRam, baoRam, store, footage, motion });
 });
 
 let dangThoat = false;       // đang cài bản mới lúc thoát
@@ -1592,6 +1658,7 @@ app.on('before-quit', (e) => {
     return;
   }
   try { dieuPhoi && dieuPhoi.dong(); } catch (_) {}
+  try { motion && motion.dangChay && motion.dungLai(); } catch (_) {}   // 1.7.0: tắt tiến trình vẽ + Chrome của nó
   try { tabsFlow && tabsFlow.closeAll(); } catch (_) {}
   try { store && store.close(); } catch (_) {}
   try { storeFlow && storeFlow.close(); } catch (_) {}

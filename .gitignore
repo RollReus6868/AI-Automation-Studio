@@ -2,3 +2,4 @@ node_modules/
 dist/
 shots/
 *_LOG.txt
+src/motion/bundle/

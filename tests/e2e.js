@@ -13,6 +13,8 @@
 // node tests/e2e.js dondep — 1.4.12: trang Muse giả; kịch bản tests/don-dep-e2e-chay.js (dọn dữ liệu thừa, giữ đăng nhập).
 // node tests/e2e.js footage — 1.6.0: API Pexels / Pixabay giả (/pexels/…, /pixabay/…); kịch bản tests/footage-e2e-chay.js
 //                             (mở _footage.xlsx, tải footage qua giao diện, Đổi clip, Bỏ, hết lượt Pexels → Pixabay).
+// node tests/e2e.js motion  — 1.7.0: video motion graphic theo cảnh, Remotion THẬT ở tiến trình con; kịch bản tests/motion-e2e-chay.js
+//                             (cài đặt, mở _motion.xlsx, Tạo video, video AI cũ vào _bo, Bỏ / Lấy lại / Tạo lại, Dừng giữa chừng).
 const http = require('http');
 const fs = require('fs');
 const os = require('os');
@@ -27,6 +29,7 @@ const THEODOI = process.argv[2] === 'theodoi';
 const KIEMDO = process.argv[2] === 'kiemdo';   // 1.4.12
 const DONDEP = process.argv[2] === 'dondep';
 const FOOTAGE = process.argv[2] === 'footage';   // 1.6.0
+const MOTION = process.argv[2] === 'motion';     // 1.7.0
 const fixture = fs.readFileSync(path.join(__dirname, 'fixture-muse.html'));
 const trangFlow = fs.readFileSync(path.join(__dirname, 'flow-gia', 'trang-flow.html'));
 const trangNhac = fs.readFileSync(path.join(__dirname, 'fixture-flowmusic.html'));
@@ -280,13 +283,15 @@ const sv = http.createServer((req, res) => {
 
 sv.listen(0, '127.0.0.1', () => {
   const url = `http://127.0.0.1:${sv.address().port}`;
-  const tam = fs.mkdtempSync(path.join(os.tmpdir(), FLOW ? 'flow-e2e-' : NHAC ? 'nhac-e2e-' : DRIVE ? 'drive-e2e-' : QUET ? 'quet-e2e-' : THEODOI ? 'theodoi-e2e-' : KIEMDO ? 'kiemdo-e2e-' : DONDEP ? 'dondep-e2e-' : FOOTAGE ? 'footage-e2e-' : 'muse-e2e-'));
+  const tam = fs.mkdtempSync(path.join(os.tmpdir(), FLOW ? 'flow-e2e-' : NHAC ? 'nhac-e2e-' : DRIVE ? 'drive-e2e-' : QUET ? 'quet-e2e-' : THEODOI ? 'theodoi-e2e-' : KIEMDO ? 'kiemdo-e2e-' : DONDEP ? 'dondep-e2e-' : FOOTAGE ? 'footage-e2e-' : MOTION ? 'motion-e2e-' : 'muse-e2e-'));
   const electron = require('electron');
-  const args = ['.'];
+  // 1.7.0: E2E_EXE=<app đã đóng gói> → chạy bản cài (app.asar) thay cho mã nguồn; MUSE_TEST vẫn lấy từ thư mục repo
+  const exe = process.env.E2E_EXE ? path.resolve(__dirname, '..', process.env.E2E_EXE) : '';
+  const args = exe ? [] : ['.'];
   if (process.platform === 'linux') args.push('--no-sandbox');
-  const p = spawn(electron, args, {
+  const p = spawn(exe || electron, args, {
     cwd: path.join(__dirname, '..'),
-    env: { ...process.env, MUSE_URL: url, MUSE_TEST: FLOW ? 'tests/flow-e2e-chay.js' : NHAC ? 'tests/nhac-e2e-chay.js' : DRIVE ? 'tests/drive-e2e-chay.js' : QUET ? 'tests/quet-e2e-chay.js' : THEODOI ? 'tests/theo-doi-e2e-chay.js' : KIEMDO ? 'tests/kiem-do-e2e-chay.js' : DONDEP ? 'tests/don-dep-e2e-chay.js' : FOOTAGE ? 'tests/footage-e2e-chay.js' : 'tests/e2e-chay.js', DRIVE_URL: url, NHAC_URL: `${url}/fmusic/`, MUSE_DATA_DIR: path.join(tam, 'data'),
+    env: { ...process.env, MUSE_URL: url, MUSE_TEST: FLOW ? 'tests/flow-e2e-chay.js' : NHAC ? 'tests/nhac-e2e-chay.js' : DRIVE ? 'tests/drive-e2e-chay.js' : QUET ? 'tests/quet-e2e-chay.js' : THEODOI ? 'tests/theo-doi-e2e-chay.js' : KIEMDO ? 'tests/kiem-do-e2e-chay.js' : DONDEP ? 'tests/don-dep-e2e-chay.js' : FOOTAGE ? 'tests/footage-e2e-chay.js' : MOTION ? 'tests/motion-e2e-chay.js' : 'tests/e2e-chay.js', DRIVE_URL: url, NHAC_URL: `${url}/fmusic/`, MUSE_DATA_DIR: path.join(tam, 'data'),
       MUSE_E2E_TAM: tam, MUSE_NO_UPDATE_CHECK: '1', MUSE_CHO_KET_NOI_MS: '4000', FOOTAGE_PEXELS_URL: `${url}/pexels`, FOOTAGE_PIXABAY_URL: `${url}/pixabay`,
       FOOTAGE_TAY_URL: `${url}/__stock/tim?q={q}&trang={trang}`,
       ...(FLOW ? { FLOW_TEST_URL: `${url}/fx/vi/tools/flow`, FLOW_TEST_HOST: '^http://127\\.0\\.0\\.1:\\d+/fx/',
@@ -308,7 +313,7 @@ sv.listen(0, '127.0.0.1', () => {
     console.log(code === 0 ? `E2E: PASS (${giay} s / hạn ${hanGiay} s)` : `E2E: FAIL (mã ${code}, ${giay} s / hạn ${hanGiay} s)`);
     if (code !== 0) {
       // Đỏ → chép nhật ký bài kiểm + nhật ký app vào shots/ (CI tải lên thành artifact anh-chup-*, kể cả khi đỏ) để truy.
-      const kieu = FLOW ? 'flow' : NHAC ? 'nhac' : DRIVE ? 'drive' : QUET ? 'quet' : THEODOI ? 'theodoi' : KIEMDO ? 'kiemdo' : DONDEP ? 'dondep' : FOOTAGE ? 'footage' : 'muse';
+      const kieu = FLOW ? 'flow' : NHAC ? 'nhac' : DRIVE ? 'drive' : QUET ? 'quet' : THEODOI ? 'theodoi' : KIEMDO ? 'kiemdo' : DONDEP ? 'dondep' : FOOTAGE ? 'footage' : MOTION ? 'motion' : 'muse';
       const dich = path.join(__dirname, '..', 'shots', `e2e-${kieu}-${process.platform}`);
       try {
         fs.mkdirSync(dich, { recursive: true });
@@ -324,7 +329,7 @@ sv.listen(0, '127.0.0.1', () => {
       // Log của job không tải được từ phiên Claude → đưa các dòng đáng chú ý lên thành annotation.
       const quanTrong = raChu.split('\n').filter((l) => /✘|⏱|ⓘ|kẹt|LỖI|KẾT QUẢ|^--/.test(l)).join('\n').slice(-5000);
       const esc = (x) => x.replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
-      console.log(`::error title=E2E ${FLOW ? 'Flow ' : NHAC ? 'Nhac ' : DRIVE ? 'Drive ' : QUET ? 'Quet ' : THEODOI ? 'TheoDoi ' : KIEMDO ? 'KiemDo ' : DONDEP ? 'DonDep ' : FOOTAGE ? 'Footage ' : ''}${process.platform}::${esc(quanTrong || raChu.slice(-5000))}`);
+      console.log(`::error title=E2E ${FLOW ? 'Flow ' : NHAC ? 'Nhac ' : DRIVE ? 'Drive ' : QUET ? 'Quet ' : THEODOI ? 'TheoDoi ' : KIEMDO ? 'KiemDo ' : DONDEP ? 'DonDep ' : FOOTAGE ? 'Footage ' : MOTION ? 'Motion ' : ''}${process.platform}::${esc(quanTrong || raChu.slice(-5000))}`);
     }
     process.exit(code === 0 ? 0 : 1);
   });

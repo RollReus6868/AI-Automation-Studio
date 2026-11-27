@@ -395,7 +395,7 @@
   }
 
   // ── Điều hướng ──────────────────────────────────────────────────────────
-  const TEN_TRANG = { anh: 'Tạo ảnh', video: 'Tạo video', nhac: 'Tạo nhạc', footage: 'Footage', hengio: 'Hẹn giờ', nhanvat: 'Nhân vật', thuvien: 'Thư viện', taikhoan: 'Tài khoản', huongdan: 'Hướng dẫn', caidat: 'Cài đặt' };
+  const TEN_TRANG = { anh: 'Tạo ảnh', video: 'Tạo video', nhac: 'Tạo nhạc', footage: 'Footage', motion: 'Motion', hengio: 'Hẹn giờ', nhanvat: 'Nhân vật', thuvien: 'Thư viện', taikhoan: 'Tài khoản', huongdan: 'Hướng dẫn', caidat: 'Cài đặt' };
   function diToi(trang) {
     if (U.trang === 'taikhoan' && trang !== 'taikhoan' && U.dangNhapMo) dongDangNhap();
     const cu = U.trang;
@@ -405,7 +405,7 @@
     const tao = trang === 'anh' || trang === 'video' || trang === 'nhac';
     document.body.classList.toggle('trang-nhac', trang === 'nhac');
     $('#trang-tao').hidden = !tao;
-    for (const t of ['footage', 'hengio', 'nhanvat', 'thuvien', 'taikhoan', 'huongdan', 'caidat']) $(`#trang-${t}`).hidden = t !== trang;
+    for (const t of ['footage', 'motion', 'hengio', 'nhanvat', 'thuvien', 'taikhoan', 'huongdan', 'caidat']) $(`#trang-${t}`).hidden = t !== trang;
     $('#khuDuAn').style.visibility = tao ? 'visible' : 'hidden';
     if (tao) {
       if (cu !== trang) { U.chon.clear(); U.chiTiet = null; }
@@ -426,6 +426,7 @@
     if (trang === 'caidat') { veCaiDat(); if (cu !== 'caidat') doDuLieu(); }   // 1.4.12: đo dữ liệu app mỗi lần vào Cài đặt
     if (trang === 'hengio') napHenGio();
     if (trang === 'footage') napFootage();
+    if (trang === 'motion') napMotion();
     luuUi();
     ve();
   }
@@ -442,6 +443,7 @@
     if (U.trang === 'taikhoan') veTaiKhoan();
     if (U.trang === 'hengio') veHenGio();
     if (U.trang === 'footage') veFootage();
+    if (U.trang === 'motion') veMotion();
   }
 
   function veTopbar() {
@@ -2350,10 +2352,137 @@
     return ra.join(', ');
   };
 
+  // ── Motion (1.7.0): video motion graphic theo cảnh bằng Remotion (src/main/motion.js) ─────────────
+  const TT_MOTION = { cho: 'Chờ', dang: 'Đang vẽ…', xong: 'Đã có', loi: 'Lỗi', bo: 'Đã bỏ' };
+  /** Tóm tắt nội dung của một cảnh theo mẫu (để nhận ra cảnh trong danh sách). */
+  function tomTatMotion(x) {
+    const p = x.props || {};
+    if (x.mau === 'BAN_DO') return (p.diem || []).map((d) => d.ten).join(p.tuyen ? ' → ' : ' · ');
+    if (x.mau === 'DONG_THOI_GIAN') return (p.suKien || []).map((e) => `${e.hienTai ? '★ ' : ''}${e.nam}${e.nam && e.ten ? ' ' : ''}${e.ten}`).join(' · ');
+    if (x.mau === 'CAU_KINH') return `“${String(p.cau || '').replace(/\*/g, '')}”${p.tham ? ` — ${p.tham}` : ''}`;
+    if (x.mau === 'PHA_HE') return (p.nut || []).map((n) => n.ten).join(', ');
+    if (x.mau === 'SO_SANH') return `${(p.trai || {}).tieuDe || ''} ⇄ ${(p.phai || {}).tieuDe || ''}: ${((p.trai || {}).dong || []).length} dòng`;
+    return '';
+  }
+  function napMotion() {
+    const m = S && S.motion;
+    if (!m) return;
+    const c = m.caiDat;
+    $('#mtRong').value = String(c.rong);
+    $('#mtFps').value = String(c.fps);
+    $('#mtDuoi').value = String(c.duoi);
+    $('#mtMau').value = c.mau;
+    $('#mtThay').checked = c.thayVideoCu !== false;
+    veMotion();
+  }
+  function veMotion() {
+    const m = S && S.motion;
+    if (!m) return;
+    const d = m.ds;
+    $('#mtTenDs').textContent = d ? ` — ${d.ten} (${d.canh.length} cảnh)` : '';
+    if (document.activeElement !== $('#mtGoc')) $('#mtGoc').value = d ? d.goc : '';
+    if (document.activeElement !== $('#mtThuMuc')) $('#mtThuMuc').value = d ? (d.thuMucVideo || `${d.goc}${d.goc.includes('\\') ? '\\' : '/'}Videos`) : '';
+    for (const id of ['#mtChonGoc', '#mtMoGoc', '#mtChonThuMuc', '#mtMoThuMuc', '#mtThuMucMacDinh', '#mtXoaDs', '#mtQuet']) $(id).disabled = !d || (!!m.dangChay && id !== '#mtMoGoc' && id !== '#mtMoThuMuc');
+    $('#mtThuMucMacDinh').disabled = !d || !d.thuMucVideo || !!m.dangChay;
+    const nut = $('#mtChay');
+    nut.disabled = !d;
+    nut.classList.toggle('dung', !!m.dangChay);
+    datHtml(nut, m.dangChay ? `${ic('pause')}<span>Dừng</span>` : `${ic('play')}<span>Tạo video</span>`);
+    datHtml($('#mtTrinh'), m.taiTrinhDuyet != null ? `${ic('download')}Đang tải trình vẽ của Remotion (lần đầu): <b>${m.taiTrinhDuyet}%</b>`
+      : m.trinhDuyet ? `<span class="mo">Trình vẽ: ${esc(m.trinhDuyet)}</span>` : '');
+    if (!d) {
+      datHtml($('#mtTomTat'), '');
+      datHtml($('#mtBang'), `<div class="ft-trong">Chưa mở danh sách. Bấm <b>Mở file motion…</b> và chọn file <code>&lt;tên&gt;_motion.xlsx</code> (cột <code>scene</code>, <code>mau</code>, <code>tieu_de</code>, <code>noi_dung</code>, <code>phu</code>…). Nhờ skill chia cảnh xuất file này cho những cảnh nên làm bằng motion graphic.</div>`);
+      return;
+    }
+    const dem = (t) => d.canh.filter((x) => x.trangThai === t).length;
+    const coFile = d.canh.filter((x) => x.trangThai === 'xong').map((x) => x.so);
+    const thieuAnh = d.canh.filter((x) => !x.anh).length, thieuAm = d.canh.filter((x) => !x.amThanh).length;
+    datHtml($('#mtTomTat'),
+      `<span>Đã có <b>${dem('xong')}</b>/${d.canh.length}</span>` +
+      (dem('loi') ? `<span class="do">Lỗi ${dem('loi')}</span>` : '') + (dem('bo') ? `<span>Đã bỏ ${dem('bo')}</span>` : '') +
+      (thieuAnh ? `<span title="Cảnh chưa có ảnh dùng nền tối">${thieuAnh} cảnh chưa có ảnh</span>` : '') +
+      (thieuAm ? `<span title="Cảnh chưa có giọng đọc dùng số giây trong file (cột giay) hoặc độ dài mặc định của mẫu">${thieuAm} cảnh chưa có giọng đọc</span>` : '') +
+      (coFile.length ? `<span class="ft-so" title="Dán vào nút Chọn số ở trang Tạo video để dừng / bỏ video AI của các cảnh này">Cảnh dùng motion: <code>${esc(window.HD_CHUOI_SO(coFile))}</code> <button class="nut-vien nho" data-mt="chepSo">${ic('copy')}Chép số</button></span>` : '') +
+      ((d.loiDoc || []).length ? `<div class="mt-loi-doc do"><b>${d.loiDoc.length} dòng trong file bị bỏ qua — sửa file rồi mở lại:</b>${d.loiDoc.slice(0, 5).map((l) => `<span>${esc(l)}</span>`).join('')}${d.loiDoc.length > 5 ? `<span>… và ${d.loiDoc.length - 5} dòng khác</span>` : ''}</div>` : ''));
+    const tenMau = m.mau || {};
+    datHtml($('#mtBang'), d.canh.map((x) => {
+      const p = x.props || {};
+      const tieuDe = p.tieuDe || (x.mau === 'CAU_KINH' ? p.tham : '') || '';
+      const giay = x.thoiLuong > 0 ? `giọng đọc ${giayDep(x.thoiLuong)}` : x.giay ? `${giayDep(x.giay)} (theo file)` : 'mặc định';
+      const tien = x.trangThai === 'dang' ? `<div class="mt-tien"><i style="width:${Math.round((x.tienDo || 0) * 100)}%"></i></div><small>${Math.round((x.tienDo || 0) * 100)}%</small>` : '';
+      const nut = [
+        x.trangThai === 'xong' ? `<button class="nut-vien nho" data-mt="xem" data-so="${x.so}" title="Mở video">${ic('eye')}Xem</button>` : '',
+        x.trangThai !== 'bo' ? `<button class="nut-vien nho" data-mt="lamLai" data-so="${x.so}" title="Vẽ lại video của cảnh này"${m.dangChay ? ' disabled' : ''}>${ic('refresh-cw')}${x.trangThai === 'xong' ? 'Tạo lại' : 'Tạo'}</button>` : '',
+        x.trangThai === 'xong' ? `<button class="nut-vien nho" data-mt="bo" data-so="${x.so}" title="Không dùng motion cho cảnh này (video chuyển vào thư mục _bo)"${m.dangChay ? ' disabled' : ''}>${ic('x')}Bỏ</button>` : '',
+        x.trangThai === 'bo' ? `<button class="nut-vien nho" data-mt="layLai" data-so="${x.so}">${ic('rotate-ccw')}Lấy lại</button>` : ''
+      ].join('');
+      return `<div class="mt-dong tt-${x.trangThai}"><div class="ft-canh">${esc(x.canh)}</div>` +
+        `<div class="mt-anh">${x.anh ? `<img loading="lazy" src="${esc(fileUrl(x.anh))}" alt="">` : `<span title="Chưa có ảnh của cảnh — nền tối">${ic('image')}</span>`}</div>` +
+        `<div class="mt-nd"><div class="mt-td"><b>${esc(tenMau[x.mau] || x.mau)}</b>${tieuDe ? ` · ${esc(tieuDe)}` : ''}</div><small>${esc(tomTatMotion(x))}</small></div>` +
+        `<div class="ft-can">${giay}</div>` +
+        `<div class="ft-tt"><span class="the-tt">${TT_MOTION[x.trangThai] || x.trangThai}</span>${tien}${x.loi ? `<small class="do">${esc(x.loi)}</small>` : ''}</div>` +
+        `<div class="ft-nut">${nut}</div></div>`;
+    }).join(''));
+  }
+  function ganMotion() {
+    $('#mtLuu').onclick = async () => {
+      const r = await api.call('motionDatCaiDat', { rong: +$('#mtRong').value, fps: +$('#mtFps').value, duoi: +$('#mtDuoi').value, mau: $('#mtMau').value, thayVideoCu: $('#mtThay').checked });
+      if (r && r.ok) { S.motion.caiDat = r.caiDat; napMotion(); toast('Đã lưu cài đặt motion'); } else toast(`Lưu lỗi: ${(r && r.loi) || '?'}`, true);
+    };
+    $('#mtMoFile').onclick = async () => {
+      const r = await api.call('motionMoFile', { duAn: (duAnHienTai() || {}).id });
+      if (!r) return;
+      if (!r.ok) { toast(`Không mở được: ${r.loi}`, true); return; }
+      toast(`Đã mở ${r.so} cảnh${r.loi && r.loi.length ? ` · ${r.loi.length} dòng bỏ qua` : ''}`);
+    };
+    $('#mtChay').onclick = async () => {
+      const m = S && S.motion;
+      if (!m || !m.ds) return;
+      const r = await api.call(m.dangChay ? 'motionDung' : 'motionChay');
+      if (r && r.ok === false) toast(r.loi || 'Không chạy được', true);
+    };
+    $('#mtQuet').onclick = async () => { await api.call('motionQuet'); toast('Đã quét lại ảnh và giọng đọc'); };
+    $('#mtXoaDs').onclick = async () => {
+      if (!await xacNhan('Đóng danh sách motion?', 'Video đã tạo trong thư mục lưu vẫn giữ nguyên.', 'Đóng')) return;
+      const r = await api.call('motionXoaDs');
+      if (r && r.ok === false) toast(r.loi, true);
+    };
+    $('#mtChonGoc').onclick = () => api.call('motionChonGoc');
+    $('#mtMoGoc').onclick = () => { const d = S.motion && S.motion.ds; if (d) api.call('moThuMuc', { dir: d.goc }); };
+    $('#mtChonThuMuc').onclick = () => api.call('motionChonThuMucVideo');
+    $('#mtThuMucMacDinh').onclick = () => api.call('motionVideoMacDinh');
+    $('#mtMoThuMuc').onclick = () => { if ($('#mtThuMuc').value) api.call('moThuMuc', { dir: $('#mtThuMuc').value }); };
+    $('#trang-motion').addEventListener('click', async (e) => {
+      const b = e.target.closest('[data-mt]');
+      if (!b || b.disabled) return;
+      const so = +b.dataset.so;
+      if (b.dataset.mt === 'chepSo') {
+        const d = S.motion.ds;
+        await navigator.clipboard.writeText(window.HD_CHUOI_SO(d.canh.filter((x) => x.trangThai === 'xong').map((x) => x.so)));
+        toast('Đã chép số cảnh — dán vào nút Chọn số ở trang Tạo video');
+        return;
+      }
+      if (b.dataset.mt === 'xem') { api.call('motionMoVideo', { so }); return; }
+      if (b.dataset.mt === 'lamLai') {
+        b.disabled = true;
+        const r = await api.call('motionChay', { so: [so] });
+        if (r && r.ok === false) toast(r.loi || 'Lỗi', true);
+        return;
+      }
+      const lenh = { bo: 'motionBo', layLai: 'motionLayLai' }[b.dataset.mt];
+      if (!lenh) return;
+      b.disabled = true;
+      const r = await api.call(lenh, { so });
+      if (r && r.ok === false) toast(r.loi || 'Lỗi', true);
+    });
+  }
+
   // ── Khởi động ────────────────────────────────────────────────────────────
   veIcon(document);
   ganSuKien();
   ganFootage();
+  ganMotion();
   // 1.4.14: hàng đợi tới theo phần đổi (s.goiViec) — ghép vào bản đang có; gói lệch bản thì xin lại bản đủ.
   let xinDu = null;
   const nhanGoi = (s) => {
