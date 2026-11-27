@@ -28,7 +28,7 @@ const { DownloadManager } = require('./src/flow/main/downloads');
 const { locVeoSettings } = require('./src/flow/main/kiem-truoc');
 const { xoaDuAnFlow } = require('./src/flow/main/xoa-du-an');
 const { xoaChatChuotThat, nenThuChuotThat } = require('./src/main/xoa-chat-muse');
-const { chepLenDrive, timThuMucDrive } = require('./src/main/drive');
+const { chepLenDrive, timThuMucDrive, thuMucDich, tenThuMucDuAn } = require('./src/main/drive');
 const { DriveWeb } = require('./src/main/drive-web');
 const { ensureDebugger } = require('./src/flow/main/paste');
 const DD = require('./src/main/don-dep');   // 1.4.12 dọn dữ liệu thừa (khác donDep = dọn chat / dự án Flow)
@@ -778,6 +778,20 @@ async function donDuLieu(muc) {
   } finally { dangDon = false; }
 }
 
+/**
+ * 1.6.5: thư mục Videos của một dự án — cùng chỗ app đưa video của dự án lên Drive:
+ * Drive bật + chép vào thư mục Drive trên máy → <thư mục Drive>/<Tên dự án>/Videos (vd G:\My Drive\Epic_18\Videos);
+ * còn lại → <thư mục lưu video của dự án>/<Tên dự án>/Videos.
+ */
+function thuMucVideosDuAn(duAnId) {
+  if (!dieuPhoi) return null;
+  const d = dieuPhoi.duAn.find((x) => x.id === duAnId) || dieuPhoi.duAn[0];
+  if (!d) return null;
+  const c = dieuPhoi.cd(d.id);
+  if (c.driveBat && c.driveCach !== 'web' && c.thuMucDrive) return { thuMuc: thuMucDich(c.thuMucDrive, d.ten, 'video'), ten: d.ten, drive: true };
+  return { thuMuc: path.join(dieuPhoi.thuMucRa('video', d.id), tenThuMucDuAn(d.ten), 'Videos'), ten: d.ten, drive: false };
+}
+
 /** 1.6.0: tải một clip footage về file tạm (.part) rồi đổi tên — tải hỏng giữa chừng không để lại file dở. */
 async function taiFootageVe(url, tep) {
   const r = await net.fetch(url);
@@ -1261,13 +1275,14 @@ const LENH = {
 
   // 1.6.0 Footage (Pexels / Pixabay qua API chính thức) — src/main/footage.js
   footageDatCaiDat: (c) => footage.datCaiDat(c),
-  footageMoFile: async () => {
+  footageMoFile: async ({ duAn } = {}) => {
     const r = await dialog.showOpenDialog(win, { title: 'Mở danh sách footage (<tên>_footage.xlsx)', properties: ['openFile'],
       filters: [{ name: 'Danh sách footage', extensions: ['xlsx', 'csv'] }] });
     if (r.canceled || !r.filePaths[0]) return null;
-    return footage.napTep(r.filePaths[0]);
+    return footage.napTep(r.filePaths[0], duAn);   // 1.6.5: lưu vào thư mục Videos của dự án đang mở
   },
-  footageNapTep: ({ tep }) => footage.napTep(tep),
+  footageNapTep: ({ tep, duAn }) => footage.napTep(tep, duAn),
+  footageThuMucDuAn: ({ duAn } = {}) => footage.veThuMucDuAn(duAn),
   footageChonThuMuc: async () => {
     const d = footage.ds;
     const r = await dialog.showOpenDialog(win, { title: 'Thư mục lưu footage (vd thư mục Videos của project CapCut Draft Studio)',
@@ -1371,6 +1386,7 @@ app.whenReady().then(() => {
     fetch: (u, o) => net.fetch(u, o),
     taiVe: taiFootageVe,
     thuMucGoc: thuMucChanDoan(''),
+    thuMucDuAn: thuMucVideosDuAn,   // 1.6.5
     goc: { pexels: process.env.FOOTAGE_PEXELS_URL || undefined, pixabay: process.env.FOOTAGE_PIXABAY_URL || undefined }
   });
 

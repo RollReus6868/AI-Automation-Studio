@@ -2204,9 +2204,9 @@
     const c = f.caiDat, d = f.ds;
     $('#ftPexelsGhi').textContent = c.coPexels ? `✓ Đã lưu khoá (…${c.pexelsDuoi}).` : 'Chưa có khoá.';
     $('#ftPixabayGhi').textContent = c.coPixabay ? `✓ Đã lưu khoá (…${c.pixabayDuoi}).` : 'Chưa có khoá.';
-    $('#ftTenDs').textContent = d ? ` — ${d.ten} (${d.canh.length} cảnh)` : '';
+    $('#ftTenDs').textContent = d ? ` — ${d.ten} (${d.canh.length} cảnh)${d.duAnTen ? ` · dự án ${d.duAnTen}` : ''}` : '';
     if (document.activeElement !== $('#ftThuMuc')) $('#ftThuMuc').value = d ? d.thuMuc : '';
-    for (const id of ['#ftChonThuMuc', '#ftMoThuMuc', '#ftXoaDs']) $(id).disabled = !d;
+    for (const id of ['#ftChonThuMuc', '#ftMoThuMuc', '#ftXoaDs', '#ftThuMucDuAn']) $(id).disabled = !d;
     $('#ftTimLai').disabled = !d || !!f.dangChay;
     const nut = $('#ftChay');
     nut.disabled = !d;
@@ -2251,7 +2251,7 @@
       if (r && r.ok) { S.footage.caiDat = r.caiDat; napFootage(); toast('Đã lưu khoá và cài đặt footage'); } else toast(`Lưu lỗi: ${(r && r.loi) || '?'}`, true);
     };
     $('#ftMoFile').onclick = async () => {
-      const r = await api.call('footageMoFile');
+      const r = await api.call('footageMoFile', { duAn: (duAnHienTai() || {}).id });
       if (!r) return;
       if (!r.ok) { toast(`Không mở được: ${r.loi}`, true); return; }
       toast(`Đã mở ${r.so} cảnh${r.loi && r.loi.length ? ` · ${r.loi.length} dòng bỏ qua` : ''}`);
@@ -2273,6 +2273,10 @@
       if (r && r.ok === false) toast(r.loi, true);
     };
     $('#ftChonThuMuc').onclick = () => api.call('footageChonThuMuc');
+    $('#ftThuMucDuAn').onclick = async () => {   // 1.6.5
+      const r = await api.call('footageThuMucDuAn', { duAn: (duAnHienTai() || {}).id });
+      if (r && r.ok) toast(`Lưu vào ${r.thuMuc}`); else toast((r && r.loi) || 'Lỗi', true);
+    };
     $('#ftMoThuMuc').onclick = () => { const d = S.footage && S.footage.ds; if (d) api.call('moThuMuc', { dir: d.thuMuc }); };
     for (const a of $$('#trang-footage a[data-link]')) a.onclick = (e) => { e.preventDefault(); api.call('moLink', { url: a.dataset.link }); };
     $('#trang-footage').addEventListener('click', async (e) => {

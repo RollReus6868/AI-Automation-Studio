@@ -7,7 +7,7 @@ const fs = require('fs');
 const path = require('path');
 const { net } = require('electron');
 
-module.exports = function e2eFootage({ win, app, footage }) {
+module.exports = function e2eFootage({ win, app, footage, LENH, dieuPhoi }) {
   const tam = process.env.MUSE_E2E_TAM;
   const nhatKyFile = path.join(tam, 'e2e-log.txt');
   const ghi = (s) => { fs.appendFileSync(nhatKyFile, s + '\n'); console.log(s); };
@@ -108,9 +108,16 @@ module.exports = function e2eFootage({ win, app, footage }) {
       const tep2 = path.join(tam, 'Ban_2_footage.csv');
       fs.writeFileSync(tep2, 'scene,tu_khoa,giay_can,tranh\n20,sand dunes wind,7,city\n22,olive tree,6,\n');
       await cauHinh({ pexels429: true, hongTai: ['px401-1080'] });
-      footage.napTep(tep2);
+      // 1.6.5: file mới mở trong dự án có Drive (chép vào thư mục Drive trên máy) → <Drive>/<Tên dự án>/Videos, tự tạo.
+      const drive = path.join(tam, 'GDrive');
+      fs.mkdirSync(drive, { recursive: true });
+      const da = dieuPhoi.duAn[0];
+      LENH.datCaiDat({ duAn: da.id, driveBat: true, driveCach: 'may', thuMucDrive: drive });
+      LENH.footageNapTep({ tep: tep2, duAn: da.id });
       const thu2 = footage.ds.thuMuc;
-      kiem(thu2 === path.join(tam, 'data', 'Footage', 'Ban_2'), `thư mục mặc định theo tên file (${thu2})`);
+      kiem(thu2 === require('../src/main/drive').thuMucDich(drive, da.ten, 'video') && /Videos$/.test(thu2), `thư mục mặc định = Videos của dự án trên Drive (${thu2})`);
+      kiem(await cho(() => js("document.querySelector('#ftThuMuc').value") .then((v) => v === thu2), 5000, 'ô thư mục hiện Videos của dự án') !== false, 'giao diện hiện thư mục Videos của dự án');
+      kiem(await js("/dự án/.test(document.querySelector('#ftTenDs').textContent)"), 'tên dự án hiện cạnh danh sách');
       await taiVaCho('lần 2');
       kiem(canh(20).trangThai === 'xong' && canh(20).clip.id === 'pixabay-501', `cảnh 20 lấy Pixabay khi Pexels hết lượt, bỏ clip có "city" (${canh(20).clip && canh(20).clip.id})`);
       kiem(canh(22).trangThai === 'loi' && /không có clip khớp từ khoá/.test(canh(22).loi), `cảnh 22 lỗi có lý do (${canh(22).loi})`);
@@ -126,6 +133,12 @@ module.exports = function e2eFootage({ win, app, footage }) {
       await cauHinh({ hongTai: [] });
       await taiVaCho('lần 4');
       kiem(canh(22).trangThai === 'xong' && fs.existsSync(path.join(thu2, '0022.mp4')), 'Tải footage lần nữa: cảnh lỗi tải lại được');
+      kiem(fs.existsSync(path.join(drive, require('../src/main/drive').tenThuMucDuAn(da.ten), 'Videos', '0022.mp4')), '1.6.5: clip nằm trong <Drive>/<Tên dự án>/Videos (thư mục tự tạo)');
+      footage.datThuMuc(path.join(tam, 'khac'));
+      await bam('#ftThuMucDuAn');
+      await cho(() => footage.ds.thuMuc === thu2, 5000, 'nút Videos của dự án');
+      kiem(footage.ds.thuMuc === thu2, 'nút "Videos của dự án" đặt lại thư mục lưu');
+      LENH.datCaiDat({ duAn: da.id, driveBat: false });
 
       ghi('-- 5b. 1.6.2 Tìm lại tất cả (nút trên giao diện): clip cũ sang _bo, tải lại theo chấm khớp mới');
       const truocTL = footage.luotXong;
