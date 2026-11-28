@@ -1,4 +1,17 @@
-# AI Automation Studio 1.7.0
+# AI Automation Studio 1.8.0
+
+- **Mục mới: Dashboard** (đầu thanh bên trái) — quản lý và chạy cả quy trình của một video từ một chỗ.
+  1. Để mọi file đầu vào của một video vào một thư mục (gọi là **dự án tổng**, vd `G:\My Drive\TBN_16`): `… - prompt anh.txt`, `… - prompt animation.txt`, `… - nhac flowmusic.txt`, `… - thumbnail.txt`, `…_motion.xlsx`, `…_footage.xlsx` — đúng các file skill chia cảnh xuất ra.
+  2. Dashboard → **Chọn thư mục…**. Chọn thư mục cha chứa nhiều video (vd thư mục kênh có TBN_16, TBN_17…) thì app thêm cả vào danh sách, đổi qua lại bằng ô chọn.
+  3. Bật / tắt từng mục rồi gạt **Chạy tất cả**.
+- App tự gắn một **dự án của app cùng tên thư mục**: ảnh lưu thẳng vào `images` (001.png…), video từ ảnh vào `Videos` (cùng tên ảnh), nhạc vào `BGM`, thumbnail vào `thumbnail`. **Số nào đã có file thì bỏ qua** — chạy lại không làm lại cái đã có.
+- **Sáu mục**, mỗi mục một công tắc: **Tạo ảnh** (chọn Muse / Google Flow, tỷ lệ), **Tạo video từ ảnh** (mỗi ảnh dùng đúng dòng của file animation; ảnh có sẵn mà thiếu video thì chỉ tạo video), **Tạo nhạc nền**, **Motion** (vẽ khi ảnh của cảnh về), **Footage**, **Thumbnail**. Tắt một mục giữa lúc chạy → việc của mục đó *Đã dừng*; bật lại → chạy tiếp.
+- **Cảnh có trong file motion / footage không tạo video AI** (tiết kiệm lượt) — ảnh của cảnh vẫn tạo vì motion dùng làm nền. Tắt mục Motion / Footage thì các cảnh đó lại được tạo video AI.
+- **Báo cáo**: mỗi thẻ mục ghi đã có / tổng, số còn thiếu, chờ / đang chạy / lỗi, lỗi gần nhất, thời gian chạy. Mọi mục xong thì lượt tự đóng và ghi vào **Báo cáo các lượt chạy** (thời gian, kết quả, từng mục được thêm bao nhiêu, bao nhiêu lỗi).
+- **Hẹn giờ chuyển vào Dashboard** (cuối trang). Thêm loại hẹn mới **Chạy tất cả dự án tổng**: chọn giờ bắt đầu / giờ dừng / mỗi ngày hay một lần / dự án tổng — tới giờ app mở đúng dự án tổng đó và gạt Chạy tất cả, tới giờ dừng thì dừng. Hẹn giờ từng chức năng (Tạo ảnh / video / nhạc) như cũ nằm ngay bên dưới.
+- Mọi thứ khác giữ nguyên như 1.7.0; các trang Tạo ảnh, Tạo video, Footage, Motion vẫn dùng riêng được như trước.
+
+## Bản 1.7.0
 
 - **Mục mới: Motion** (thanh bên trái, dưới *Footage*) — tạo **video motion graphic** cho những cảnh của kịch bản nên làm bằng đồ họa chuyển động, bằng **Remotion**. 5 mẫu:
   - **Bản đồ hành trình**: bản đồ cổ vùng đất Kinh Thánh (bờ biển, sông Giô-đanh, Nin, Ơ-phơ-rát, Ti-gơ-rơ, biển Ga-li-lê, Biển Chết), đường đi vẽ dần qua từng địa danh, mỗi nơi bật lên khi đường đi tới. App biết sẵn ~170 địa danh (Jerusalén / Giê-ru-sa-lem / Jerusalem đều được); nơi lạ ghi thêm toạ độ, vd `Mari @ 34.55, 40.89`.

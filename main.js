@@ -34,6 +34,7 @@ const { ensureDebugger } = require('./src/flow/main/paste');
 const DD = require('./src/main/don-dep');   // 1.4.12 dọn dữ liệu thừa (khác donDep = dọn chat / dự án Flow)
 const { QuanLyFootage } = require('./src/main/footage');   // 1.6.0 tải footage Pexels / Pixabay theo cảnh
 const { QuanLyMotion, taoTienTrinhCon } = require('./src/main/motion');   // 1.7.0 video motion graphic theo cảnh (Remotion)
+const { QuanLyDashboard } = require('./src/main/dashboard');   // 1.8.0 Dashboard: chạy cả quy trình của một dự án tổng
 
 // Thư mục dữ liệu riêng (phiên đăng nhập, cài đặt, hàng đợi) — PHẢI trước whenReady.
 app.setPath('userData', process.env.MUSE_DATA_DIR ||
@@ -50,7 +51,7 @@ const DUOI_ANH = /\.(png|jpe?g|webp|gif|bmp)$/i;
 const MIME = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif', bmp: 'image/bmp' };
 
 let win = null;
-let store, storeFlow, taiKhoan, dieuPhoi, capNhat, tabsFlow, mayFlow, taiVeFlow, footage, motion;
+let store, storeFlow, taiKhoan, dieuPhoi, capNhat, tabsFlow, mayFlow, taiVeFlow, footage, motion, dashboard;
 const nhatKy = [];
 let henBao = null;
 let soDongGhi = 0;
@@ -177,6 +178,7 @@ function trangThai() {
     nenTang: process.platform,
     footage: footage ? footage.trangThai() : null,   // 1.6.0
     motion: motion ? motion.trangThai() : null,      // 1.7.0
+    dashboard: dashboard ? dashboard.trangThai() : null,   // 1.8.0
     dangNhap: dangNhap ? { id: dangNhap.id, khung: dangNhap.view.getBounds() } : null
   };
 }
@@ -1400,6 +1402,24 @@ const LENH = {
   footageTayHien: () => { if (cuaSoTay && !cuaSoTay.isDestroyed()) { cuaSoTay.show(); cuaSoTay.focus(); return { ok: true }; } return footage.tay.bat ? footage.tayMoCanh() : { ok: false, loi: 'Chưa mở Tải tay' }; },
   footageTayDong: () => footage.tayDong(),
 
+  // 1.8.0 Dashboard — src/main/dashboard.js
+  dashChonGoc: async ({ duAn } = {}) => {
+    const r = await dialog.showOpenDialog(win, { title: 'Chọn thư mục dự án tổng (chứa file prompt ảnh, animation, nhạc, motion, footage…)',
+      defaultPath: dashboard.duLieu.goc || undefined, properties: ['openDirectory'] });
+    if (r.canceled || !r.filePaths[0]) return null;
+    return dashboard.chonGoc(r.filePaths[0], duAn);
+  },
+  dashDatGoc: ({ goc, duAn }) => dashboard.chonGoc(goc, duAn),
+  dashBoGoc: ({ goc }) => dashboard.boGoc(goc),
+  dashDatDuAn: ({ id }) => dashboard.datDuAn(id),
+  dashDatMuc: ({ k, ...thay }) => dashboard.datMuc(k, thay),
+  dashChonTep: ({ k, tep }) => dashboard.chonTep(k, tep),
+  dashChayTatCa: () => dashboard.chayTatCa(),
+  dashDungTatCa: () => dashboard.dungTatCa(),
+  dashQuet: () => { dashboard.nho = null; return { ok: true }; },
+  dashDatHen: (h) => dashboard.datHen(h),
+  dashXoaHen: ({ id }) => dashboard.xoaHen(id),
+
   // 1.7.0 Motion graphic theo cảnh (Remotion) — src/main/motion.js
   motionDatCaiDat: (c) => motion.datCaiDat(c),
   motionMoFile: async ({ duAn } = {}) => {
@@ -1603,6 +1623,9 @@ app.whenReady().then(() => {
       if (taiKhoan.ds.some((a) => a.nen === 'muse')) capNhatToken();   // chạy xong hàng chờ → cập nhật mức token Muse
     }
   });
+  // 1.8.0: Dashboard — dự án tổng (một thư mục chứa mọi file đầu vào), bật / tắt từng mục, Chạy tất cả, báo cáo, hẹn giờ.
+  dashboard = new QuanLyDashboard({ store, dieuPhoi, motion, footage, log, bao: () => baoTrangThai(), duAnMacDinh: () => (dieuPhoi.duAn[0] || {}).id });
+  setInterval(() => { try { dashboard.tick(); } catch (err) { log('error', `❌ Dashboard: ${err.message}`); } }, 2000);
 
   capNhat = new BoCapNhat({
     phienBan: pkg.version, repo: layRepo(pkg), platform: process.platform, arch: process.arch,
@@ -1627,7 +1650,8 @@ app.whenReady().then(() => {
   let chanNgu = -1;
   const xetChanNgu = () => {
     try {
-      const can = dieuPhoi.henGio.some((h) => h.bat) || dieuPhoi.henDangChay.size > 0;
+      const dh = dashboard ? dashboard.duLieu : {};
+      const can = dieuPhoi.henGio.some((h) => h.bat) || dieuPhoi.henDangChay.size > 0 || (dh.hen || []).some((h) => h.bat) || !!dh.henDang;   // 1.8.0: hẹn của Dashboard
       if (can && chanNgu < 0) { chanNgu = powerSaveBlocker.start('prevent-app-suspension'); log('info', '⏰ Có hẹn giờ chạy: giữ máy không tự ngủ để tới giờ app chạy được.'); }
       else if (!can && chanNgu >= 0) { powerSaveBlocker.stop(chanNgu); chanNgu = -1; }
     } catch (_) {}
@@ -1643,7 +1667,7 @@ app.whenReady().then(() => {
     setInterval(() => capNhat.kiemTra({ imLang: true }), 4 * 3600 * 1000);
   }
   // Bài kiểm thử: MUSE_TEST=tests/<bài>.js nhận đúng các đối tượng app đang dùng.
-  if (process.env.MUSE_TEST) require(path.resolve(process.env.MUSE_TEST))({ win, app, LENH, dieuPhoi, taiKhoan, nhatKy, tabsFlow, mayFlow, storeFlow, docRam, baoRam, store, footage, motion });
+  if (process.env.MUSE_TEST) require(path.resolve(process.env.MUSE_TEST))({ win, app, LENH, dieuPhoi, taiKhoan, nhatKy, tabsFlow, mayFlow, storeFlow, docRam, baoRam, store, footage, motion, dashboard });
 });
 
 let dangThoat = false;       // đang cài bản mới lúc thoát

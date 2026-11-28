@@ -519,21 +519,21 @@ body.trang-nhac .khong-nhac { display: none !important; }
 .chip-hen { cursor: pointer; }
 .chip-hen:hover { color: var(--chu); }
 .chip-hen.chay { color: var(--xanh); border-color: rgba(52, 211, 153, .35); }
-.the-hen .trang-hen { margin-left: auto; font-size: 12px; font-weight: 600; color: var(--chu-mo); }
-.the-hen .trang-hen.bat { color: var(--vang); }
-.the-hen .trang-hen.chay { color: var(--xanh); }
-.the-hen input[type="time"] { color-scheme: dark; display: block; }
-.the-hen input[type="time"]::-webkit-calendar-picker-indicator { cursor: pointer; opacity: .7; }
-.the-hen .o-gio { display: flex; align-items: center; gap: 8px; margin-top: 5px; }
-.the-hen .o-gio input { margin-top: 0; flex: 1; min-width: 0; }
-.the-hen .dong-o { flex-wrap: wrap; }
-.the-hen .hen.tat .luoi-3, .the-hen .hen.tat .chon-du-an-hen { opacity: .55; }
+.the-hen .trang-hen, .the-hen-dash .trang-hen { margin-left: auto; font-size: 12px; font-weight: 600; color: var(--chu-mo); }
+.the-hen .trang-hen.bat, .the-hen-dash .trang-hen.bat { color: var(--vang); }
+.the-hen .trang-hen.chay, .the-hen-dash .trang-hen.chay { color: var(--xanh); }
+.the-hen input[type="time"], .the-hen-dash input[type="time"] { color-scheme: dark; display: block; }
+.the-hen input[type="time"]::-webkit-calendar-picker-indicator, .the-hen-dash input[type="time"]::-webkit-calendar-picker-indicator { cursor: pointer; opacity: .7; }
+.the-hen .o-gio, .the-hen-dash .o-gio { display: flex; align-items: center; gap: 8px; margin-top: 5px; }
+.the-hen .o-gio input, .the-hen-dash .o-gio input { margin-top: 0; flex: 1; min-width: 0; }
+.the-hen .dong-o, .the-hen-dash .dong-o { flex-wrap: wrap; }
+.the-hen .hen.tat .luoi-3, .the-hen .hen.tat .chon-du-an-hen, .the-hen-dash .hen.tat .luoi-3, .the-hen-dash .hen.tat .chon-du-an-hen { opacity: .55; }
 /* 1.4.14: nhiều hẹn mỗi chức năng, mỗi hẹn tick nhiều dự án. */
-.the-hen .hen { padding: 12px 0 2px; }
-.the-hen > [data-hen="them"] { margin-top: 8px; }
-.the-hen .hen + .hen { border-top: 1px solid var(--vien); margin-top: 6px; }
-.the-hen .hen .trang-hen { margin-left: 8px; }
-.the-hen .ds-hen:empty::after { content: 'Chưa có hẹn giờ nào.'; display: block; padding: 6px 0 12px; font-size: 12.5px; color: var(--chu-mo); }
+.the-hen .hen, .the-hen-dash .hen { padding: 12px 0 2px; }
+.the-hen > [data-hen="them"], .the-hen-dash > [data-hen="them"] { margin-top: 8px; }
+.the-hen .hen + .hen, .the-hen-dash .hen + .hen { border-top: 1px solid var(--vien); margin-top: 6px; }
+.the-hen .hen .trang-hen, .the-hen-dash .hen .trang-hen { margin-left: 8px; }
+.the-hen .ds-hen:empty::after, .the-hen-dash .ds-hen:empty::after { content: 'Chưa có hẹn giờ nào.'; display: block; padding: 6px 0 12px; font-size: 12.5px; color: var(--chu-mo); }
 .chon-du-an-hen { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; margin: 2px 0 12px; font-size: 12.5px; color: var(--chu-phu); }
 .chon-du-an-hen label { display: inline-flex; align-items: center; gap: 6px; color: var(--chu); font-size: 13px; cursor: pointer; }
 .chon-du-an-hen input { width: 16px; height: 16px; margin: 0; accent-color: var(--g2); }
@@ -704,3 +704,79 @@ label > .ap { margin-left: 6px; }
   .mt-dong .ft-nut { grid-column: 3 / -1; justify-content: flex-start; }
 }
 
+
+/* ── Dashboard (1.8.0) ─────────────────────────────────────────── */
+.db-hang-goc { flex-wrap: wrap; }
+.db-hang-goc select { flex: 1 1 320px; min-width: 0; }
+.db-goc-ghi { display: flex; flex-direction: column; gap: 3px; margin-top: 8px; font-size: 12.5px; }
+.db-goc-ghi span { overflow-wrap: anywhere; }
+.db-tong-the .db-chay-the b { font-size: 16px; }
+.db-cong-tac-lon { transform: scale(1.35); transform-origin: right center; margin-right: 6px; }
+.db-o-so { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
+.db-o-so:empty { display: none; }
+.db-o { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border: 1px solid var(--vien); border-radius: 12px; background: rgba(255, 255, 255, .02); min-width: 0; }
+.db-o span { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--chu-phu); }
+.db-o span svg { width: 14px; height: 14px; }
+.db-o b { font-size: 17px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.db-luoi { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
+.db-muc { display: flex; flex-direction: column; gap: 7px; padding: 12px 14px; border: 1px solid var(--vien); border-radius: 14px; background: rgba(255, 255, 255, .025); min-width: 0; }
+.db-muc.tt-tat { opacity: .55; }
+.db-muc.tt-dang { border-color: var(--tim); box-shadow: 0 0 0 1px var(--tim-nen) inset; }
+.db-muc.tt-xong { border-color: var(--xanh); }
+.db-muc.tt-loi { border-color: var(--do); }
+.db-muc-dau { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.db-muc-dau > i svg { width: 18px; height: 18px; }
+.db-muc-dau b { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.db-muc-dau .the-tt { margin-left: auto; white-space: nowrap; }
+.db-muc.tt-dang .the-tt { background: var(--tim-nen); color: var(--tim); }
+.db-muc.tt-xong .the-tt { background: var(--xanh-nen); color: var(--xanh); }
+.db-muc.tt-loi .the-tt { background: var(--do-nen); color: var(--do); }
+.db-tep { font-size: 12px; color: var(--chu-phu); min-width: 0; }
+.db-tep span { display: flex; align-items: center; gap: 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.db-tep svg { width: 13px; height: 13px; flex: none; }
+.db-tep select { width: 100%; }
+.db-tien { height: 6px; border-radius: 3px; background: rgba(255, 255, 255, .08); overflow: hidden; }
+.db-tien i { display: block; height: 100%; background: var(--tim); }
+.db-muc.tt-xong .db-tien i { background: var(--xanh); }
+.db-so { font-size: 13px; }
+.db-so b { font-size: 16px; }
+.db-dem { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; font-size: 12px; color: var(--chu-phu); }
+.db-dem svg { width: 12px; height: 12px; vertical-align: -2px; margin-right: 2px; }
+.db-tuy-chon { display: flex; gap: 8px; flex-wrap: wrap; }
+.db-tuy-chon label { display: flex; flex-direction: column; gap: 3px; font-size: 11.5px; color: var(--chu-phu); flex: 1 1 110px; min-width: 0; }
+.db-ghi { display: flex; flex-direction: column; gap: 3px; font-size: 11.5px; }
+.db-ghi span { overflow-wrap: anywhere; }
+.db-ghi svg { width: 12px; height: 12px; vertical-align: -2px; margin-right: 3px; }
+.db-ghi .vang { color: var(--vang); }
+.db-mo-trang { align-self: flex-start; font-size: 12px; display: inline-flex; align-items: center; gap: 4px; margin-top: auto; }
+.db-mo-trang svg { width: 12px; height: 12px; }
+.db-luot { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; }
+.db-luot-dau, .db-luot-dong { display: grid; grid-template-columns: 96px minmax(0, 120px) 110px 74px minmax(0, 1fr) 44px; gap: 8px; align-items: start; }
+.db-luot-dau { color: var(--chu-phu); font-size: 11.5px; padding: 0 8px; }
+.db-luot-dong { padding: 7px 8px; border-radius: 9px; background: rgba(255, 255, 255, .025); }
+.db-luot-dong > span { overflow: hidden; text-overflow: ellipsis; }
+.db-luot-dong .xanh { color: var(--xanh); }
+.db-luot-dong .vang { color: var(--vang); }
+.db-luot-muc { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.db-luot-muc em { font-style: normal; white-space: nowrap; }
+.the-hen-dash { margin: 10px 0 14px; }
+.the-hen-dash > #dbThemHen { margin-top: 8px; }
+.the-hen-dash .ds-hen:empty::after { content: 'Chưa có hẹn giờ nào.'; display: block; padding: 6px 0 12px; font-size: 12.5px; color: var(--chu-mo); }
+.the-hen-dash h4 .trang-hen { margin-left: auto; font-size: 12px; font-weight: 600; color: var(--chu-mo); text-transform: none; }
+.the-hen-dash h4 .trang-hen.bat { color: var(--vang); }
+.the-hen-dash h4 .trang-hen.chay { color: var(--xanh); }
+.the-hen-dash h4, .db-tieu-de-phu { display: flex; align-items: center; gap: 8px; margin: 4px 0 6px; font-size: 14px; }
+.the-hen-dash h4 svg { width: 16px; height: 16px; }
+.db-tieu-de-phu { margin-top: 18px; }
+.db-hen-luoi { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 1280px) {
+  .db-luoi { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .db-o-so { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .db-hen-luoi { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .db-luot-dau { display: none; }
+  .db-luot-dong { grid-template-columns: 90px minmax(0, 1fr) 100px 64px; }
+  .db-luot-dong .db-luot-muc { grid-column: 1 / -1; }
+  .db-luot-dong > span:last-child { display: none; }
+}
+.db-ghi details summary { cursor: pointer; color: var(--chu-phu); }
+.db-ghi details[open] summary { margin-bottom: 2px; }
