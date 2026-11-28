@@ -3067,13 +3067,13 @@ testAsync('1.3.4 Store ghi theo nhịp nhipMs (không ghi sớm hơn, vẫn ghi 
     assert.strictEqual(henCua(dp2, 'nhac').daChay, '2026-10-18 07:00');
   });
 
-  test('1.3.6 hẹn giờ: giao diện có trang Hẹn giờ 3 thẻ, lệnh có trong LENH, giữ máy không ngủ khi có hẹn', () => {
+  test('1.3.6 hẹn giờ: 3 thẻ hẹn từng chức năng (1.8.0: nằm trong Dashboard), lệnh có trong LENH, giữ máy không ngủ khi có hẹn', () => {
     const html = docNguon('src/ui/index.html'), m = docNguon('main.js'), ui = docNguon('src/ui/app.js');
-    assert.ok(/data-trang="hengio"/.test(html) && /id="trang-hengio"/.test(html));
+    assert.ok(!/data-trang="hengio"/.test(html) && !/id="trang-hengio"/.test(html) && /id="trang-dashboard"[\s\S]*id="khuHenGio"[\s\S]*data-loai="nhac"/.test(html), 'Hẹn giờ chuyển vào Dashboard');
     assert.deepStrictEqual([...html.matchAll(/class="the-cai the-hen" data-loai="(\w+)"/g)].map((x) => x[1]), ['anh', 'video', 'nhac']);
     assert.ok(/datHenGio: \(\{ loai, hen \}\) => dieuPhoi\.datHenGio\(loai, hen\)/.test(m) && /dungHen: \(\{ loai, id \}\) => dieuPhoi\.dungHen\(id \|\| loai\)/.test(m) && /xoaHenGio: \(\{ id \}\) => dieuPhoi\.xoaHenGio\(id\)/.test(m));
     assert.ok(/powerSaveBlocker\.start\('prevent-app-suspension'\)/.test(m) && /powerSaveBlocker\.stop\(chanNgu\)/.test(m));
-    assert.ok(/'hengio', 'nhanvat'/.test(ui) && /api\.call\('datHenGio'/.test(ui));
+    assert.ok(/if \(trang === 'hengio'\) \{ diToi\('dashboard'\)/.test(ui) && /\$\$\('#khuHenGio \.the-hen'\)/.test(ui) && /api\.call\('datHenGio'/.test(ui));
   });
 }
 
@@ -4644,7 +4644,7 @@ console.log('\n── 1.6.0 Footage (Pexels / Pixabay) ────────�
   test('1.6.0 Footage: trang Footage trong thanh trái + TEN_TRANG + vòng ẩn/hiện; lệnh có trong LENH; không tải Storyblocks bằng máy; ảnh nhỏ https được hiện', () => {
     const html = docNguon('src/ui/index.html', true), ui = docNguon('src/ui/app.js'), m = docNguon('main.js'), f = docNguon('src/main/footage.js', true);
     assert.ok(/data-trang="footage"/.test(html) && /id="trang-footage"/.test(html));
-    assert.ok(/footage: 'Footage'/.test(ui) && /\['footage', 'motion', 'hengio'/.test(ui) && /if \(trang === 'footage'\) napFootage\(\);/.test(ui) && /if \(U\.trang === 'footage'\) veFootage\(\);/.test(ui));
+    assert.ok(/footage: 'Footage'/.test(ui) && /\['dashboard', 'footage', 'motion', 'nhanvat'/.test(ui) && /if \(trang === 'footage'\) napFootage\(\);/.test(ui) && /if \(U\.trang === 'footage'\) veFootage\(\);/.test(ui));
     for (const l of ['footageDatCaiDat', 'footageMoFile', 'footageNapTep', 'footageChonThuMuc', 'footageChay', 'footageDung', 'footageDoi', 'footageBo', 'footageLayLai', 'footageXoaDs']) {
       assert.ok(new RegExp(`\\n  ${l}: `).test(m), `LENH.${l}`);
     }
@@ -4911,6 +4911,251 @@ console.log('\n── 1.7.0 Motion graphic theo cảnh (Remotion) ────�
     if (!fs.existsSync(b)) { console.log('     (chưa đóng gói mẫu motion — bỏ qua; CI đóng gói trước npm test)'); return; }
     assert.strictEqual(JSON.parse(fs.readFileSync(b, 'utf8')).dau, M.dauNguonMotion(path.join(__dirname, '..', 'src', 'motion')));
     for (const f of ['index.html', 'bundle.js', 'bundle.js.map']) assert.ok(fs.existsSync(path.join(path.dirname(b), f)), f);
+  });
+}
+
+console.log('\n── 1.8.0 Dashboard: dự án tổng, các mục, hẹn giờ Chạy tất cả ─────');
+{
+  const os = require('os');
+  const DB = require('../src/main/dashboard');
+  const dsFileThat = (goc) => {
+    const ra = [];
+    const di = (thuMuc, tien, sau) => {
+      let ds = [];
+      try { ds = fs.readdirSync(thuMuc, { withFileTypes: true }); } catch (_) { return; }
+      for (const e of ds) { if (e.isFile()) ra.push(tien + e.name); else if (e.isDirectory() && sau > 0) di(path.join(thuMuc, e.name), `${tien}${e.name}/`, sau - 1); }
+    };
+    if (goc) di(goc, '', 3);
+    return ra;
+  };
+  /** Dự án tổng mẫu giống TBN_16: 4 prompt ảnh (ảnh 1, 2 đã có, video 1 đã có), 4 dòng animation, 2 nhạc, 1 thumbnail, motion cảnh 2, footage cảnh 4. */
+  const duAnTong = (ten = 'TBN_99') => {
+    const cha = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-'));
+    const g = path.join(cha, ten);
+    for (const d of ['images', 'Videos', 'BGM', 'Audio']) fs.mkdirSync(path.join(g, d), { recursive: true });
+    const n = 'loi-thoai_Mau';
+    fs.writeFileSync(path.join(g, `${n} - prompt anh.txt`), 'anh 1\nnhiều dòng\n\nanh 2\n\nanh 3\n\nanh 4\n');
+    fs.writeFileSync(path.join(g, `${n} - prompt animation.txt`), 'dong 1\ndong 2\ndong 3\ndong 4\n');
+    fs.writeFileSync(path.join(g, `${n} - nhac flowmusic.txt`), 'nhac 1\n\nnhac 2\n');
+    fs.writeFileSync(path.join(g, `${n} - thumbnail.txt`), 'thumb 1\n');
+    fs.copyFileSync(path.join(__dirname, 'fixture-motion.xlsx'), path.join(g, `${n}_motion.xlsx`));
+    fs.writeFileSync(path.join(g, `${n}_tts.xlsx`), 'x');
+    for (const f of ['001.png', '002.png']) fs.writeFileSync(path.join(g, 'images', f), 'png');
+    fs.writeFileSync(path.join(g, 'Videos', '001.mp4'), 'mp4');
+    return { cha, g, n };
+  };
+  const giaMotion = () => ({ ds: null, dangChay: false, nap: [], chayDs: [], napTep(t) { this.ds = { tep: t, goc: '', canh: [{ so: 3, trangThai: 'cho', anh: '' }] }; this.nap.push(t); return { ok: true }; },
+    datGoc(g) { this.ds.goc = g; return { ok: true }; }, datThuMucVideo() { return { ok: true }; }, quet() { for (const x of this.ds.canh) x.anh = fs.existsSync(path.join(this.ds.goc, 'images', '003.png')) ? 'co' : ''; },
+    async chay(so) { this.chayDs.push(so); for (const x of this.ds.canh) if (so.includes(x.so)) x.trangThai = 'xong'; return { ok: true }; }, dungLai() { this.dungGoi = true; } });
+  const giaFootage = () => ({ ds: null, dangChay: false, tay: { bat: false }, nap: [], napTep(t) { this.ds = { tep: t, thuMuc: '', canh: [{ so: 4, trangThai: 'cho' }] }; this.nap.push(t); return { ok: true }; },
+    datThuMuc(t) { this.ds.thuMuc = t; return { ok: true }; }, loiTruocChay() { return this.loi || null; }, async chay() { this.daChay = (this.daChay || 0) + 1; return { ok: true }; }, dungLai() { this.dungGoi = true; } });
+  const dungDash = (o = {}) => {
+    const x = dungDieuPhoi({ dsFile: dsFileThat, tonTai: (f) => fs.existsSync(f), bayGio: o.bayGio });
+    x.dp.chayDuAn = function (id) { this.duAnChay.add(id); return true; };   // không mở luồng thật
+    x.dp._vong = () => {};   // không giao việc cho luồng (bài này chỉ kiểm phần Dashboard)
+    const motion = giaMotion(), footage = giaFootage();
+    const db = new DB.QuanLyDashboard({ store: x.store, dieuPhoi: x.dp, motion, footage, log: (m, c) => x.nhatKy.push(`[${m}] ${c}`), bao: () => {}, bayGio: o.bayGio, duAnMacDinh: () => 'mac-dinh' });
+    return { ...x, db, motion, footage };
+  };
+
+  test('dashboard: nhận file đầu vào theo tên, đọc prompt (ảnh / nhạc theo đoạn, animation theo dòng giữ số)', () => {
+    const { g } = duAnTong();
+    const t = DB.timTepDauVao(g);
+    assert.deepStrictEqual(Object.keys(t).sort(), ['anh', 'motion', 'nhac', 'thumbnail', 'tts', 'video']);
+    assert.deepStrictEqual(DB.docPrompt('anh', t.anh[0].tep), ['anh 1\nnhiều dòng', 'anh 2', 'anh 3', 'anh 4']);
+    assert.deepStrictEqual(DB.docPrompt('video', t.video[0].tep), ['dong 1', 'dong 2', 'dong 3', 'dong 4']);
+    assert.deepStrictEqual(DB.docPrompt('nhac', t.nhac[0].tep), ['nhac 1', 'nhac 2']);
+    const tbn = '/mnt/user-data/uploads/TBN_16';
+    if (fs.existsSync(tbn)) {   // file thật của người dùng (chỉ có ở máy dựng)
+      const r = DB.timTepDauVao(tbn);
+      assert.deepStrictEqual(['anh', 'video', 'nhac', 'thumbnail', 'motion', 'footage'].map((k) => r[k] && DB.docPrompt.length && r[k].length), [1, 1, 1, 1, 1, 1]);
+      assert.deepStrictEqual(['anh', 'video', 'nhac', 'thumbnail'].map((k) => DB.docPrompt(k, r[k][0].tep).filter(Boolean).length), [391, 391, 16, 3]);
+    }
+  });
+
+  test('dashboard: chọn thư mục → dự án của app cùng tên, lưu thẳng vào images / Videos / BGM, bỏ qua số đã có, không lên Drive', () => {
+    const { db, dp } = dungDash();
+    const { g } = duAnTong();
+    dp.datCaiDat({ driveBat: true, thuMucAnh: '/khac' }, 'mac-dinh');
+    const r = db.chonGoc(g);
+    assert.ok(r.ok, JSON.stringify(r));
+    const d = dp.duAn.find((x) => x.id === r.duAn);
+    assert.strictEqual(d.ten, 'TBN_99');
+    const c = dp.cd(d.id);
+    assert.deepStrictEqual([c.thuMucAnh, c.thuMucVideo, c.thuMucNhac, c.tenAnh, c.tenNhac, c.driveBat, c.boQuaDaCo, d.thuMucVideoAnh],
+      [path.join(g, 'images'), path.join(g, 'Videos'), path.join(g, 'BGM'), '{stt}', '{stt}', false, true, path.join(g, 'Videos')]);
+    assert.strictEqual(dp.cd('mac-dinh').driveBat, true, 'dự án khác giữ cài đặt');
+    // chọn lại → dùng lại đúng dự án, không tạo TBN_99-2
+    db.chonGoc(g);
+    assert.strictEqual(dp.duAn.filter((x) => /TBN_99/.test(x.ten)).length, 1);
+  });
+
+  test('dashboard: thư mục cha chứa nhiều video → thêm mọi thư mục con có file đầu vào; thư mục rỗng báo lỗi', () => {
+    const { db } = dungDash();
+    const a = duAnTong('TBN_1');
+    const b = path.join(a.cha, 'TBN_2');
+    fs.mkdirSync(b);
+    fs.writeFileSync(path.join(b, 'x - prompt anh.txt'), 'p');
+    fs.mkdirSync(path.join(a.cha, 'rong'));
+    const r = db.chonGoc(a.cha);
+    assert.ok(r.ok && r.them === 2, JSON.stringify(r));
+    const st = db.trangThai();
+    assert.deepStrictEqual(st.dsGoc.map((x) => x.ten), ['TBN_1', 'TBN_2']);
+    assert.strictEqual(path.basename(st.goc), 'TBN_1');
+    assert.ok(/không có file đầu vào/.test(db.chonGoc(path.join(a.cha, 'rong')).loi));
+    assert.ok(db.boGoc(st.goc).ok && path.basename(db.trangThai().goc) === 'TBN_2');
+  });
+
+  test('dashboard: thống kê từng mục — số đã có / thiếu, video bỏ cảnh motion + footage, cảnh báo số dòng lệch', () => {
+    const { db } = dungDash();
+    const { g } = duAnTong();
+    db.chonGoc(g);
+    const st = db.trangThai();
+    assert.deepStrictEqual([st.muc.anh.tong, st.muc.anh.xong, st.muc.anh.thieu], [4, 2, '3–4']);
+    // fixture-motion: cảnh 3, 5, 9, 11, 12 → video AI chỉ cần cho 1, 2, 4 (1 đã có)
+    assert.deepStrictEqual([st.muc.video.tong, st.muc.video.xong, st.muc.video.thieu, st.muc.video.boCanh], [3, 1, '2, 4', '3, 5, 9, 11–12'], JSON.stringify(st.muc.video));
+    assert.deepStrictEqual([st.muc.nhac.tong, st.muc.thumbnail.tong, st.muc.motion.tong], [2, 1, 5]);
+    assert.ok(st.tep.tts.chon && !st.tep.overlay.chon);
+    // tắt mục motion → cảnh motion lại cần video AI
+    db.datMuc('motion', { bat: false }); db.nho = null;
+    assert.deepStrictEqual([db.trangThai().muc.video.tong, db.trangThai().muc.video.boCanh], [4, ''], 'tắt motion → cảnh 3 lại cần video AI');
+  });
+
+  test('dashboard: Chạy tất cả — ảnh thiếu + video riêng từng ảnh (bỏ cảnh motion), video từ ảnh có sẵn, nhạc, thumbnail dự án phụ, motion / footage; báo cáo lượt', async () => {
+    let gio = 1_000_000;
+    const { db, dp, motion, footage } = dungDash({ bayGio: () => gio });
+    const { g, n } = duAnTong();
+    fs.copyFileSync(path.join(__dirname, 'fixture-footage.xlsx'), path.join(g, `${n}_footage.xlsx`));
+    db.chonGoc(g);
+    db.datMuc('thumbnail', { bat: true });
+    assert.ok(db.chayTatCa().ok);
+    const lk = db.trangThai();
+    const v = (loai, id = lk.duAn) => dp.viec.filter((j) => j.duAn === id && j.loai === loai);
+    // cảnh 3 có motion + footage → ảnh 3 vẫn tạo (nền của motion) nhưng không nối video AI; ảnh 4 nối video với dòng 4
+    assert.deepStrictEqual(v('anh').map((j) => [j.stt, j.prompt, j.chuoi && j.chuoi.prompt]), [[3, 'anh 3', null], [4, 'anh 4', 'dong 4']]);
+    assert.deepStrictEqual(v('video').map((j) => [j.stt, j.prompt, j.anhCoSan]), [[2, 'dong 2', true]], 'ảnh 2 có sẵn, video 2 thiếu → chỉ video');
+    assert.deepStrictEqual(v('nhac').map((j) => j.prompt), ['nhac 1', 'nhac 2']);
+    assert.ok(lk.duAnThumb && v('anh', lk.duAnThumb).map((j) => j.prompt).join() === 'thumb 1');
+    assert.strictEqual(dp.cd(lk.duAnThumb).thuMucAnh, path.join(g, 'thumbnail'));
+    assert.ok(dp.duAnChay.has(lk.duAn) && dp.duAnChay.has(lk.duAnThumb));
+    assert.ok(motion.nap.length === 1 && footage.daChay === 1 && footage.ds.thuMuc === path.join(g, 'Videos'));
+    assert.deepStrictEqual(motion.chayDs, [], 'motion chờ ảnh 3 của cảnh (đang tạo ảnh)');
+    assert.ok(db.trangThai().dang && db.trangThai().muc.anh.dangChay);
+    // ảnh 3 về → cảnh motion 3 vẽ ở nhịp kế (≥ 15 s)
+    fs.writeFileSync(path.join(g, 'images', '003.png'), 'png');
+    gio += 5000; db.tick();
+    assert.deepStrictEqual(motion.chayDs, [], 'quét ảnh cho motion mỗi 15 s');
+    gio += 15000; db.tick();
+    assert.deepStrictEqual(motion.chayDs, [[3]]);
+    // mọi việc xong → lượt đóng, báo cáo đủ mục
+    for (const j of dp.viec) j.trangThai = 'xong';
+    dp.viec.find((j) => j.loai === 'nhac').trangThai = 'loi';
+    dp.viec.find((j) => j.loai === 'nhac').xongLuc = gio;
+    gio += 60000; db.tick();
+    const st = db.trangThai();
+    assert.ok(!st.dang && st.luot.length === 1, JSON.stringify(st.luot));
+    const l = st.luot[0];
+    assert.ok(l.ketQua === 'xong' && l.giay === 80 && l.nguon === 'tay' && l.muc.nhac.loi === 1 && l.loi >= 1, JSON.stringify(l));
+    assert.ok(['anh', 'video', 'nhac', 'motion', 'footage', 'thumbnail'].every((k) => l.muc[k]));
+  });
+
+  test('dashboard: tắt / bật mục giữa lượt — việc của mục Đã dừng rồi chạy tiếp; mục tắt sẵn thì việc cũ của loại đó không chạy theo dự án', () => {
+    const { db, dp } = dungDash();
+    const { g } = duAnTong();
+    db.chonGoc(g);
+    const id = db.trangThai().duAn;
+    dp.them({ duAn: id, loai: 'nhac', prompts: ['nhac cu'] });   // việc nhạc thêm tay từ trước
+    db.datMuc('nhac', { bat: false });
+    db.chayTatCa();
+    const nhac = dp.viec.filter((j) => j.duAn === id && j.loai === 'nhac');
+    assert.ok(nhac.length === 1 && nhac[0].trangThai === 'dung', 'mục Nhạc tắt → việc nhạc cũ Đã dừng');
+    db.datMuc('nhac', { bat: true });
+    // (việc cũ mang số 1 → prompt nhạc 1 của file coi như đang chờ, chỉ thêm prompt 2)
+    assert.ok(dp.viec.filter((j) => j.duAn === id && j.loai === 'nhac').every((j) => j.trangThai === 'cho'), 'bật lại → chạy tiếp + thêm nhạc từ file');
+    assert.strictEqual(dp.viec.filter((j) => j.duAn === id && j.loai === 'nhac').length, 2);
+    db.datMuc('anh', { bat: false });
+    assert.ok(dp.viec.filter((j) => j.duAn === id && j.loai === 'anh').every((j) => j.trangThai === 'dung'));
+    db.datMuc('video', { bat: false });
+    assert.ok(dp.viec.filter((j) => j.duAn === id && j.loai === 'anh').every((j) => !j.chuoi), 'tắt video → ảnh còn lại thôi nối video');
+    db.datMuc('motion', { bat: false });
+    assert.ok(db.dungTatCa().ok && !db.trangThai().dang);
+    assert.strictEqual(db.trangThai().luot[0].ketQua, 'dung');
+  });
+
+  test('dashboard: chỉ bật Tạo video (ảnh tắt) → chỉ video từ ảnh đã có; DieuPhoi boSo / chiTuAnhCo / ganChuoiVideo', () => {
+    const { db, dp } = dungDash();
+    const { g } = duAnTong();
+    db.chonGoc(g);
+    for (const k of ['anh', 'nhac', 'motion', 'footage', 'thumbnail']) db.datMuc(k, { bat: false });
+    db.chayTatCa();
+    const id = db.trangThai().duAn;
+    assert.deepStrictEqual(dp.viec.filter((j) => j.duAn === id).map((j) => `${j.loai}${j.stt}`), ['video2']);
+    const { dp: dp2 } = dungDieuPhoi();
+    dp2.them({ prompts: ['a', 'b', 'c'], chuoiVideo: { prompts: ['v1', 'v2', 'v3'], boSo: [2] } });
+    assert.deepStrictEqual(dp2.viec.map((j) => j.chuoi && j.chuoi.prompt), ['v1', null, 'v3']);
+    assert.strictEqual(dp2.ganChuoiVideo('mac-dinh', { prompts: ['x1', 'x2', 'x3'], nen: 'flow' }), 3);
+    assert.deepStrictEqual(dp2.viec.map((j) => [j.chuoi.prompt, j.chuoi.nen]), [['x1', 'flow'], ['x2', 'flow'], ['x3', 'flow']]);
+    assert.strictEqual(dp2.ganChuoiVideo('mac-dinh', null), 3);
+    assert.ok(dp2.viec.every((j) => j.chuoi === null));
+    assert.ok(!dp2.them({ prompts: ['a'], chiTuAnhCo: true }).ok, 'chiTuAnhCo cần prompt video + bỏ qua số đã có');
+    dp2.dungViec(dp2.viec.map((j) => j.id));
+    assert.strictEqual(dp2.tiepViec(dp2.viec.map((j) => j.id)), 3);
+    assert.ok(dp2.viec.every((j) => j.trangThai === 'cho' && !j.chayRieng));
+  });
+
+  test('dashboard: lỗi rõ khi thiếu file / thiếu khoá API footage; mở app lại giữa lượt → lượt coi như đã dừng', () => {
+    const { db, store, footage } = dungDash();
+    const { g, n } = duAnTong();
+    fs.rmSync(path.join(g, `${n} - prompt animation.txt`));
+    fs.copyFileSync(path.join(__dirname, 'fixture-footage.xlsx'), path.join(g, `${n}_footage.xlsx`));
+    footage.loi = 'Chưa có khoá API Pexels hay Pixabay — nhập ở thẻ Khoá API rồi Lưu';
+    db.chonGoc(g);
+    db.datMuc('anh', { bat: false });
+    db.chayTatCa();
+    const st = db.trangThai();
+    assert.ok(/prompt animation/.test(st.muc.video.ghiChu), st.muc.video.ghiChu);
+    assert.ok(/khoá API/.test(st.muc.footage.ghiChu), st.muc.footage.ghiChu);
+    assert.ok(!db.chonGoc(g).ok, 'đang chạy không đổi dự án tổng');
+    const db2 = new DB.QuanLyDashboard({ store, dieuPhoi: db.dp, motion: db.o.motion, footage, log: () => {}, bao: () => {} });
+    assert.ok(!db2.trangThai().dang && db2.trangThai().luot[0].ketQua === 'dung');
+    assert.ok(!new DB.QuanLyDashboard({ store: khoGia(), dieuPhoi: db.dp, motion: db.o.motion, footage }).chayTatCa().ok);
+  });
+
+  test('1.8.0 Dashboard: trang + lệnh có trong LENH, tick + hẹn giữ máy không ngủ, e2e dashboard trên CI', () => {
+    const html = docNguon('src/ui/index.html', true), ui = docNguon('src/ui/app.js'), m = docNguon('main.js');
+    assert.ok(/data-trang="dashboard"/.test(html) && /id="trang-dashboard"/.test(html) && html.indexOf('data-trang="dashboard"') < html.indexOf('data-trang="anh"'), 'Dashboard đầu thanh trái');
+    assert.ok(/dashboard: 'Dashboard'/.test(ui) && /if \(trang === 'dashboard'\) \{ napHenGio\(\); napDash\(\); \}/.test(ui) && /\n  ganDash\(\);/.test(ui));
+    for (const l of (ui.match(/api\.call\('dash[A-Za-z]+'/g) || [])) assert.ok(new RegExp(`\\n  ${l.slice(10, -1)}: `).test(m), `giao diện gọi ${l} có trong LENH`);
+    for (const l of ['dashChonGoc', 'dashDatGoc', 'dashBoGoc', 'dashDatMuc', 'dashChonTep', 'dashChayTatCa', 'dashDungTatCa', 'dashQuet', 'dashDatHen', 'dashXoaHen']) assert.ok(new RegExp(`\\n  ${l}: `).test(m), `LENH.${l}`);
+    assert.ok(/dashboard: dashboard \? dashboard\.trangThai\(\) : null/.test(m) && /dashboard\.tick\(\)/.test(m));
+    assert.ok(m.indexOf('dashboard = new QuanLyDashboard') > m.indexOf('dieuPhoi = new DieuPhoi'), 'Dashboard dựng sau DieuPhoi');
+    assert.ok(/\(dh\.hen \|\| \[\]\)\.some\(\(h\) => h\.bat\) \|\| !!dh\.henDang/.test(m), 'hẹn của Dashboard giữ máy không ngủ');
+    for (const w of ['build-windows.yml', 'build-mac.yml']) assert.ok(/run: node tests\/e2e\.js dashboard/.test(docNguon(`.github/workflows/${w}`, true)), `${w} chạy e2e dashboard`);
+    assert.ok(/DASH \? 'tests\/dashboard-e2e-chay\.js'/.test(docNguon('tests/e2e.js', true)));
+  });
+
+  test('dashboard: hẹn giờ Chạy tất cả — tới giờ chạy dự án tổng của hẹn, tới giờ dừng thì dừng, hẹn một lần tự tắt', async () => {
+    const t0 = new Date(2026, 10, 28, 21, 59, 0).getTime();
+    let gio = t0;
+    const { db } = dungDash({ bayGio: () => gio });
+    const a = duAnTong('A'), b = duAnTong('B');
+    db.chonGoc(a.g);
+    for (const k of ['nhac', 'motion', 'footage']) db.datMuc(k, { bat: false });
+    assert.ok(!db.datHen({ batDau: '25:00' }).ok);
+    const h = db.datHen({ bat: true, batDau: '22:00', ketThuc: '23:30', lap: 'mot', goc: b.g });
+    assert.ok(h.ok && h.hen.id === 'dash-1' && h.hen.goc === b.g);
+    db.tick();
+    await new Promise((r) => setImmediate(r));
+    assert.ok(!db.trangThai().dang, 'chưa tới giờ');
+    gio = t0 + 61000; db.tick();
+    await new Promise((r) => setImmediate(r));
+    let st = db.trangThai();
+    assert.ok(st.dang && st.dang.nguon === 'hen' && st.goc === b.g, 'tới giờ: chuyển sang dự án tổng B và chạy');
+    assert.ok(st.henDang && st.hen[0].dang && !st.hen[0].bat, 'hẹn một lần tự tắt sau khi chạy');
+    gio = new Date(2026, 10, 28, 23, 31, 0).getTime(); db.tick();
+    st = db.trangThai();
+    assert.ok(!st.dang && !st.henDang && st.luot[0].ketQua === 'dung' && st.luot[0].nguon === 'hen');
+    assert.ok(db.xoaHen('dash-1').ok && !db.trangThai().hen.length);
   });
 }
 

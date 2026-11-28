@@ -14,12 +14,12 @@
   <aside class="rail">
     <img class="logo" src="../../icons/icon256.png" alt="" title="AI Automation Studio">
     <nav id="nav">
+      <button data-trang="dashboard"><i data-icon="layout-dashboard"></i><span>Dashboard</span></button>
       <button data-trang="anh"><i data-icon="image"></i><span>Tạo ảnh</span></button>
       <button data-trang="video"><i data-icon="video"></i><span>Tạo video</span></button>
       <button data-trang="nhac"><i data-icon="music"></i><span>Tạo nhạc</span></button>
       <button data-trang="footage"><i data-icon="film"></i><span>Footage</span></button>
       <button data-trang="motion"><i data-icon="wand-sparkles"></i><span>Motion</span></button>
-      <button data-trang="hengio"><i data-icon="clock"></i><span>Hẹn giờ</span></button>
       <button data-trang="nhanvat"><i data-icon="user-plus"></i><span>Nhân vật</span></button>
       <button data-trang="thuvien"><i data-icon="layout-grid"></i><span>Thư viện</span></button>
       <button data-trang="taikhoan"><i data-icon="contact"></i><span>Tài khoản</span></button>
@@ -337,7 +337,7 @@
           <li><b>Chạy một số prompt:</b> <i>Cài đặt nâng cao → Chỉ chạy prompt số</i>, ghi ví dụ <code>98, 303, 305-350</code> (để trống = chạy hết). Đặt tên file bằng <code>{stt}</code> để số trong tên khớp số dòng prompt.</li>
           <li><b>Nhiều dự án chạy song song:</b> mỗi dự án có <i>Cài đặt</i> riêng và luồng riêng. Bấm <i>Chạy dự án</i> ở dự án 1, chuyển sang dự án 2 bấm <i>Chạy dự án</i> nữa — hai dự án chạy cùng lúc, kể cả khi dùng chung tài khoản. Menu dự án có <i>Chạy tất cả dự án</i> / <i>Dừng tất cả dự án</i>. Số thứ tự ảnh và video đếm riêng (350 ảnh → video cũng số 1–350).</li>
           <li><b>Cài đặt mặc định:</b> ở trang Cài đặt chỉnh xong bấm <i>Lưu làm cài đặt mặc định</i> (thanh dưới đáy trang): mọi dự án đang có và dự án mới dùng bộ đó; thư mục lưu, mẫu tên file vẫn riêng từng dự án. <i>Lưu cài đặt</i> chỉ đổi dự án đang mở.</li>
-          <li><b>Hẹn giờ chạy:</b> mục <i>Hẹn giờ</i> có thẻ riêng cho Tạo ảnh, Tạo video, Tạo nhạc. Bấm <i>Thêm hẹn giờ</i> (thêm được nhiều hẹn, vd dự án A lúc 22:00, dự án B + C lúc 02:00), chọn giờ bắt đầu (và giờ dừng nếu muốn), mỗi ngày hay một lần, tick các dự án (hoặc <i>Mọi dự án</i>) → <i>Lưu hẹn giờ</i>; <i>Xoá hẹn</i> để bỏ. Tới giờ app chạy các việc <b>đang chờ</b> của đúng chức năng đó; thêm việc trước bằng <i>Chỉ thêm vào hàng đợi</i>. App phải đang mở, máy đang bật.</li>
+          <li><b>Hẹn giờ chạy:</b> phần <i>Hẹn giờ</i> ở cuối trang <i>Dashboard</i> (1.8.0) có thẻ riêng cho Tạo ảnh, Tạo video, Tạo nhạc. Bấm <i>Thêm hẹn giờ</i> (thêm được nhiều hẹn, vd dự án A lúc 22:00, dự án B + C lúc 02:00), chọn giờ bắt đầu (và giờ dừng nếu muốn), mỗi ngày hay một lần, tick các dự án (hoặc <i>Mọi dự án</i>) → <i>Lưu hẹn giờ</i>; <i>Xoá hẹn</i> để bỏ. Tới giờ app chạy các việc <b>đang chờ</b> của đúng chức năng đó; thêm việc trước bằng <i>Chỉ thêm vào hàng đợi</i>. App phải đang mở, máy đang bật.</li>
           <li><b>Dừng / chạy từng việc:</b> mỗi dòng đang chạy có nút <i>Dừng</i>; việc đã dừng có nút <i>Chạy</i> (chạy ngay, kể cả khi dự án đang dừng). Chọn nhiều dòng rồi bấm <i>Chạy</i> / <i>Dừng</i> / <i>Tạo lại</i> ở thanh chọn.</li>
           <li><b>Tắt app giữa chừng (Muse):</b> mở lại app, các video / ảnh đã gửi Muse mà chưa lấy kết quả được tự kiểm: app mở lại chat cũ, Muse làm xong rồi thì tải về luôn (không tạo lại, không trùng); Muse còn đang tạo thì giữ chat và kiểm lại sau. Muốn kiểm ngay: bấm <i>Kiểm tra việc dở</i> trên danh sách việc (hoặc ⋯ ở dòng việc → <i>Kiểm tra chat cũ</i>).</li>
           <li><b>Xem lại tab / chat của một video (1.5.2):</b> bấm vào việc → cột <i>Chi tiết kết quả</i> → mục <i>Tab của việc này</i>. Việc đang chạy: <i>Hiện tab đang chạy</i> mở cửa sổ đang làm việc đó (bấm X chỉ ẩn đi, việc vẫn chạy). Mỗi chat Muse việc đã chạy (kể cả chat cũ ở tài khoản trước khi bị chuyển vì quá giờ) có <i>Mở tab</i> để xem Muse đã tạo được chưa và <i>Tải về</i> để lấy video trong chat đó về (không gửi lại prompt, việc thành Xong, tên file và Drive như thường).</li>
@@ -376,6 +376,7 @@
           <li><b>Footage cho cảnh (1.6.0):</b> nhờ skill chia cảnh "tìm footage" để có thêm file <code>&lt;tên&gt;_footage.xlsx</code> (cảnh nào dùng stock video, từ khoá tiếng Anh, số giây cần, chữ cần tránh). Lấy khoá API miễn phí ở pexels.com/api và pixabay.com/api/docs → mục <i>Footage</i> → dán khoá → <i>Lưu</i> → <i>Mở file footage…</i> → <i>Chọn…</i> thư mục <code>Videos</code> của project CapCut Draft Studio → <i>Tải footage</i>. Mỗi cảnh thành <code>0047.mp4</code>…; CapCut Draft Studio dùng video đó thay ảnh của cảnh (giữ bật <i>Cắt video</i> trong CapCut Draft Studio — mặc định đã bật — để clip dài được cắt vừa cảnh, không bị tua nhanh). Clip không hợp: <i>Đổi clip</i> (clip kế tiếp) hoặc <i>Bỏ</i> (file chuyển vào <code>_bo</code>, cảnh dùng lại ảnh AI). Nút <i>Chép số</i> cho dãy số cảnh dùng footage — dán vào <i>Chọn số</i> ở trang Tạo video để dừng / xoá video AI của các cảnh đó cho đỡ tốn lượt. Clip Storyblocks: tự tải trên web (hoặc qua Storyblocks MCP trong Claude / ChatGPT), đặt tên <code>0047.mp4</code> vào cùng thư mục — app bỏ qua cảnh đã có file. Ghi công tác giả: file <code>nguon-footage.txt</code> trong thư mục lưu.</li>
           <li><b>Tải tay footage (1.6.6):</b> không có khoá API (Pexels đã ngừng cấp khoá mới) hoặc muốn tự chọn clip, kể cả Storyblocks nếu bạn có gói → mục <i>Footage</i> → mở file footage → ở khung <i>Tải tay</i> chọn trang (Pexels / Pixabay / Storyblocks) → <i>Mở trang tải tay</i>. App mở cửa sổ trang tìm video đúng từ khoá của cảnh đầu tiên còn thiếu; lần đầu bạn tự đăng nhập trong cửa sổ đó (app nhớ đăng nhập riêng từng trang). Bạn xem, chọn clip và <b>tự bấm Download</b> (chọn bản MP4, nên 1080p) → app lưu thành <code>0047.mp4</code> vào thư mục lưu (mặc định <code>Videos</code> của dự án) rồi mở trang của cảnh kế. <i>Từ khoá khác</i> mở cụm từ khoá kế của cảnh, <i>Bỏ qua cảnh</i> để cảnh đó dùng ảnh AI, nút <i>Tải tay</i> ở mỗi dòng tải lại riêng cảnh đó (clip cũ vào <code>_bo</code>). Trang Storyblocks không mở đúng kết quả tìm thì bấm <i>Chép từ khoá</i> rồi dán vào ô tìm của trang. App không tự bấm gì trên trang — mỗi clip do bạn chọn và tải, đúng điều khoản của các trang.</li>
           <li><b>Motion graphic theo cảnh (1.7.0):</b> nhờ skill chia cảnh xuất thêm file <code>&lt;tên&gt;_motion.xlsx</code> (skill tự chọn cảnh nên làm motion: hành trình, mốc thời gian, câu Kinh Thánh then chốt, gia phả, so sánh). Đặt file vào thư mục dự án (cùng chỗ có <code>images</code> và <code>Audio</code>) → mục <i>Motion</i> → <i>Mở file motion…</i> → <i>Tạo video</i>. Mỗi cảnh thành <code>Videos/0047.mp4</code> dài bằng giọng đọc của cảnh cộng phần đệm, nền là ảnh AI của cảnh; video AI cũ cùng số (nếu có) chuyển vào <code>Videos/_bo</code>. Cột của file: <code>scene</code>, <code>mau</code> (<code>BAN_DO</code>, <code>DONG_THOI_GIAN</code>, <code>CAU_KINH</code>, <code>PHA_HE</code>, <code>SO_SANH</code>), <code>nhan</code>, <code>tieu_de</code>, <code>noi_dung</code>, <code>phu</code>, <code>goc</code>, <code>giay</code>. Cách ghi <code>noi_dung</code>: bản đồ <code>Ur &gt; Harán &gt; Canaán</code> (địa danh lạ: <code>Mari @ 34.55, 40.89</code>); dòng thời gian <code>930 a.C. | Reino dividido; *850 a.C. | Eliseo</code> (dấu * = mốc đang kể); câu Kinh Thánh ghi nguyên câu, chữ cần nhấn để giữa hai dấu *, tham chiếu ở <code>phu</code>, nguyên ngữ ở <code>goc</code>; phả hệ <code>Abraham &gt; Isaac, Ismael; Isaac &gt; *Jacob*</code>; so sánh dòng đầu là hai tiêu đề <code>Saúl | David</code> rồi từng cặp <code>trái | phải</code>, kết luận ở <code>phu</code>. Dòng sai được báo rõ lý do ở đầu danh sách. Lần đầu app tải trình vẽ của Remotion (~100 MB); không tải được thì dùng Chrome / Edge có sẵn. Nút <i>Chép số</i> cho dãy số cảnh dùng motion — dán vào <i>Chọn số</i> ở trang Tạo video để khỏi tạo video AI cho các cảnh đó.</li>
+          <li><b>Dashboard — chạy cả quy trình một video (1.8.0):</b> để mọi file đầu vào của một video vào một thư mục (<i>dự án tổng</i>, vd <code>G:\My Drive\TBN_16</code>): <code>… - prompt anh.txt</code>, <code>… - prompt animation.txt</code>, <code>… - nhac flowmusic.txt</code>, <code>… - thumbnail.txt</code>, <code>…_motion.xlsx</code>, <code>…_footage.xlsx</code>. Mục <i>Dashboard</i> → <i>Chọn thư mục…</i> (chọn thư mục cha chứa nhiều video thì app thêm cả vào danh sách). App gắn một dự án của app cùng tên thư mục: ảnh lưu vào <code>images</code>, video từ ảnh vào <code>Videos</code> (cùng tên ảnh), nhạc vào <code>BGM</code>, thumbnail vào <code>thumbnail</code>; số đã có file thì bỏ qua. Mỗi mục (Tạo ảnh, Tạo video từ ảnh, Tạo nhạc nền, Motion, Footage, Thumbnail) có công tắc bật / tắt, chọn chạy ở Muse hay Google Flow, tỷ lệ ảnh; tắt một mục giữa lúc chạy thì việc của mục đó <i>Đã dừng</i>, bật lại là chạy tiếp. Gạt <b>Chạy tất cả</b>: ảnh thiếu được tạo (kèm video riêng từng ảnh theo dòng của file animation), ảnh có sẵn mà thiếu video thì chỉ tạo video, cảnh có trong file motion / footage không tạo video AI, motion vẽ khi ảnh của cảnh về, footage tải theo khoá API. Mỗi thẻ ghi đã có / tổng, số còn thiếu, chờ / đang chạy / lỗi, thời gian chạy; mọi mục xong thì lượt tự đóng và ghi vào <i>Báo cáo các lượt chạy</i>. Hẹn giờ <i>Chạy tất cả</i> chọn giờ bắt đầu / dừng và dự án tổng.</li>
           <li><b>Lỗi lạ:</b> Cài đặt → <i>Cả app</i> → bật <i>Hiện các luồng chạy ngầm</i> để nhìn thấy trang Muse / Flow của từng luồng; nhật ký đầy đủ ở thư mục dữ liệu (<code>nhat-ky.txt</code>).</li>
         </ol>
       </section>
@@ -468,10 +469,43 @@
     </main>
 
     <!-- ── Hẹn giờ (1.3.6) ─────────────────────────────────────────── -->
-    <main class="trang" id="trang-hengio" hidden>
+
+    <!-- ── Dashboard (1.8.0): chạy cả quy trình của một dự án tổng + hẹn giờ ─── -->
+    <main class="trang" id="trang-dashboard" hidden>
       <section class="panel trang-don cuon">
-        <div class="panel-dau"><h2><i data-icon="clock"></i>Hẹn giờ chạy</h2></div>
-        <p class="ghi-cai-dat-du-an">Mỗi chức năng hẹn giờ riêng, và có thể <b>thêm nhiều hẹn</b> (vd dự án A lúc 22:00, dự án B và C lúc 02:00). Đến giờ bắt đầu, app tự chạy mọi việc <b>đang chờ</b> của chức năng đó trong các dự án đã tick (hoặc mọi dự án) — như bấm Chạy, chỉ khác là chỉ chạy loại việc đó. Có giờ dừng thì tới giờ app dừng, việc dở về hàng chờ; không có thì chạy tới hết. Ảnh có bật "Ảnh xong → tự tạo video" thì video nối từ ảnh chạy tiếp theo hẹn của Tạo ảnh. App phải đang mở (thu nhỏ được) và máy đang bật: khi có hẹn, app giữ máy không tự ngủ.</p>
+        <div class="panel-dau"><h2><i data-icon="layout-dashboard"></i>Dashboard — chạy cả quy trình của một dự án tổng</h2></div>
+        <p class="ghi-cai-dat-du-an"><b>Dự án tổng</b> là một thư mục chứa mọi file đầu vào của một video (vd <code>G:\My Drive\TBN_16</code>): <code>… - prompt anh.txt</code>, <code>… - prompt animation.txt</code>, <code>… - nhac flowmusic.txt</code>, <code>… - thumbnail.txt</code>, <code>…_motion.xlsx</code>, <code>…_footage.xlsx</code>. Chọn thư mục → app tự nhận file, gắn một dự án của app cùng tên (ảnh lưu vào <code>images</code>, video vào <code>Videos</code>, nhạc vào <code>BGM</code>, thumbnail vào <code>thumbnail</code>; số đã có file thì bỏ qua). Bật / tắt từng mục rồi gạt <b>Chạy tất cả</b>. Cảnh có trong file motion / footage không tạo video AI; motion chờ ảnh của cảnh rồi mới vẽ. Chọn thư mục cha chứa nhiều video thì app thêm cả vào danh sách.</p>
+        <div class="the-cai db-goc-the">
+          <h3><i data-icon="folder-open"></i>Dự án tổng</h3>
+          <div class="dong-o db-hang-goc">
+            <select id="dbDsGoc" title="Các dự án tổng đã mở"></select>
+            <button class="nut-vien" id="dbChonGoc"><i data-icon="folder-open"></i>Chọn thư mục…</button>
+            <button class="nut-vien nho" id="dbMoGoc" title="Mở thư mục trong máy">Mở</button>
+            <button class="nut-vien nho" id="dbQuet" title="Đọc lại file và thư mục"><i data-icon="refresh-cw"></i>Quét lại</button>
+            <button class="nut-vien nho" id="dbBoGoc" title="Bỏ khỏi danh sách (không xoá file)"><i data-icon="x"></i>Bỏ</button>
+          </div>
+          <div id="dbGocGhi" class="db-goc-ghi"></div>
+        </div>
+        <div class="the-cai db-tong-the">
+          <div class="dong-cong-tac db-chay-the"><div><b>Chạy tất cả</b><small id="dbTrangThai">Chọn dự án tổng để bắt đầu.</small></div><label class="cong-tac db-cong-tac-lon"><input type="checkbox" id="dbChay"><span></span></label></div>
+          <div class="db-o-so" id="dbTongSo"></div>
+        </div>
+        <div class="db-luoi" id="dbMuc"></div>
+        <div class="the-cai">
+          <h3><i data-icon="chart-column"></i>Báo cáo các lượt chạy</h3>
+          <div id="dbLuot" class="db-luot"></div>
+        </div>
+        <div class="the-cai" id="khuHenGio">
+          <h3><i data-icon="clock"></i>Hẹn giờ</h3>
+          <small class="mo">App phải đang mở (thu nhỏ được) và máy đang bật: khi có hẹn, app giữ máy không tự ngủ.</small>
+          <div class="the-cai the-hen-dash">
+            <h4><i data-icon="zap"></i>Chạy tất cả dự án tổng<span class="trang-hen" id="dbHenTong"></span></h4>
+            <small class="mo">Đến giờ bắt đầu, app mở đúng dự án tổng của hẹn và gạt <b>Chạy tất cả</b> (các mục đang bật). Có giờ dừng thì tới giờ app dừng, việc dở về hàng chờ; không có thì chạy tới hết.</small>
+            <div id="dbDsHen" class="ds-hen"></div>
+            <button class="nut-vien nho" id="dbThemHen"><i data-icon="plus"></i>Thêm hẹn giờ Chạy tất cả</button>
+          </div>
+          <h4 class="db-tieu-de-phu">Hẹn giờ từng chức năng (theo dự án của app)</h4>
+          <small class="mo">Mỗi chức năng hẹn giờ riêng, có thể thêm nhiều hẹn (vd dự án A lúc 22:00, dự án B và C lúc 02:00). Đến giờ bắt đầu, app chạy mọi việc <b>đang chờ</b> của chức năng đó trong các dự án đã tick (hoặc mọi dự án). Ảnh có bật "Ảnh xong → tự tạo video" thì video nối từ ảnh chạy tiếp theo hẹn của Tạo ảnh.</small>
         <div class="the-cai the-hen" data-loai="anh">
           <h3><i data-icon="image"></i>Tạo ảnh<span class="trang-hen" data-hen="tong"></span></h3>
           <div class="ds-hen"></div>
@@ -486,6 +520,7 @@
           <h3><i data-icon="music"></i>Tạo nhạc<span class="trang-hen" data-hen="tong"></span></h3>
           <div class="ds-hen"></div>
           <button class="nut-vien nho" data-hen="them"><i data-icon="plus"></i>Thêm hẹn giờ Tạo nhạc</button>
+        </div>
         </div>
       </section>
     </main>

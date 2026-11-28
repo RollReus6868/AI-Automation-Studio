@@ -106,8 +106,8 @@ module.exports = async ({ win, app, dieuPhoi, docRam, baoRam, nhatKy, taiKhoan }
     const dB = dieuPhoi.taoDuAn('Dự án B'), dC = dieuPhoi.taoDuAn('Dự án C');
     await wait(1500);   // giao diện nhận 2 dự án mới (trạng thái gom ≥ 250 ms)
     await js(`window.__diToi('hengio'); undefined`);
-    await choDen(() => js(`!!document.querySelector('#trang-hengio .the-hen[data-loai="anh"] [data-hen="them"]')`), 5000);
-    const theAnh = `#trang-hengio .the-hen[data-loai="anh"]`;
+    await choDen(() => js(`!!document.querySelector('#khuHenGio .the-hen[data-loai="anh"] [data-hen="them"]')`), 5000);
+    const theAnh = `#khuHenGio .the-hen[data-loai="anh"]`;
     const datHen = (gio, ds) => js(`(() => { const el = [...document.querySelectorAll('${theAnh} .hen')].pop();
       el.querySelector('[data-hen="batDau"]').value = '${gio}';
       for (const id of ${JSON.stringify(ds)}) { const x = el.querySelector('[data-da="' + id + '"]'); x.checked = true; x.dispatchEvent(new Event('change', { bubbles: true })); }
@@ -128,7 +128,7 @@ module.exports = async ({ win, app, dieuPhoi, docRam, baoRam, nhatKy, taiKhoan }
     const ui = JSON.parse(await js(`JSON.stringify({ n: document.querySelectorAll('${theAnh} .hen').length, tong: document.querySelector('${theAnh} [data-hen="tong"]').textContent,
       tick: [...document.querySelectorAll('${theAnh} .hen')].map((el) => [...el.querySelectorAll('[data-da]')].filter((x) => x.checked).map((x) => x.dataset.da).join('+')),
       ghi: document.querySelector('${theAnh} .hen [data-hen="ghi"]').textContent, chip: document.querySelector('#chipHen').hidden ? '' : document.querySelector('#chipHen').textContent })`));
-    ok('trang Hẹn giờ hiện 2 hẹn, đúng dự án đã tick, chip hẹn giờ trên thanh trên', ui.n === 2 && ui.tick.join('|') === `${dB.id}+${dC.id}|da-ram` && /2 dự án đã chọn/.test(ui.ghi) && /Ảnh/i.test(ui.chip), JSON.stringify(ui));
+    ok('phần Hẹn giờ (trong Dashboard) hiện 2 hẹn, đúng dự án đã tick, chip hẹn giờ trên thanh trên', ui.n === 2 && ui.tick.join('|') === `${dB.id}+${dC.id}|da-ram` && /2 dự án đã chọn/.test(ui.ghi) && /Ảnh/i.test(ui.chip), JSON.stringify(ui));
     if (process.env.GD_ANH) { await wait(400); require('fs').writeFileSync(process.env.GD_ANH, (await win.webContents.capturePage()).toPNG()); }
     // Xoá hẹn 02:00 (hộp xác nhận → Xoá).
     await js(`[...document.querySelectorAll('${theAnh} .hen')].pop().querySelector('[data-hen="xoa"]').click(); 1`);

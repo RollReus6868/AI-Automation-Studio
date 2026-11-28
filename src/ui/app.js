@@ -24,7 +24,7 @@
   const chuanRieng = (x) => (x && typeof x === 'object' && Array.isArray(x.ds) && x.ds.length
     ? { ten: String(x.ten || ''), ds: x.ds.map((p) => String(p || '')) } : null);
   U.rieng = { chuoi: chuanRieng(U.rieng && U.rieng.chuoi), thuMuc: chuanRieng(U.rieng && U.rieng.thuMuc) };
-  U.chon = new Set(); U.chiTiet = null; U.dongNho = new WeakMap(); U.nvChon = new Set(); U.log = []; U.dangNhapMo = false;
+  U.chon = new Set(); U.chiTiet = null; U.dongNho = new WeakMap(); U.nvChon = new Set(); U.log = []; U.dangNhapMo = false; U.dbMo = new Set();
   // Ảnh tham chiếu / thư mục ảnh RIÊNG cho từng trang: ảnh gắn ở trang video không được dính sang trang ảnh.
   U.tc = { anh: { ds: [], thuMuc: null }, video: { ds: [], thuMuc: null }, nhac: { ds: [], thuMuc: null } };
   const TC = () => U.tc[loaiTrang()];
@@ -395,8 +395,11 @@
   }
 
   // ── Điều hướng ──────────────────────────────────────────────────────────
-  const TEN_TRANG = { anh: 'Tạo ảnh', video: 'Tạo video', nhac: 'Tạo nhạc', footage: 'Footage', motion: 'Motion', hengio: 'Hẹn giờ', nhanvat: 'Nhân vật', thuvien: 'Thư viện', taikhoan: 'Tài khoản', huongdan: 'Hướng dẫn', caidat: 'Cài đặt' };
+  const TEN_TRANG = { dashboard: 'Dashboard', anh: 'Tạo ảnh', video: 'Tạo video', nhac: 'Tạo nhạc', footage: 'Footage', motion: 'Motion', hengio: 'Hẹn giờ', nhanvat: 'Nhân vật', thuvien: 'Thư viện', taikhoan: 'Tài khoản', huongdan: 'Hướng dẫn', caidat: 'Cài đặt' };
   function diToi(trang) {
+    // 1.8.0: Hẹn giờ chuyển vào Dashboard — lối cũ (chip hẹn giờ, bài kiểm) vẫn tới đúng chỗ
+    if (trang === 'hengio') { diToi('dashboard'); const k = $('#khuHenGio'); if (k && k.scrollIntoView) k.scrollIntoView(); return; }
+    if (!TEN_TRANG[trang]) trang = 'anh';
     if (U.trang === 'taikhoan' && trang !== 'taikhoan' && U.dangNhapMo) dongDangNhap();
     const cu = U.trang;
     U.trang = trang;
@@ -405,7 +408,7 @@
     const tao = trang === 'anh' || trang === 'video' || trang === 'nhac';
     document.body.classList.toggle('trang-nhac', trang === 'nhac');
     $('#trang-tao').hidden = !tao;
-    for (const t of ['footage', 'motion', 'hengio', 'nhanvat', 'thuvien', 'taikhoan', 'huongdan', 'caidat']) $(`#trang-${t}`).hidden = t !== trang;
+    for (const t of ['dashboard', 'footage', 'motion', 'nhanvat', 'thuvien', 'taikhoan', 'huongdan', 'caidat']) $(`#trang-${t}`).hidden = t !== trang;
     $('#khuDuAn').style.visibility = tao ? 'visible' : 'hidden';
     if (tao) {
       if (cu !== trang) { U.chon.clear(); U.chiTiet = null; }
@@ -424,7 +427,7 @@
       $('#nenVideoChuoi').value = U.chuoi.nen || '';
     }
     if (trang === 'caidat') { veCaiDat(); if (cu !== 'caidat') doDuLieu(); }   // 1.4.12: đo dữ liệu app mỗi lần vào Cài đặt
-    if (trang === 'hengio') napHenGio();
+    if (trang === 'dashboard') { napHenGio(); napDash(); }
     if (trang === 'footage') napFootage();
     if (trang === 'motion') napMotion();
     luuUi();
@@ -441,7 +444,7 @@
     if (U.trang === 'nhanvat') veNhanVat();
     if (U.trang === 'thuvien') veThuVien();
     if (U.trang === 'taikhoan') veTaiKhoan();
-    if (U.trang === 'hengio') veHenGio();
+    if (U.trang === 'dashboard') { veHenGio(); veDash(); }
     if (U.trang === 'footage') veFootage();
     if (U.trang === 'motion') veMotion();
   }
@@ -1452,7 +1455,7 @@
   /** Dựng lại danh sách hẹn của các thẻ (khi vào trang / sau khi lưu, thêm, xoá) — không dựng lại lúc đang gõ. */
   function napHenGio(chiLoai) {
     if (!S) return;
-    for (const the of $$('#trang-hengio .the-hen')) {
+    for (const the of $$('#khuHenGio .the-hen')) {
       const l = the.dataset.loai;
       if (chiLoai && chiLoai !== l) continue;
       const ds = (S.henGio || []).filter((h) => h.loai === l);
@@ -1463,7 +1466,7 @@
   }
   function veHenGio() {
     const hg = S.henGio || [], hc = S.henChay || {};
-    for (const the of $$('#trang-hengio .the-hen')) {
+    for (const the of $$('#khuHenGio .the-hen')) {
       const l = the.dataset.loai;
       const cua = hg.filter((h) => h.loai === l), dangChay = cua.filter((h) => hc[h.id]).length, bat = cua.filter((h) => h.bat).length;
       const tong = $('[data-hen="tong"]', the);
@@ -2075,12 +2078,12 @@
       toast(`Thư mục Google Drive: ${chon}`);
     };
     // Hẹn giờ
-    $('#chipHen').onclick = () => diToi('hengio');
+    $('#chipHen').onclick = () => diToi('hengio');   // 1.8.0: tới phần Hẹn giờ trong Dashboard
     // 1.4.14: nhiều hẹn mỗi thẻ — bắt sự kiện chung cho cả trang.
-    const trangHen = $('#trang-hengio');
+    const trangHen = $('#khuHenGio');
     trangHen.addEventListener('change', (e) => {
       const el = e.target.closest('.hen');
-      if (!el) return;
+      if (!el || !el.closest('.the-hen')) return;
       if (e.target.matches('[data-hen="moi"]') && e.target.checked) for (const x of $$('[data-da]', el)) x.checked = false;
       if (e.target.matches('[data-da]')) $('[data-hen="moi"]', el).checked = !$$('[data-da]', el).some((x) => x.checked);
       if (e.target.matches('[data-hen="moi"]') && !e.target.checked && !$$('[data-da]', el).some((x) => x.checked)) e.target.checked = true;
@@ -2088,7 +2091,7 @@
     });
     trangHen.addEventListener('click', async (e) => {
       const b = e.target.closest('[data-hen]');
-      if (!b || !['them', 'luu', 'dung', 'xoa', 'boKetThuc'].includes(b.dataset.hen)) return;
+      if (!b || !b.closest('.the-hen') || !['them', 'luu', 'dung', 'xoa', 'boKetThuc'].includes(b.dataset.hen)) return;
       const the = b.closest('.the-hen'), l = the.dataset.loai, el = b.closest('.hen'), id = el ? el.dataset.id : '';
       const o = (k) => $(`[data-hen="${k}"]`, el);
       if (b.dataset.hen === 'them') {
@@ -2478,11 +2481,241 @@
     });
   }
 
+  // ── Dashboard (1.8.0): dự án tổng, bật / tắt từng mục, Chạy tất cả, báo cáo, hẹn giờ (src/main/dashboard.js) ──────
+  const DB_ICON = { anh: 'image', video: 'video', nhac: 'music', motion: 'wand-sparkles', footage: 'film', thumbnail: 'image-plus' };
+  const DB_TRANG = { anh: 'anh', video: 'video', nhac: 'nhac', motion: 'motion', footage: 'footage', thumbnail: 'anh' };
+  const DB_FILE = { anh: '" - prompt anh.txt"', video: '" - prompt animation.txt"', nhac: '" - nhac flowmusic.txt"', motion: '"_motion.xlsx"', footage: '"_footage.xlsx"', thumbnail: '" - thumbnail.txt"' };
+  const DB_NGAN = { anh: 'Ảnh', video: 'Video', nhac: 'Nhạc', motion: 'Motion', footage: 'Footage', thumbnail: 'Thumbnail' };
+  /** 3725 → "1 giờ 2 phút"; 75 → "1 phút 15 giây". */
+  function thoiGianDep(s) {
+    s = Math.max(0, Math.round(+s || 0));
+    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), g = s % 60;
+    return h ? `${h} giờ ${m} phút` : m ? `${m} phút ${g} giây` : `${g} giây`;
+  }
+  const luocNgay = (t) => { const d = new Date(t); return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')} ${gioHen(t)}`; };
+  function napDash() {
+    const d = S && S.dashboard;
+    if (!d) return;
+    $('#dbDsHen').__kyHieu = null;   // veHenDash dựng lại (kể cả khi đang có hẹn mới chưa lưu)
+    $('#dbDsHen').__ep = true;
+    veDash();
+  }
+  function htmlHenDash(h) {
+    const d = S.dashboard, id = h.id || '';
+    const lap = (v, t) => `<option value="${v}"${(h.lap || 'ngay') === v ? ' selected' : ''}>${t}</option>`;
+    const goc = [...(d.dsGoc || []).map((x) => x.goc)];
+    if (h.goc && !goc.includes(h.goc)) goc.unshift(h.goc);
+    return `<div class="hen${h.bat ? '' : ' tat'}" data-dh-id="${esc(id)}">
+      <div class="dong-cong-tac"><div><b>${id ? 'Bật hẹn giờ' : 'Hẹn mới (chưa lưu)'}</b><span class="trang-hen" data-dh="trang"></span></div>
+        <label class="cong-tac"><input type="checkbox" data-dh="bat"${h.bat ? ' checked' : ''}><span></span></label></div>
+      <div class="luoi-3 db-hen-luoi">
+        <label>Giờ bắt đầu<input type="time" data-dh="batDau" value="${esc(h.batDau || '22:00')}"></label>
+        <label>Giờ dừng <small>(trống = chạy tới hết)</small><span class="o-gio"><input type="time" data-dh="ketThuc" value="${esc(h.ketThuc || '')}"><button class="lien-ket" data-dh="boKetThuc" title="Bỏ giờ dừng">Bỏ</button></span></label>
+        <label>Lặp lại<select data-dh="lap">${lap('ngay', 'Mỗi ngày')}${lap('mot', 'Chỉ một lần')}</select></label>
+        <label>Dự án tổng<select data-dh="goc">${goc.map((g) => `<option value="${esc(g)}"${g === (h.goc || d.goc) ? ' selected' : ''}>${esc(g.split(/[\\/]/).pop())}</option>`).join('')}</select></label>
+      </div>
+      <div class="dong-o"><button class="nut-gradient nho" data-dh="luu"><i data-icon="check"></i>Lưu hẹn giờ</button><button class="nut-vien nho" data-dh="xoa"><i data-icon="trash-2"></i>Xoá hẹn</button></div>
+    </div>`;
+  }
+  function veHenDash() {
+    const d = S.dashboard;
+    const hs = d.hen || [];
+    // danh sách hẹn đổi (lưu / xoá / hẹn tới giờ tự tắt…) mà không có hẹn mới đang soạn, không đang gõ → dựng lại
+    const ds = $('#dbDsHen');
+    const dangSoan = $$('.hen', ds).some((x) => !x.dataset.dhId) || ds.contains(document.activeElement);
+    const kyHieu = hs.map((h) => `${h.id}|${h.bat}|${h.batDau}|${h.ketThuc}|${h.lap}|${h.goc}`).join(';');
+    if ((ds.__ep || !dangSoan) && ds.__kyHieu !== kyHieu) {
+      ds.__kyHieu = kyHieu;
+      ds.__ep = false;
+      ds.innerHTML = hs.map(htmlHenDash).join('');
+      veIcon(ds);
+    }
+    const bat = hs.filter((h) => h.bat).length, dang = hs.filter((h) => h.dang).length;
+    const tong = $('#dbHenTong');
+    tong.className = `trang-hen${dang ? ' chay' : bat ? ' bat' : ''}`;
+    tong.textContent = hs.length ? `${hs.length} hẹn${bat ? ` · ${bat} đang bật` : ''}${dang ? ' · đang chạy theo hẹn' : ''}` : '';
+    for (const el of $$('#dbDsHen .hen')) {
+      const id = el.dataset.dhId, h = hs.find((x) => x.id === id) || {};
+      const tr = $('[data-dh="trang"]', el);
+      tr.className = `trang-hen${h.dang ? ' chay' : h.bat ? ' bat' : ''}`;
+      tr.textContent = !id ? '' : h.dang ? `Đang chạy theo hẹn${d.henDang && d.henDang.den ? ` · dừng ${gioHen(d.henDang.den)}` : ' · tới hết'}` : h.bat && h.lanToi ? `Lần tới: ${ngayHen(h.lanToi)} · ${h.ten}` : 'Đang tắt';
+      el.classList.toggle('tat', !$('[data-dh="bat"]', el).checked);
+    }
+  }
+  /** Một thẻ mục trên Dashboard. */
+  function htmlMucDash(k, m, d) {
+    const tep = (d.tep || {})[k] || { ds: [] };
+    const du = m.tong > 0 && m.xong >= m.tong;
+    const trangThai = !m.bat ? 'tat' : m.dangChay ? 'dang' : (d.dang && m.xongMuc) || du ? 'xong' : m.ghiChu || m.loi ? 'loi' : 'cho';
+    const nhan = { tat: 'Đang tắt', dang: 'Đang chạy', xong: du ? 'Đã đủ' : 'Xong lượt này', loi: m.ghiChu ? 'Cần xem' : 'Có lỗi', cho: d.dang ? 'Chờ' : 'Sẵn sàng' }[trangThai];
+    const pt = m.tong ? Math.round((m.xong / m.tong) * 100) : 0;
+    const tenTep = (f) => f.split(/[\\/]/).pop();
+    const oTep = !tep.ds.length ? `<span class="do">Không thấy file ${DB_FILE[k]}</span>`
+      : tep.ds.length === 1 ? `<span title="${esc(tep.ds[0].tep)}">${ic('file-text')}${esc(tenTep(tep.ds[0].tep))}</span>`
+        : `<select data-db="tep" data-k="${k}" title="Có ${tep.ds.length} file cùng loại — chọn file dùng">${tep.ds.map((f) => `<option value="${esc(f.tep)}"${f.tep === tep.chon ? ' selected' : ''}>${esc(f.ten)}</option>`).join('')}</select>`;
+    const dem = [];
+    if (['anh', 'video', 'nhac', 'thumbnail'].includes(k)) {
+      if (m.cho) dem.push(`Chờ ${m.cho}`);
+      if (m.chay) dem.push(`Đang chạy ${m.chay}`);
+      if (m.dung) dem.push(`Đã dừng ${m.dung}`);
+    } else if (m.chay) dem.push('Đang chạy');
+    if (m.loi) dem.push(`<span class="do">Lỗi ${m.loi}</span>`);
+    if (m.giay) dem.push(`${ic('timer')}${thoiGianDep(m.giay)}`);
+    const chon = (key, ds) => `<select data-db="${key}" data-k="${k}">${ds.map(([v, t]) => `<option value="${v}"${m[key] === v ? ' selected' : ''}>${t}</option>`).join('')}</select>`;
+    const tuyChon = [];
+    if (k === 'anh' || k === 'video' || k === 'thumbnail') tuyChon.push(`<label>Chạy ở${chon('nen', [['muse', 'Muse'], ['flow', 'Google Flow']])}</label>`);
+    if (k === 'anh' || k === 'thumbnail') tuyChon.push(`<label>Tỷ lệ${chon('tyLe', ['16:9', '9:16', '1:1', '4:3', '3:4'].map((x) => [x, x]))}</label>`);
+    const ghi = [];
+    if (m.ghiChu) ghi.push(`<span class="do">${ic('triangle-alert')}${esc(m.ghiChu)}</span>`);
+    if (m.loiDoc) ghi.push(`<span class="do">Không đọc được file: ${esc(m.loiDoc)}</span>`);
+    if (m.canhBao) ghi.push(`<span class="vang">${esc(m.canhBao)}</span>`);
+    // danh sách số dài → gọn trong <details> (giữ đóng / mở qua các lần vẽ lại)
+    const chiTiet = (ma, tom, ds) => `<details data-db-mo="${k}-${ma}"${U.dbMo.has(`${k}-${ma}`) ? ' open' : ''}><summary>${tom}</summary><span class="mo">${esc(ds)}</span></details>`;
+    if (k === 'video' && m.boCanh) ghi.push(chiTiet('bo', `Không tạo video AI cho ${m.soBoCanh || ''} cảnh đã có motion / footage`, m.boCanh));
+    if (k === 'motion' && m.choAnh) ghi.push(`<span>${m.choAnh} cảnh chưa có ảnh — vẽ khi ảnh về</span>`);
+    if (m.soThieu && m.bat) ghi.push(chiTiet('thieu', `Còn thiếu ${m.soThieu} số`, m.thieu));
+    if (m.loiCuoi) ghi.push(`<span class="do" title="${esc(m.loiCuoi)}">Lỗi gần nhất: ${esc(String(m.loiCuoi).slice(0, 140))}</span>`);
+    return `<div class="db-muc tt-${trangThai}" data-k="${k}">
+      <div class="db-muc-dau">${ic(DB_ICON[k])}<b>${esc(m.ten)}</b><span class="the-tt">${nhan}</span>
+        <label class="cong-tac" title="Bật / tắt mục ${esc(m.ten)}"><input type="checkbox" data-db="bat" data-k="${k}"${m.bat ? ' checked' : ''}><span></span></label></div>
+      <div class="db-tep">${oTep}</div>
+      <div class="db-tien"><i style="width:${pt}%"></i></div>
+      <div class="db-so"><b>${m.xong}</b>/${m.tong} đã có${m.tong ? ` · ${pt}%` : ''}</div>
+      <div class="db-dem">${dem.join(' · ') || '<span class="mo">—</span>'}</div>
+      ${tuyChon.length ? `<div class="db-tuy-chon">${tuyChon.join('')}</div>` : ''}
+      ${ghi.length ? `<div class="db-ghi">${ghi.join('')}</div>` : ''}
+      <button class="lien-ket db-mo-trang" data-db="moTrang" data-trang="${DB_TRANG[k]}">Mở trang ${esc(TEN_TRANG[DB_TRANG[k]])} ${ic('external-link')}</button>
+    </div>`;
+  }
+  function veDash() {
+    const d = S && S.dashboard;
+    if (!d) return;
+    const sel = $('#dbDsGoc');
+    if (document.activeElement !== sel) {
+      datHtml(sel, d.dsGoc && d.dsGoc.length ? d.dsGoc.map((x) => `<option value="${esc(x.goc)}"${x.goc === d.goc ? ' selected' : ''}>${esc(x.ten)}${x.con ? '' : ' (không thấy thư mục)'} — ${esc(x.goc)}</option>`).join('')
+        : '<option value="">Chưa có dự án tổng — bấm "Chọn thư mục…"</option>');
+      sel.value = d.goc || '';
+    }
+    const dang = !!d.dang;
+    sel.disabled = dang;
+    $('#dbChonGoc').disabled = dang;
+    $('#dbBoGoc').disabled = dang || !d.goc;
+    $('#dbMoGoc').disabled = !d.goc;
+    $('#dbQuet').disabled = !d.goc;
+    const chay = $('#dbChay');
+    chay.checked = dang;
+    chay.disabled = !d.goc;
+    const phu = d.phu || {};
+    const tep = d.tep || {};
+    datHtml($('#dbGocGhi'), !d.goc ? '' :
+      `<span>Dự án của app: <b>${esc(d.tenDuAn || '—')}</b>${d.duAnThumb ? ' (+ dự án phụ cho thumbnail)' : ''}</span>` +
+      (d.thuMuc ? `<span class="mo">ảnh → ${esc(d.thuMuc.anh.split(/[\\/]/).pop())} · video → ${esc(d.thuMuc.video.split(/[\\/]/).pop())} · nhạc → ${esc(d.thuMuc.nhac.split(/[\\/]/).pop())} · thumbnail → ${esc(d.thuMuc.thumbnail.split(/[\\/]/).pop())}</span>` : '') +
+      `<span class="mo">Giọng đọc (Audio): ${phu.amThanh || 0} file · TTS: ${tep.tts && tep.tts.chon ? 'có file _tts.xlsx' : 'không có'} · Overlay CapCut: ${tep.overlay && tep.overlay.chon ? 'có file _overlay.xlsx' : 'không có'}</span>` +
+      (d.loiQuet ? `<span class="do">${esc(d.loiQuet)}</span>` : ''));
+    const thuTu = d.thuTu || Object.keys(d.muc || {});
+    const bat = thuTu.filter((k) => d.muc[k].bat);
+    datHtml($('#dbTrangThai'), !d.goc ? 'Chọn dự án tổng để bắt đầu.' : dang
+      ? `Đang chạy${d.dang.nguon === 'hen' ? ' theo hẹn giờ' : ''} — ${thoiGianDep(d.dang.giay)} · ${thuTu.filter((k) => d.muc[k].dangChay).map((k) => DB_NGAN[k]).join(', ') || 'đang hoàn tất'}`
+      : bat.length ? `Gạt để chạy ${bat.length} mục đang bật: ${bat.map((k) => DB_NGAN[k]).join(', ')}` : 'Chưa bật mục nào');
+    const tong = thuTu.filter((k) => d.muc[k].bat).reduce((a, k) => ({ xong: a.xong + d.muc[k].xong, tong: a.tong + d.muc[k].tong, loi: a.loi + d.muc[k].loi }), { xong: 0, tong: 0, loi: 0 });
+    const luot = (d.luot || [])[0];
+    datHtml($('#dbTongSo'), !d.goc ? '' : [
+      ['timer', 'Thời gian chạy', dang ? thoiGianDep(d.dang.giay) : luot ? `${thoiGianDep(luot.giay)} (lượt trước)` : '—'],
+      ['circle-check', 'Đã có (mục đang bật)', `${tong.xong}/${tong.tong}`],
+      ['triangle-alert', 'Lỗi', String(tong.loi)],
+      ['zap', 'Mục đang chạy', dang ? String(thuTu.filter((k) => d.muc[k].dangChay).length) : '0']
+    ].map(([i, t, v]) => `<div class="db-o"><span>${ic(i)}${t}</span><b>${esc(v)}</b></div>`).join(''));
+    const muc = $('#dbMuc');
+    if (!muc.contains(document.activeElement) || document.activeElement.type === 'checkbox') {
+      datHtml(muc, d.goc ? thuTu.map((k) => htmlMucDash(k, d.muc[k], d)).join('') : '<div class="ft-trong">Bấm <b>Chọn thư mục…</b> và chọn thư mục dự án tổng (vd <code>G:\\My Drive\\TBN_16</code>).</div>');
+    }
+    datHtml($('#dbLuot'), !(d.luot || []).length ? '<div class="mo">Chưa có lượt chạy nào.</div>' :
+      `<div class="db-luot-dau"><span>Bắt đầu</span><span>Dự án tổng</span><span>Thời gian</span><span>Kết quả</span><span>Từng mục (đã có / tổng, + mới trong lượt)</span><span>Lỗi</span></div>` +
+      d.luot.map((l) => `<div class="db-luot-dong"><span>${luocNgay(l.batDau)}${l.nguon === 'hen' ? ' ⏰' : ''}</span><span title="${esc(l.goc)}">${esc(String(l.goc).split(/[\\/]/).pop())}</span>` +
+        `<span>${thoiGianDep(l.giay)}</span><span class="${l.ketQua === 'xong' ? 'xanh' : 'vang'}">${l.ketQua === 'xong' ? 'Xong' : 'Đã dừng'}</span>` +
+        `<span class="db-luot-muc">${Object.entries(l.muc || {}).map(([k, x]) => `<em>${DB_NGAN[k]} ${x.xong}/${x.tong}${x.xongThem ? ` (+${x.xongThem})` : ''}${x.giay ? ` · ${thoiGianDep(x.giay)}` : ''}${x.loi ? ` · <b class="do">${x.loi} lỗi</b>` : ''}</em>`).join('')}</span>` +
+        `<span class="${l.loi ? 'do' : ''}">${l.loi || 0}</span></div>`).join(''));
+    veHenDash();
+  }
+  function ganDash() {
+    $('#dbChonGoc').onclick = async () => {
+      const r = await api.call('dashChonGoc', { duAn: (duAnHienTai() || {}).id });
+      if (!r) return;
+      if (!r.ok) { toast(r.loi, true); return; }
+      toast(r.them > 1 ? `Đã thêm ${r.them} dự án tổng` : 'Đã chọn dự án tổng');
+    };
+    $('#dbDsGoc').onchange = async (e) => {
+      if (!e.target.value) return;
+      const r = await api.call('dashDatGoc', { goc: e.target.value, duAn: (duAnHienTai() || {}).id });
+      if (r && !r.ok) toast(r.loi, true);
+    };
+    $('#dbMoGoc').onclick = () => { if (S.dashboard.goc) api.call('moThuMuc', { dir: S.dashboard.goc }); };
+    $('#dbQuet').onclick = async () => { await api.call('dashQuet'); toast('Đã đọc lại thư mục dự án tổng'); };
+    $('#dbBoGoc').onclick = async () => {
+      const g = S.dashboard.goc;
+      if (!g || !await xacNhan('Bỏ dự án tổng khỏi danh sách?', `${esc(g)}<br>File trong thư mục và dự án của app vẫn giữ nguyên.`, 'Bỏ')) return;
+      const r = await api.call('dashBoGoc', { goc: g });
+      if (r && !r.ok) toast(r.loi, true);
+    };
+    $('#dbChay').onchange = async (e) => {
+      const r = await api.call(e.target.checked ? 'dashChayTatCa' : 'dashDungTatCa');
+      if (r && r.ok === false) { toast(r.loi || 'Không chạy được', true); e.target.checked = !e.target.checked; }
+    };
+    const trang = $('#trang-dashboard');
+    trang.addEventListener('toggle', (e) => {
+      const el = e.target;
+      if (!el.dataset || !el.dataset.dbMo) return;
+      if (el.open) U.dbMo.add(el.dataset.dbMo); else U.dbMo.delete(el.dataset.dbMo);
+    }, true);
+    trang.addEventListener('change', async (e) => {
+      const el = e.target.closest('[data-db]');
+      if (!el || !el.dataset.k) return;
+      const k = el.dataset.k, loai = el.dataset.db;
+      const r = loai === 'tep' ? await api.call('dashChonTep', { k, tep: el.value })
+        : await api.call('dashDatMuc', { k, [loai]: loai === 'bat' ? el.checked : el.value });
+      if (r && r.ok === false) toast(r.loi, true);
+    });
+    trang.addEventListener('click', async (e) => {
+      const mo = e.target.closest('[data-db="moTrang"]');
+      if (mo) { diToi(mo.dataset.trang); return; }
+      const b = e.target.closest('[data-dh]');
+      if (!b || !['luu', 'xoa', 'boKetThuc'].includes(b.dataset.dh)) return;
+      const el = b.closest('.hen'), id = el.dataset.dhId;
+      const o = (k) => $(`[data-dh="${k}"]`, el);
+      if (b.dataset.dh === 'boKetThuc') { o('ketThuc').value = ''; return; }
+      if (b.dataset.dh === 'xoa') {
+        if (!id) { el.remove(); veHenDash(); return; }
+        if (!await xacNhan('Xoá hẹn giờ?', `Xoá hẹn Chạy tất cả lúc ${esc(o('batDau').value)}.`, 'Xoá', true)) return;
+        const r = await api.call('dashXoaHen', { id });
+        if (!r || !r.ok) { toast((r && r.loi) || 'Không xoá được', true); return; }
+        S.dashboard.hen = S.dashboard.hen.filter((h) => h.id !== id);
+        napDash();
+        toast('Đã xoá hẹn giờ');
+        return;
+      }
+      const h = { bat: o('bat').checked, batDau: o('batDau').value, ketThuc: o('ketThuc').value, lap: o('lap').value, goc: o('goc') ? o('goc').value : '' };
+      if (!h.batDau) { toast('Chọn giờ bắt đầu', true); return; }
+      if (id) h.id = id;
+      const r = await api.call('dashDatHen', h);
+      if (!r || !r.ok) { toast((r && r.loi) || 'Không lưu được hẹn giờ', true); return; }
+      const cu = S.dashboard.hen.find((x) => x.id === r.hen.id);
+      S.dashboard.hen = cu ? S.dashboard.hen.map((x) => (x === cu ? { ...cu, ...r.hen } : x)) : [...S.dashboard.hen, r.hen];
+      napDash();
+      toast(h.bat ? `Đã hẹn Chạy tất cả lúc ${r.hen.batDau}${r.hen.ketThuc ? `, dừng ${r.hen.ketThuc}` : ''}` : 'Đã tắt hẹn giờ');
+    });
+    $('#dbThemHen').onclick = () => {
+      if (!S.dashboard.goc) { toast('Chọn dự án tổng trước', true); return; }
+      $('#dbDsHen').insertAdjacentHTML('beforeend', htmlHenDash({ bat: true, batDau: '22:00', lap: 'ngay', goc: S.dashboard.goc }));
+      veIcon($('#dbDsHen')); veHenDash();
+    };
+  }
+
   // ── Khởi động ────────────────────────────────────────────────────────────
   veIcon(document);
   ganSuKien();
   ganFootage();
   ganMotion();
+  ganDash();
   // 1.4.14: hàng đợi tới theo phần đổi (s.goiViec) — ghép vào bản đang có; gói lệch bản thì xin lại bản đủ.
   let xinDu = null;
   const nhanGoi = (s) => {

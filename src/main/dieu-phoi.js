@@ -682,16 +682,24 @@ class DieuPhoi {
     // 1.4.6: chuoiVideo.prompts = prompt video RIÊNG từng ảnh (file .txt): ảnh của prompt số N lấy dòng N; ảnh không
     // có dòng riêng thì dùng prompt dùng chung (trống nữa thì prompt video mặc định).
     const pc = p.chuoiVideo, ds = pc && Array.isArray(pc.prompts) ? pc.prompts.map((x) => String(x || '').trim()) : [];
-    const cv = pc && loai === 'anh' && (String(pc.prompt || '').trim() || ds.some(Boolean))
-      ? { prompt: String(pc.prompt || '').trim(), prompts: ds.some(Boolean) ? ds : null, tyLe: hd.TY_LE.includes(pc.tyLe) ? pc.tyLe : '',
-        nen: pc.nen === 'flow' || pc.nen === 'muse' ? pc.nen : nen } : null;
+    const cv = loai === 'anh' ? this._chuanChuoi(pc, nen) : null;
     return { d, tatCa, chon, nen, loai, cv };
+  }
+
+  /** Chuỗi ảnh → video đã chuẩn hoá (null = không nối video). 1.8.0: boSo = số ảnh KHÔNG nối video (cảnh đã có motion /
+   *  footage — Dashboard). */
+  _chuanChuoi(pc, nen) {
+    const ds = pc && Array.isArray(pc.prompts) ? pc.prompts.map((x) => String(x || '').trim()) : [];
+    if (!pc || !(String(pc.prompt || '').trim() || ds.some(Boolean))) return null;
+    const boSo = Array.isArray(pc.boSo) ? pc.boSo.map(Number).filter((n) => n > 0) : [];
+    return { prompt: String(pc.prompt || '').trim(), prompts: ds.some(Boolean) ? ds : null, tyLe: hd.TY_LE.includes(pc.tyLe) ? pc.tyLe : '',
+      nen: pc.nen === 'flow' || pc.nen === 'muse' ? pc.nen : nen, ...(boSo.length ? { boSo: new Set(boSo) } : {}) };
   }
 
   /** 1.4.6: chuỗi ảnh → video của ảnh mang số `stt`: prompt video riêng (dòng `stt` của file .txt) hoặc dùng chung.
    *  Mỗi việc ảnh chỉ giữ prompt của chính nó (không chép cả danh sách vào mọi việc). */
   _chuoiCho(cv, stt) {
-    if (!cv) return null;
+    if (!cv || (cv.boSo && cv.boSo.has(stt))) return null;
     const rieng = (cv.prompts && cv.prompts[stt - 1]) || '';
     return { prompt: rieng || cv.prompt || hd.PROMPT_VIDEO_MAC_DINH, tyLe: cv.tyLe, nen: cv.nen, ...(rieng ? { rieng: true } : {}) };
   }
@@ -801,7 +809,7 @@ class DieuPhoi {
       if (v.cho) { kq.dangCho.push(stt); continue; }
       const f = v.file || timFile(loai, { stt, prompt, thamChieu: tham }, goc, mauCua(loai));
       if (!f) { kq.thieu.push(stt); continue; }
-      if (cv) {
+      if (cv && !(cv.boSo && cv.boSo.has(stt))) {
         const nv = noiVideoTuAnh(f);
         const vv = viecCo('video', stt, nv.goc);
         if (vv.cho) { kq.dangCho.push(stt); continue; }
@@ -980,10 +988,12 @@ class DieuPhoi {
     // 1.4.2: "Bỏ qua số đã có file trong thư mục" (gửi kèm, hoặc theo cài đặt dự án).
     const boQua = p.boQuaDaCo !== undefined ? !!p.boQuaDaCo : !!this.cd(d.id).boQuaDaCo;
     let q = null;
+    // 1.8.0 (Dashboard): chiTuAnhCo = chỉ tạo video từ ảnh ĐÃ CÓ trong thư mục, không tạo ảnh mới (mục Tạo ảnh đang tắt).
+    if (p.chiTuAnhCo && !(boQua && cv)) return { ok: false, loi: 'Chỉ tạo video từ ảnh có sẵn cần bật "Bỏ qua số đã có" và prompt video' };
     if (boQua) {
       q = this.quetDaCo(p);
       const thieu = new Set(q.thieu);
-      chon = chon.filter((x) => thieu.has(x.stt));
+      chon = p.chiTuAnhCo ? [] : chon.filter((x) => thieu.has(x.stt));
       if (!chon.length && !q.chiVideo.length) {
         const loi = `Mọi prompt được chọn đã có ${TEN_LOAI[loai]} trong thư mục${q.dangCho.length ? ' hoặc đang chờ trong hàng đợi' : ''} — không còn số nào cần làm`;
         this.log('info', `🔎 "${d.ten}": ${loi} (đã có ${q.coSan.length}, đang chờ ${q.dangCho.length}).`);
@@ -1117,6 +1127,30 @@ class DieuPhoi {
     }
     if (chay && lai.length) this._chayRieng(lai);
     this.luu();
+    return n;
+  }
+
+  /**
+   * 1.8.0 (Dashboard): đặt lại "ảnh xong → tự tạo video" cho các ảnh CHƯA xong của dự án (chờ / đang chạy / đã dừng / lỗi):
+   * pc = chuỗi như them({chuoiVideo}) hoặc null (thôi nối video). Ảnh đã xong không đụng tới.
+   */
+  ganChuoiVideo(duAnId, pc) {
+    const cv = this._chuanChuoi(pc, 'muse');
+    let n = 0;
+    for (const j of this.viec) {
+      if (j.duAn !== duAnId || j.loai !== 'anh' || j.daNoiVideo || !['cho', 'chay', 'dung', 'loi'].includes(j.trangThai)) continue;
+      const moi = cv ? this._chuoiCho({ ...cv, nen: cv.nen || j.nen }, j.stt) : null;
+      if (JSON.stringify(moi) !== JSON.stringify(j.chuoi || null)) { j.chuoi = moi; n++; }
+    }
+    if (n) this.luu();
+    return n;
+  }
+
+  /** 1.8.0 (Dashboard bật lại một mục): việc "Đã dừng" về hàng chờ, chạy theo dự án (không chen lên đầu như Chạy riêng). */
+  tiepViec(ids) {
+    let n = 0;
+    for (const j of this.viec) if (ids.includes(j.id) && j.trangThai === 'dung') { Object.assign(j, { trangThai: 'cho', buoc: '' }); n++; }
+    if (n) { this.luu(); this._vong(); this.o.bao(); }
     return n;
   }
 

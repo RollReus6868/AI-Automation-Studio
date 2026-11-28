@@ -85,6 +85,12 @@ jobs:
         env:
           E2E_HAN_GIAY: '800'
         run: node tests/e2e.js motion
+      # 1.8.0: Dashboard - du an tong -> Chay tat ca (Muse gia, API footage gia, Remotion that), bao cao, hen gio
+      - name: Kiem thu dau-cuoi (Dashboard, chay tat ca)
+        timeout-minutes: 15
+        env:
+          E2E_HAN_GIAY: '800'
+        run: node tests/e2e.js dashboard
 
       # 1.3.4: giao dien voi 200 video xong khong phinh RAM (anh nho thay <video>, ve theo tung dong)
       - name: Kiem thu RAM giao dien
